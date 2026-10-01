@@ -53,7 +53,7 @@ export default function VideoPerformanceOptions({ options, value, onChange, refe
     <label className="flex min-h-10 items-center gap-2 text-xs text-content">
       <input type="checkbox" checked={!!value.h3_spectrum} onChange={(e) => e.target.checked ? enableAttention({ h3_spectrum: true }) : onChange({ h3_spectrum: false })} /> Spectrum · forecast intermediate steps
     </label>
-    <p className="text-[0.6875rem] text-content-subtle">Sage and Spectrum can run together. They turn off Sparse and VDN. Spectrum can change detail and motion; compare the result with the same seed.</p>
+    <p className="text-2xs text-content-subtle">Sage and Spectrum can run together. They turn off Sparse and VDN. Spectrum can change detail and motion; compare the result with the same seed.</p>
     <label className="flex flex-col gap-1 text-xs text-content-muted">Video decoding
       <select aria-label="Video decoding" className={select} value={value.h3_video_vae || 'fp16'} onChange={(e) => onChange({ h3_video_vae: e.target.value })}>
         <option value="fp16">FP16 VAE</option><option value="int8">INT8 VAE · less weight memory</option>
@@ -64,7 +64,7 @@ export default function VideoPerformanceOptions({ options, value, onChange, refe
         <option value="native">Native writer</option><option value="fast">Fast H.264 · veryfast / CRF 16</option>
       </select>
     </label>
-    <p className="text-[0.6875rem] text-content-subtle">Fast recording keeps audio and completes the MP4 before making it playable. It speeds up saving, not sampling.</p>
+    <p className="text-2xs text-content-subtle">Fast recording keeps audio and completes the MP4 before making it playable. It speeds up saving, not sampling.</p>
     {needs('sage', value.h3_attention === 'sage') && <><p role="status" className="text-xs text-amber-200">{status.sage.hint}</p><Prepare action={status.sage.action} label="Install H3 attention switch" onRefresh={onRefresh} /></>}
     {needs('spectrum', value.h3_spectrum) && <Prepare action={status.spectrum.action} label="Install Spectrum" onRefresh={onRefresh} />}
     {needs('int8', value.h3_video_vae === 'int8') && <Prepare action={status.int8.action} label="Download INT8 video VAE" restart={false} onRefresh={onRefresh} />}

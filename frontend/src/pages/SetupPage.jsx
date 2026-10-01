@@ -1626,7 +1626,7 @@ export default function SetupPage() {
       <div data-probe-reading="setup-downloads" data-probe-content="setup" data-probe-setup="ready"
         className="mx-auto max-w-2xl space-y-5 [&_button]:min-h-10 [&_summary]:min-h-10 lg:[&_button]:min-h-0 lg:[&_summary]:min-h-0">
         <div className="text-center">
-          <div className="text-3xl" aria-hidden="true">⬇</div>
+          <div className="text-2xl" aria-hidden="true">⬇</div>
           <h1 className="mt-2 text-2xl font-bold text-content">Optional downloads & repair</h1>
           <p className="mt-2 text-sm text-content-muted">
             Install only the tools you want to use. Each action lists what it adds;

@@ -157,7 +157,7 @@ export default function PublishHfModal({ datasetId, onClose }) {
                 disabled={busy} className="mt-0.5" />
               <span>I have the right to share these images and the consent of any identifiable person.</span>
             </label>
-            <p className="text-content-subtle text-[0.6875rem] -mt-1">
+            <p className="text-content-subtle text-2xs -mt-1">
               You are responsible for what you publish. Nothing is uploaded until you press Publish.
             </p>
 

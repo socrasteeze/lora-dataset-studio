@@ -158,7 +158,7 @@ export default function VideoStudioInstallCard({ caps, onDone }) {
     <section className="rounded-xl border border-border bg-surface p-5">
       <h3 className="flex items-center gap-2 text-base font-semibold text-content">
         🎬 Video Test Studio
-        <span className="rounded-md border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[0.6875rem] font-semibold text-amber-200">
+        <span className="rounded-md border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-2xs font-semibold text-amber-200">
           beta
         </span>
         <HelpBadge topic="setup-video-studio" />

@@ -71,7 +71,7 @@ export default function VideoSampleLightbox({ datasetId, target, onClose }) {
             className="max-h-[70vh] w-full rounded-lg object-contain" />
         ))}
         {current?.kind === 'animation' && (
-          <p className="m-0 text-[0.625rem] text-content-subtle">Animated WebP — loops on its own, no scrub bar.</p>
+          <p className="m-0 text-2xs text-content-subtle">Animated WebP — loops on its own, no scrub bar.</p>
         )}
         {samples?.length > 1 && (
           <div className="flex flex-wrap gap-1.5">

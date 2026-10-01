@@ -111,7 +111,7 @@ export default function VideoBankPage() {
       <header className="flex flex-wrap items-center gap-2">
         <h1 className="flex items-center gap-2 text-xl font-bold text-content">
           <Clapperboard aria-hidden="true" className="mr-2 inline h-5 w-5 align-[-3px]" />Video bank
-          <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+          <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
             Beta
           </span>
         </h1>

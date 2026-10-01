@@ -99,7 +99,7 @@ export default function DescribeShotsDialog({ captionModel, initialStyle, onLaun
                     <span className="font-semibold">{m.label}</span>
                     {/* Downloads are allowed but never silent — the same rule
                         as the job line's download notice, one screen earlier. */}
-                    <span className={`ml-2 text-[0.6875rem] ${m.cached ? 'text-emerald-300' : 'text-amber-300'}`}>
+                    <span className={`ml-2 text-2xs ${m.cached ? 'text-emerald-300' : 'text-amber-300'}`}>
                       {m.cached ? 'on this machine' : 'downloads on first run'}
                     </span>
                     {m.hint && (

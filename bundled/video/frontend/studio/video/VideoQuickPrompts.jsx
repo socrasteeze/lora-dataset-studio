@@ -39,7 +39,7 @@ export default function VideoQuickPrompts({ mode, onAppend, hasReferenceImages =
   return (
     <section data-testid="video-quick-prompts"
       className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface-raised p-2">
-      <span className="text-[0.6875rem] font-semibold uppercase tracking-wider text-content-muted">
+      <span className="text-2xs font-semibold uppercase tracking-wider text-content-muted">
         ⚡ Quick prompts
       </span>
 
@@ -48,7 +48,7 @@ export default function VideoQuickPrompts({ mode, onAppend, hasReferenceImages =
         {VIDEO_QUICK_PROMPT_CATEGORIES.map((cat) => (
           <button key={cat.id} type="button" onClick={() => setActiveId(cat.id)}
             aria-pressed={cat.id === active.id} title={cat.label}
-            className={`flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 text-[0.6875rem] font-medium min-h-10 lg:min-h-0 ${
+            className={`flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 text-2xs font-medium min-h-10 lg:min-h-0 ${
               cat.id === active.id ? 'border-primary bg-primary/10 text-content'
                 : 'border-border text-content-muted hover:text-content'}`}>
             <span aria-hidden="true">{cat.emoji}</span>
@@ -62,13 +62,13 @@ export default function VideoQuickPrompts({ mode, onAppend, hasReferenceImages =
           <button key={p.label} type="button"
             onClick={() => onAppend?.(promptForMode(p.prompt, mode, hasReferenceImages))}
             title={promptForMode(p.prompt, mode, hasReferenceImages)}
-            className="min-h-10 rounded-full border border-border bg-surface px-3 py-1 text-[0.6875rem] font-medium text-content hover:border-primary hover:text-content lg:min-h-0">
+            className="min-h-10 rounded-full border border-border bg-surface px-3 py-1 text-2xs font-medium text-content hover:border-primary hover:text-content lg:min-h-0">
             {p.label}
           </button>
         ))}
       </div>
 
-      <span className="text-[0.6875rem] text-content-subtle">
+      <span className="text-2xs text-content-subtle">
         Each chip adds a line — stack a scenario, a camera move and an audio bed.
         {mode === 'ref2va'
           ? (hasReferenceImages ? ' Picture 1 supplies the visual subject. Edit the tags to use your other references.' : ' Add picture references to use their identity; these presets currently describe the scene without a picture tag.')

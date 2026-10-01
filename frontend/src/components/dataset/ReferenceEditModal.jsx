@@ -374,7 +374,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
               {editRefs.length < maxRefs && (
                 <button type="button" onClick={() => inpRef.current?.click()} disabled={busy}
                   aria-label="Add a reference image for the edit"
-                  className="w-12 h-12 rounded-lg border border-dashed border-border-strong text-content-muted text-lg leading-none disabled:opacity-40">+</button>
+                  className="w-12 h-12 rounded-lg border border-dashed border-border-strong text-content-muted text-xl leading-none disabled:opacity-40">+</button>
               )}
               <input ref={inpRef} type="file" accept="image/*" multiple className="hidden" disabled={busy}
                 onChange={(e) => { addRefs(e.target.files); e.target.value = ''; }} />

@@ -158,13 +158,13 @@ export default function SideBySideVideo({ originalSrc, renderSrc, title, exportH
             ✕
           </button>
         </div>
-        <p className="text-[0.6875rem] text-content-subtle">
+        <p className="text-2xs text-content-subtle">
           The left player leads: play, pause and seek there and the right one follows in step (the right one is muted).
           {oneToOne ? ' At 1:1, scrolling one pane scrolls the other.' : ' Press 1:1 to see the pixels at their real size.'}
           {exportHref ? ' ⬇ Export saves both as one labelled video.' : ''}
         </p>
         {exportError && (
-          <p role="alert" className="text-[0.6875rem] text-red-300">{exportError}</p>
+          <p role="alert" className="text-2xs text-red-300">{exportError}</p>
         )}
         <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2">
           {player(sides[0], true)}

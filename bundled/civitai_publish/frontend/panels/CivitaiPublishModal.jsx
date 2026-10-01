@@ -291,7 +291,7 @@ export default function CivitaiPublishModal({ context, onClose }) {
               <span aria-hidden>📤</span> {isImage ? 'Post this image on Civitai' : 'Civitai model page'}
             </h2>
             <p className="m-0 mt-0.5 truncate text-xs text-content-muted" title={subject}>{subject}</p>
-            <p className="m-0 mt-0.5 text-[0.6875rem] text-content-subtle">
+            <p className="m-0 mt-0.5 text-2xs text-content-subtle">
               {status == null ? 'Checking the API key…'
                 : noKey ? 'No Civitai API key configured.'
                   : `${status.username ? `Signed in as ${status.username}` : 'API key configured'} · links open on ${status.link_host}`}
@@ -427,7 +427,7 @@ export default function CivitaiPublishModal({ context, onClose }) {
                         </label>
                       </div>
                       {defaults?.base_model_hint && (
-                        <p className="m-0 -mt-1 text-[0.6875rem] text-amber-200">{defaults.base_model_hint}</p>
+                        <p className="m-0 -mt-1 text-2xs text-amber-200">{defaults.base_model_hint}</p>
                       )}
                       <label className="flex flex-col gap-0.5">
                         <span className={LABEL}>Trigger words (comma-separated)</span>
@@ -452,7 +452,7 @@ export default function CivitaiPublishModal({ context, onClose }) {
                           onChange={(e) => setForm({ ...form, file_name: e.target.value })}
                           disabled={busy} className={`${FIELD} font-mono`} />
                         {defaults?.file && (
-                          <span className="text-[0.6875rem] text-content-subtle">
+                          <span className="text-2xs text-content-subtle">
                             {defaults.file.size_mb} MB · {defaults.file.fp}
                             {defaults.file.epoch ? ` · epoch ${defaults.file.epoch}` : ''} · from {defaults.file.source}
                           </span>

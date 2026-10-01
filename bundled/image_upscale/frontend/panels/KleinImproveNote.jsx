@@ -265,7 +265,7 @@ export default function KleinImproveNote({
     // min-w-0 + break-words: the quoted instruction is user text of arbitrary
     // length and this sits inside flex rows that would otherwise be widened past
     // a 400 px screen by a single long word.
-    <div className={`min-w-0 space-y-1 text-[0.6875rem] leading-relaxed ${className}`}>
+    <div className={`min-w-0 space-y-1 text-2xs leading-relaxed ${className}`}>
       <p className="text-content-subtle break-words">
         {line.text}
         {line.quote && (
@@ -301,7 +301,7 @@ export default function KleinImproveNote({
             value={loraPreset}
             onChange={(e) => setLoraPreset(e.target.value)}
             className="min-w-0 max-w-full flex-1 bg-white/[0.03] border border-white/10 rounded-md
-                       px-2 py-1 text-[0.6875rem] text-content focus:outline-none
+                       px-2 py-1 text-2xs text-content focus:outline-none
                        focus:border-primary/60 disabled:opacity-50"
           >
             <option value="" className="bg-surface-overlay">None</option>
@@ -419,7 +419,7 @@ export default function KleinImproveNote({
           value={megapixels}
           onChange={(e) => setMegapixels(e.target.value)}
           className="w-20 bg-white/[0.03] border border-white/10 rounded-md
-                     px-2 py-1 text-[0.6875rem] text-content focus:outline-none
+                     px-2 py-1 text-2xs text-content focus:outline-none
                      focus:border-primary/60 disabled:opacity-50"
         />
       </label>

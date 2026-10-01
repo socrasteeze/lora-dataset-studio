@@ -18,7 +18,7 @@ export default function VideoLaneTab() {
       {/* The lane ships, works end to end, and is younger than everything
           around it — the badge says "expect rough edges", not "expect loss":
           triage data is the only thing at stake and sources are never written. */}
-      <span className="ml-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+      <span className="ml-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 text-2xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
         Beta
       </span>
     </NavLink>

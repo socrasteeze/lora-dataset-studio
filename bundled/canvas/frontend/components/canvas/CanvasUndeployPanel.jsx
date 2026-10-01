@@ -106,7 +106,7 @@ export default function CanvasUndeployPanel({ open, onClose, onChanged }) {
             <h2 id="canvas-undeploy-title" className="text-sm font-semibold text-content">
               ⏏ Undeploy LoRAs from ComfyUI
             </h2>
-            <p className="mt-1 text-[0.6875rem] leading-snug text-content-subtle">
+            <p className="mt-1 text-2xs leading-snug text-content-subtle">
               {deployedSummary(rows, keys.size)}
             </p>
           </div>
@@ -117,31 +117,31 @@ export default function CanvasUndeployPanel({ open, onClose, onChanged }) {
         </div>
 
         {/* Said once, at the top, because it is what makes ticking freely safe. */}
-        <p className="m-0 rounded-lg border border-border bg-app/60 px-3 py-2 text-[0.6875rem] leading-snug text-content-subtle">
+        <p className="m-0 rounded-lg border border-border bg-app/60 px-3 py-2 text-2xs leading-snug text-content-subtle">
           Only LoRAs <b>this app deployed</b> are listed — anything you downloaded into the
           same folder is never touched. Your training saves are kept, so every one of these
           can be deployed again from its checkpoint.
         </p>
 
         {loading && (
-          <p className="m-0 flex items-center gap-2 rounded-lg border border-border bg-app/60 px-3 py-2 text-[0.75rem] text-content-muted" role="status">
+          <p className="m-0 flex items-center gap-2 rounded-lg border border-border bg-app/60 px-3 py-2 text-xs text-content-muted" role="status">
             <span className="inline-block h-4 w-4 rounded-full border-2 border-purple-400/40 border-t-purple-400 animate-spin" aria-hidden />
             Reading ComfyUI's loras folders…
           </p>
         )}
 
         {error && (
-          <div className="rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-[0.75rem] text-red-200" role="alert">
+          <div className="rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-xs text-red-200" role="alert">
             <p className="m-0">{error}</p>
             <button type="button" onClick={load}
-              className="mt-2 rounded border border-red-300/40 px-2 py-1 text-[0.6875rem] font-semibold hover:bg-red-500/10">
+              className="mt-2 rounded border border-red-300/40 px-2 py-1 text-2xs font-semibold hover:bg-red-500/10">
               Try again
             </button>
           </div>
         )}
 
         {!loading && !error && rows.length === 0 && (
-          <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-[0.75rem] text-amber-200" role="status">
+          <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200" role="status">
             Nothing to undeploy — this app has no LoRA in ComfyUI's loras folders right now.
           </p>
         )}
@@ -150,12 +150,12 @@ export default function CanvasUndeployPanel({ open, onClose, onChanged }) {
           <>
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" onClick={() => setKeys(allKeys())} disabled={busy}
-                className="rounded-md border border-border px-2 py-1 text-[0.6875rem] font-medium text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-40">
+                className="rounded-md border border-border px-2 py-1 text-2xs font-medium text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-40">
                 Select all ({rows.length})
               </button>
               <button type="button" onClick={() => setKeys(new Set())}
                 disabled={busy || keys.size === 0}
-                className="rounded-md border border-border px-2 py-1 text-[0.6875rem] font-medium text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-40">
+                className="rounded-md border border-border px-2 py-1 text-2xs font-medium text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-40">
                 Clear
               </button>
             </div>
@@ -163,7 +163,7 @@ export default function CanvasUndeployPanel({ open, onClose, onChanged }) {
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
               {groups.map((group) => (
                 <section key={String(group.datasetId)} className="flex flex-col gap-1.5">
-                  <h3 className="m-0 text-[0.6875rem] font-semibold uppercase tracking-wide text-content-subtle">
+                  <h3 className="m-0 text-2xs font-semibold uppercase tracking-wide text-content-subtle">
                     {group.datasetName}
                     <span className="ml-1.5 font-normal normal-case tracking-normal opacity-70">
                       ({group.rows.length})
@@ -177,17 +177,17 @@ export default function CanvasUndeployPanel({ open, onClose, onChanged }) {
                         <input type="checkbox" checked={keys.has(key)} disabled={busy}
                           onChange={() => toggle(key)} className="shrink-0 accent-purple-400" />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[0.8125rem] text-content">
+                          <span className="block truncate text-xs text-content">
                             {row.label || row.filename}
                           </span>
-                          <span className="block truncate text-[0.625rem] text-content-subtle">
+                          <span className="block truncate text-2xs text-content-subtle">
                             {familyLabel(row.family)} · {row.filename}
                           </span>
                         </span>
                         {/* The retrofit badge the per-dataset list already shows:
                             a file whose real architecture contradicts its folder. */}
                         {row.arch_mismatch && (
-                          <span className="shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 text-[0.625rem] font-semibold text-amber-200"
+                          <span className="shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 text-2xs font-semibold text-amber-200"
                             title="This file's architecture does not match the folder it sits in.">
                             ⚠ {row.arch_label || row.arch_mismatch}
                           </span>
@@ -203,11 +203,11 @@ export default function CanvasUndeployPanel({ open, onClose, onChanged }) {
 
         <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} disabled={busy}
-            className="rounded-lg border border-border bg-app px-3 py-1.5 text-[0.75rem] text-content-muted hover:text-content disabled:opacity-50">
+            className="rounded-lg border border-border bg-app px-3 py-1.5 text-xs text-content-muted hover:text-content disabled:opacity-50">
             Cancel
           </button>
           <button type="button" onClick={run} disabled={busy || keys.size === 0}
-            className="rounded-lg border border-amber-400/50 bg-amber-500/15 px-4 py-1.5 text-[0.75rem] font-semibold text-amber-100 disabled:opacity-40">
+            className="rounded-lg border border-amber-400/50 bg-amber-500/15 px-4 py-1.5 text-xs font-semibold text-amber-100 disabled:opacity-40">
             {busy ? '⏏ Undeploying…' : undeployButtonLabel(keys.size)}
           </button>
         </div>

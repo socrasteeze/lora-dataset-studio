@@ -44,7 +44,7 @@ export default function CanvasBlendPanel({
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-app/40 p-2">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-[0.6875rem] font-semibold text-content">
+        <span className="text-2xs font-semibold text-content">
           <span aria-hidden>⚗️</span> How to use these checkpoints
         </span>
         <HelpBadge topic="canvas-blend" />
@@ -61,7 +61,7 @@ export default function CanvasBlendPanel({
                 disabled={dead}
                 aria-pressed={mode === value}
                 title={dead ? familyReason : undefined}
-                className={`rounded px-2.5 py-1 text-[0.6875rem] font-semibold ${
+                className={`rounded px-2.5 py-1 text-2xs font-semibold ${
                   mode === value ? 'bg-primary/30 text-content' : 'text-content-subtle hover:text-content'
                 } ${dead ? 'cursor-not-allowed opacity-40 hover:text-content-subtle' : ''}`}>
                 {label}
@@ -71,7 +71,7 @@ export default function CanvasBlendPanel({
         </div>
       </div>
 
-      <p className="m-0 text-content-subtle text-[0.6875rem]">
+      <p className="m-0 text-content-subtle text-2xs">
         {blend
           ? 'One generation loads every ticked checkpoint together, each at its own '
             + 'weight. The strength sweep is replaced by these weights, so a blend '
@@ -83,14 +83,14 @@ export default function CanvasBlendPanel({
       {/* Mixed families: why the toggle is dead, in the panel and not only in a
           tooltip a touch screen never shows. */}
       {familyReason && (
-        <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2.5 py-1.5 text-amber-200 text-[0.6875rem]"
+        <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2.5 py-1.5 text-amber-200 text-2xs"
           role="status">
           {familyReason}
         </p>
       )}
 
       {blend && blocker && !familyReason && (
-        <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2.5 py-1.5 text-amber-200 text-[0.6875rem]"
+        <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2.5 py-1.5 text-amber-200 text-2xs"
           role="status">
           {blocker}
         </p>
@@ -102,7 +102,7 @@ export default function CanvasBlendPanel({
               is neither, which is a result people ask for on purpose and also the
               one that surprises everybody who expected "both people". Saying it
               here costs a line; not saying it costs a GPU hour and a bug report. */}
-          <p className="m-0 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-content-muted text-[0.6875rem]">
+          <p className="m-0 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-content-muted text-2xs">
             <span aria-hidden>💡</span> Two identity LoRAs blend into a hybrid person —
             neither of the two, sometimes exactly what you want. The usual sweet spot is
             identity + style, or identity + concept.
@@ -123,11 +123,11 @@ export default function CanvasBlendPanel({
                   set={canvasStackWeightSet(sets, e)}
                   onToggleChip={(w) => onToggleChip?.(k, w)}
                   trigger={e.triggerWord ? (
-                    <code className="shrink-0 rounded border border-indigo-400/40 bg-indigo-500/10 px-1.5 py-0.5 text-[0.625rem] font-semibold text-indigo-300">
+                    <code className="shrink-0 rounded border border-indigo-400/40 bg-indigo-500/10 px-1.5 py-0.5 text-2xs font-semibold text-indigo-300">
                       {e.triggerWord}
                     </code>
                   ) : (
-                    <span className="shrink-0 text-amber-300/80 text-[0.625rem]"
+                    <span className="shrink-0 text-amber-300/80 text-2xs"
                       title="This dataset has no trigger word — nothing of it is added to the prompt">
                       no trigger
                     </span>
@@ -142,7 +142,7 @@ export default function CanvasBlendPanel({
 
           {/* No silent magic: the exact tokens that will be prefixed to whatever
               prompt is typed below, in the order they will be prefixed in. */}
-          <p className="m-0 text-content-subtle text-[0.6875rem]" data-testid="canvas-blend-triggers">
+          <p className="m-0 text-content-subtle text-2xs" data-testid="canvas-blend-triggers">
             {!injectTrigger
               ? 'The Trigger word box below is unticked — no trigger word is added to your prompt.'
               : triggers.length

@@ -77,19 +77,19 @@ export default function VideoClipGrid({
                 <span className="grid h-full w-full place-items-center text-2xl text-content-subtle"
                   aria-hidden>🎞</span>
               )}
-              <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/70 px-1 font-mono text-[0.625rem] text-white">
+              <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/70 px-1 font-mono text-2xs text-white">
                 {clip.duration_s?.toFixed(1)}s
               </span>
               {clip.status !== 'pending' && (
                 <span aria-hidden
-                  className={`pointer-events-none absolute left-1 top-1 rounded px-1 text-[0.625rem] font-bold text-white ${
+                  className={`pointer-events-none absolute left-1 top-1 rounded px-1 text-2xs font-bold text-white ${
                     clip.status === 'keep' ? 'bg-emerald-600' : 'bg-rose-600'}`}>
                   {clip.status === 'keep' ? '✓' : '✕'}
                 </span>
               )}
               {clip.promoted_dataset_id && (
                 <span aria-hidden title="Already promoted into a dataset"
-                  className="pointer-events-none absolute right-1 top-1 rounded bg-indigo-600 px-1 text-[0.625rem] font-bold text-gray-950">
+                  className="pointer-events-none absolute right-1 top-1 rounded bg-indigo-600 px-1 text-2xs font-bold text-gray-950">
                   ▶
                 </span>
               )}
@@ -99,7 +99,7 @@ export default function VideoClipGrid({
               {(clip.flags || []).length > 0 && (
                 <span
                   title={clip.flags.map((f) => FLAG_LABELS[f] || f).join(' · ')}
-                  className="pointer-events-none absolute bottom-1 left-1 rounded bg-amber-500/90 px-1 text-[0.625rem] font-bold text-black">
+                  className="pointer-events-none absolute bottom-1 left-1 rounded bg-amber-500/90 px-1 text-2xs font-bold text-black">
                   ⚑ {clip.flags.length > 1 ? clip.flags.length : (FLAG_LABELS[clip.flags[0]] || clip.flags[0])}
                 </span>
               )}
@@ -112,7 +112,7 @@ export default function VideoClipGrid({
               {(clip.camera || []).length > 0 && (
                 <span
                   title={cameraBadge(clip)}
-                  className="pointer-events-none absolute bottom-1 right-1 rounded bg-slate-800/85 px-1 text-[0.625rem] font-semibold text-slate-100">
+                  className="pointer-events-none absolute bottom-1 right-1 rounded bg-slate-800/85 px-1 text-2xs font-semibold text-slate-100">
                   🎥 {clip.camera.length > 1 ? clip.camera.length : cameraBadge(clip)}
                 </span>
               )}
@@ -123,7 +123,7 @@ export default function VideoClipGrid({
                   the neighbouring shot" — worth knowing before training on it. */}
               {fade && (
                 <span title={fade.title}
-                  className="pointer-events-none absolute left-1/2 top-1 -translate-x-1/2 rounded bg-amber-500/90 px-1 text-[0.625rem] font-bold text-black">
+                  className="pointer-events-none absolute left-1/2 top-1 -translate-x-1/2 rounded bg-amber-500/90 px-1 text-2xs font-bold text-black">
                   {fade.label}
                 </span>
               )}
@@ -137,7 +137,7 @@ export default function VideoClipGrid({
                   shot the next keystroke will hit. */}
               {isCursor && (
                 <span title="The next keystroke decides this shot"
-                  className="shrink-0 rounded bg-amber-400 px-1 text-[0.625rem] font-bold leading-tight text-black">
+                  className="shrink-0 rounded bg-amber-400 px-1 text-2xs font-bold leading-tight text-black">
                   ▸ next
                 </span>
               )}
@@ -145,7 +145,7 @@ export default function VideoClipGrid({
                 onChange={(e) => onToggle(clip.id, e)}
                 aria-label={`Select the shot at ${clipLabel(clip.start_s, clip.end_s)}`}
                 className="shrink-0 accent-indigo-500" />
-              <span className="min-w-0 truncate font-mono text-[0.625rem] text-content-subtle"
+              <span className="min-w-0 truncate font-mono text-2xs text-content-subtle"
                 title={`${clip.relpath} — ${clipLabel(clip.start_s, clip.end_s)}`}>
                 {clipLabel(clip.start_s, clip.end_s)}
               </span>
@@ -156,7 +156,7 @@ export default function VideoClipGrid({
                 answer. Absent outside a search — this is not a permanent
                 property of a shot. */}
             {matchLines?.[clip.id] && (
-              <p className="truncate px-1.5 pb-1 text-[0.625rem] text-indigo-300"
+              <p className="truncate px-1.5 pb-1 text-2xs text-indigo-300"
                 title={matchLines[clip.id]}>
                 🔎 {matchLines[clip.id]}
               </p>

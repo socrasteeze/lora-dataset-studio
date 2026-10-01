@@ -278,7 +278,7 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
         <div className="flex items-center justify-between">
           <h3 className="text-content font-semibold text-sm">⚙️ Caption method — this dataset</h3>
           <button type="button" onClick={onClose} aria-label="Close"
-            className="text-content-subtle hover:text-content text-lg leading-none">×</button>
+            className="text-content-subtle hover:text-content text-xl leading-none">×</button>
         </div>
 
         {loading ? (

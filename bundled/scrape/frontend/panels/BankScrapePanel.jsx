@@ -73,7 +73,7 @@ export default function BankScrapePanel({ banks, onDone }) {
         className="flex w-full items-center gap-2 px-4 py-3 text-left">
         <Globe aria-hidden="true" className="h-4 w-4" />
         <span className="text-sm font-semibold text-content">Scrape the web into a bank</span>
-        <span className="hidden text-[0.6875rem] text-content-subtle sm:inline">
+        <span className="hidden text-2xs text-content-subtle sm:inline">
           no folder to prepare — the images land in a bank ready to triage
         </span>
         <HelpBadge topic="bank-scrape" />
@@ -85,7 +85,7 @@ export default function BankScrapePanel({ banks, onDone }) {
           {/* Destination first: it decides whether this scrape starts a pile or
               grows one. Wraps to one column at 400 px. */}
           <div className="flex flex-col gap-2 rounded-lg border border-border bg-white/[0.03] p-3">
-            <span className="text-[0.6875rem] font-semibold uppercase tracking-wide text-content-subtle">
+            <span className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">
               Destination
             </span>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-content">
@@ -124,7 +124,7 @@ export default function BankScrapePanel({ banks, onDone }) {
                 </select>
               </label>
             )}
-            <p className="text-[0.6875rem] leading-relaxed text-content-subtle">
+            <p className="text-2xs leading-relaxed text-content-subtle">
               Images are stored exactly as downloaded. Small shots, near-duplicates and
               framing stay for the bank&rsquo;s own passes to judge — that is the point of
               triaging here rather than importing straight into a dataset.

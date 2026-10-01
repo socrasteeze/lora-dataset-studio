@@ -74,7 +74,7 @@ export default function KleinCompareDialog({
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-content">⚖ Compare Klein models</h3>
           <button type="button" onClick={onClose} disabled={!!running} aria-label="Close"
-            className="text-lg leading-none text-content-subtle hover:text-content disabled:opacity-40">×</button>
+            className="text-xl leading-none text-content-subtle hover:text-content disabled:opacity-40">×</button>
         </div>
         <p className="text-xs leading-relaxed text-content-muted">
           Each ticked model repaints the <b>same flagged image</b>, same zones, same

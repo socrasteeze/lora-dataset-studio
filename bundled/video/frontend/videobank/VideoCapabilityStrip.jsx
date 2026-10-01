@@ -37,7 +37,7 @@ export default function VideoCapabilityStrip({ capability, compact = false }) {
       {!compact && notice.detail && (
         /* The server's own sentence, verbatim — it names the exact package, and
            a paraphrase is how someone pip-installs the wrong one. */
-        <p className="mt-2 font-mono text-[0.6875rem] text-amber-200/80 break-words">
+        <p className="mt-2 font-mono text-2xs text-amber-200/80 break-words">
           {notice.detail}
         </p>
       )}

@@ -923,7 +923,7 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
           Video Test Studio
           <HelpBadge topic="page-video-studio" />
         </h2>
-        <span className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[0.6875rem] font-semibold text-amber-200">
+        <span className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-2xs font-semibold text-amber-200">
           MiniMax H3 · beta
         </span>
         <span className="hidden text-xs text-content-subtle sm:inline">
@@ -944,7 +944,7 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
             file(s) are missing — about 39.5 GB in total. Install them from the
             Setup screen, under 🎬 Video Test Studio.
           </p>
-          <ul className="mt-1 list-disc pl-5 text-[0.6875rem] text-content-subtle">
+          <ul className="mt-1 list-disc pl-5 text-2xs text-content-subtle">
             {(options.missing_weights || []).filter((m) => m.required).map((m) => (
               <li key={m.filename}>{m.what} — <code className="break-all">{m.filename}</code></li>
             ))}
@@ -1046,13 +1046,13 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
                   ? 'Auto reads the start frame — switch to “From an image” to use it'
                   : (source.image ? 'Write the movement from the start frame'
                     : 'Pick a start frame first')}
-                className="ml-auto min-h-10 rounded-lg border border-border px-2 py-1 text-[0.6875rem] text-content-muted hover:text-content disabled:opacity-40 lg:min-h-0">
+                className="ml-auto min-h-10 rounded-lg border border-border px-2 py-1 text-2xs text-content-muted hover:text-content disabled:opacity-40 lg:min-h-0">
                 {motionBusy === 'auto' ? '…' : '✨ Auto'}
               </button>
               <button type="button" onClick={enhanceMotion}
                 disabled={busy || reference.staging || !!motionBusy || !prompt.trim()}
                 title="Rewrite what is written with more of the detail a sampler can use"
-                className="min-h-10 rounded-lg border border-border px-2 py-1 text-[0.6875rem] text-content-muted hover:text-content disabled:opacity-40 lg:min-h-0">
+                className="min-h-10 rounded-lg border border-border px-2 py-1 text-2xs text-content-muted hover:text-content disabled:opacity-40 lg:min-h-0">
                 {motionBusy === 'enhance' ? '…' : '✨ Enrich'}
               </button>
               {/* ⌫ Clear: one press empties the field. A textarea that only
@@ -1064,7 +1064,7 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
                 disabled={!!motionBusy || !prompt}
                 title="Clear the motion field"
                 aria-label="Clear the motion field"
-                className="min-h-10 rounded-lg border border-border px-2 py-1 text-[0.6875rem] text-content-muted hover:text-content disabled:opacity-40 lg:min-h-0">
+                className="min-h-10 rounded-lg border border-border px-2 py-1 text-2xs text-content-muted hover:text-content disabled:opacity-40 lg:min-h-0">
                 ⌫ Clear
               </button>
               {/* ⚙ opens the writer window — the model and its dials belong at
@@ -1073,7 +1073,7 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
               <button type="button" onClick={() => setModelOpen(true)}
                 title="Which model writes the motion"
                 aria-label="Which model writes the motion"
-                className="min-h-10 rounded-lg border border-border px-2 py-1 text-[0.6875rem] text-content-muted hover:text-content lg:min-h-0">
+                className="min-h-10 rounded-lg border border-border px-2 py-1 text-2xs text-content-muted hover:text-content lg:min-h-0">
                 ⚙
               </button>
             </span>
@@ -1081,13 +1081,13 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
               placeholder={isReference ? 'The person in <Picture 1> wears the outfit from <Picture 2> and follows the movement in <Video 1>…'
                 : 'What happens in the shot — she turns her head and smiles, the camera pushes in slowly…'}
               className="w-full resize-y rounded-lg border border-border bg-app px-2.5 py-2 text-sm text-content" />
-            <span className="text-[0.6875rem] text-content-subtle">
+            <span className="text-2xs text-content-subtle">
               {isReference ? 'Name the tags above to say what each reference contributes. Auto and Enrich read the references together and keep those roles in H3’s reference prompt.' : <>Describe the movement, not the picture: the start frame already says
               what the scene looks like. ✨ Auto and ✨ Enrich answer in H3’s own
               three-field prompt, paced to the clip length you set.</>}
             </span>
             {isReference && reference.references.some((r) => r.kind === 'audio' || (r.kind === 'video' && r.include_audio)) && (
-              <p className="text-[0.6875rem] text-amber-200">The prompt writer does not transcribe reference audio. Describe speech, rhythm or ambience in its role; the audio still conditions the generated clip.</p>
+              <p className="text-2xs text-amber-200">The prompt writer does not transcribe reference audio. Describe speech, rhythm or ambience in its role; the audio still conditions the generated clip.</p>
             )}
             {writerNotice && <p role="status" className="text-xs text-amber-200">{writerNotice}</p>}
             {/* 🎬 Shots. The server has always known how to cut a clip into
@@ -1102,7 +1102,7 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
                 SHOT_CHOICES so a moved MAX_SHOTS cannot wrap the row. What the
                 length cannot hold is greyed AND said in the sentence — a title
                 on a disabled button never shows on a phone. */}
-            <div data-testid="video-shots" className="flex flex-col gap-1 text-[0.6875rem]">
+            <div data-testid="video-shots" className="flex flex-col gap-1 text-2xs">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-semibold text-content">Shots</span>
                 <div role="radiogroup" aria-label="Shots"
@@ -1138,7 +1138,7 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
             {/* The toggle enriches AT LAUNCH — what runs is what the clip
                 records, so a card always names the prompt that really made it.
                 Off by default: it changes what the sampler reads. */}
-            <label className="flex items-start gap-2 rounded-lg border border-border bg-surface-raised px-2 py-1.5 text-[0.6875rem] text-content-muted">
+            <label className="flex items-start gap-2 rounded-lg border border-border bg-surface-raised px-2 py-1.5 text-2xs text-content-muted">
               <input type="checkbox" checked={enhanceOn} className="mt-0.5"
                 onChange={(e) => setEnhanceOn(e.target.checked)} />
               <span className="min-w-0">
@@ -1153,7 +1153,7 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
             {/* The batch's prompt, asked only when there IS a batch: two
                 choices, so a segmented pair rather than a select. */}
             {mode === 'i2v' && sources.length > 1 && (
-              <div data-testid="video-prompt-mode" className="flex flex-col gap-1 rounded-lg border border-border bg-surface-raised px-2 py-1.5 text-[0.6875rem]">
+              <div data-testid="video-prompt-mode" className="flex flex-col gap-1 rounded-lg border border-border bg-surface-raised px-2 py-1.5 text-2xs">
                 <span className="font-semibold text-content">Prompt for the {sources.length} pictures</span>
                 <div role="radiogroup" aria-label="Prompt for the batch" className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-surface p-0.5">
                   {[['same', 'Same for all'], ['per-image', '✨ Written per picture']].map(([id, text]) => (
@@ -1186,12 +1186,12 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
           <VideoOptionsPanel options={options} value={renderOpts} onChange={isReference ? reference.setSettings : setOpts} referenceMode={isReference}
             onRefresh={() => apiFetch(optionsUrl()).then(setOptions).catch((e) => toast.error(e?.message || 'Could not refresh model availability.'))} />
           <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-3">
-            <p className="break-words font-mono text-[0.6875rem] leading-snug text-content-muted">
+            <p className="break-words font-mono text-2xs leading-snug text-content-muted">
               {readback}
             </p>
             {generateButton}
             {reason && (
-              <p className="text-[0.6875rem] text-content-subtle">{reason}</p>
+              <p className="text-2xs text-content-subtle">{reason}</p>
             )}
             {removedReference && (
               <button type="button" onClick={editRemovedReference}
@@ -1204,7 +1204,7 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
       </div>
 
       <section id="vs-clips" className="flex flex-col gap-2 scroll-mt-16">
-        <h2 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-content-subtle">
+        <h2 className="font-mono text-2xs uppercase tracking-[0.18em] text-content-subtle">
           Clips — newest first
         </h2>
         <AutoContinuePanel session={auto.session} ready={auto.ready} busy={auto.busy} error={auto.error}

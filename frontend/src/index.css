@@ -60,7 +60,7 @@
 .app-header [data-testid="header-system-stats"] > span:first-child {
   flex-wrap: wrap;
   gap: 0;
-  font-size: 11px;
+  font-size: 0.6875rem; /* 2xs */
 }
 .app-header [data-testid="header-system-stats"] > span:first-child > span {
   padding: 3px 10px;
@@ -418,7 +418,7 @@
 .dataset-tile-badge {
   padding: 0.125rem 0.375rem;
   border-radius: 0.25rem;
-  font-size: 10px;
+  font-size: 0.6875rem; /* 2xs */
   line-height: 1rem;
   pointer-events: auto;
 }

@@ -119,7 +119,7 @@ export default function ReferenceLibraryPicker({ kind, limit, heldKeys = [], dis
               <label className="flex flex-col gap-1 text-xs text-content-muted">Frame to use
                 <select aria-label={`Frame from ${item.label}`} value={selection.frame} onChange={(e) => patch(key, { frame: e.target.value })} className={INPUT}><option value="first">First frame</option><option value="last">Last frame</option></select>
               </label>
-              <p className="text-[0.6875rem] text-content-subtle">The thumbnail is the clip poster. The chosen frame is extracted when you add it.</p>
+              <p className="text-2xs text-content-subtle">The thumbnail is the clip poster. The chosen frame is extracted when you add it.</p>
             </>}
             {kind !== 'image' && <>
               <p className="text-xs text-content-muted">{Number(item.duration) > 0 ? `Clip length: ${Number(item.duration).toFixed(2)} s. ` : ''}{kind === 'audio' ? 'Extract sound from this interval.' : 'Use the video in this interval.'} Times start at the beginning of this clip.</p>

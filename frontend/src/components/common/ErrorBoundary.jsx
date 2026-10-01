@@ -34,7 +34,7 @@ class ErrorBoundary extends Component {
             className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center bg-app text-content"
             role="alert"
           >
-            <p className="text-lg font-semibold">
+            <p className="text-xl font-semibold">
               {this.props.fallbackMessage || 'An unexpected error occurred.'}
             </p>
             <button

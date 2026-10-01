@@ -57,7 +57,7 @@ export function VideoCheckpointList({
         <div key={g.key} className="flex flex-col gap-1.5" data-lane={g.lane}>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <p className="m-0 text-xs font-semibold text-content">{groupTitle(g)}</p>
-            <p className="m-0 font-mono text-[0.625rem] text-content-subtle">{groupSub(g)}</p>
+            <p className="m-0 font-mono text-2xs text-content-subtle">{groupSub(g)}</p>
           </div>
           <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
             {g.steps.map((s) => {
@@ -66,11 +66,11 @@ export function VideoCheckpointList({
               return (
                 <li key={a.key} data-step-key={a.key}
                   className="flex flex-col gap-1 rounded border border-border bg-surface-raised px-2 py-1.5">
-                  <div className="flex flex-wrap items-center gap-1.5 text-[0.6875rem]">
+                  <div className="flex flex-wrap items-center gap-1.5 text-2xs">
                     <span className="font-medium text-content">{a.label}</span>
                     {stepUsesBest(s, payload?.best_settings_loras) && <span className="text-amber-200" title="Used by the dataset’s best settings">★ Best settings</span>}
                     {a.deployed && (
-                      <span className="rounded bg-emerald-500/15 px-1 py-px text-[0.5625rem] font-semibold uppercase text-emerald-200">
+                      <span className="rounded bg-emerald-500/15 px-1 py-px text-2xs font-semibold uppercase text-emerald-200">
                         Deployed
                       </span>
                     )}
@@ -115,7 +115,7 @@ export function VideoCheckpointList({
                     {a.del.ok ? (
                       <button type="button" disabled={rowBusy} onClick={() => onDelete?.(g, s)}
                         title={a.del.title}
-                        className="ml-auto flex items-center gap-1 px-1 py-0.5 text-[0.625rem] text-content-subtle hover:text-rose-200 disabled:opacity-60">
+                        className="ml-auto flex items-center gap-1 px-1 py-0.5 text-2xs text-content-subtle hover:text-rose-200 disabled:opacity-60">
                         <Trash2 aria-hidden="true" className="h-3 w-3" />
                         {busy === `${a.key}:delete` ? 'Deleting…' : a.del.label}
                       </button>
@@ -250,7 +250,7 @@ export default function VideoCheckpointManager({ ds, refreshKey = 0, onSavesChan
         <summary className="cursor-pointer text-xs font-semibold text-content">
           ◉ Run graph{hasGraph ? ` — ${graphSummary(tree)}` : ''}
         </summary>
-        <p className="m-0 mt-1 mb-1.5 text-[0.6875rem] text-content-muted">{hasGraph ? PREVIEWS_NOTE : EMPTY_GRAPH_NOTE}</p>
+        <p className="m-0 mt-1 mb-1.5 text-2xs text-content-muted">{hasGraph ? PREVIEWS_NOTE : EMPTY_GRAPH_NOTE}</p>
         {!hasGraph && previews.length > 0 && <button type="button" onClick={() => renderedPreviews()}
           className="min-h-10 rounded border border-border px-3 py-1 text-xs text-content lg:min-h-0">Rendered previews ({previews.length})</button>}
         {hasGraph && (

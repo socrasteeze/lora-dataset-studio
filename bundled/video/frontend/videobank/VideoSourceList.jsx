@@ -7,7 +7,7 @@ import { canRecut } from './videoShotCuts'
 // The per-file actions share one look: they are peers, and a difference in
 // weight between them would read as a difference in consequence.
 const ACTION = 'min-h-10 lg:min-h-0 rounded border border-border bg-surface-raised px-1.5 py-0.5 '
-  + 'text-[0.625rem] font-semibold text-content-muted hover:bg-surface'
+  + 'text-2xs font-semibold text-content-muted hover:bg-surface'
 
 const TONE = {
   ok: 'bg-emerald-500/15 text-emerald-200',
@@ -68,12 +68,12 @@ export default function VideoSourceList({
                 className="min-h-10 lg:min-h-0 min-w-0 flex-1 truncate text-left font-mono text-xs text-content hover:underline">
                 {s.relpath}
               </button>
-              <span className={`shrink-0 rounded px-1.5 py-0.5 text-[0.625rem] font-semibold ${TONE[state.tone]}`}
+              <span className={`shrink-0 rounded px-1.5 py-0.5 text-2xs font-semibold ${TONE[state.tone]}`}
                 title={state.title}>
                 {state.label}
               </span>
             </div>
-            <p className="text-[0.6875rem] text-content-subtle">
+            <p className="text-2xs text-content-subtle">
               {formatDuration(s.duration_s)} · {formatFileSize(s.file_size)}
               {sourceGeometry(s) ? ` · ${sourceGeometry(s)}` : ''}
             </p>
@@ -81,7 +81,7 @@ export default function VideoSourceList({
                 three facts and a fourth wraps at 400 px. Absent entirely when
                 the container said nothing — a blank beats a fabricated 0. */}
             {sourceEncoding(s) && (
-              <p className="text-[0.6875rem] text-content-subtle"
+              <p className="text-2xs text-content-subtle"
                 title="How hard this file was compressed. Bits per pixel per frame is the comparable one: under ~0.05 is visibly damaged, over ~0.15 is comfortable. Shown only — the 🩻 Defects pass measures the damage this predicts.">
                 {sourceEncoding(s)}
               </p>

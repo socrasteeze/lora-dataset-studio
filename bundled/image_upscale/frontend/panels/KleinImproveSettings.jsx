@@ -104,7 +104,7 @@ return <Card id="klein-improve-settings" title="Klein improvement">
                   e.target.value === '' ? kleinDefault(k.key) : Number(e.target.value))}
                 className={INPUT_CLASS}
               />
-              <p className="mt-1 text-[0.6875rem] text-content-subtle">
+              <p className="mt-1 text-2xs text-content-subtle">
                 {k.hint} Default {String(kleinDefault(k.key))}.
               </p>
               <ResetToDefault label={k.label} section="klein" field={k.key}

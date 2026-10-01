@@ -206,7 +206,7 @@ export default function VideoClipLightbox({
               className="rounded-md bg-gradient-primary px-2.5 py-1 text-xs font-semibold text-gray-950 disabled:opacity-40">
               {savingCaption ? 'Saving…' : 'Save caption'}
             </button>
-            <span className="text-[0.6875rem] text-white/50">
+            <span className="text-2xs text-white/50">
               {captionStateNote({ ...clip, caption })}
             </span>
           </div>
@@ -217,7 +217,7 @@ export default function VideoClipLightbox({
         <VideoClipTrimTools bankId={bankId} clip={clip} source={source}
           playheadS={playheadS} onChanged={onRetouched} />
 
-        <p className="text-center text-[0.6875rem] text-white/50">
+        <p className="text-center text-2xs text-white/50">
           ← → to move · K to keep · R to reject · Esc to close
           {/* Never rendered on a correct build; it is a tripwire for a future
               grid that reintroduces inline players. */}

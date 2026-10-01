@@ -554,7 +554,7 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
         <span className="text-white/70 text-xs truncate">{alt}</span>
         <button type="button" onClick={close} disabled={working || saveBlocked}
           title="Close (Esc)" aria-label="Close review"
-          className="ml-auto w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white text-lg leading-none disabled:opacity-40">✕</button>
+          className="ml-auto w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white text-xl leading-none disabled:opacity-40">✕</button>
       </div>
 
       {/* Image + editable correction-zone overlays.

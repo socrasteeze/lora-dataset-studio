@@ -32,7 +32,7 @@ function ClipPlayer({ clip }) {
   </>;
 }
 
-const ACTION = 'flex items-center justify-center gap-1 rounded-lg border px-2 py-1 text-[0.6875rem] min-h-10 lg:min-h-0';
+const ACTION = 'flex items-center justify-center gap-1 rounded-lg border px-2 py-1 text-2xs min-h-10 lg:min-h-0';
 
 export default function VideoClipHistory({
   clips, onRate, onDelete, onReuse, onVfi, vfiBusy, onNeuralRender, nrBusy, onCompare, onContinue, continueBusy,
@@ -73,7 +73,7 @@ export default function VideoClipHistory({
                   {running && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
                   <span className="px-3 text-center">{running ? 'Rendering…' : (clip.error || 'Failed')}</span>
                   {progress && (
-                    <span className="px-3 text-center text-[0.6875rem] text-amber-200/80"
+                    <span className="px-3 text-center text-2xs text-amber-200/80"
                       data-testid="clip-render-progress">
                       {progress}
                     </span>
@@ -88,7 +88,7 @@ export default function VideoClipHistory({
                   source is older than its render by construction, and a pair
                   that cannot be seen together reads as a deleted original. */}
               {(clip.nr_of || clip.vfi_of || clip.continues_of) && onJumpTo && (
-                <p className="text-[0.6875rem] text-content-subtle">
+                <p className="text-2xs text-content-subtle">
                   {clip.nr_of ? 'neural render of' : clip.vfi_of ? 'smoothed from' : 'continues'}{' '}
                   <button type="button" onClick={() => onJumpTo(clip.nr_of || clip.vfi_of || clip.continues_of)}
                     className="underline decoration-dotted underline-offset-2 hover:text-content">
@@ -101,19 +101,19 @@ export default function VideoClipHistory({
                   the part alone — the reason was written to `error` on a done
                   clip and never shown (found in verification). */}
               {clip.status === 'done' && clip.error && (
-                <p className="text-[0.6875rem] text-amber-300/80">{clip.error}</p>
+                <p className="text-2xs text-amber-300/80">{clip.error}</p>
               )}
               {/* The facts that made this clip, one pill each — comparing two
                   cards is reading which pill differs. */}
               <div className="flex flex-wrap gap-1">
                 {clipTags(clip).map((t) => (
                   <span key={t}
-                    className="max-w-full truncate rounded-full border border-border bg-surface-raised px-2 py-px text-[0.6875rem] text-content-muted">
+                    className="max-w-full truncate rounded-full border border-border bg-surface-raised px-2 py-px text-2xs text-content-muted">
                     {t}
                   </span>
                 ))}
               </div>
-              <p className="text-[0.6875rem] text-content-subtle">
+              <p className="text-2xs text-content-subtle">
                 {clip.mode === 'ref2va' ? 'reference-to-video' : clip.mode === 't2v' ? 'text-to-video' : 'image-to-video'}
                 {clip.seconds ? ` · ${clip.seconds}s` : ''}
                 {clip.megapixels ? ` · ${clip.megapixels} MP` : ''}

@@ -152,7 +152,7 @@ export default function SystemStatsReadout({
     <span data-testid={testId}
       className="flex flex-wrap items-center gap-1.5">
       {enabled && (
-        <span className="flex items-center gap-1.5 tabular-nums text-[0.625rem]"
+        <span className="flex items-center gap-1.5 tabular-nums text-2xs"
           title={machineLoadSummary(segments)}>
           {segments.map((s) => (
             <span key={s.key} className="flex items-center gap-1 whitespace-nowrap"
@@ -173,7 +173,7 @@ export default function SystemStatsReadout({
             ? "Press again to interrupt LDS's render and free the memory; the render is dropped. The offer expires after a minute."
             : "Free memory: unload the models ComfyUI keeps cached in RAM and VRAM, and the vision model LDS loaded. They reload on the next job. Refused while something is rendering or training; when the render is LDS's own, press again within a minute to interrupt it and free."}
           aria-label={armedKind === 'free' ? "Free memory — press again to interrupt LDS's render" : 'Free memory'}
-          className={`flex h-10 items-center gap-1 rounded border px-1.5 text-[0.625rem] hover:text-content disabled:cursor-wait disabled:opacity-60 lg:h-6 lg:px-1 ${
+          className={`flex h-10 items-center gap-1 rounded border px-1.5 text-2xs hover:text-content disabled:cursor-wait disabled:opacity-60 lg:h-6 lg:px-1 ${
             armedKind === 'free' ? 'border-amber-400 bg-amber-400/15 text-amber-200' : 'border-border bg-app/40 text-content-subtle/70'}`}>
           {freeing ? '…' : '🧹'}
           {armedKind === 'free' && <span className="whitespace-nowrap">press again</span>}
@@ -189,7 +189,7 @@ export default function SystemStatsReadout({
            measures targets, not intentions): a 24-px glyph next to 11-px text
            looks perfectly deliberate in a screenshot and is still a miss for
            a finger. */
-        className="flex h-10 items-center rounded border border-border bg-app/40 px-1.5 text-content-subtle/70 text-[0.625rem] hover:text-content lg:h-6 lg:px-1">
+        className="flex h-10 items-center rounded border border-border bg-app/40 px-1.5 text-content-subtle/70 text-2xs hover:text-content lg:h-6 lg:px-1">
         {enabled ? '▾' : '📊'}
       </button>
       <HelpBadge topic={helpTopic} />

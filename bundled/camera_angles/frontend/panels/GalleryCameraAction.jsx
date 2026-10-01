@@ -37,7 +37,7 @@ export default function GalleryCameraAction({ img, hasRow = false, disabled = fa
         onClick={(e) => { e.stopPropagation(); setOpen(true); }}
         disabled={disabled || !!refusal}
         title={refusal || 'Re-shoot this scene from another camera position'}
-        className="min-h-10 lg:min-h-0 inline-flex items-center gap-2 rounded-lg border border-indigo-400/50 bg-indigo-500/20 px-3 py-1.5 text-[0.75rem] font-semibold text-indigo-100 hover:bg-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-45">
+        className="min-h-10 lg:min-h-0 inline-flex items-center gap-2 rounded-lg border border-indigo-400/50 bg-indigo-500/20 px-3 py-1.5 text-xs font-semibold text-indigo-100 hover:bg-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-45">
         <Camera className="size-3.5" aria-hidden />
         Camera angles
       </button>

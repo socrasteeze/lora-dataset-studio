@@ -115,7 +115,7 @@ export default function VideoDatasetLightbox({
         </div>
 
         {nrParams && (
-          <p className="text-[0.6875rem] text-white/70">
+          <p className="text-2xs text-white/70">
             ✨ Neural render: {neuralRenderTags(nrParams).join(' · ')}
           </p>
         )}
@@ -123,7 +123,7 @@ export default function VideoDatasetLightbox({
           {/* Provenance, on the screen where it is asked for: "which rush is
               this, and where in it?" is the question a badly cut clip raises,
               and the answer is what you take back to the bank to re-cut. */}
-          <span className="min-w-0 truncate font-mono text-[0.6875rem] text-white/70"
+          <span className="min-w-0 truncate font-mono text-2xs text-white/70"
             title={clip.src_relpath || ''}>
             {clip.src_relpath || 'no source recorded'}
             {seconds != null ? ` · ${clipLabel(clip.start_s, clip.end_s)}` : ''}
@@ -153,7 +153,7 @@ export default function VideoDatasetLightbox({
         </div>
 
         <label className="flex flex-col gap-1">
-          <span className="text-[0.6875rem] text-white/70">
+          <span className="text-2xs text-white/70">
             Caption — written to <code className="font-mono">{clip.filename.replace(/\.[^.]+$/, '.txt')}</code> next to the clip
           </span>
           <textarea rows={3} value={caption}
@@ -162,7 +162,7 @@ export default function VideoDatasetLightbox({
             onBlur={() => { typing.current = false; onSave() }}
             placeholder="Describe what happens in the clip — camera, subject, motion."
             className="w-full rounded border border-white/20 bg-black/60 px-2 py-1 text-sm text-white" />
-          <span className="text-[0.625rem] text-white/50">
+          <span className="text-2xs text-white/50">
             {saving ? 'Saving…' : 'Saved when you click away. Esc closes; ← → step through the set.'}
           </span>
         </label>

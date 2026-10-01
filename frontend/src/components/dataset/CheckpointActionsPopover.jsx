@@ -52,7 +52,7 @@ export default function CheckpointActionsPopover({
           {a.isRun ? (runLabel || 'This run') : `Step ${Number(a.step).toLocaleString()}`}
         </span>
         {a.final && (
-          <span className="shrink-0 rounded bg-emerald-500/15 px-1 py-px text-emerald-200 text-[0.5rem] font-semibold uppercase">final</span>
+          <span className="shrink-0 rounded bg-emerald-500/15 px-1 py-px text-emerald-200 text-2xs font-semibold uppercase">final</span>
         )}
         <button type="button" onClick={onClose}
           className="ml-auto shrink-0 text-content-subtle hover:text-content text-xs"

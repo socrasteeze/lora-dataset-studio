@@ -321,7 +321,7 @@ test('the canvas page folds its header on a phone, never its help', () => {
   // …and an sr-only title takes its place exactly where it was dropped.
   assert.match(page, /<h1 className="sr-only lg:hidden">LoRA Canvas<\/h1>/);
   // The blurb stays hidden right up to `lg`, as it already was.
-  assert.match(page, /className="mt-1 hidden text-content-muted text-\[0\.75rem\] lg:block"/);
+  assert.match(page, /className="mt-1 hidden text-content-muted text-xs lg:block"/);
   assert.doesNotMatch(page, /text-\[0\.75rem\] sm:block/);
   // The ? badge is not lost with the header it sat in: it moves onto the ⋯
   // shelf, exactly like ⏏ Undeploy… did. "The ? next to the title explains this

@@ -50,7 +50,7 @@ export default function InstalledPlugins({ plugins = [], busy, caps, capsKnown =
               <div className="flex min-w-0 flex-1 basis-48 items-start gap-3">
                 <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border text-sm font-semibold uppercase">{mark(plugin.name)}</span>
                 <div className="min-w-0">
-                  <h3 id={'plugin-title-' + plugin.id} className="break-words text-lg font-semibold leading-snug text-content">{plugin.name}</h3>
+                  <h3 id={'plugin-title-' + plugin.id} className="break-words text-xl font-semibold leading-snug text-content">{plugin.name}</h3>
                   <p className="mt-1 text-xs text-content-muted">Installed {plugin.installed_version || plugin.version} · {plugin.official ? 'LDS' : plugin.bundled ? 'Included' : plugin.author || 'External'}</p>
                 </div>
               </div>

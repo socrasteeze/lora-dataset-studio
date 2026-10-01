@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-01-consistent-type-and-controls',
+    date: '2026-10-01',
+    title: 'Consistent text and control sizes',
+    blurb: 'Labels, buttons and fields now share one type scale and one height per row, so a toolbar lines up and small text stays readable.',
+  },
+  {
     id: '2026-10-01-plugins-on-this-install',
     date: '2026-10-01',
     title: 'Installed plugins stay on one page',

@@ -46,7 +46,7 @@ export default function LockableSlider({
           {label}
         </span>
         <div className="flex items-center gap-2">
-          <span className="text-content-muted text-[0.8125rem] font-semibold">
+          <span className="text-content-muted text-xs font-semibold">
             {format(safeValue)}
           </span>
           <SliderLock locked={locked} onToggle={toggle} label={label} />

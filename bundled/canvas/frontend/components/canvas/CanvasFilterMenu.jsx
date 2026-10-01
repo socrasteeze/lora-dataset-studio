@@ -75,7 +75,7 @@ export default function CanvasFilterMenu({ label, glyph = null, summary = '',
         // up — the exact readout this bar exists to keep.
         aria-label={`${label}${summary ? ` — ${summary}` : ''}`}
         className={'flex h-10 max-w-full items-center gap-1 md:gap-1.5 rounded-md border px-2 md:px-2.5 '
-          + 'text-[0.75rem] font-semibold disabled:opacity-40 lg:h-9 '
+          + 'text-xs font-semibold disabled:opacity-40 lg:h-9 '
           + (active
             ? 'border-indigo-400/60 bg-indigo-500/15 text-indigo-100'
             : 'border-border bg-app/60 text-content hover:border-indigo-400/50')}>

@@ -246,7 +246,7 @@ function CanvasImageNode({ node, datasetId, laneName, onGeometry,
         ? 'pointer-events-none absolute left-1 top-1 z-10 flex max-w-[calc(100%-0.5rem)] items-center gap-1 rounded border border-white/15 bg-black/50 px-1.5 py-px backdrop-blur-sm'
         : 'flex shrink-0 items-center gap-1 border-b border-border bg-app/70 px-1.5 py-0.5')
         + reveal}>
-        <span className={'min-w-0 flex-1 truncate text-[0.5625rem] font-semibold tabular-nums '
+        <span className={'min-w-0 flex-1 truncate text-2xs font-semibold tabular-nums '
           + (member ? 'text-white' : 'text-content-muted')}>
           {imageLabel}
         </span>
@@ -285,14 +285,14 @@ function CanvasImageNode({ node, datasetId, laneName, onGeometry,
         <button type="button" onClick={(e) => { e.stopPropagation(); onOpen?.(node); }}
           title="Open this image full-screen with all its settings"
           aria-label={`Open ${imageLabel} full-screen`}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/15 bg-black/65 text-white transition-colors text-[0.75rem] leading-none hover:bg-black/70">🔍</button>
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/15 bg-black/65 text-white transition-colors text-xs leading-none hover:bg-black/70">🔍</button>
         {/* ✕ closes the node and REMEMBERS where it was. Re-pinning the same
             image from its gallery brings it back here, this size. */}
         <button type="button" onClick={(e) => { e.stopPropagation(); onClose?.(node); }}
           data-testid="canvas-image-close"
           title="Close this image — re-opening it from its gallery puts it back here, at this size"
           aria-label={`Close the pinned image at ${imageLabel}`}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/15 bg-black/65 text-white transition-colors text-[0.875rem] leading-none hover:border-red-400/60 hover:bg-red-500/70">✕</button>
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/15 bg-black/65 text-white transition-colors text-sm leading-none hover:border-red-400/60 hover:bg-red-500/70">✕</button>
         {/* ⬇ Keep this picture. Third in the row, after the two controls a hand
             already knows the position of.
             The file lands under a name that still says where it came from —
@@ -305,7 +305,7 @@ function CanvasImageNode({ node, datasetId, laneName, onGeometry,
           data-testid="canvas-image-download"
           title="Download this image — the file name keeps its dataset, run, step and seed"
           aria-label={`Download the image at ${imageLabel}`}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/15 bg-black/65 text-white transition-colors text-[0.75rem] leading-none hover:bg-black/70 disabled:opacity-50">
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/15 bg-black/65 text-white transition-colors text-xs leading-none hover:bg-black/70 disabled:opacity-50">
           {dl.busy ? '…' : '⬇'}
         </button>
         {/* HQ — swap the WebP tile for the ORIGINAL bytes, this picture only.
@@ -331,7 +331,7 @@ function CanvasImageNode({ node, datasetId, laneName, onGeometry,
             ? `Show the fast tile again for the image at ${imageLabel}`
             : `Show the image at ${imageLabel} at full quality`}
           className={'flex h-7 w-7 shrink-0 items-center justify-center rounded-md border '
-            + 'font-semibold transition-colors text-[0.5rem] leading-none '
+            + 'font-semibold transition-colors text-2xs leading-none '
             + (showHq
               ? 'border-indigo-300 bg-indigo-500/90 text-white'
               : 'border-white/15 bg-black/65 text-white hover:bg-black/70')}>HQ</button>
@@ -353,7 +353,7 @@ function CanvasImageNode({ node, datasetId, laneName, onGeometry,
             title={rmState.title}
             aria-label={rmState.aria}
             className={'flex h-7 w-7 shrink-0 items-center justify-center rounded-md border '
-              + 'transition-colors text-[0.75rem] leading-none disabled:opacity-50 '
+              + 'transition-colors text-xs leading-none disabled:opacity-50 '
               + (rm.armed
                 ? 'border-red-300 bg-red-600/90 text-white'
                 : 'border-white/15 bg-black/65 text-white hover:border-red-400/60 hover:bg-red-500/70')}>
@@ -367,7 +367,7 @@ function CanvasImageNode({ node, datasetId, laneName, onGeometry,
         <div role="alert" data-testid="canvas-image-delete-error"
           onClick={(e) => { e.stopPropagation(); rm.clearError(); }}
           style={{ transform: `scale(${k})`, transformOrigin: 'bottom left' }}
-          className="absolute bottom-0 left-0 z-20 max-w-full cursor-pointer rounded-tr-md bg-red-900/90 px-1 py-0.5 text-[0.5rem] leading-tight text-red-50">
+          className="absolute bottom-0 left-0 z-20 max-w-full cursor-pointer rounded-tr-md bg-red-900/90 px-1 py-0.5 text-2xs leading-tight text-red-50">
           {rm.error}
         </div>
       )}
@@ -379,7 +379,7 @@ function CanvasImageNode({ node, datasetId, laneName, onGeometry,
         <div role="alert" data-testid="canvas-image-download-error"
           onClick={(e) => { e.stopPropagation(); dl.clearError(); }}
           style={{ transform: `scale(${k})`, transformOrigin: 'bottom left' }}
-          className="absolute bottom-0 left-0 z-10 max-w-full cursor-pointer rounded-tr-md bg-red-900/90 px-1 py-0.5 text-[0.5rem] leading-tight text-red-50">
+          className="absolute bottom-0 left-0 z-10 max-w-full cursor-pointer rounded-tr-md bg-red-900/90 px-1 py-0.5 text-2xs leading-tight text-red-50">
           {dl.error}
         </div>
       )}
@@ -398,7 +398,7 @@ function CanvasImageNode({ node, datasetId, laneName, onGeometry,
           // max-w-[55%] and not max-w-full: this badge is permanent and it lives
           // on the same edge as the control row, at the other end. Full width it
           // would sit UNDER the buttons on every blended picture.
-          className="pointer-events-none absolute bottom-0 left-0 z-10 max-w-[55%] truncate rounded-tr-md border-r border-t border-purple-400/50 bg-black/60 px-1 py-px text-[0.5rem] font-semibold leading-tight text-purple-200 backdrop-blur-sm">
+          className="pointer-events-none absolute bottom-0 left-0 z-10 max-w-[55%] truncate rounded-tr-md border-r border-t border-purple-400/50 bg-black/60 px-1 py-px text-2xs font-semibold leading-tight text-purple-200 backdrop-blur-sm">
           <span aria-hidden>🧬</span> {blendNote}
         </span>
       )}
@@ -433,7 +433,7 @@ function CanvasImageNode({ node, datasetId, laneName, onGeometry,
         title="Drag to resize"
         style={{ position: 'absolute', right: 0, bottom: 0, width: 28, height: 28,
           transform: `scale(${k})`, transformOrigin: 'bottom right' }}
-        className="cursor-nwse-resize touch-none rounded-tl-md border-l border-t border-indigo-400/40 bg-app/80 text-content-subtle after:absolute after:bottom-1 after:right-1 after:text-[0.625rem] after:content-['◢']" />
+        className="cursor-nwse-resize touch-none rounded-tl-md border-l border-t border-indigo-400/40 bg-app/80 text-content-subtle after:absolute after:bottom-1 after:right-1 after:text-2xs after:content-['◢']" />
       )}
     </div>
   );

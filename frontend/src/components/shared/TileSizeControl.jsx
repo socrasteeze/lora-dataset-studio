@@ -1,4 +1,5 @@
 import { LayoutGrid } from 'lucide-react';
+import { Chip } from '../common/Controls.jsx';
 /**
  * Discreet segmented S/M/L control, not a slider (mouse-fragile, no useful
  * granularity for 3 steps). Shared by the workspace image grid (DatasetGrid)
@@ -10,15 +11,11 @@ export default function TileSizeControl({ size, onChange, titles, className = ''
     <div role="group" aria-label="Thumbnail size" className={`flex items-center gap-1 shrink-0 ${className}`}>
       <LayoutGrid aria-hidden="true" className="h-3.5 w-3.5 text-content-subtle" />
       {['S', 'M', 'L'].map((s) => (
-        <button key={s} type="button" onClick={() => onChange(s)}
-          aria-pressed={size === s} title={titles[s]}
-          aria-label={`${titles[s]}${size === s ? ' (active)' : ''}`}
-          className={`w-6 h-6 rounded-md border text-2xs font-semibold transition-colors ${
-            size === s
-              ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-200'
-              : 'border-border bg-surface text-content-muted hover:bg-surface-raised'}`}>
+        <Chip key={s} pressed={size === s} onClick={() => onChange(s)}
+          title={titles[s]}
+          aria-label={`${titles[s]}${size === s ? ' (active)' : ''}`}>
           {s}
-        </button>
+        </Chip>
       ))}
     </div>
   );

@@ -108,7 +108,7 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
             <button type="button" onClick={() => inpExtra.current?.click()} disabled={importBusy}
               aria-label="Add an extra reference photo (other angles of the same face)"
               title="Add an extra reference photo — Klein uses these together to lock identity on every generation. Krea 2 Edit does not read them: its second image is added inside the ✦ Edit reference dialog and is meant to be a different subject."
-              className="w-12 h-12 rounded-lg border border-dashed border-border-strong text-content-muted text-lg leading-none disabled:opacity-40">
+              className="w-12 h-12 rounded-lg border border-dashed border-border-strong text-content-muted text-xl leading-none disabled:opacity-40">
               +
             </button>
           )}

@@ -97,7 +97,7 @@ function ActivityButton() {
         title="What the app is doing right now — running passes, the queue, and a live log"
         aria-label="Activity"
         className="rounded-md p-2 text-content-muted hover:text-content hover:bg-surface-raised">
-        <span aria-hidden className="block text-lg leading-none">📋</span>
+        <span aria-hidden className="block text-xl leading-none">📋</span>
       </button>
       {open && <ActivityPanel onClose={() => setOpen(false)} />}
     </>

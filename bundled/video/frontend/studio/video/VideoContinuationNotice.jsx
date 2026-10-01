@@ -22,7 +22,7 @@ export default function VideoContinuationNotice({ state, mode, isReference = fal
   return (
     <>
       {used.length > 0 && (
-        <p className="rounded-lg border border-border bg-surface-raised px-2.5 py-1.5 text-[0.6875rem] text-content-muted">
+        <p className="rounded-lg border border-border bg-surface-raised px-2.5 py-1.5 text-2xs text-content-muted">
           {/* Two ⏭ clicks are an ordinary gesture and make two videos, each
               behind its own parent — a sentence written for one join says
               something false about that (verification, 2026-09-07). */}
@@ -35,7 +35,7 @@ export default function VideoContinuationNotice({ state, mode, isReference = fal
         </p>
       )}
       {ignored.map(({ id, mode: home }) => (
-        <p key={id} className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2.5 py-1.5 text-[0.6875rem] text-amber-200">
+        <p key={id} className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2.5 py-1.5 text-2xs text-amber-200">
           ⏭ Clip #{id} is armed to be continued, and {MODE_NAMES[mode] || mode} does not start from it:
           this Generate renders a NEW clip.
           <button type="button" onClick={() => onMode?.(home)}

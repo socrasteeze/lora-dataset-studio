@@ -63,7 +63,7 @@ export default function VideoDatasetGrid({
                   aria-hidden>🎞</span>
               )}
               {seconds != null && (
-                <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/70 px-1 font-mono text-[0.625rem] text-white">
+                <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/70 px-1 font-mono text-2xs text-white">
                   {seconds.toFixed(1)}s
                 </span>
               )}
@@ -71,7 +71,7 @@ export default function VideoDatasetGrid({
                   worked through by hunting the silent clips, and a ✓ on every
                   captioned tile would drown the three that still need one. */}
               {!hasCaption(clip) && (
-                <span className="pointer-events-none absolute left-1 top-1 rounded bg-amber-600/90 px-1 text-[0.625rem] font-bold text-white"
+                <span className="pointer-events-none absolute left-1 top-1 rounded bg-amber-600/90 px-1 text-2xs font-bold text-white"
                   title="No caption — this clip trains on the trigger word alone">
                   no caption
                 </span>
@@ -82,7 +82,7 @@ export default function VideoDatasetGrid({
                 onChange={(e) => onToggle(clip, e.nativeEvent)}
                 aria-label={`Select ${clip.filename}`}
                 className="h-4 w-4 shrink-0 accent-indigo-500" />
-              <span className="min-w-0 truncate font-mono text-[0.625rem] text-content-subtle"
+              <span className="min-w-0 truncate font-mono text-2xs text-content-subtle"
                 title={clip.src_relpath
                   ? `${clip.filename} — cut from ${clip.src_relpath}`
                   : clip.filename}>

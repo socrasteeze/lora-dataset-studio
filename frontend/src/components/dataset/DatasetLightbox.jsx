@@ -548,7 +548,7 @@ export default function DatasetLightbox({
       <button type="button" ref={closeRef}
         onClick={(e) => { e.stopPropagation(); onClose(); }}
         title="Close (Esc)" aria-label="Close inspection"
-        className="absolute top-3 right-3 z-10 w-10 h-10 lg:w-9 lg:h-9 rounded-full bg-white/10 hover:bg-white/20 text-white text-lg leading-none">✕</button>
+        className="absolute top-3 right-3 z-10 w-10 h-10 lg:w-9 lg:h-9 rounded-full bg-white/10 hover:bg-white/20 text-white text-xl leading-none">✕</button>
 
       {/* The image area is the positioning context for ⟨ / ⟩ — NOT the dialog:
           in rail mode the dialog's right edge is the action rail, and an arrow

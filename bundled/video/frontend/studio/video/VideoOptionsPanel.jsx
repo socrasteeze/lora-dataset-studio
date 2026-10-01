@@ -31,12 +31,12 @@ function Toggle({ checked, onChange, icon: Icon, label, cost, hint, disabled, di
           <Icon aria-hidden="true" className="h-3.5 w-3.5 text-content-muted" />
           <span className="min-w-0 flex-1 break-words">{label}</span>
           {!disabled && cost && (
-            <span className="shrink-0 rounded-full border border-border px-1.5 py-px text-[0.625rem] text-content-subtle">
+            <span className="shrink-0 rounded-full border border-border px-1.5 py-px text-2xs text-content-subtle">
               {cost}
             </span>
           )}
         </span>
-        <span className="block text-[0.6875rem] leading-snug text-content-subtle">
+        <span className="block text-2xs leading-snug text-content-subtle">
           {disabled ? disabledHint : hint}
         </span>
       </span>
@@ -147,7 +147,7 @@ export default function VideoOptionsPanel({ options, value, onChange, referenceM
               <Zap aria-hidden="true" className="h-3.5 w-3.5 text-content-muted" />
               <span className="min-w-0 flex-1">Acceleration, {accelSteps} steps</span>
               {value.accel && (
-                <span className="shrink-0 rounded-full border border-border px-1.5 py-px text-[0.625rem] text-content-subtle">
+                <span className="shrink-0 rounded-full border border-border px-1.5 py-px text-2xs text-content-subtle">
                   minutes, not tens
                 </span>
               )}
@@ -162,7 +162,7 @@ export default function VideoOptionsPanel({ options, value, onChange, referenceM
                 </option>
               ))}
             </select>
-            <span className="text-[0.6875rem] leading-snug text-content-subtle">{accelHint}</span>
+            <span className="text-2xs leading-snug text-content-subtle">{accelHint}</span>
           </label>
           {/* Two boxes swap the BASE and a clip has one base: ticking either
               clears the other, so the pair never sends a graph the builder has
@@ -198,7 +198,7 @@ export default function VideoOptionsPanel({ options, value, onChange, referenceM
               <Sparkles aria-hidden="true" className="h-3.5 w-3.5 text-content-muted" />
               <span className="min-w-0 flex-1">Sparse attention</span>
               {!off('sparse') && !vdnPicked && (
-                <span className="shrink-0 rounded-full border border-border px-1.5 py-px text-[0.625rem] text-content-subtle">
+                <span className="shrink-0 rounded-full border border-border px-1.5 py-px text-2xs text-content-subtle">
                   speed for fidelity
                 </span>
               )}
@@ -211,11 +211,11 @@ export default function VideoOptionsPanel({ options, value, onChange, referenceM
                 <option key={c.value || 'off'} value={c.value}>{c.label}</option>
               ))}
             </select>
-            <span className="text-[0.6875rem] leading-snug text-content-subtle">{sparseHint}</span>
+            <span className="text-2xs leading-snug text-content-subtle">{sparseHint}</span>
           </label>
         </div>
         {!referenceMode && value.sparse && value.sparse !== 'max' && value.latentUpscale && (
-          <p className="rounded-lg border border-border bg-app px-2.5 py-1.5 text-[0.6875rem] leading-snug text-content-muted">
+          <p className="rounded-lg border border-border bg-app px-2.5 py-1.5 text-2xs leading-snug text-content-muted">
             With the upscale on, the first pass stays dense and only the upscale
             samples sparse — the prompt keeps its say where it sets the
             composition. Pick <strong>Max</strong> to accelerate both.
@@ -238,7 +238,7 @@ export default function VideoOptionsPanel({ options, value, onChange, referenceM
             </span>
             {value.steps ? (
               <button type="button" onClick={() => set({ steps: '' })}
-                className="rounded-md border border-border px-1.5 py-0.5 text-[0.625rem] text-content-muted hover:text-content">
+                className="rounded-md border border-border px-1.5 py-0.5 text-2xs text-content-muted hover:text-content">
                 Auto
               </button>
             ) : null}
@@ -252,7 +252,7 @@ export default function VideoOptionsPanel({ options, value, onChange, referenceM
           onChange={(e) => set({ steps: Number(e.target.value) })}
           {...stepsLock.rangeProps} disabled={taomate || stepsLock.rangeProps.disabled}
           className={`mt-1 accent-primary ${stepsLock.rangeProps.className}`} />
-        <span className="text-[0.6875rem] leading-snug text-content-subtle">
+        <span className="text-2xs leading-snug text-content-subtle">
           {referenceMode && value.accel
             ? `This reference acceleration is trained for ${autoSteps} steps. Auto restores that profile; compare changes using the same references.`
             : value.accel
@@ -266,7 +266,7 @@ export default function VideoOptionsPanel({ options, value, onChange, referenceM
       </label>
 
       <div className="flex flex-col gap-1.5 border-t border-border pt-3">
-        <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-content-subtle">Shot</h3>
+        <h3 className="font-mono text-2xs uppercase tracking-[0.18em] text-content-subtle">Shot</h3>
         <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
           {/* A SLIDER, not a 21-row dropdown. The legal lengths are a ladder
               (H3's VAE packs 17 frames per chunk, so every rung is ≡ 5 mod 17)
@@ -295,7 +295,7 @@ export default function VideoOptionsPanel({ options, value, onChange, referenceM
               aria-label="Clip length"
               {...lengthLock.rangeProps}
               className={`mt-1 accent-primary ${lengthLock.rangeProps.className}`} />
-            <span className="flex justify-between text-[0.625rem] tabular-nums text-content-subtle">
+            <span className="flex justify-between text-2xs tabular-nums text-content-subtle">
               <span>{clipSeconds(frames[0], fps)}s</span>
               <span>{clipSeconds(frames[frames.length - 1], fps)}s</span>
             </span>
@@ -323,7 +323,7 @@ export default function VideoOptionsPanel({ options, value, onChange, referenceM
               className="rounded-lg border border-border bg-app px-2 py-1.5 text-content min-h-10 lg:min-h-0" />
           </label>
         </div>
-        <p className="text-[0.6875rem] leading-snug text-content-subtle">
+        <p className="text-2xs leading-snug text-content-subtle">
           {seconds ? `${value.frames} frames at ${fps} fps — a ${seconds}s clip. ` : ''}
           Faces sharpen up to about 1 MP; past that the machine that runs the job
           decides whether it fits.

@@ -68,13 +68,13 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
       title="SeedVR2 upscaling (local)"
       help="SeedVR2 resolves detail at a higher resolution and leaves the original look alone. It works independently of Klein Improve. Pick it per batch from the bulk actions in the dataset workspace, or choose its default in the shared improvement engine preference. Open Preparation above to prepare its ComfyUI node pack and two model files."
     >
-      <p className={ready ? 'text-[0.6875rem] text-emerald-300' : 'text-[0.6875rem] text-amber-300'}>
+      <p className={ready ? 'text-2xs text-emerald-300' : 'text-2xs text-amber-300'}>
         {ready
           ? 'Ready — SeedVR2 appears in the workspace bulk actions.'
           : 'Not ready yet. Open Preparation above, connect a compatible ComfyUI Windows portable, then review and install the node pack and model files together. Restart ComfyUI when idle and re-check. Other ComfyUI installations show their manual preparation steps.'}
       </p>
 
-      <p className="mt-1 text-[0.6875rem] text-content-subtle">
+      <p className="mt-1 text-2xs text-content-subtle">
         <a href="https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler" target="_blank"
           rel="noreferrer" className="text-sky-300 underline hover:text-sky-200">Node pack →</a>
         {' · '}
@@ -99,14 +99,14 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
           <option value="">auto — the 3B FP8 build, or whatever is installed</option>
           {installed.map((name) => <option key={name} value={name}>{name}</option>)}
         </select>
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           Only builds already in your ComfyUI&rsquo;s <code>models/SEEDVR2</code> folder are
           listed: the pack&rsquo;s loader downloads an unknown name on first use, and a
           dropdown must not start a multi-gigabyte download. To use another build, put the
           file in that folder — it then appears here.
         </p>
         {catalog.length > 0 && (
-          <ul className="mt-1 space-y-0.5 text-[0.6875rem] text-content-subtle">
+          <ul className="mt-1 space-y-0.5 text-2xs text-content-subtle">
             {catalog.map((v) => (
               <li key={v.file}>
                 {v.installed ? '✓' : '·'} <b>{v.label}</b> — {v.size_gb} GB, ~{v.vram_gb} GB
@@ -136,7 +136,7 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
             </optgroup>
           )}
         </select>
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           Leave it on auto unless your VAE file is named something with no
           &ldquo;vae&rdquo; in it — that is the only case the automatic search misses, and
           the reason the second group above is offered at all. Picking a DiT build here
@@ -160,7 +160,7 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
           <option value="always">Always tile large frames</option>
           <option value="never">Never tile</option>
         </select>
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           Needs the <code>Comfyui_TTP_Toolset</code> node pack; without it this has no
           effect. Tiling is not only about memory: a tile is upscaled at the size the
           model works well at, so a large frame keeps far more fine detail than one
@@ -171,7 +171,7 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
           <b>never</b> if you ever see a seam.
         </p>
         {laneLine && (
-          <p className="mt-1 text-[0.6875rem] text-sky-300">{laneLine}</p>
+          <p className="mt-1 text-2xs text-sky-300">{laneLine}</p>
         )}
         <ResetToDefault label="High-resolution tiling" section="seedvr2" field="tiling" {...reset} />
       </div>
@@ -191,7 +191,7 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
             e.target.value === '' ? dflt('tile_px') : Number(e.target.value))}
           className={INPUT_CLASS}
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           The memory dial of this engine: inference processes one tile at a time, so
           <b> lower it if upscales run out of VRAM</b> (768 or 512 on an 8 GB card) and
           raise it on a big card for fewer seams and more context per tile.
@@ -218,7 +218,7 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
             e.target.value === '' ? dflt('tile_threshold') : Number(e.target.value))}
           className={INPUT_CLASS}
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           Where <b>Tile when it helps</b> switches over. <b>0</b> (default) follows the tile
           size — {SEEDVR2_TILE_ABOVE_FACTOR}&times; it, so {tilePx} px tiles start tiling
           above {Math.round(tilePx * SEEDVR2_TILE_ABOVE_FACTOR)} px. Set a number to place
@@ -244,7 +244,7 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
             e.target.value === '' ? dflt('resolution') : Number(e.target.value))}
           className={INPUT_CLASS}
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           The SHORT edge is scaled to this and the aspect ratio is kept, so 1080 on a 3:2
           photo gives 1620&times;1080. LoRA training buckets rarely go above 1024&ndash;1280,
           so higher mostly costs VRAM and time.
@@ -267,7 +267,7 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
             e.target.value === '' ? dflt('max_resolution') : Number(e.target.value))}
           className={INPUT_CLASS}
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           The safety valve on a wide crop: at a 1080 short edge a 4:1 panorama becomes
           4320 px across, which is where a run runs out of VRAM.
         </p>
@@ -286,7 +286,7 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
         >
           {SEEDVR2_COLOR_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           How the result is graded back onto the source&rsquo;s colours. <b>lab</b> is the
           model&rsquo;s own default and the most conservative; <b>wavelet</b> holds broad tone
           better on heavily degraded sources; <b>none</b> shows the raw output. Colour
@@ -311,14 +311,14 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
             e.target.value === '' ? dflt('blocks_to_swap') : Number(e.target.value))}
           className={INPUT_CLASS}
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           0 = none, and fastest. Raise it to fit a bigger build on a smaller card: it trades
           speed for VRAM headroom and does not change the result.
         </p>
         <ResetToDefault label="Blocks offloaded" section="seedvr2" field="blocks_to_swap" {...reset} />
       </div>
 
-      <p className="mt-3 text-[0.6875rem] text-content-subtle">
+      <p className="mt-3 text-2xs text-content-subtle">
         <b>No batch size here, on purpose.</b> SeedVR2&rsquo;s batch size is a <i>video</i> window
         whose frames share attention to stay coherent — feeding it unrelated photos would let
         them bleed into each other. Dataset images are upscaled one per job; the throughput

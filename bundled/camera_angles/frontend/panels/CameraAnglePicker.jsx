@@ -154,8 +154,8 @@ export default function CameraAnglePicker({ onShoot, onClose, modelResident = fa
       className={`min-h-10 lg:min-h-0 flex-1 rounded-lg border px-3 py-2 text-left transition-colors ${on
         ? 'border-indigo-400/70 bg-indigo-500/25 text-indigo-100'
         : 'border-white/10 bg-white/[0.03] text-gray-300 hover:border-white/25'}`}>
-      <span className="block text-[0.8rem] font-semibold leading-tight">{label}</span>
-      {hint && <span className="block text-[0.68rem] text-gray-400">{hint}</span>}
+      <span className="block text-xs font-semibold leading-tight">{label}</span>
+      {hint && <span className="block text-2xs text-gray-400">{hint}</span>}
     </button>
   );
 
@@ -192,7 +192,7 @@ export default function CameraAnglePicker({ onShoot, onClose, modelResident = fa
           <Camera className="mt-0.5 size-5 shrink-0 text-indigo-300" aria-hidden />
           <div className="min-w-0 flex-1">
             <h2 className="font-sans text-base font-semibold text-gray-100">Camera angles</h2>
-            <p className="mt-0.5 text-[0.78rem] leading-snug text-gray-400">{CAMERA_INTRO}</p>
+            <p className="mt-0.5 text-xs leading-snug text-gray-400">{CAMERA_INTRO}</p>
           </div>
           {!inline && <button type="button" onClick={onClose} aria-label="Close" ref={closeRef}
             className="min-h-10 lg:min-h-0 -mr-1 rounded-lg px-2 text-gray-400 hover:bg-white/5 hover:text-gray-200">
@@ -202,18 +202,18 @@ export default function CameraAnglePicker({ onShoot, onClose, modelResident = fa
 
         <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto p-4 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]">
           <section data-probe-panel="camera-dial" className="min-w-0">
-            <h3 className="mb-2 font-mono text-[0.66rem] uppercase tracking-[0.14em] text-gray-400">
+            <h3 className="mb-2 font-mono text-2xs uppercase tracking-[0.14em] text-gray-400">
               Around the subject
             </h3>
             <AzimuthDial picked={azimuths} onToggle={(id) => setAzimuths((v) => toggle(v, id))} />
             <div className="mt-2 flex gap-2">
               <button type="button"
                 onClick={() => setAzimuths(AZIMUTHS.map((a) => a.id))}
-                className="min-h-10 lg:min-h-0 flex-1 rounded-lg border border-white/10 px-2 py-1.5 text-[0.72rem] text-gray-300 hover:border-white/25">
+                className="min-h-10 lg:min-h-0 flex-1 rounded-lg border border-white/10 px-2 py-1.5 text-xs text-gray-300 hover:border-white/25">
                 All sides
               </button>
               <button type="button" onClick={() => setAzimuths([])}
-                className="min-h-10 lg:min-h-0 flex-1 rounded-lg border border-white/10 px-2 py-1.5 text-[0.72rem] text-gray-300 hover:border-white/25">
+                className="min-h-10 lg:min-h-0 flex-1 rounded-lg border border-white/10 px-2 py-1.5 text-xs text-gray-300 hover:border-white/25">
                 Clear
               </button>
             </div>
@@ -221,7 +221,7 @@ export default function CameraAnglePicker({ onShoot, onClose, modelResident = fa
 
           <section data-probe-panel="camera-axes" className="min-w-0 space-y-4">
             <div>
-              <h3 className="mb-2 font-mono text-[0.66rem] uppercase tracking-[0.14em] text-gray-400">
+              <h3 className="mb-2 font-mono text-2xs uppercase tracking-[0.14em] text-gray-400">
                 Camera height
               </h3>
               <div className="flex flex-wrap gap-2">
@@ -232,7 +232,7 @@ export default function CameraAnglePicker({ onShoot, onClose, modelResident = fa
             </div>
 
             <div>
-              <h3 className="mb-2 font-mono text-[0.66rem] uppercase tracking-[0.14em] text-gray-400">
+              <h3 className="mb-2 font-mono text-2xs uppercase tracking-[0.14em] text-gray-400">
                 Distance
               </h3>
               <div className="flex flex-wrap gap-2">
@@ -240,7 +240,7 @@ export default function CameraAnglePicker({ onShoot, onClose, modelResident = fa
                   distances.includes(d.id), d.label, null,
                   () => setDistances((v) => toggle(v, d.id)), d.id))}
               </div>
-              <p className="mt-1.5 text-[0.68rem] leading-snug text-gray-500">{DISTANCE_CAVEAT}</p>
+              <p className="mt-1.5 text-2xs leading-snug text-gray-500">{DISTANCE_CAVEAT}</p>
             </div>
 
             {/* Which Qwen-Image-Edit build renders the views. Only shown once
@@ -248,13 +248,13 @@ export default function CameraAnglePicker({ onShoot, onClose, modelResident = fa
                 value a beat later reads as the app changing its mind. */}
             {unet && (
               <div>
-                <h3 className="mb-2 font-mono text-[0.66rem] uppercase tracking-[0.14em] text-gray-400">
+                <h3 className="mb-2 font-mono text-2xs uppercase tracking-[0.14em] text-gray-400">
                   Model
                 </h3>
                 <GlobalModelPicker section="camera" field="unet" slot="camera_unet"
                   label="camera model" value={unet.setting}
                   onSaved={(next) => setUnet((u) => ({ ...u, setting: next }))} />
-                <p className="mt-1.5 break-words text-[0.68rem] leading-snug text-gray-500">
+                <p className="mt-1.5 break-words text-2xs leading-snug text-gray-500">
                   App-wide — every 📷 run uses it; empty = the installed{' '}
                   {unet.default}. Another Qwen-Image-Edit build (a finetune, an
                   NSFW merge) keeps the angle grammar and changes the look.
@@ -264,7 +264,7 @@ export default function CameraAnglePicker({ onShoot, onClose, modelResident = fa
                     merge renders confetti over every textured surface while
                     reporting success (measured, Rapid AIO v23, same seed). */}
                 {unet.distilled && (
-                  <p className="mt-1 break-words text-[0.68rem] leading-snug text-amber-300/80">
+                  <p className="mt-1 break-words text-2xs leading-snug text-amber-300/80">
                     This build reads as already distilled — runs skip the extra
                     speed LoRA and keep 4 steps. Pin a speed LoRA in Settings to
                     override.
@@ -274,14 +274,14 @@ export default function CameraAnglePicker({ onShoot, onClose, modelResident = fa
             )}
 
             <div>
-              <h3 className="mb-2 font-mono text-[0.66rem] uppercase tracking-[0.14em] text-gray-400">
+              <h3 className="mb-2 font-mono text-2xs uppercase tracking-[0.14em] text-gray-400">
                 What gets sent
               </h3>
               {/* Every prompt, scrollable. It used to stop at the old cap and
                   say "narrow the selection", which was the cap talking; the list
                   is a preview of what leaves the app, and truncating it hid
                   exactly the poses a long run most needs to be checked on. */}
-              <ul className="max-h-28 space-y-0.5 overflow-y-auto rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-[0.68rem] leading-relaxed text-gray-400">
+              <ul className="max-h-28 space-y-0.5 overflow-y-auto rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-2xs leading-relaxed text-gray-400">
                 {poses.length === 0 && <li className="text-gray-600">nothing picked yet</li>}
                 {poses.map((p) => {
                   const [a, e, d] = p.split('/');
@@ -298,23 +298,23 @@ export default function CameraAnglePicker({ onShoot, onClose, modelResident = fa
               number is read rather than skimmed. Each queued view can be
               dropped one at a time from the system queue, which is what makes
               a long run a decision instead of a one-way door. */}
-          <p className={`min-w-0 flex-1 text-[0.78rem] ${long ? 'text-amber-300' : 'text-gray-400'}`}>
+          <p className={`min-w-0 flex-1 text-xs ${long ? 'text-amber-300' : 'text-gray-400'}`}>
             {refusal
               ? refusal.charAt(0).toUpperCase() + refusal.slice(1)
               : costSentence(poses.length, { modelResident })}
             {long && !refusal && (
-              <span className="block text-[0.7rem] text-amber-300/70">
+              <span className="block text-2xs text-amber-300/70">
                 Long run — you can drop queued views from the system queue.
               </span>
             )}
           </p>
           {!inline && <button type="button" onClick={onClose}
-            className="min-h-10 lg:min-h-0 rounded-lg border border-white/10 px-3 py-1.5 text-[0.78rem] text-gray-300 hover:border-white/25">
+            className="min-h-10 lg:min-h-0 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-gray-300 hover:border-white/25">
             Cancel
           </button>}
           <button type="button" onClick={run} disabled={!!refusal || active || disabled}
             aria-busy={active}
-            className="min-h-10 lg:min-h-0 rounded-lg bg-gradient-primary px-4 py-1.5 text-[0.8rem] font-semibold text-gray-950 disabled:cursor-not-allowed disabled:opacity-40">
+            className="min-h-10 lg:min-h-0 rounded-lg bg-gradient-primary px-4 py-1.5 text-xs font-semibold text-gray-950 disabled:cursor-not-allowed disabled:opacity-40">
             {active ? 'Queueing…' : `Shoot ${poses.length || ''} view${poses.length === 1 ? '' : 's'}`.trim()}
           </button>
         </footer>

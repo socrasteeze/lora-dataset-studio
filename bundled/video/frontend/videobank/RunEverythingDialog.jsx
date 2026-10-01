@@ -96,7 +96,7 @@ export default function RunEverythingDialog({ capability, onClose, onLaunch }) {
               <span className="min-w-0">
                 <span className="font-semibold">{PASS_LABELS[r.key]}</span>
                 {r.locked && (
-                  <span className="ml-2 text-[0.6875rem] text-content-subtle">always</span>
+                  <span className="ml-2 text-2xs text-content-subtle">always</span>
                 )}
                 <span className="block text-xs text-content-muted">{r.why}</span>
                 {r.blocked && (

@@ -383,7 +383,7 @@ export default function BankReviewLightbox({
           <Shuffle aria-hidden="true" className="h-3.5 w-3.5" /> Random order
         </label>
         <button type="button" onClick={onClose} title="Close (Esc)" aria-label="Close review"
-          className="ml-auto h-10 w-10 lg:h-9 lg:w-9 rounded-full bg-white/10 text-lg leading-none text-white hover:bg-white/20">✕</button>
+          className="ml-auto h-10 w-10 lg:h-9 lg:w-9 rounded-full bg-white/10 text-xl leading-none text-white hover:bg-white/20">✕</button>
       </div>
 
       {done ? (

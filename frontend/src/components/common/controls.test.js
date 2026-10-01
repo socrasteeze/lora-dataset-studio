@@ -82,6 +82,43 @@ test('no output contains a stray "undefined" or doubled space', () => {
   assert.doesNotMatch(fieldClass({ size: 'sm' }), /undefined|\s{2}/)
 })
 
+test('Button, Input, Select and Chip render the shared classes', async () => {
+  await import('../../../tests/support/mountJsx.mjs')
+  const { createElement } = await import('react')
+  const { renderToStaticMarkup } = await import('react-dom/server')
+  const { Button, IconButton, Input, Select, Chip } = await import('./Controls.jsx')
+  const html = (node) => renderToStaticMarkup(node)
+
+  const button = html(createElement(Button, { children: 'Save' }))
+  assert.match(button, /type="button"/)
+  assert.match(button, /min-h-10/)
+  assert.match(button, /lg:h-8/)
+  assert.match(button, /text-sm/)
+
+  const large = html(createElement(Button, { size: 'lg', variant: 'primary', children: 'Create' }))
+  assert.match(large, /lg:h-9/)
+  assert.match(large, /bg-gradient-primary/)
+
+  const icon = html(createElement(IconButton, { label: 'Close', children: 'x' }))
+  assert.match(icon, /aria-label="Close"/)
+  assert.match(icon, /lg:h-8/)
+
+  const input = html(createElement(Input, { 'aria-label': 'Name' }))
+  assert.match(input, /<input/)
+  assert.match(input, /lg:h-8/)
+  assert.match(input, /text-sm/)
+
+  const select = html(createElement(Select, { 'aria-label': 'Size', children: 'S' }))
+  assert.match(select, /<select/)
+  assert.match(select, /lg:h-8/)
+
+  const chip = html(createElement(Chip, { pressed: true, children: 'M' }))
+  assert.match(chip, /aria-pressed="true"/)
+  assert.match(chip, /lg:h-7/)
+  assert.match(chip, /text-xs/)
+  assert.doesNotMatch(chip, /\bh-6\b/)
+})
+
 test('every class is written out whole in the source, where Tailwind can find it', () => {
   // Tailwind scans source TEXT. A class assembled from pieces (`lg:h-${n}`)
   // would build a string no stylesheet rule matches.

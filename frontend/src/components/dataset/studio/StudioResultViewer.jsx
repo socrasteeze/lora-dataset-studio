@@ -53,7 +53,7 @@ export default function StudioResultViewer({ img, items = [], onRate, onNavigate
       actions={onRate ? (
         <span className="inline-flex items-center gap-2">
           {hasNav && (
-            <span className="text-[0.72rem] tabular-nums text-white/55">
+            <span className="text-xs tabular-nums text-white/55">
               {idx + 1} / {items.length}
             </span>
           )}

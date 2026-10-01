@@ -72,16 +72,16 @@ export default function H3AttentionInstallRow({ caps, onDone }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-semibold">Block attention switch (speed lever)</p>
-          <p className="text-[0.75rem] text-content-muted">
+          <p className="text-xs text-content-muted">
             Runs the middle of the H3 stack on sage or int8 attention, the ends on full precision —
             the live channel&apos;s largest single speed lever on one card (after jacokon&apos;s FastH3 Live, Apache-2.0).
             Optional: the video lane renders without it.
           </p>
         </div>
         {installed && !missing && !justInstalled ? (
-          <span className="text-[0.75rem] text-emerald-300">✓ installed</span>
+          <span className="text-xs text-emerald-300">✓ installed</span>
         ) : installed || justInstalled ? (
-          <span className="text-[0.75rem] text-amber-200">copied — restart ComfyUI to load it</span>
+          <span className="text-xs text-amber-200">copied — restart ComfyUI to load it</span>
         ) : (
           <button type="button" onClick={start} disabled={running}
             className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50 min-h-10 lg:min-h-0">

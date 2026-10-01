@@ -31,7 +31,7 @@ export default function VideoPreviewResults({ previews, filterKey = null, onClea
         onSeeked={second ? undefined : sync} onRateChange={second ? undefined : sync}
         onTimeUpdate={second ? undefined : sync} onLoadedMetadata={second ? sync : undefined}
         className="max-h-[45vh] w-full rounded-lg bg-black" />
-      <p className="mt-1 text-[0.6875rem] text-content-muted">Seed {p.seed} · {p.generation_settings?.steps ?? '?'} steps · {p.generation_settings?.frames ?? '?'} frames</p>
+      <p className="mt-1 text-2xs text-content-muted">Seed {p.seed} · {p.generation_settings?.steps ?? '?'} steps · {p.generation_settings?.frames ?? '?'} frames</p>
       <p className="mt-1 whitespace-pre-wrap break-words text-xs text-content-muted">{p.prompt}</p>
       <details className="mt-1 text-xs text-content-subtle"><summary className="min-h-10 cursor-pointer lg:min-h-0">Render settings</summary>
         <pre className="whitespace-pre-wrap break-all">{JSON.stringify(p.generation_settings || {}, null, 2)}</pre>
@@ -53,7 +53,7 @@ export default function VideoPreviewResults({ previews, filterKey = null, onClea
       {previews.map((p) => <li key={p.clip_id} className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-surface p-3">
         <div className="flex flex-wrap justify-between gap-1 text-xs text-content"><strong>{previewLabel(p.selector)}</strong><span>{p.status}</span></div>
         {p.poster_url && <img loading="lazy" src={p.poster_url} alt="" className="aspect-video w-full rounded object-contain bg-black" />}
-        <p className="text-[0.6875rem] text-content-subtle">Seed {p.seed} · clip #{p.clip_id}</p>
+        <p className="text-2xs text-content-subtle">Seed {p.seed} · clip #{p.clip_id}</p>
         {p.source_current === false && <p className="text-xs text-amber-200">Original save changed or removed</p>}
         <p className="line-clamp-3 break-words text-xs text-content-muted">{p.prompt}</p>
         {p.error && <p role="alert" className="break-words text-xs text-amber-200">{p.error}</p>}

@@ -51,7 +51,7 @@ export function Fp8DeliverPlan({
   if (!plan?.ok) return null;
   const choice = plan.choice || null;
   return (
-    <div className="mt-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1.5 text-[0.6875rem] leading-relaxed">
+    <div className="mt-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1.5 text-2xs leading-relaxed">
       <p className="m-0">
         Takes <span className="font-mono break-all">{plan.weight_basename}</span>
         {' '}({fmtGB(plan.source_bytes)})
@@ -148,7 +148,7 @@ export function Fp8DeliverProgress({ state, onCancel = null }) {
     ? pct(state.downloaded_bytes, state.download_total_bytes)
     : pct(state.done, state.total);
   return (
-    <div className="mt-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1.5 text-[0.6875rem] leading-relaxed"
+    <div className="mt-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1.5 text-2xs leading-relaxed"
       role="status">
       <p className="m-0">
         {downloading
@@ -177,7 +177,7 @@ export function Fp8DeliverOutcome({ state }) {
   const result = state.result || null;
   if (state.status === 'done') {
     return (
-      <p className="m-0 mt-1.5 text-emerald-200 text-[0.6875rem] leading-relaxed" role="status">
+      <p className="m-0 mt-1.5 text-emerald-200 text-2xs leading-relaxed" role="status">
         ✓ <span className="font-mono break-all">{state.destination_name}</span>
         {' '}({fmtGB(result?.bytes_after)}) is in
         {' '}<span className="font-mono break-all">{state.destination_dir}</span> and was
@@ -191,14 +191,14 @@ export function Fp8DeliverOutcome({ state }) {
   }
   if (state.status === 'cancelled') {
     return (
-      <p className="m-0 mt-1.5 text-amber-200 text-[0.6875rem] leading-relaxed" role="status">
+      <p className="m-0 mt-1.5 text-amber-200 text-2xs leading-relaxed" role="status">
         ■ {state.error}
       </p>
     );
   }
   if (state.status === 'error') {
     return (
-      <p className="m-0 mt-1.5 text-rose-200 text-[0.6875rem] leading-relaxed" role="alert">
+      <p className="m-0 mt-1.5 text-rose-200 text-2xs leading-relaxed" role="alert">
         ✗ {state.error || 'Quantization failed.'} Nothing was overwritten.
       </p>
     );
@@ -313,7 +313,7 @@ export default function Fp8QuantizeTool({
   };
 
   const running = RUNNING_STATES.includes(state?.status);
-  const controlClass = 'shrink-0 self-start px-2.5 py-1 rounded-lg bg-primary/20 border border-primary/40 text-white text-[0.75rem] font-semibold disabled:opacity-40';
+  const controlClass = 'shrink-0 self-start px-2.5 py-1 rounded-lg bg-primary/20 border border-primary/40 text-white text-xs font-semibold disabled:opacity-40';
 
   return (
     <div className={framed
@@ -322,7 +322,7 @@ export default function Fp8QuantizeTool({
       {framed && (
         <>
           <span className="font-semibold">Quantize a model to fp8</span>
-          <p className="m-0 mt-1 text-sky-200/75 text-[0.6875rem] leading-relaxed">
+          <p className="m-0 mt-1 text-sky-200/75 text-2xs leading-relaxed">
             Turns a full-precision checkpoint into the ~10 GB fp8 file ComfyUI loads with the
             standard Load Diffusion Model node. The plan shows where the file will be saved. The
             source is never modified and nothing is ever overwritten. This is not the same thing
@@ -336,7 +336,7 @@ export default function Fp8QuantizeTool({
           even though that master exists only in a private Hugging Face repo. */}
       {target && (
         <div className={framed ? 'mt-2' : ''}>
-          <p className="m-0 text-[0.6875rem] leading-relaxed">
+          <p className="m-0 text-2xs leading-relaxed">
             <span className="font-semibold">{target.label || 'The model this run delivered'}</span>
             {target.name ? <> — <span className="font-mono break-all">{target.name}</span></> : null}
             {target.sizeBytes ? <> · {fmtGB(target.sizeBytes)}</> : null}
@@ -354,7 +354,7 @@ export default function Fp8QuantizeTool({
             ✨ Quantize to fp8
           </button>
           {delivery === false && !target.path && (
-            <p className="mt-1 text-amber-200 text-[0.6875rem]">
+            <p className="mt-1 text-amber-200 text-2xs">
               Enable Cloud training to fetch this repository, or choose a file already on this computer below.
             </p>
           )}
@@ -368,7 +368,7 @@ export default function Fp8QuantizeTool({
       {manualPath && (
       <div className={framed || target ? 'mt-2' : ''}>
         {target && (
-          <p className="m-0 mb-1 text-sky-200/75 text-[0.625rem] uppercase tracking-wide">
+          <p className="m-0 mb-1 text-sky-200/75 text-2xs uppercase tracking-wide">
             Or another file, already on this machine
           </p>
         )}
@@ -380,7 +380,7 @@ export default function Fp8QuantizeTool({
             disabled={running || disabled}
             placeholder="Full path to a .safetensors model"
             aria-label="Path of the model file to quantize to fp8"
-            className="w-full sm:flex-1 sm:min-w-[12rem] rounded border border-sky-300/40 bg-app/70 px-2 py-1 text-content text-[0.75rem] font-mono disabled:opacity-50" />
+            className="w-full sm:flex-1 sm:min-w-[12rem] rounded border border-sky-300/40 bg-app/70 px-2 py-1 text-content text-xs font-mono disabled:opacity-50" />
           <button type="button" onClick={askForPath}
             disabled={disabled || busy || running || delivery === null || !path.trim()}
             className={controlClass}>
@@ -391,7 +391,7 @@ export default function Fp8QuantizeTool({
       )}
 
       {plan && !plan.ok && !running && (
-        <p className="m-0 mt-1 text-amber-200 text-[0.6875rem]" role="alert">⚠ {plan.error}</p>
+        <p className="m-0 mt-1 text-amber-200 text-2xs" role="alert">⚠ {plan.error}</p>
       )}
       {!running && (
         <Fp8DeliverPlan plan={plan} keepMaster={keepMaster} busy={busy} disabled={disabled}

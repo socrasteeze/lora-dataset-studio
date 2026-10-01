@@ -26,7 +26,7 @@ function renderInline(text, keyBase = 'i') {
     const tok = m[0];
     const key = `${keyBase}-${k++}`;
     if (tok.startsWith('`')) {
-      out.push(<code key={key} className="px-1 py-0.5 rounded bg-surface-raised text-indigo-200 text-[0.8125em] font-mono">{tok.slice(1, -1)}</code>);
+      out.push(<code key={key} className="px-1 py-0.5 rounded bg-surface-raised text-indigo-200 text-xs font-mono">{tok.slice(1, -1)}</code>);
     } else if (tok.startsWith('**')) {
       out.push(<strong key={key} className="text-content font-semibold">{tok.slice(2, -2)}</strong>);
     } else if (tok.startsWith('*')) {
@@ -63,7 +63,7 @@ function CodeBlock({ body }) {
           <span aria-live="polite">{state === 'copied' ? 'Copied' : state === 'failed' ? 'Copy failed' : 'Copy'}</span>
         </button>
       </div>
-      <pre className="m-0 rounded-lg border border-border bg-app/60 p-3 overflow-x-auto text-[0.8125rem] text-content-muted font-mono">{body}</pre>
+      <pre className="m-0 rounded-lg border border-border bg-app/60 p-3 overflow-x-auto text-xs text-content-muted font-mono">{body}</pre>
     </div>
   );
 }
@@ -132,7 +132,7 @@ function renderBlock(b, idx, guide = false) {
   const key = `b${idx}`;
   switch (b.t) {
           case 'h1': return <h1 key={key} className="m-0 mt-2 text-content font-bold text-2xl">{renderInline(b.body, key)}</h1>;
-          case 'h2': return <h2 key={key} id={guide ? undefined : markdownHeadingId(b.body)} className={`${guide ? 'text-xl' : 'mt-4 border-b border-border pb-1.5 text-lg'} m-0 text-content font-bold`}>{renderInline(b.body, key)}</h2>;
+          case 'h2': return <h2 key={key} id={guide ? undefined : markdownHeadingId(b.body)} className={`${guide ? 'text-xl' : 'mt-4 border-b border-border pb-1.5 text-xl'} m-0 text-content font-bold`}>{renderInline(b.body, key)}</h2>;
           case 'h3': return <h3 key={key} className="m-0 mt-2 text-content font-semibold text-base">{renderInline(b.body, key)}</h3>;
           case 'hr': return <hr key={key} className="border-border my-2" />;
           case 'quote': return (

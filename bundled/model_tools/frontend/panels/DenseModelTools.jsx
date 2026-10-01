@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Fp8QuantizeTool from './Fp8QuantizeTool.jsx';
 import LoraMergeTool from './LoraMergeTool.jsx';
 
-const BUTTON = 'rounded-md border border-sky-300/40 bg-sky-400/15 px-2.5 py-1 text-[0.6875rem] '
+const BUTTON = 'rounded-md border border-sky-300/40 bg-sky-400/15 px-2.5 py-1 text-2xs '
   + 'font-semibold text-sky-50 hover:bg-sky-400/25 disabled:opacity-40';
 const TOOL_BOX = 'mt-1.5 rounded-md border border-sky-300/30 bg-app/50 px-2 py-1.5';
 
@@ -52,7 +52,7 @@ export default function DenseModelTools({ entry, busy = false, actions = null })
       </div>
 
       {quantize?.reason && (
-        <p className="m-0 mt-1 text-content-subtle text-[0.625rem] leading-snug">
+        <p className="m-0 mt-1 text-content-subtle text-2xs leading-snug">
           {quantize.reason}
         </p>
       )}

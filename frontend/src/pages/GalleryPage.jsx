@@ -437,7 +437,7 @@ export default function GalleryPage() {
         </p>
       )}
       {status === 'ready' && images.length === 0 && (
-        <p className="m-0 text-content-muted text-[0.8125rem]">
+        <p className="m-0 text-content-muted text-xs">
           {galleryEmptyMessage(filters)}
         </p>
       )}
@@ -515,7 +515,7 @@ export default function GalleryPage() {
         <div ref={loadMoreRef} className="flex justify-center">
           <button type="button" data-testid="gallery-load-more"
             onClick={loadMore} disabled={loadingMore}
-            className="min-h-10 rounded-md border border-border px-4 py-1.5 text-[0.8125rem] text-content-muted hover:border-indigo-400/50 hover:text-content disabled:opacity-50">
+            className="min-h-10 rounded-md border border-border px-4 py-1.5 text-xs text-content-muted hover:border-indigo-400/50 hover:text-content disabled:opacity-50">
             {loadingMore ? 'Loading…' : `Load more (${feed.count - images.length} left)`}
           </button>
         </div>

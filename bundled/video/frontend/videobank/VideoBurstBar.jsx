@@ -80,7 +80,7 @@ export default function VideoBurstBar({
           {end && (
             <p role="status" className="mt-1.5 text-xs text-content-muted">{end}</p>
           )}
-          <p className="mt-1.5 font-mono text-[0.6875rem] text-content-subtle">{BURST_HINT}</p>
+          <p className="mt-1.5 font-mono text-2xs text-content-subtle">{BURST_HINT}</p>
         </>
       )}
 
@@ -97,7 +97,7 @@ export default function VideoBurstBar({
               </div>
             ))}
           </dl>
-          <p className="mt-2 text-[0.6875rem] text-content-subtle">
+          <p className="mt-2 text-2xs text-content-subtle">
             Shortcuts never fire while you are typing in a search or a threshold
             field. Turn burst mode off with Esc.
           </p>

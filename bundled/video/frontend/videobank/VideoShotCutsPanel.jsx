@@ -98,7 +98,7 @@ export default function VideoShotCutsPanel({ bankId, shotDetect, onChanged }) {
             placeholder={thresholdLabel(null, fallback)}
             className="mt-0.5 w-full rounded-md border border-border bg-app px-2 py-1 text-sm text-content"
           />
-          <span className="mt-0.5 block text-[0.7rem] leading-tight text-content-subtle">
+          <span className="mt-0.5 block text-2xs leading-tight text-content-subtle">
             Leave empty to use the app default ({Number(fallback).toFixed(2)}).
             Empty is not zero — zero would cut on every frame.
           </span>
@@ -139,7 +139,7 @@ export default function VideoShotCutsPanel({ bankId, shotDetect, onChanged }) {
                       : 'border-border bg-app text-content-muted'}`}>
                   <span className="font-mono">{row.threshold.toFixed(2)}</span>
                   <span className="text-content">{row.shots} shots</span>
-                  <span className="text-[0.7rem] text-content-subtle">
+                  <span className="text-2xs text-content-subtle">
                     {row.deltaLabel}
                   </span>
                 </li>
@@ -149,7 +149,7 @@ export default function VideoShotCutsPanel({ bankId, shotDetect, onChanged }) {
           </div>
         )}
 
-        <p className="text-[0.7rem] leading-tight text-content-subtle">
+        <p className="text-2xs leading-tight text-content-subtle">
           A re-cut never touches a shot you cut by hand, a shot already in a
           built dataset, or a file you marked as a single take. Everything else
           is replaced, and loses its thumbnail and its quality scores — they

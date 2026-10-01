@@ -40,7 +40,7 @@ export default function NeuralRenderDialog({
       <input type="range" min="0" max={max} step={step} value={params[key]}
         aria-label={label} onChange={(e) => set({ [key]: e.target.value })}
         className="w-full" />
-      <span className="text-[0.6875rem] text-content-subtle">{hint}</span>
+      <span className="text-2xs text-content-subtle">{hint}</span>
     </label>
   )
 
@@ -79,7 +79,7 @@ export default function NeuralRenderDialog({
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Starting point">
           {NR_PRESETS.map((p) => (
             <button key={p.id} type="button" onClick={() => set(p.params)} aria-pressed={preset === p.id}
-              className={`min-h-10 rounded-full border px-3 py-0.5 text-[0.6875rem] font-semibold lg:min-h-0 ${
+              className={`min-h-10 rounded-full border px-3 py-0.5 text-2xs font-semibold lg:min-h-0 ${
                 preset === p.id ? 'border-border-strong bg-surface-raised text-content'
                   : 'border-border text-content-muted hover:text-content'}`}>
               {p.label}
@@ -106,14 +106,14 @@ export default function NeuralRenderDialog({
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Passes">
             {Array.from({ length: PASSES_MAX }, (_, i) => i + 1).map((n) => (
               <button key={n} type="button" onClick={() => set({ passes: n })} aria-pressed={params.passes === n}
-                className={`min-h-10 rounded-full border px-3 py-0.5 text-[0.6875rem] font-semibold lg:min-h-0 ${
+                className={`min-h-10 rounded-full border px-3 py-0.5 text-2xs font-semibold lg:min-h-0 ${
                   params.passes === n ? 'border-border-strong bg-surface-raised text-content'
                     : 'border-border text-content-muted hover:text-content'}`}>
                 {n}
               </button>
             ))}
           </div>
-          <p className="text-[0.6875rem] text-content-subtle">Each extra pass feeds the render back through the model. Extra passes run in still mode.</p>
+          <p className="text-2xs text-content-subtle">Each extra pass feeds the render back through the model. Extra passes run in still mode.</p>
         </fieldset>
         <label className="flex items-center gap-2 text-xs text-content-muted">
           <input type="checkbox" checked={params.scale === 2} onChange={(e) => set({ scale: e.target.checked ? 2 : 1 })} />
@@ -126,14 +126,14 @@ export default function NeuralRenderDialog({
             {TEMPORAL_MODES.map((m) => (
               <button key={m.id} type="button" onClick={() => set({ temporal: m.id })}
                 aria-pressed={params.temporal === m.id} title={m.hint}
-                className={`min-h-10 rounded-full border px-3 py-0.5 text-[0.6875rem] font-semibold lg:min-h-0 ${
+                className={`min-h-10 rounded-full border px-3 py-0.5 text-2xs font-semibold lg:min-h-0 ${
                   params.temporal === m.id ? 'border-border-strong bg-surface-raised text-content'
                     : 'border-border text-content-muted hover:text-content'}`}>
                 {m.label}
               </button>
             ))}
           </div>
-          <p className="text-[0.6875rem] text-content-subtle">
+          <p className="text-2xs text-content-subtle">
             {TEMPORAL_MODES.find((m) => m.id === params.temporal)?.hint} → {temporalOutcome(params.temporal, width, params.passes)}.
           </p>
         </fieldset>

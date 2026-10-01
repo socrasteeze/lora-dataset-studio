@@ -142,7 +142,7 @@ export default function Dlss5InstallCard({ caps, onDone }) {
       )}
 
       {log.length > 0 && (
-        <pre className="mt-3 max-h-40 overflow-auto rounded-md border border-border bg-surface-raised p-2 font-mono text-[0.6875rem] text-content-muted">
+        <pre className="mt-3 max-h-40 overflow-auto rounded-md border border-border bg-surface-raised p-2 font-mono text-2xs text-content-muted">
           {log.slice(-20).join('\n')}
         </pre>
       )}
