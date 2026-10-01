@@ -15,7 +15,8 @@ The run happened on this Windows machine, not in the cloud: the "remote" agent r
 - FAIL host suite: `backend/tests/test_setup_state.py::test_tracked_local_engine_is_not_a_regression_while_comfyui_is_down`. Its `SimpleNamespace` engine spec lacks `counts_as_recommended`. Reproduces alone and at main `f3815e82e`.
 - Isolation gap, also on main: with `LDS_PLUGINS_DIR` set for the whole run, `test_static_mime_types.py` and `test_bank_pass_write_lock.py` call `create_app()` without their own plugins dir, so xdist workers collide on `admission.lock` (`StorageError: Another process is preparing...`). Each passes alone; with the variable unset only the setup_state failure remains (10472 pass). Fix: per-test `LDS_PLUGINS_DIR`, or redirect it in the autouse fixture (see item 11).
 - Install trap: `pip install -r requirements-dev.txt -r requirements-torch-tests.txt` in ONE command fails, because the torch file's `--index-url` replaces PyPI. Install them in two commands.
-- Next: fix the three failing tests in a source commit, re-run the gates in a real cloud environment with Docker, then fast-forward main and delete the four branches.
+- The three failing tests are fixed in `bccf53d6c` (bundle `a93882c91`); not yet re-run. Docker is out of scope: the user does not use it.
+- Next: re-run the gates at `a93882c91` in a real cloud environment, then fast-forward main and delete the four branches.
 
 ### Open low-severity review notes
 - `backend/app/capabilities.py:54` `_POSITIVE_IMPORT_TTL = 24 * 3600` keeps a JoyCaption "ready" verdict for 24 h, so an uninstall or a broken env reads as ready for up to a day.
