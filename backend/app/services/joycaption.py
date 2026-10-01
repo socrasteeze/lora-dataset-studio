@@ -1,6 +1,7 @@
 """JoyCaption Beta One LoRA dataset captioning through a subprocess.
 
-Run Llava 8B NF4 in ai-toolkit's torch/transformers/bitsandbytes venv,
+Run Llava 8B (NF4, or bf16 from a complete local snapshot) in ai-toolkit's
+torch/transformers/bitsandbytes venv,
 not Flask's Python. Load once for the entire batch rather than per
 image. Missing/failed inference is nonfatal and returns {}; the caller
 falls back to Qwen3-VL or honors the explicitly selected backend."""
@@ -24,6 +25,15 @@ logger = logging.getLogger(__name__)
 
 # joycaption_infer.py lives in backend/infer, not app/services.
 _SCRIPT = cfg.BACKEND_DIR / 'infer' / 'joycaption_infer.py'
+
+# Default budget: a fixed allowance for the first-run ~7 GB download and the model
+# load, plus a per-image allowance. A flat 1800 s cut large banks off after about
+# 300 images and handed the rest to the fallback engine, mixing caption styles.
+BASE_TIMEOUT_S = 1800
+PER_IMAGE_TIMEOUT_S = 20
+# A worker that prints nothing at all (no caption, no progress, no download bar)
+# for this long is stuck; stop it without waiting out a long per-image budget.
+STALL_TIMEOUT_S = 900
 
 
 def availability() -> dict:
@@ -59,7 +69,7 @@ def _reflect_stage(line: str, activity_token) -> None:
 
 
 def caption_images_joycaption(paths, prompt: str | None = None,
-                              max_tokens: int = 300, timeout: int = 1800,
+                              max_tokens: int = 300, timeout: int | None = None,
                               activity_token=None, should_cancel=None,
                               on_caption=None, progress=None,
                               errors_out=None, diagnostics_out=None,
@@ -86,7 +96,9 @@ def caption_images_joycaption(paths, prompt: str | None = None,
     thread while the worker runs, so they may write the database.
     on_progress(ready, total) reports unique successful captions as stdout arrives.
     It runs on the reader thread: use it only for thread-safe activity updates,
-    never database writes. Failed images remain eligible for the caller's fallback."""
+    never database writes. Failed images remain eligible for the caller's fallback.
+    timeout=None budgets BASE_TIMEOUT_S plus PER_IMAGE_TIMEOUT_S per image; a worker
+    silent for STALL_TIMEOUT_S is stopped as timed out either way."""
     if diagnostics_out is not None:
         diagnostics_out.update(returncode=None, timed_out=False, stderr_tail=[])
     paths = [p for p in (paths or []) if p and os.path.isfile(p)]
@@ -135,6 +147,8 @@ def caption_images_joycaption(paths, prompt: str | None = None,
     # it runs on the reader and may only touch thread-safe activity state.
     landed: queue.Queue = queue.Queue()
     reported = 0
+    # Monotonic time of the worker's last output line on either pipe (stall check).
+    last_output = {'t': time.monotonic()}
 
     def _consume_json_line(line: str) -> None:
         """Parse one stdout JSON line: a per-image {i,path,caption|error}, or the final
@@ -171,6 +185,7 @@ def caption_images_joycaption(paths, prompt: str | None = None,
     def _drain_stdout():
         try:
             for raw in proc.stdout:
+                last_output['t'] = time.monotonic()
                 line = raw.strip()
                 if line.startswith('{'):
                     _consume_json_line(line)
@@ -192,6 +207,7 @@ def caption_images_joycaption(paths, prompt: str | None = None,
     def _drain_stderr():
         try:
             for raw in proc.stderr:
+                last_output['t'] = time.monotonic()
                 line = raw.rstrip('\n')
                 if not line:
                     continue
@@ -240,8 +256,12 @@ def caption_images_joycaption(paths, prompt: str | None = None,
     # Deliberately still wait(), not poll(): wait(timeout=…) is the contract this
     # function already had, and switching to poll() would silently require every
     # existing and future test double to grow a method it never needed.
+    if timeout is None:
+        timeout = BASE_TIMEOUT_S + PER_IMAGE_TIMEOUT_S * len(paths)
     budget = processing_timeout(timeout)
+    stall = processing_timeout(STALL_TIMEOUT_S)
     _deadline = None if budget is None else time.monotonic() + budget
+    stalled = False
     try:
         while True:
             left = 0.2 if _deadline is None else max(0.0, _deadline - time.monotonic())
@@ -250,7 +270,11 @@ def caption_images_joycaption(paths, prompt: str | None = None,
                 break
             except subprocess.TimeoutExpired:
                 _pump()
-                if _deadline is not None and time.monotonic() >= _deadline:
+                now = time.monotonic()
+                if _deadline is not None and now >= _deadline:
+                    raise
+                if now - last_output['t'] >= stall:
+                    stalled = True
                     raise
         _pump()
     except subprocess.TimeoutExpired:
@@ -260,15 +284,22 @@ def caption_images_joycaption(paths, prompt: str | None = None,
         proc.wait()
         t_out.join(timeout=5)
         t_err.join(timeout=5)
-        # The dominant cause of a first-run timeout is the ~7 GB model download, not a
-        # hang — say so, and note the download is cached so a re-run resumes instead of
-        # restarting from zero. Anything already streamed is still returned below.
-        logger.error('joycaption: timed out after %.1fs while processing %d image(s) — '
-                     'if this was the FIRST run the ~7 GB model was still downloading; '
-                     'the partial download is cached, so just run captioning again to '
-                     'resume. Last subprocess output: %s',
-                     time.monotonic() - started, len(paths),
-                     ' | '.join(list(stderr_tail)[-5:]) or '(none)')
+        if stalled:
+            logger.error('joycaption: worker printed nothing for %.0fs and was stopped '
+                         'after %d/%d caption(s). Last subprocess output: %s',
+                         stall, len(captions), len(paths),
+                         ' | '.join(list(stderr_tail)[-5:]) or '(none)')
+        else:
+            # The dominant cause of a first-run timeout is the ~7 GB model download, not
+            # a hang — say so, and note the download is cached so a re-run resumes
+            # instead of restarting from zero. Anything already streamed is still
+            # returned below.
+            logger.error('joycaption: timed out after %.1fs while processing %d image(s) — '
+                         'if this was the FIRST run the ~7 GB model was still downloading; '
+                         'the partial download is cached, so just run captioning again to '
+                         'resume. Last subprocess output: %s',
+                         time.monotonic() - started, len(paths),
+                         ' | '.join(list(stderr_tail)[-5:]) or '(none)')
     t_out.join(timeout=5)
     t_err.join(timeout=5)
     # Final drain: the reader can queue between the loop's last pump and its own
