@@ -140,16 +140,27 @@ def _name_list():
     return None
 
 
+_UNPUSHED_RANGE = 'origin/main..HEAD'
+
+
 def _unpushed_range():
-    """`origin/v2..HEAD`, or '' when there is nothing to check (no remote yet,
+    """`origin/main..HEAD`, or '' when there is nothing to check (no remote yet,
     or everything already pushed). These commits are the last ones that can still
     be fixed for free: once a name is on the public remote, removing it means
-    rewriting history, which breaks `pull --ff-only` for every install."""
-    out = subprocess.run(['git', 'rev-list', '--count', 'origin/v2..HEAD'],
+    rewriting history, which breaks `pull --ff-only` for every install.
+
+    The base ref has to be a branch this fork actually has. `origin/v2` never
+    existed here, so the old range failed closed and the check skipped forever.
+    """
+    base = subprocess.run(['git', 'rev-parse', '--verify', '--quiet', 'origin/main'],
+                          cwd=_REPO, capture_output=True, text=True, timeout=60)
+    if base.returncode != 0 or not base.stdout.strip():
+        return ''
+    out = subprocess.run(['git', 'rev-list', '--count', _UNPUSHED_RANGE],
                          cwd=_REPO, capture_output=True, text=True, timeout=60)
     if out.returncode != 0 or out.stdout.strip() in ('', '0'):
         return ''
-    return 'origin/v2..HEAD'
+    return _UNPUSHED_RANGE
 
 
 def _unpushed_text(rev_range):
@@ -213,6 +224,21 @@ def test_an_explicit_list_still_wins_over_the_discovered_one(monkeypatch, tmp_pa
     monkeypatch.setenv('LDS_PRIVACY_NAMES', str(explicit))
 
     assert tnpd._name_list() == ['Given']
+
+
+def test_the_unpushed_range_names_a_branch_that_exists():
+    """The scan range has to name a ref this checkout can resolve.
+
+    `origin/v2` was upstream's branch. This fork never had it, so `git rev-list`
+    failed and the name scan skipped on every run.
+    """
+    assert tnpd._UNPUSHED_RANGE == 'origin/main..HEAD'
+    assert 'origin/v2' not in tnpd._UNPUSHED_RANGE
+    probe = subprocess.run(
+        ['git', 'rev-parse', '--verify', '--quiet', 'origin/main'],
+        cwd=tnpd._REPO, capture_output=True, text=True, timeout=60)
+    assert probe.returncode == 0 and probe.stdout.strip(), (
+        'origin/main is missing, so the unpushed name scan would skip')
 
 
 def test_no_forbidden_name_in_commits_that_have_not_been_pushed():

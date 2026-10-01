@@ -234,10 +234,8 @@ def test_the_ci_size_gate_names_its_blind_spots_instead_of_its_sources():
     """An unlisted path must COUNT toward the threshold, not score zero.
 
     This replaced an INCLUDE list of backend/ frontend/src frontend/tests, under
-    which every other path in the repo was invisible: scripts/update-docker-gpu.ps1
-    and the root update-docker*.bat launchers (owned by backend-tests), the
-    Dockerfile and packaging/ (owned by docker-smoke) could change by any amount
-    and never reach the job that tests them.
+    which every other path in the repo was invisible. scripts/, packaging/ and
+    bundled/ could change by any amount and never reach the job that tests them.
     """
     text = _CI.read_text(encoding='utf-8')
     gate_steps = [step for step in _workflow_steps(text)
