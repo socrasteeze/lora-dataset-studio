@@ -16,7 +16,6 @@ import SetupHealthNotice from './components/setup/SetupHealthNotice'
 import SetupJourneyNotice from './components/setup/SetupJourneyNotice'
 import ComfyRecoveryBanner from './components/common/ComfyRecoveryBanner'
 import GenerationQueueDock from './components/common/GenerationQueueDock'
-import DockerUpdateInstructions from './components/common/DockerUpdateInstructions'
 import PinokioUpdateInstructions from './components/common/PinokioUpdateInstructions'
 import { lazyPage } from './utils/lazyPage'
 
@@ -462,9 +461,6 @@ function UpdateBanner() {
   // One-click pull + restart, same backend action as the Settings card. A packaged
   // build (no git) comes back {manual:true} → fall back to the download page.
   const apply = async () => {
-    // Docker owns /app as image content. The action is hidden below, but keep a
-    // hard guard so an already-bound/stale callback cannot call the endpoint.
-    if (installMode(info) === 'docker') return
     // Pinokio owns start/stop: an in-app restart would orphan the server.
     if (installMode(info) === 'pinokio') return
     setApplying(true); setPhase('pulling'); setError(null)
@@ -487,7 +483,6 @@ function UpdateBanner() {
   }
 
   if (!info) return null
-  const dockerMode = installMode(info) === 'docker'
   const pinokioMode = installMode(info) === 'pinokio'
   return (
     <div className="mx-auto max-w-5xl px-4 pt-3">
@@ -511,9 +506,7 @@ function UpdateBanner() {
                     : 'a new version'}
               </span> (you run {versionLabel(info)}).
             </span>
-            {dockerMode ? (
-              <DockerUpdateInstructions status={info} />
-            ) : pinokioMode ? (
+            {pinokioMode ? (
               <PinokioUpdateInstructions />
             ) : (
               <>

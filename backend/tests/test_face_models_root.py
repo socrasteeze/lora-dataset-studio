@@ -2,13 +2,13 @@
 
 Community report (Discord): "Person grouping keeps trying to download the
 antelopev2 file every time I restart the container. Did I maybe forget to mount
-a path in my docker config so it's persistent or could it be a bug? The rest of
+a path in my container config so it's persistent or could it be a bug? The rest of
 the dependencies stays installed after reboots, seems to be just this one now."
 
 Nothing was missing from their mounts. Face work was the only engine that never
 placed its own weights: with no ``root=``, insightface writes ~350 MB under
 ``~/.insightface``. That home is permanent on a native install, which is why the
-default survived this long unseen — and in Docker it sits in the container's
+default survived this long unseen — and in container it sits in the container's
 writable layer, which no Compose file mounts and which ``--force-recreate`` (how
 the launcher starts a STOPPED container) discards. The ML venvs live under
 ``data/envs``, on the mounted volume: that is exactly why "the rest of the
@@ -72,7 +72,7 @@ def test_a_configured_root_still_wins_verbatim(app, home):
 
 def test_with_nothing_installed_the_pack_lands_under_the_data_directory(app, home):
     """The fix in one assertion: an unconfigured install downloads into the one
-    folder every Docker stack mounts, instead of a home nobody mounts."""
+    folder every container stack mounts, instead of a home nobody mounts."""
     with app.app_context():
         assert face_models.models_root() == str(cfg.data_dir() / 'models' / 'insightface')
 

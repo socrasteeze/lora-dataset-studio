@@ -1,4 +1,4 @@
-"""Stage only the curated fork plugins for container and portable builds."""
+"""Stage only the curated fork plugins for portable builds."""
 from __future__ import annotations
 
 import argparse

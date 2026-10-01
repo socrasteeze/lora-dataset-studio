@@ -538,10 +538,8 @@ These are built on personal time, and how fast they arrive depends on how much o
 - **Reference**
   - [Why this instead of ai-toolkit?](#why-this-instead-of-ai-toolkit)
   - [Feature matrix by backend](#feature-matrix-by-backend)
-  - [Run it your way](#run-it-your-way) — full local, existing-ComfyUI Docker, **Docker (CPU or GPU)**
+  - [Run it your way](#run-it-your-way) — full local
   - [Setup & install](#setup--install)
-    - [Docker + your existing ComfyUI](#option-3--docker--your-existing-comfyui)
-    - [Docker (GPU + ComfyUI)](#option-4--docker-gpu--comfyui)
   - [Minimum requirements](#minimum-requirements)
   - [Configuration & settings reference](#configuration--settings-reference)
   - [Exposing the app beyond localhost](#exposing-the-app-beyond-localhost)
@@ -923,9 +921,6 @@ Missing dependencies are shown in Setup/Settings and gated features stay unavail
 
 | Mode | Good for | What is optional or unavailable |
 |---|---|---|
-| **Docker + existing ComfyUI** | Run LDS in Docker while keeping the ComfyUI already installed on the host | The launcher asks for the ComfyUI folder once; training still needs ai-toolkit on the host — this fork has no cloud fallback |
-| **Docker GPU + fresh ComfyUI** | Run LDS and a new isolated ComfyUI together on an NVIDIA GPU | Existing ComfyUI/models stay untouched; training still needs ai-toolkit on the host — this fork has no cloud fallback |
-| **Rented GPU pod (RunPod)** | Reach the studio, Image Bank and ComfyUI generation from any browser, on a GPU you do not own | **No training at all on the pod**: ai-toolkit is not in the image, and this fork has no rented-GPU lane to fall back on — train on your own machine, or point a pod's Generate at it. Large ZIP exports can hit the pod proxy's 100-second timeout. Set `LDS_PUBLIC=1`: a pod hostname is public, and that forces the access-token gate on. See the [RunPod guide](docs/guide/runpod.md) |
 | **Full local** | Local engines, ML helpers, ai-toolkit training, Canvas generation and Test Studio | Install/connect only the tools you need; each capability degrades independently |
 
 This fork is **local-only end to end**: no Nano Banana / ChatGPT / OpenRouter API engines (Klein/ComfyUI is the only generation path) and no rented-GPU training. Without a GPU on this machine you get everything except generation and training — see [No local GPU? Then no training here](#no-local-gpu-then-no-training-here).
@@ -941,10 +936,7 @@ Complete **Setup**, then create a dataset or install the plugins you need. Impor
 | Installation | Instructions |
 |---|---|
 | Git checkout or manual Python environment | [Native installation](docs/guide/installation.md#windows) |
-| Docker with an existing or fresh ComfyUI | [Docker guide](docs/guide/docker.md) |
-| Docker without a GPU | [API-only setup](docs/guide/installation.md#docker-without-a-gpu) |
 | Pinokio | [One-click installation](docs/guide/installation.md#pinokio) |
-| Rented RunPod GPU | [RunPod guide](docs/guide/runpod.md) |
 
 Download **`LoRA-Dataset-Studio-windows.zip`** from the [latest release](https://github.com/socrasteeze/lora-dataset-studio/releases/latest) when that asset is present; otherwise use GitHub's **Source code (zip)**. Extract the entire archive, then double-click:
 
@@ -1021,50 +1013,7 @@ npm install
 npm run build
 ```
 
-### Option 3 — Docker + your existing ComfyUI
-
-**Beginner Windows flow:** download/extract the [**source ZIP**](https://github.com/perfectgf/lora-dataset-studio/archive/refs/heads/v2.zip) — the release asset `LoRA-Dataset-Studio-windows.zip` does not carry the Docker launchers — start Docker Desktop, then double-click **`start-docker.bat`**. On the first run, select either the ComfyUI folder containing `main.py` and `models`, or its portable parent containing `ComfyUI\main.py`. LDS validates the folder and remembers it for this checkout.
-
-Start your usual ComfyUI on the host. LDS uses `http://host.docker.internal:8188` from its container and mounts the selected folder at `/external-comfyui`. If the folder later moves, double-click **`configure-docker.bat`**. The launcher chooses a free Studio port and opens the browser automatically. Local training still needs ai-toolkit on the host — this fork has no cloud fallback.
-
-### Option 4 — Docker (GPU + ComfyUI)
-
-**Beginner Windows flow:**
-
-1. Download the [source ZIP](https://github.com/perfectgf/lora-dataset-studio/archive/refs/heads/v2.zip), then extract the complete folder.
-2. Start **Docker Desktop** and wait until it reports that Docker is running.
-3. Double-click **`start-docker-gpu.bat`** in the extracted folder.
-4. Leave the first build/start running; it downloads the image and ComfyUI environment. The launcher prints both actual addresses and opens Studio as soon as Studio responds, while its batch window stays open until ComfyUI finishes its first boot. You do not need to open a second ComfyUI window.
-
-This creates a **fresh, isolated, repo-local** Docker setup: its own ComfyUI, models, application data and Image Bank folder live beside this checkout. **It never touches an existing ComfyUI by default.**
-
-For either Docker launcher, choose Ollama only inside **LDS Setup**: **No Ollama**, **Existing host Ollama**, or **Docker Ollama**. The Docker companion is started only after that explicit choice, and no vision model is downloaded automatically. Pull the selected model from the LDS Ollama card to see progress and cancel it if needed.
-
-The double-click launcher allocates free host ports atomically: Studio uses the first available port in `5050-5149`, and ComfyUI the first available port in `8188-8287`. If `5050` or `8188` is already occupied, the existing service is left running and another port is chosen automatically. Re-running the launcher from the same checkout reopens its current mapped ports without recreating the running container; a conflicting container owned by another checkout is reported and left untouched. The launcher does not edit `.env`.
-
-Advanced CLI:
-
-```bash
-cp .env.example .env
-mkdir -p run basedir data-docker-gpu          # create the bind mounts FIRST
-docker compose -f docker-compose.gpu.yml up --build
-```
-
-This image ships **ComfyUI inside the container** — Klein/Krea generation, the
-Test Studio and Canvas work without installing ComfyUI on the host — but it
-still does **not** do **local LoRA training**: ai-toolkit stays a host-native
-tool, and this fork has no cloud fallback, so if you came here to train, you
-want Option 1 or 2. For the advanced CLI, the default addresses remain
-`http://127.0.0.1:5050/` for Studio and `http://127.0.0.1:8188/` for ComfyUI;
-`.env` can override them. This lane requires an NVIDIA GPU, a compatible
-driver and NVIDIA Container Toolkit support. Storage relocation, ports,
-existing-ComfyUI adoption, UID/GID, DNS, update commands, resource caps and
-operational limits are documented in the dedicated
-[Docker guide](docs/guide/docker.md).
-
-To update a Docker install, double-click **`update-docker.bat`** for the latest stable release, or pass `v2` to follow the maintained branch (`main` remains a compatibility alias for `v2`). It rebuilds transactionally and rolls back if the container does not come up healthy. Both `start-docker.bat` and `start-docker-gpu.bat` accept `--rebuild` and `--update-rebuild`; `start-docker.bat` also accepts `--configure`, which is what `configure-docker.bat` calls. After upgrading from V1, install the optional features you use from **Plugins → Store**. Both images include the public Store configuration; [Docker plugin administration and restarts](docs/guide/docker.md#v2-plugins) explains how to unlock installation and apply changes.
-
-### Option 5 — Pinokio (one click, any OS)
+### Option 3 — Pinokio (one click, any OS)
 
 In [Pinokio](https://pinokio.computer), open **Discover → Download from URL** and paste `https://github.com/socrasteeze/lora-dataset-studio.git`, then click **Install** and **Start**. Pinokio builds the Python environment, installs the core requirements and opens Studio; **Update** fast-forwards the same checkout the in-app updater uses.
 
@@ -1076,7 +1025,7 @@ Only the core app is installed this way. Complete **Setup**, then choose your op
 |---|---|---|
 | [ai-toolkit](https://github.com/ostris/ai-toolkit) | Local LoRA training and JoyCaption | Set its directory and Python interpreter in **Settings → Local tools**; conda, uv, venv and portable Python installs are supported |
 | [ComfyUI](https://github.com/comfyanonymous/ComfyUI) | Klein/Krea local generation, Studio, Canvas generation and deployment; SDXL base discovery | Keep its API reachable and set the install/models paths in **Settings → Local tools** |
-| [Ollama](https://ollama.com) | Auto-captioning, framing, head-crop and watermark detection | In Docker, choose none/host/companion in **Setup**, then pull the model explicitly from LDS; native installs can use their configured URL |
+| [Ollama](https://ollama.com) | Auto-captioning, framing, head-crop and watermark detection | Set its URL in **Settings**, then pull the model explicitly from LDS |
 | [LM Studio](https://lmstudio.ai) | The same, if that is the local model server you already run | Pick it in **Settings ▸ Local tools**. It only serves a model that is loaded (no JIT by default), so LDS starts the server and loads the model itself once LM Studio has been opened once; models can be downloaded from the same card, by model id or huggingface.co URL |
 
 Which of the two serves those features is a single setting (**Settings ▸ Local tools ▸ Local LLM provider**); Ollama stays the default. The full path rules, model layouts and provider states are in the [settings reference](docs/guide/settings-reference.md#local-tools). If a tool remains unavailable, use the [troubleshooting guide](docs/guide/troubleshooting.md).
@@ -1095,16 +1044,16 @@ The app scales from "no GPU at all" to a full local training rig — each capabi
 
 | Mode / capability | GPU (NVIDIA) | Disk | Notes |
 |---|---|---|---|
-| **Curation-only** (import/scrape, curate, caption manually, export/backup) | none | ~2 GB | Any machine with Python 3.10+ (3.13/3.14 run the core app fine — the 3.10–3.12 window is an ML-extras constraint); Docker image available |
+| **Curation-only** (import/scrape, curate, caption manually, export/backup) | none | ~2 GB | Any machine with Python 3.10+ (3.13/3.14 run the core app fine — the 3.10–3.12 window is an ML-extras constraint) |
 | **Auto-captioning & framing** (Ollama vision, 8B model) | ~8 GB VRAM | ~7 GB | Runs alongside generation, not concurrently |
-| **Local generation** (Klein 9B **KV** fp8 via ComfyUI) | ~16 GB VRAM | ~30 GB (model + text encoder + VAE) | Free, local and NSFW-capable; Setup downloads the models. The KV build is up to **2.5× faster on multi-reference edits** at the same quality. Available in Docker GPU mode |
+| **Local generation** (Klein 9B **KV** fp8 via ComfyUI) | ~16 GB VRAM | ~30 GB (model + text encoder + VAE) | Free, local and NSFW-capable; Setup downloads the models. The KV build is up to **2.5× faster on multi-reference edits** at the same quality |
 | **LoRA training — Z-Image / SDXL** (ai-toolkit) | 16 GB+ recommended | 10 GB+ free enforced per run | Quantized (qfloat8) + low-VRAM mode |
 | **LoRA training — Krea 2** (ai-toolkit) | **24 GB VRAM** at 1024 px (enforced warning) | ~24 GB base download (Raw), or none if you start from a Krea 2 checkpoint you already have, + 10 GB+ free | Under 24 GB, select **Resolution → 768 only** in Advanced options |
 | **LoRA training — FLUX.2 Klein** (ai-toolkit) | 4B: **16–24 GB VRAM** · 9B: **32–48 GB** | base download + 10 GB+ free | Both bases are gated on Hugging Face; 9B needs a card most desktops don't have |
 | **LoRA training — FLUX.1 / Anima** (ai-toolkit) | ~24 GB VRAM (both are 12B-class families) | base download + 10 GB+ free | **Local only — neither has a cloud lane.** FLUX.1 is gated on Hugging Face; Anima's base is public and reads booru tags natively |
 | **Face scoring / person masks / watermark inpaint** (ML extras) | none (CPU) | ~3 GB (+ CPU torch for LaMa) | Python **3.10–3.12 required** for wheels; installable per capability from Setup |
 
-- **OS**: Windows 10/11 for the full local stack (`start.bat`). Linux/macOS work for curation-only + manual venv; GPU Docker depends on host NVIDIA support.
+- **OS**: Windows 10/11 for the full local stack (`start.bat`). Linux and macOS work for curation-only and a manual venv.
 - **Python**: 3.10–3.12 — but not required up front: `start.bat` fetches a self-contained CPython 3.12 if your machine has none. 3.13+ (already installed) runs the core app but can't install the ML extras.
 - **RAM**: 16 GB+ recommended when training locally. Unlike VRAM and free disk, this one is a recommendation the app never measures — a run that dies for want of system memory has no guard-rail in front of it.
 - **Dataset size**: a launch is gated on a per-family floor — 12 images for Z-Image, 15 for Krea 2 / FLUX.1 / FLUX.2 Klein, 20 for SDXL, 4 for a slider LoRA — with 20-30 recommended. Below the floor the app asks you to confirm and warns about overfitting rather than refusing outright.
@@ -1118,7 +1067,7 @@ The short version:
 
 - **Ordinary settings** are written to `config.json` (git-ignored, in your data directory). Copy `config.example.json` to `config.json` to edit by hand — but almost everything has a UI control in **Settings**.
 - **Secrets** (`HF_TOKEN`, optional scraper keys) live in `.env`, never in `config.json` or a commit — copy `.env.example` to `.env`, or paste keys into Settings and let the app write them. (This fork removed the cloud image-generation engines and the rented-GPU training lane, so there are no `GEMINI_API_KEY` / `OPENAI_API_KEY` / `VAST_API_KEY` secrets to set.)
-- **A handful of environment variables** override paths for containerized setups: `LDS_DATA_DIR` (runtime data), `LDS_CONFIG` (path to `config.json`), `LDS_ENV` (path to `.env`), `LDS_HOST` (bind host, beats `server.host`), `FLASK_DEBUG` (`1` for Flask debug).
+- **A handful of environment variables** override paths: `LDS_DATA_DIR` (runtime data), `LDS_CONFIG` (path to `config.json`), `LDS_ENV` (path to `.env`), `LDS_HOST` (bind host, beats `server.host`), `FLASK_DEBUG` (`1` for Flask debug).
 - **The keys you most often touch** — `server.port` (default `5050`), `comfyui.api_url`, `ollama.vision_model`, `aitoolkit.dir`, `training.default_family` — are all in the [full reference](docs/guide/settings-reference.md#configjson-key-reference-all-keys).
 
 ## Exposing the app beyond localhost

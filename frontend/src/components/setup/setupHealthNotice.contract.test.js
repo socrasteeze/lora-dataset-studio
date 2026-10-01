@@ -21,7 +21,7 @@ test('a failed setup-state request is retried once, then ignored — never read 
 test('the notice waits for capabilities that ANSWERED, and hands the rule that fact', () => {
   assert.match(NOTICE, /const \{ caps, loading, known, refresh \} = useCapabilities\(\)/)
   assert.match(NOTICE, /if \(loading \|\| !known \|\| startedRef\.current\) return/)
-  assert.match(NOTICE, /capsKnown: current\.known,\s*state: s, pendingDockerChoice,/)
+  assert.match(NOTICE, /capsKnown: current\.known,\s*state: s, pathname: current\.pathname,/)
   assert.match(NOTICE, /const current = currentRef\.current/)
   assert.match(NOTICE, /useLayoutEffect\(\(\) => \{\s*currentRef\.current = \{ caps, loading, known, navigate, pathname, refresh \}\s*\}, \[caps, loading, known, navigate, pathname, refresh\]\)/)
   assert.match(NOTICE, /\}, \[loading, known\]\)/)

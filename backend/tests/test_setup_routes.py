@@ -125,198 +125,42 @@ def test_validate_comfyui_dir_missing(client, tmp_path):
     assert r.get_json()['status'] == 'missing'
 
 
-# --- Docker-managed service readiness --------------------------------------
-
-def test_runtime_readiness_gpu_boot_polls_only_integrated_comfyui(
-        client, monkeypatch):
-    from app import capabilities
-    calls = []
-
-    monkeypatch.setenv('LDS_RUNTIME', 'docker-gpu')
-    monkeypatch.setattr(capabilities.cfg, 'get', lambda *_args, **_kwargs: '')
-    monkeypatch.setattr(
-        capabilities,
-        '_http_ok',
-        lambda url, timeout=3, **_kwargs: calls.append((url, timeout)) or False,
-    )
-
-    response = client.get('/api/setup/runtime-readiness')
-    body = response.get_json()
-
-    assert body == {
-        'comfyui': {
-            'mode': 'integrated', 'state': 'starting',
-            'ready': False, 'poll': True,
-        },
-        'ollama': {
-            'mode': 'unconfigured', 'state': 'unconfigured',
-            'ready': False, 'poll': False,
-        },
-    }
-    assert calls == [('http://127.0.0.1:8188/history', 1.0)]
-    assert all(timeout <= 1.0 for _, timeout in calls)
-    assert response.headers['Cache-Control'] == 'no-store'
-
-
-def test_runtime_readiness_managed_services_turn_ready_without_full_probe(
-        client, monkeypatch):
-    from app import capabilities
-
-    monkeypatch.setenv('LDS_RUNTIME', 'docker-gpu')
-    monkeypatch.setattr(
-        capabilities.cfg, 'get',
-        lambda key, default=None: 'docker' if key == 'ollama.deployment_mode' else default)
-    monkeypatch.setattr(capabilities, '_http_ok', lambda *_args, **_kwargs: True)
-    monkeypatch.setattr(
-        capabilities,
-        'probe',
-        lambda *_args, **_kwargs: pytest.fail('full capability probe was called'),
-    )
-
+def test_retired_ollama_mode_reads_as_host(client):
+    from app import capabilities, config
+    assert capabilities.normalized_ollama_deployment_mode('none') == 'none'
+    assert capabilities.normalized_ollama_deployment_mode('host') == 'host'
+    assert capabilities.normalized_ollama_deployment_mode('retired') == 'host'
+    assert capabilities.normalized_ollama_deployment_mode('') == 'host'
+    config.save_config({'ollama': {'deployment_mode': 'retired', 'url': 'http://127.0.0.1:9'}})
     body = client.get('/api/setup/runtime-readiness').get_json()
-
-    assert body['comfyui'] == {
-        'mode': 'integrated', 'state': 'ready',
-        'ready': True, 'poll': False,
-    }
-    assert body['ollama'] == {
-        'mode': 'docker', 'state': 'ready',
-        'ready': True, 'poll': False,
-    }
+    assert body['ollama']['mode'] == 'local'
+    config.save_config({'ollama': {'deployment_mode': 'none'}})
+    disabled = client.get('/api/setup/runtime-readiness').get_json()
+    assert disabled['ollama']['mode'] == 'none'
+    assert disabled['ollama']['state'] == 'disabled'
+    assert disabled['ollama']['ready'] is False
 
 
-def test_runtime_readiness_ollama_none_is_disabled_and_never_probed(
-        client, monkeypatch):
-    from app import capabilities
-    calls = []
-
-    monkeypatch.setenv('LDS_RUNTIME', 'desktop')
-    # Native installs ignore Docker-only launcher choices.
-    monkeypatch.setenv('LDS_OLLAMA_MODE', 'none')
-    monkeypatch.setattr(
-        capabilities.cfg, 'get', lambda *_args, **_kwargs: 'http://127.0.0.1:11434')
-    monkeypatch.setattr(
-        capabilities,
-        '_http_ok',
-        lambda url, **_kwargs: calls.append(url) or False,
-    )
-
+def test_runtime_readiness_describes_a_direct_install(client, monkeypatch):
+    monkeypatch.setenv('LDS_RUNTIME', 'custom')
     body = client.get('/api/setup/runtime-readiness').get_json()
-
-    assert body == {
-        'comfyui': {
-            'mode': 'external', 'state': 'manual',
-            'ready': False, 'poll': False,
-        },
-        'ollama': {
-            'mode': 'local', 'state': 'unreachable',
-            'ready': False, 'poll': False,
-        },
-    }
-    assert calls == ['http://127.0.0.1:11434/api/tags']
+    assert body['comfyui']['mode'] == 'external'
+    assert body['comfyui']['state'] == 'manual'
+    assert body['ollama']['mode'] == 'local'
+    assert client.put('/api/setup/ollama-deployment', json={'mode': 'host'}).status_code == 404
 
 
-def test_runtime_readiness_light_docker_never_invents_integrated_comfyui(
-        client, monkeypatch):
-    from app import capabilities
-    calls = []
-
-    monkeypatch.setenv('LDS_RUNTIME', 'docker')
-    monkeypatch.setattr(capabilities.cfg, 'get', lambda *_args, **_kwargs: '')
-    monkeypatch.setattr(
-        capabilities,
-        '_http_ok',
-        lambda url, **_kwargs: calls.append(url) or False,
-    )
-
-    body = client.get('/api/setup/runtime-readiness').get_json()
-
-    assert body['comfyui'] == {
-        'mode': 'external', 'state': 'manual',
-        'ready': False, 'poll': False,
-    }
-    assert body['ollama']['mode'] == 'unconfigured'
-    assert body['ollama']['state'] == 'unconfigured'
-    assert calls == []
 
 
-def test_runtime_readiness_external_host_comfy_is_manual_not_starting(
-        client, monkeypatch):
-    from app import capabilities
-
-    monkeypatch.setenv('LDS_RUNTIME', 'docker-external-comfy')
-    monkeypatch.setenv('LDS_DOCKER_COMFY_MODE', 'external')
-    monkeypatch.setattr(capabilities.cfg, 'get', lambda *_args, **_kwargs: 'none')
-    monkeypatch.setattr(
-        capabilities,
-        '_http_ok',
-        lambda *_args, **_kwargs: pytest.fail('external ComfyUI must not be polled here'),
-    )
-
-    body = client.get('/api/setup/runtime-readiness').get_json()
-
-    assert body['comfyui'] == {
-        'mode': 'external-host', 'state': 'manual',
-        'ready': False, 'poll': False,
-    }
 
 
-def test_runtime_readiness_uses_persisted_mode_and_fixed_host_url(
-        client, monkeypatch):
-    from app import capabilities
-    calls = []
-    config_reads = []
-
-    monkeypatch.setenv('LDS_RUNTIME', 'docker-external-comfy')
-    monkeypatch.setenv('LDS_DOCKER_COMFY_MODE', 'external')
-    monkeypatch.setenv('LDS_OLLAMA_MODE', 'docker')
-    monkeypatch.setenv('LDS_OLLAMA_URL', 'file:///ignored.sock')
-
-    def fake_get(key, default=None):
-        config_reads.append(key)
-        if key == 'ollama.deployment_mode':
-            return 'host'
-        return pytest.fail(f'unexpected config read: {key}')
-
-    monkeypatch.setattr(capabilities.cfg, 'get', fake_get)
-    monkeypatch.setattr(
-        capabilities, '_http_ok',
-        lambda url, **_kwargs: calls.append(url) or False)
-
-    body = client.get('/api/setup/runtime-readiness').get_json()
-
-    assert config_reads == ['ollama.deployment_mode']
-    assert calls == ['http://host.docker.internal:11434/api/tags']
-    assert body['ollama'] == {
-        'mode': 'host', 'state': 'unreachable',
-        'ready': False, 'poll': False,
-    }
-    assert 'url' not in body['ollama']
 
 
-def test_runtime_readiness_docker_mode_ignores_arbitrary_saved_and_env_urls(
-        client, monkeypatch):
-    from app import capabilities
-    calls = []
 
-    monkeypatch.setenv('LDS_RUNTIME', 'docker-external-comfy')
-    monkeypatch.setenv('LDS_DOCKER_COMFY_MODE', 'external')
-    monkeypatch.setenv('LDS_OLLAMA_URL', 'file:///ignored.sock')
-    monkeypatch.setattr(
-        capabilities.cfg, 'get',
-        lambda key, default=None: 'docker' if key == 'ollama.deployment_mode'
-        else pytest.fail(f'unexpected config read: {key}'))
-    monkeypatch.setattr(
-        capabilities, '_http_ok',
-        lambda url, **_kwargs: calls.append(url) or False)
 
-    body = client.get('/api/setup/runtime-readiness').get_json()
 
-    assert calls == ['http://ollama:11434/api/tags']
-    assert body['ollama'] == {
-        'mode': 'docker', 'state': 'starting',
-        'ready': False, 'poll': True,
-    }
+
+
 
 
 def test_runtime_readiness_http_probe_is_bounded_streamed_and_closed(monkeypatch):
@@ -349,104 +193,15 @@ def test_runtime_readiness_http_probe_is_bounded_streamed_and_closed(monkeypatch
     assert response.closed is True
 
 
-def test_runtime_readiness_response_never_exposes_configured_urls_or_paths(
-        client, monkeypatch):
-    from app import capabilities
-    secret_url = 'http://user:password@private-host.internal:11434'
-    secret_path = r'C:\private\ComfyUI'
-
-    monkeypatch.setenv('LDS_RUNTIME', 'docker-gpu')
-    monkeypatch.setenv('LDS_OLLAMA_MODE', 'host')
-    monkeypatch.setattr(
-        capabilities.cfg,
-        'get',
-        lambda key, *_args: ('host' if key == 'ollama.deployment_mode'
-                             else secret_url if key == 'ollama.url' else secret_path),
-    )
-    monkeypatch.setattr(capabilities, '_http_ok', lambda *_args, **_kwargs: False)
-
-    response = client.get('/api/setup/runtime-readiness')
-    body = response.get_json()
-    raw = response.get_data(as_text=True)
-
-    assert response.status_code == 200
-    assert set(body) == {'comfyui', 'ollama'}
-    assert 'password' not in raw
-    assert 'private-host' not in raw
-    assert 'private' not in raw
-
-
-@pytest.mark.parametrize(('runtime', 'docker_mode'), [
-    ('docker-gpu', ''),
-    ('docker-external-comfy', 'external'),
-])
-def test_portable_comfyui_start_is_refused_for_docker_owned_runtimes(
-        client, monkeypatch, runtime, docker_mode):
-    from app.services import comfyui_control
-
-    monkeypatch.setenv('LDS_RUNTIME', runtime)
-    if docker_mode:
-        monkeypatch.setenv('LDS_DOCKER_COMFY_MODE', docker_mode)
-    else:
-        monkeypatch.delenv('LDS_DOCKER_COMFY_MODE', raising=False)
-    monkeypatch.setattr(
-        comfyui_control,
-        'start_comfyui',
-        lambda: pytest.fail('Docker runtime must never spawn portable ComfyUI'),
-    )
-
-    response = client.post('/api/setup/comfyui/start')
-
-    assert response.status_code == 409
-    assert 'Docker' in response.get_json()['error']
 
 
 
-@pytest.mark.parametrize(('mode', 'url'), [
-    ('none', ''),
-    ('host', 'http://host.docker.internal:11434'),
-    ('docker', 'http://ollama:11434'),
-])
-def test_save_ollama_deployment_persists_only_fixed_contract(
-        client, monkeypatch, mode, url):
-    from app import capabilities
-    from app.routes import setup as setup_routes
-    saved = {}
-
-    monkeypatch.setenv('LDS_RUNTIME', 'docker')
-    monkeypatch.setattr(
-        setup_routes.cfg, 'save_config',
-        lambda partial: saved.update(partial) or partial)
-    monkeypatch.setattr(
-        capabilities, 'setup_runtime_readiness',
-        lambda: {'ollama': {'mode': mode, 'state': 'ready',
-                            'ready': True, 'poll': False}})
-
-    response = client.put('/api/setup/ollama-deployment', json={'mode': mode})
-
-    assert response.status_code == 200
-    assert saved == {'ollama': {'deployment_mode': mode, 'url': url}}
-    assert response.get_json()['config'] == saved
 
 
-@pytest.mark.parametrize('payload', [
-    None,
-    {},
-    {'mode': 'Docker'},
-    {'mode': 'docker', 'url': 'http://attacker.invalid'},
-    {'mode': 1},
-])
-def test_save_ollama_deployment_rejects_non_contract_payload(
-        client, monkeypatch, payload):
-    monkeypatch.setenv('LDS_RUNTIME', 'docker')
-    response = client.put('/api/setup/ollama-deployment', json=payload)
-    assert response.status_code == 400
 
 
-def test_save_ollama_deployment_is_docker_only(client, monkeypatch):
-    monkeypatch.setenv('LDS_RUNTIME', 'desktop')
-    response = client.put('/api/setup/ollama-deployment', json={'mode': 'none'})
-    assert response.status_code == 409
+
+
 
 
 def test_ollama_cancel_endpoint_is_idempotent(client):

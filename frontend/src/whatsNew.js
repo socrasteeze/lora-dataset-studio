@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-01-direct-install',
+    date: '2026-10-01',
+    title: 'Docker support removed',
+    blurb: 'Container images, compose files, and the container launchers are gone. Install on the machine that runs the app. Remote ComfyUI backends in Settings stay available.',
+  },
+  {
     id: '2026-10-01-zz-honest-caption-verdict', date: '2026-10-01',
     title: 'See When a Launch-all Left Captions Short',
     blurb: 'A bank whose Launch-all captions were partly written by the fallback engine, or that left images uncaptioned because another app held the model, no longer shows a clean finish. Its card says how many, for example "⚠ 3 not captioned · 862 by fallback", and the report marks the Caption step instead of ticking it. Queued banks also start one after another without the pause between them.',

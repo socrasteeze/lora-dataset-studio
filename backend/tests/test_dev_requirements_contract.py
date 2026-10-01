@@ -43,7 +43,7 @@ _TORCH_PATH_SAMPLES = (
 # backend/tests, node --test over both frontend/tests and the colocated
 # *.test.js beside their sources, and unittest over scripts/tests.
 _TEST_PATH_SAMPLES = (
-    'backend/tests/test_docker_gpu_updater.py',
+    'backend/tests/test_updater.py',
     'backend/tests/test_bank_scan_no_db_lock.py',
     'frontend/tests/theme-token-contract.test.mjs',
     'frontend/src/whatsNew.test.js',

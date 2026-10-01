@@ -1758,7 +1758,7 @@ def test_run_bank_scoring_still_installs_into_the_managed_venv(app, monkeypatch)
 # --- Interpreter identity: environments, not binaries ----------------------------
 # On Linux every venv's bin/python is a SYMLINK to the base interpreter, so
 # comparing interpreters with os.path.samefile answers "same base Python?" — True
-# for any two venvs on the machine. Inside the GPU Docker image that mistook the
+# for any two venvs on the machine. Inside a GPU image that mistook the
 # app-managed bank-scoring env for the Flask venv and refused the watermark-detector
 # and shot-detection installs with advice that could not work (the config key the
 # refusal says to clear was already empty). The comparators now compare the venv
@@ -1831,7 +1831,7 @@ def test_same_path_still_matches_a_not_yet_built_venv_by_string(tmp_path):
 # torch alone from the CPU index leaves torchvision to resolve later from PyPI as
 # open_clip/timm/simple-lama's dependency — and on Linux that wheel is built against
 # a DIFFERENT torch, so the env dies at import with 'operator torchvision::nms does
-# not exist' (the Docker GPU report; Dockerfile.gpu pairs them for the same reason).
+# not exist' (reported from a GPU image whose venv hit the same mismatch).
 
 def test_bank_scoring_install_pairs_torchvision_with_torch(app, monkeypatch):
     from app import setup_installer, config

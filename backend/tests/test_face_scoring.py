@@ -202,7 +202,7 @@ def test_score_dataset_faces_stdin_payload_includes_models_root(app, monkeypatch
 
 def test_score_dataset_faces_stdin_payload_falls_back_to_the_managed_root(app, monkeypatch):
     """Unconfigured is NOT "let insightface decide": it used to send None, which
-    sent the ~350 MB pack to ~/.insightface -- a folder no Docker stack mounts
+    sent the ~350 MB pack to ~/.insightface -- a folder no container stack mounts
     (see test_face_models_root.py)."""
     from app.services import face_models, face_similarity as fsim
 
@@ -227,7 +227,7 @@ def test_score_dataset_faces_stdin_payload_falls_back_to_the_managed_root(app, m
             expected = str(face_models.models_root())
     payload = json.loads(captured['input'])
     assert payload['models_root'] == expected
-    assert payload['models_root']          # never None — that was the Docker bug
+    assert payload['models_root']          # never None — that was the container bug
 
 
 def test_score_dataset_faces_native_crash_returns_empty_not_exception(app, monkeypatch):

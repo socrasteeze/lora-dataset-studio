@@ -2,9 +2,8 @@
 
 Enabling or disabling writes ``plugins.enabled.<id>`` and answers how THIS
 install restarts (registration happens at boot): the supervisor relaunches by
-itself on start.bat and the GPU Docker image; the CPU image, Pinokio and the
-portable bundle get a sentence that says what to do, never a promise the code
-does not keep.
+itself on start.bat; Pinokio and the portable bundle get a sentence that says
+what to do, never a promise the code does not keep.
 
 The static route that serves an external plugin's UI checks containment on
 ``realpath`` and refuses links: the design review served a ``.env`` through a
@@ -47,8 +46,6 @@ def restart_payload() -> dict:
         mode, how = 'pinokio', 'Stop the app in Pinokio, then Start it again, for the change to apply.'
     elif os.environ.get('LDS_RESTART_MODE', '').strip().lower() == 'supervisor':
         mode, how = 'self', 'Apply changes and restart LDS to use the requested plugin state.'
-    elif updater.is_docker_runtime():
-        mode, how = 'container', 'Restart the container (docker compose restart) for the change to apply.'
     else:
         mode, how = 'manual', 'Close the app and start it again for the change to apply.'
     return {'required': True, 'mode': mode, 'how': how, 'can_apply': mode == 'self'}

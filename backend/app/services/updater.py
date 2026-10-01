@@ -11,7 +11,7 @@
   survive the swap. See `_PROTECTED_TOP_LEVEL`.
 
 Dependency installation is deliberately deferred to restart.  Desktop installs
-use the detached helper; the Docker supervisor reruns its boot-time dependency
+use the detached helper; the supervisor reruns its boot-time dependency
 check after exit code 75.  Running pip inside the live Flask process can corrupt
 locked packages on Windows.
 
@@ -32,43 +32,6 @@ from pathlib import Path
 from ..config import REPO_ROOT, get as _cfg_get
 
 _GIT_TIMEOUT = 120
-
-# The Docker image is immutable application code: changing files below /app from
-# the web UI would be lost at the next container recreation (and most of those
-# files are intentionally root-owned anyway).  Keep the rebuild recipe in one
-# place so the API and both frontend update surfaces expose the exact same two
-# commands, in order.
-DOCKER_RUNTIME = 'docker-gpu'
-DOCKER_UPDATE_INSTRUCTIONS = (
-    'git pull',
-    'docker compose -f docker-compose.gpu.yml up -d --build',
-)
-
-
-def is_docker_runtime() -> bool:
-    """All Docker lanes run immutable application code, including API-only."""
-    return os.environ.get('LDS_RUNTIME', '').strip().lower() in {
-        'docker', 'docker-external-comfy', DOCKER_RUNTIME,
-    }
-
-
-def docker_update_payload() -> dict:
-    """Structured manual-update contract shared by check/apply endpoints."""
-    runtime = os.environ.get('LDS_RUNTIME', '').strip().lower()
-    instructions = list(DOCKER_UPDATE_INSTRUCTIONS)
-    if runtime == 'docker':
-        instructions[1] = 'docker compose up -d --build'
-    elif runtime == 'docker-external-comfy':
-        instructions[1] = ('docker compose -f docker-compose.yml '
-                           '-f docker-compose.external-comfy.yml '
-                           '-f .docker-compose.external-comfy.override.yml up -d --build')
-    return {
-        'install_mode': 'docker',
-        'can_apply': False,
-        'manual': True,
-        'instructions': instructions,
-    }
-
 
 # A Pinokio install (start.js sets LDS_RUNTIME) is a perfectly ordinary git
 # checkout — the tree updates the same way — but the RESTART is not ours to do.
@@ -94,9 +57,8 @@ def is_pinokio_runtime() -> bool:
 def pinokio_update_payload() -> dict:
     """Structured manual-update contract shared by check/apply endpoints.
 
-    Same shape as :func:`docker_update_payload`, so the frontend has one
-    contract for "this install updates elsewhere" rather than two. Unlike
-    Docker, this payload is merged ON TOP of the real git status: how many
+    The frontend has one contract for "this install updates elsewhere".
+    This payload is merged on top of the real git status: how many
     commits behind the tree is stays true and useful — only the button goes."""
     return {
         'install_mode': 'pinokio',
@@ -726,7 +688,7 @@ def schedule_restart(delay: float = 1.2, *, install_requirements: bool = False,
                      environment_updates: dict[str, str] | None = None) -> bool:
     """Schedule exactly one relaunch, after allowing the HTTP response to flush.
 
-    Under the Docker supervisor, exit 75 and let the launcher be the sole owner
+    Under the supervisor, exit 75 and let the launcher be the sole owner
     of the new process.  start.bat's own loop sets ``LDS_SUPERVISOR=1`` and tests
     for exit code 3 instead, relaunching in the SAME console so Ctrl+C keeps
     working; ``install_requirements`` is a no-op there because start.bat runs its

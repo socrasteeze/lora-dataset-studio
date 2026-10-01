@@ -8,12 +8,9 @@ user had configured one, so insightface fell back to its OWN default,
 would delete the zip after extracting it is commented out upstream).
 
 That default is invisible on a native install, where the home directory is
-permanent, and fatal in Docker: no Compose file mounts the container user's home
-(``/root`` for the API-only image, ``/home/comfy`` for the GPU one — upstream's
-``useradd -d /home/comfy``), and the Windows launcher restarts a STOPPED
-container with ``--force-recreate`` (scripts/docker-launch.ps1), which replaces
-the container and discards its writable layer. So the pack was re-downloaded on
-every restart, while the ML venvs — which live under ``data/envs`` — survived.
+permanent, and fatal when the home directory is not mounted: the pack is
+re-downloaded on every restart, while the ML venvs — which live under
+``data/envs`` — survive.
 
 An install that ALREADY holds the pack under ``~/.insightface`` keeps using it.
 Moving those files could break another tool sharing that folder, and copying

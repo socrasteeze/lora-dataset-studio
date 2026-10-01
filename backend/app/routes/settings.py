@@ -171,10 +171,8 @@ def _settings_payload() -> dict:
         # "running vs saved" diff instead of showing a misleading n/a:n/a.
         'runtime': {'host': current_app.config.get('LDS_BOUND_HOST'),
                     'port': current_app.config.get('LDS_BOUND_PORT'),
-                    # Docker owns the bind through LDS_HOST/LDS_PORT and the
-                    # published host port through LDS_HOST_PORT.  The UI uses
-                    # this bit to prevent saving controls that cannot take
-                    # effect inside the managed container.
+                    # LDS_BIND_MANAGED means the launcher owns the listen
+                    # address. The UI hides controls that cannot take effect.
                     'bind_managed': os.environ.get('LDS_BIND_MANAGED', '').strip().lower()
                                     in {'1', 'true', 'yes', 'on'},
                     # LDS_PUBLIC=1: the bind is reachable from the internet, so
@@ -622,7 +620,6 @@ def update_check():
     from ..version import APP_VERSION
     from ..services import updater
     force = bool(request.args.get('force'))
-    docker_runtime = updater.is_docker_runtime()
     # Fork Divergence 12: only an explicit "Check for updates" (force) may reach
     # the network. Every other caller (?auto=1, the bare path) is answered from
     # the last explicit result, whatever its age, or told that checks are off.
@@ -636,7 +633,7 @@ def update_check():
     # A git checkout: the meaningful signal is commits-behind-origin (the user pushes
     # commits to a branch, not tagged releases — a release-only check reads "up to date"
     # while the tree is many commits behind).
-    if not docker_runtime and updater.is_git_checkout():
+    if updater.is_git_checkout():
         now = time.time()
         gs = updater.git_update_status()
         if gs is not None:
@@ -650,8 +647,6 @@ def update_check():
     repo = cfg.get('updates.repo') or 'socrasteeze/lora-dataset-studio'
     out = {'ok': True, 'current': APP_VERSION, 'latest': None,
            'update_available': False, 'url': f'https://github.com/{repo}/releases'}
-    if docker_runtime:
-        out.update(updater.docker_update_payload())
     if updater.is_pinokio_runtime():
         out.update(updater.pinokio_update_payload())
     sha = updater.current_sha()
@@ -677,10 +672,9 @@ def update_check():
                     zip_size = int(a.get('size') or 0)
                     if 'windows' in name:
                         break
-            # Neither container nor Pinokio install may advertise an in-app
-            # apply just because the release carries a ZIP: both update from
-            # outside this process.
-            if not docker_runtime and not updater.is_pinokio_runtime():
+            # A Pinokio install updates from outside this process, so a ZIP
+            # on the release is not an in-app apply.
+            if not updater.is_pinokio_runtime():
                 out['can_apply'] = bool(zip_size) or any(
                     (a.get('name') or '').lower().endswith('.zip') and a.get('browser_download_url')
                     for a in (j.get('assets') or []))
@@ -705,15 +699,6 @@ def update_apply():
     trivial ZIP outcomes (up to date / no ZIP asset / offline) come back inline
     just like the git path. Both defer changed requirements to the restart helper."""
     from ..services import updater
-    # Refuse before even probing .git or the release feed: /app is immutable in
-    # the GPU image and an in-container update would be both incomplete and
-    # discarded on recreation.
-    if updater.is_docker_runtime():
-        return jsonify({
-            'ok': False,
-            'reason': 'Docker installs must be updated by rebuilding the image.',
-            **updater.docker_update_payload(),
-        })
     # Pinokio owns the process: pulling here would work, but the restart that
     # follows would detach the server from the launcher that is supposed to
     # stop and start it. Refuse before touching git.

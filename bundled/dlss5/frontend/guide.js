@@ -62,7 +62,7 @@ export const GUIDE = { chapters: [], sections: [{
         "back to *Still* otherwise, and says so. A scene cut resets the history.",
         "",
         "**What it needs.** Windows and an NVIDIA GPU with a recent driver — the model is a",
-        "Direct3D 12 library, so there is no Linux or Docker path. Setup installs the",
+        "Direct3D 12 library, so there is no Linux or container path. Setup installs the",
         "small open-source **bridge**; the **model file** (`nvngx_dlssnr.dll`) is NVIDIA's",
         "and yours to place in the folder Setup names — the app does not download it and",
         "offers no link. NVIDIA ships it for the RTX 50 series; the model itself decides",

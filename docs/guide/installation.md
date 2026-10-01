@@ -59,51 +59,6 @@ npm install
 npm run build
 ```
 
-## Docker with an existing ComfyUI
-
-**Beginner Windows flow:** download/extract the [**source ZIP**](https://github.com/perfectgf/lora-dataset-studio/archive/refs/heads/v2.zip) — the release asset `LoRA-Dataset-Studio-windows.zip` does not carry the Docker launchers — start Docker Desktop, then double-click **`start-docker.bat`**. On the first run, select either the ComfyUI folder containing `main.py` and `models`, or its portable parent containing `ComfyUI\main.py`. LDS validates the folder and remembers it for this checkout.
-
-Start your usual ComfyUI on the host. LDS uses `http://host.docker.internal:8188` from its container and mounts the selected folder at `/external-comfyui`. If the folder later moves, double-click **`configure-docker.bat`**. The launcher chooses a free Studio port and opens the browser automatically.
-
-## Docker with a fresh ComfyUI
-
-**Beginner Windows flow:**
-
-1. Download the [source ZIP](https://github.com/perfectgf/lora-dataset-studio/archive/refs/heads/v2.zip), then extract the complete folder.
-2. Start **Docker Desktop** and wait until it reports that Docker is running.
-3. Double-click **`start-docker-gpu.bat`** in the extracted folder.
-4. Leave the first build/start running; it downloads the image and ComfyUI environment. The launcher prints both actual addresses and opens Studio as soon as Studio responds, while its batch window stays open until ComfyUI finishes its first boot. You do not need to open a second ComfyUI window.
-
-This creates a **fresh, isolated, repo-local** Docker setup: its own ComfyUI, models, application data and Image Bank folder live beside this checkout. **It never touches an existing ComfyUI by default.**
-
-For either Docker launcher, choose Ollama only inside **LDS Setup**: **No Ollama**, **Existing host Ollama**, or **Docker Ollama**. The Docker companion is started only after that explicit choice, and no vision model is downloaded automatically. Pull the selected model from the LDS Ollama card to see progress and cancel it if needed.
-
-The double-click launcher allocates free host ports atomically: Studio uses the first available port in `5050-5149`, and ComfyUI the first available port in `8188-8287`. If `5050` or `8188` is already occupied, the existing service is left running and another port is chosen automatically. Re-running the launcher from the same checkout reopens its current mapped ports without recreating the running container; a conflicting container owned by another checkout is reported and left untouched. The launcher does not edit `.env`.
-
-Advanced CLI:
-
-```bash
-cp .env.example .env
-mkdir -p run basedir data-docker-gpu bank-images
-docker compose -f docker-compose.gpu.yml up --build
-```
-
-For the advanced CLI, the default addresses remain `http://127.0.0.1:5050/` for Studio and `http://127.0.0.1:8188/` for ComfyUI; `.env` can override them. This lane requires an NVIDIA GPU, a compatible driver and NVIDIA Container Toolkit support. Storage relocation, ports, existing-ComfyUI adoption, UID/GID, DNS, update commands, resource caps and operational limits are documented in the dedicated [Docker guide](docker.md).
-
-## Docker without a GPU
-
-For a machine with no NVIDIA GPU: import and scraping, curation, manual captions, export and backup. This build has no cloud generation engine, and ComfyUI and ai-toolkit stay out of this image, so generation, Test Studio and local training are all unavailable in this lane — it is curation-only.
-
-```bash
-cp .env.example .env
-mkdir -p data-docker
-docker compose up --build          # docker-compose.yml, the default file
-```
-
-Studio answers on `http://127.0.0.1:5050/` and its data lives in `./data-docker`. This is the only Docker lane that needs no NVIDIA support at all.
-
-To update a Docker install, double-click **`update-docker.bat`** for the latest stable release, or pass `v2` to follow the maintained branch (`main` remains a compatibility alias for `v2`). It rebuilds transactionally and rolls back if the container does not come up healthy. Both `start-docker.bat` and `start-docker-gpu.bat` accept `--rebuild` and `--update-rebuild`; `start-docker.bat` also accepts `--configure`, which is what `configure-docker.bat` calls. After upgrading from V1, install the optional features you use from **Plugins → Store**. Both images include the public Store configuration; [Docker plugin administration and restarts](docker.md#v2-plugins) explains how to unlock installation and apply changes.
-
 ## Pinokio
 
 In [Pinokio](https://pinokio.computer), open **Discover → Download from URL** and paste `https://github.com/perfectgf/lora-dataset-studio.git`, then click **Install** and **Start**. Pinokio builds the Python environment, installs the core requirements and opens Studio; **Update** fast-forwards the same checkout the in-app updater uses.
@@ -116,7 +71,7 @@ Only the core app is installed this way. Complete **Setup**, then choose your op
 |---|---|---|
 | [ai-toolkit](https://github.com/ostris/ai-toolkit) | Local LoRA training and JoyCaption | Set its directory and Python interpreter in **Settings → Local tools**; conda, uv, venv and portable Python installs are supported |
 | [ComfyUI](https://github.com/comfyanonymous/ComfyUI) | Klein/Krea local generation, Studio, Canvas generation and deployment; SDXL base discovery | Keep its API reachable and set the install/models paths in **Settings → Local tools** |
-| [Ollama](https://ollama.com) | Auto-captioning, framing, head-crop and watermark detection | In Docker, choose none/host/companion in **Setup**, then pull the model explicitly from LDS; native installs can use their configured URL |
+| [Ollama](https://ollama.com) | Auto-captioning, framing, head-crop and watermark detection | Set its URL in **Settings**, then pull the model explicitly from LDS |
 | [LM Studio](https://lmstudio.ai) | The same, if that is the local model server you already run | Pick it in **Settings ▸ Local tools**. It only serves a model you have loaded (no JIT by default), and LDS cannot start it for you — its Developer tab has the switch |
 
 Which of the two serves those features is a single setting (**Settings ▸ Local tools ▸ Local LLM provider**); Ollama stays the default. The full path rules, model layouts and provider states are in the [settings reference](settings-reference.md#local-tools). If a tool remains unavailable, use the [troubleshooting guide](troubleshooting.md).
@@ -132,11 +87,8 @@ Secrets saved in Settings live in the git-ignored `.env`, never in `config.json`
 
 > **Pexels authorization required:** An API key alone does not authorize dataset or machine-learning use. Configure this integration only if Pexels has explicitly authorized this use case, and keep the attribution LDS displays. Read the [official Pexels terms and conditions](https://help.pexels.com/hc/en-us/articles/900005880463-What-are-the-Terms-and-Conditions/).
 
-## Hosted and local options
+## Install on this machine
 
 | Mode | Good for | What is optional or unavailable |
 |---|---|---|
-| **Docker + existing ComfyUI** | Run LDS in Docker while keeping the ComfyUI already installed on the host | The launcher asks for the ComfyUI folder once; local training still uses the host's ai-toolkit |
-| **Docker GPU + fresh ComfyUI** | Run LDS and a new isolated ComfyUI together on an NVIDIA GPU | Existing ComfyUI/models stay untouched; local training still uses the host's ai-toolkit |
-| **Rented GPU pod (RunPod)** | Reach the studio, Image Bank and ComfyUI generation from any browser, on a GPU you do not own | ai-toolkit is not in the image, and this build has no rented-GPU training lane to fall back on, so training is unavailable from the pod. Large ZIP exports can hit the pod proxy's 100-second timeout. See the [RunPod guide](runpod.md) |
-| **Full local** | Local engines, ML helpers, ai-toolkit training, Canvas generation and Test Studio | Install/connect only the tools you need; each capability degrades independently |
+| **Full local** | Local engines, ML helpers, ai-toolkit training, Canvas generation and Test Studio | Install and connect only the tools you need; each capability degrades independently |

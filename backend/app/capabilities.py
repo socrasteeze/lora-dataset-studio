@@ -1439,10 +1439,6 @@ def _scan_models() -> dict:
 _OLLAMA_DEFAULT_URL = 'http://127.0.0.1:11434'
 _COMFYUI_DEFAULT_URL = 'http://127.0.0.1:8188'
 _SETUP_READINESS_TIMEOUT = 1.0
-_DOCKER_OLLAMA_URLS = {
-    'host': 'http://host.docker.internal:11434',
-    'docker': 'http://ollama:11434',
-}
 
 
 def _validated_setup_http_base(value) -> str:
@@ -1469,108 +1465,72 @@ def _validated_setup_http_base(value) -> str:
 
 
 def setup_comfyui_mode() -> str:
-    """Classify who owns ComfyUI for Setup UI/actions (path-free enum only)."""
-    runtime = (os.environ.get('LDS_RUNTIME') or '').strip().lower()
-    docker_mode = (os.environ.get('LDS_DOCKER_COMFY_MODE') or '').strip().lower()
-    if runtime == 'docker-gpu':
-        return 'integrated'
-    if runtime == 'docker-external-comfy' and docker_mode == 'external':
-        return 'external-host'
+    """ComfyUI is always an external process on a direct install."""
     return 'external'
 
 
-def setup_is_docker_runtime() -> bool:
-    """Whether Setup is running inside one of LDS's Docker deployments."""
-    return (os.environ.get('LDS_RUNTIME') or '').strip().lower().startswith('docker')
+def normalized_ollama_deployment_mode(value=None) -> str:
+    """Keep ``none`` and ``host``. Any retired mode reads as ``host``."""
+    if value is None:
+        value = cfg.get('ollama.deployment_mode', 'host')
+    mode = value.strip().lower() if isinstance(value, str) else ''
+    if mode == 'none':
+        return 'none'
+    return 'host'
 
 
-def setup_ollama_deployment_url(mode: str) -> str:
-    """The fixed in-container endpoint for a persisted Docker deployment mode."""
-    return _DOCKER_OLLAMA_URLS.get(mode, '')
-
-
-def _setup_ollama_base_url(docker_runtime: bool, mode: str) -> str:
-    """Resolve the authoritative probe endpoint without exposing it in readiness."""
+def _setup_ollama_base_url(mode: str) -> str:
+    """Resolve the probe endpoint without exposing it in readiness."""
     if mode == 'none':
         return ''
-    if docker_runtime:
-        # The in-app deployment choice is authoritative. Never fall back to an
-        # environment variable or an old native 127.0.0.1 setting: either could
-        # silently probe a different service than the one Setup says is selected.
-        raw = setup_ollama_deployment_url(mode)
-    else:
-        raw = cfg.get('ollama.url') or _OLLAMA_DEFAULT_URL
+    raw = cfg.get('ollama.url') or _OLLAMA_DEFAULT_URL
     return _validated_setup_http_base(raw)
 
 
 def setup_runtime_readiness() -> dict:
     """Return the small, paste-safe boot snapshot used by Setup polling.
 
-    Only services owned by the selected deployment are ever reported as
-    ``starting``: integrated ComfyUI in the GPU stack, and the companion
-    Ollama container when explicitly requested.  An external/lightweight
-    Docker ComfyUI remains manual, while ``host`` Ollama is unreachable rather
-    than indefinitely starting and ``none`` is explicitly disabled.
+    ComfyUI stays manual: this install does not start it. Ollama is probed
+    at the saved URL. ``none`` is explicitly disabled.
 
-    This deliberately avoids the full capability probe (filesystem walks,
-    imports and model inspection).  Probes are bounded to one second and the
-    response contains enums/booleans only -- never configured URLs or paths.
-    Integrated ComfyUI uses its fixed internal loopback endpoint instead of a
-    user-configured URL.
+    This deliberately avoids the full capability probe. Probes are bounded
+    to one second and the response contains enums and booleans only.
     """
-    runtime = (os.environ.get('LDS_RUNTIME') or '').strip().lower()
-    docker_runtime = runtime.startswith('docker')
-    comfy_mode = setup_comfyui_mode()
-    integrated_comfyui = comfy_mode == 'integrated'
-    comfy_ready = False
-    if integrated_comfyui:
-        comfy_ready = _http_ok(
-            f'{_COMFYUI_DEFAULT_URL}/history',
-            timeout=_SETUP_READINESS_TIMEOUT,
-            readiness=True,
-        )
     comfy = {
-        'mode': comfy_mode,
-        'state': (
-            'ready' if comfy_ready else 'starting'
-        ) if integrated_comfyui else 'manual',
-        'ready': comfy_ready,
-        'poll': integrated_comfyui and not comfy_ready,
+        'mode': 'external',
+        'state': 'manual',
+        'ready': False,
+        'poll': False,
     }
-
-    if docker_runtime:
-        configured_mode = cfg.get('ollama.deployment_mode', '')
-        configured_mode = (configured_mode.strip().lower()
-                           if isinstance(configured_mode, str) else '')
-        ollama_mode = (configured_mode if configured_mode in ('none', 'host', 'docker')
-                       else 'unconfigured')
+    stored_mode = normalized_ollama_deployment_mode()
+    if stored_mode == 'none':
+        ollama = {
+            'mode': 'none',
+            'state': 'disabled',
+            'ready': False,
+            'poll': False,
+        }
     else:
-        # Native installs keep their historical URL-based behavior. A deployment
-        # choice saved while using Docker must not disable or redirect native Ollama.
         ollama_mode = 'local'
-
-    ollama_ready = False
-    ollama_url = _setup_ollama_base_url(docker_runtime, ollama_mode)
-    if ollama_mode not in ('none', 'unconfigured') and ollama_url:
-        ollama_ready = _http_ok(
-            f'{ollama_url}/api/tags',
-            timeout=_SETUP_READINESS_TIMEOUT,
-            readiness=True,
+        ollama_url = _setup_ollama_base_url(ollama_mode)
+        ollama_ready = False
+        if ollama_url:
+            ollama_ready = _http_ok(
+                f'{ollama_url}/api/tags',
+                timeout=_SETUP_READINESS_TIMEOUT,
+                readiness=True,
+            )
+        ollama_state = (
+            'misconfigured' if not ollama_url
+            else 'ready' if ollama_ready
+            else 'unreachable'
         )
-    ollama_state = (
-        'unconfigured' if ollama_mode == 'unconfigured'
-        else 'disabled' if ollama_mode == 'none'
-        else 'misconfigured' if not ollama_url
-        else 'ready' if ollama_ready
-        else 'starting' if ollama_mode == 'docker'
-        else 'unreachable'
-    )
-    ollama = {
-        'mode': ollama_mode,
-        'state': ollama_state,
-        'ready': ollama_ready,
-        'poll': ollama_mode == 'docker' and bool(ollama_url) and not ollama_ready,
-    }
+        ollama = {
+            'mode': ollama_mode,
+            'state': ollama_state,
+            'ready': ollama_ready,
+            'poll': False,
+        }
     return {'comfyui': comfy, 'ollama': ollama}
 
 
@@ -2762,19 +2722,12 @@ def _probe_uncached():
         # and its Settings Test button does the live check on demand.
         'local_llm': {'provider': _llm_provider},
         'lmstudio': {
-            # In a container, 127.0.0.1 is the CONTAINER, and LM Studio runs on the
-            # host — so the default URL is wrong by construction there. The Ollama
-            # lane has a whole deployment-mode mechanism for exactly this; LM Studio
-            # has none, so at minimum the card has to say the right address. The
-            # behaviour is deliberately NOT changed under the user's feet.
-            'docker_runtime': setup_is_docker_runtime(),
             # Installed = LM Studio's CLI on disk, server up or not. Until it was
             # found this card had only two states, so a stopped server read as
             # "not answering" with no way out but another application's menu.
             # Now (installed, reachable) reads as three, exactly like Ollama's:
-            # absent / installed-but-stopped (→ a Start button) / running.
+            # absent / installed-but-stopped (a Start button) / running.
             'installed': _lmstudio_installed,
-            'docker_host_url': 'http://host.docker.internal:1234',
             'probed': _llm_provider == 'lmstudio',
             'reachable': lmstudio['ok'],
             'url': _lmstudio_url,

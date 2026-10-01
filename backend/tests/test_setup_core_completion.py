@@ -68,13 +68,12 @@ def test_state_api_keeps_core_completion_separate_from_engine_verification(clien
         assert state['regressions'] == []
 
 
-@pytest.mark.parametrize('mode', ['', 'host', 'docker', 'none'])
-def test_core_only_docker_choice_releases_launcher_without_changing_existing_choice(client, monkeypatch, mode):
+@pytest.mark.parametrize('mode', ['', 'host', 'none'])
+def test_core_completion_leaves_the_saved_ollama_mode_alone(client, mode):
     from app import config
-    monkeypatch.setattr(capabilities, 'setup_is_docker_runtime', lambda: True)
     config.save_config({'ollama': {'deployment_mode': mode}})
     assert client.post('/api/setup-state/complete').status_code == 200
-    assert config.get('ollama.deployment_mode') == (mode or 'none')
+    assert config.get('ollama.deployment_mode') == mode
 
 
 @pytest.mark.parametrize('base,host,skipped', [(None, '127.0.0.1', True),

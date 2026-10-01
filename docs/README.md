@@ -19,8 +19,6 @@
 | [Installation](guide/installation.md) | Windows, manual Python, Pinokio, updates, external tools and API keys |
 | [Requirements](guide/requirements.md) | Hardware, disk space and dependencies by feature |
 | [Migrate to V2](guide/migrate-to-v2.md) | Upgrade a V1 Git installation while preserving data |
-| [Docker guide](guide/docker.md) | GPU-container CLI, storage, existing ComfyUI data, UID/GID, DNS, updates, resources and limits |
-| [RunPod guide](guide/runpod.md) | Running the whole studio on a rented GPU pod: registry push, template fields, network volume, the forced access token and the limits |
 | [Extensions guide](guide/extensions.md) | Optional local packages under `backend/extensions/`: the `register(app, csrf)` contract, the manifest, the trust model and why the folder can never ship |
 | [Settings reference](guide/settings-reference.md) | Every UI setting, dependency, model location, environment override and `config.json` key |
 | [Network access and privacy](guide/network-access.md) | External connections, optional usage statistics and public-access configuration |
@@ -30,7 +28,7 @@
 
 | Guide | Covers |
 |---|---|
-| [Troubleshooting](guide/troubleshooting.md) | Symptom-first fixes for models, ComfyUI, Ollama, training, Docker-adjacent paths and platform issues |
+| [Troubleshooting](guide/troubleshooting.md) | Symptom-first fixes for models, ComfyUI, Ollama, training and platform issues |
 | [Known limitations](guide/known-limitations.md) | Current product boundaries and environment-specific caveats |
 | [Getting help](guide/getting-help.md) | Paste-safe diagnostic reports and what to include in a bug report |
 

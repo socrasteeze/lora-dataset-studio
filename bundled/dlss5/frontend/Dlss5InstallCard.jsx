@@ -19,7 +19,7 @@ const ACTION = 'dlss5nr_bridge'
 // about the model would leave someone with a working bridge and nothing to run.
 //
 // A capability gated by the OPERATING SYSTEM, the first in this app: the model
-// is a Direct3D 12 library. On Linux, in Docker or on a non-NVIDIA card the
+// is a Direct3D 12 library. On Linux, in container or on a non-NVIDIA card the
 // card does not hide — it says why, so a ✗ never reads as "something to fix".
 export default function Dlss5InstallCard({ caps, onDone }) {
   const toast = useToast()
@@ -102,7 +102,7 @@ export default function Dlss5InstallCard({ caps, onDone }) {
       </p>
 
       <ul className="mt-3 flex flex-col gap-1">
-        <Row ok={st.os_ok}>Windows {st.os_ok ? '' : '— the model is a Direct3D 12 library and runs nowhere else (no Linux, no Docker)'}</Row>
+        <Row ok={st.os_ok}>Windows {st.os_ok ? '' : '— the model is a Direct3D 12 library and runs nowhere else (no Linux, no container)'}</Row>
         <Row ok={st.driver_ngx}>NVIDIA display driver {st.driver_ngx ? '' : '— its NGX runtime was not found on this machine'}</Row>
         <Row ok={st.worker}>DLSS Python engine and video encoder{st.worker ? '' : ' — prepare the engine above'}</Row>
         <Row ok={st.bridge}>Neural rendering bridge v{st.bridge_version} (MIT, from {st.bridge_url?.replace('https://', '')})</Row>

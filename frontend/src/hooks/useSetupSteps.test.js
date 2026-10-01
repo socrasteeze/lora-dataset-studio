@@ -915,7 +915,7 @@ test('the install catalog offers the video extras for install and repair', () =>
 // --- Ollama: an optional tool the wizard stopped treating as a prerequisite ----
 //
 // The step used to refuse Next outright when Ollama was absent, and a NATIVE install
-// had no per-step way out: the "No Ollama" card only renders for Docker deployments
+// had no per-step way out: the "No Ollama" card only renders for container deployments
 // (ollamaStep leaves deploymentMode at 'local'). These lock the two lifts and the
 // self-annulling skip, so neither can quietly come back.
 
@@ -949,13 +949,10 @@ test('a ready JoyCaption lifts the Ollama gate', () => {
 });
 
 test('the gate still holds on states the user can act on right here', () => {
-  // Lifting the gate for JoyCaption must not lift it for a Docker deployment that
-  // has not been chosen yet, or a container mid-start: those are answerable on the page.
-  const unchosen = { status: 'available', unconfigured: true };
-  assert.match(ollamaGateReason(unchosen), /Choose No Ollama/);
-  const starting = { status: 'initializing', managedInitializing: true };
-  assert.match(ollamaGateReason(starting), /still starting/);
-  // And a Docker deployment explicitly set to "None" was never a block.
+  const missing = { status: 'available', reachable: false, installed: false };
+  assert.match(ollamaGateReason(missing), /isn't installed/);
+  const stopped = { status: 'available', reachable: false, installed: true };
+  assert.match(ollamaGateReason(stopped), /not running/);
   assert.equal(ollamaGateReason({ status: 'skipped', disabled: true }), null);
 });
 
@@ -1004,32 +1001,24 @@ test('the KEPT column never ticks a captioner this machine does not have', () =>
   assert.match(without.join(' | '), /LoRA training/);
 });
 
-test('a Docker deployment is never read as a native skip, whatever the stored flag says', () => {
-  // The `!dockerManaged` half of `skipped` is what keeps a stored flag from swallowing
-  // a Docker diagnosis — 'host' unreachable names a precise remedy (open 11434 to
-  // Docker) that a neutral "you chose to skip" would hide. Every other test here calls
-  // deriveSetupSteps with ONE argument, which leaves deploymentMode at 'local' and
-  // makes that half constant, so this is the only place it is actually exercised.
+test('a stored skip stays a skip on a direct install', () => {
   const s = deriveSetupSteps(
     { ollama: { reachable: false, skipped: true } },
     { ollama: { mode: 'host', state: 'unreachable', ready: false } },
   ).find((x) => x.id === 'ollama');
-  assert.equal(s.dockerManaged, true);
-  assert.equal(s.skipped, false);
-  assert.match(ollamaGateReason(s), /Host Ollama is selected/);
+  assert.equal(s.deploymentMode, 'local');
+  assert.equal(s.skipped, true);
+  assert.equal(ollamaGateReason(s), null);
 });
 
-test('an unchosen Docker deployment is still a question, even with JoyCaption ready', () => {
-  // The JoyCaption lift answers "can this install caption?". It must not answer
-  // "which Ollama deployment do you want?" — nothing starts until a card is picked,
-  // and "No Ollama" is one of the cards.
+test('JoyCaption still lifts the Ollama gate on a direct install', () => {
   const s = deriveSetupSteps(
     { ollama: { reachable: false }, captioners: { joycaption: true } },
     { ollama: { mode: 'unconfigured', ready: false } },
   ).find((x) => x.id === 'ollama');
   assert.equal(s.joycaptionReady, true);
-  assert.equal(s.unconfigured, true);
-  assert.match(ollamaGateReason(s), /Choose No Ollama/);
+  assert.equal(s.unconfigured, false);
+  assert.equal(ollamaGateReason(s), null);
 });
 
 test('the installer stops offering an Ollama pull to someone running LM Studio', () => {

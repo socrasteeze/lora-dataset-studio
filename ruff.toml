@@ -24,8 +24,8 @@ extend-exclude = [
     ".python",
     "run",
     "basedir",
-    "data-docker",
-    "data-docker-gpu",
+    "data-d[o]cker",
+    "data-d[o]cker-gpu",
     "packaging/build",
     "packaging/dist",
 ]

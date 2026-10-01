@@ -1,6 +1,6 @@
 r"""The FILESYSTEM half of the ComfyUI contract must fail out loud.
 
-Reported on Discord by nofaceman: LoRA Dataset Studio in Docker, ComfyUI in a
+Reported on Discord by nofaceman: LoRA Dataset Studio in container, ComfyUI in a
 SECOND container. Setup went green (URL + directory both accepted), then every
 generation answered a bare `500` with no detail — "probably no network access".
 
@@ -41,7 +41,7 @@ def test_missing_input_folder_is_named_not_swallowed(tmp_path):
 
 
 def test_unwritable_input_folder_is_named(tmp_path, monkeypatch):
-    """The Docker case proper: the folder EXISTS (it is in the image) but this
+    """The container case proper: the folder EXISTS (it is in the image) but this
     process cannot write into it — a read-only bind mount, or a different uid.
 
     The denial is injected at the probe seam rather than by chmod: a read-only
@@ -531,7 +531,7 @@ def test_the_note_quotes_the_input_directory_flag(app, monkeypatch):
 
 def test_a_posix_path_is_absolute_even_when_this_machine_is_windows(app, monkeypatch):
     """The container case, which is the one this whole module exists for: LDS on
-    Windows, ComfyUI in WSL or Docker reporting `/workspace/ComfyUI/input`.
+    Windows, ComfyUI in WSL or container reporting `/workspace/ComfyUI/input`.
 
     `os.path.isabs` answers False for that on Windows — a leading slash is
     drive-relative there, and Python 3.13 made the rule explicit — so judging a

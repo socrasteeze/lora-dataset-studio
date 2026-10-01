@@ -2,9 +2,6 @@
    mode/label/progress logic is unit-testable without a DOM (see updateStatus.test.js).
 
    Install modes:
-   - 'docker'      a container image: the host checkout must be pulled and the
-                   image rebuilt; files inside the running container are never
-                   replaced by the in-app updater.
    - 'pinokio'     launched by the Pinokio launcher: the tree is a git checkout
                    and updates the same way, but the RESTART belongs to Pinokio.
                    Updating here would relaunch the server detached from the
@@ -15,26 +12,6 @@
                    button downloads + swaps the release, with a progress bar.
    - 'unavailable' non-git and no downloadable release: don't promise an update
                    the app can't perform — link out to the releases page instead. */
-
-// Fallback for older GPU servers. New servers supply their lane's commands.
-export const DOCKER_UPDATE_COMMANDS = Object.freeze([
-  'git pull',
-  'docker compose -f docker-compose.gpu.yml up -d --build',
-])
-
-export const DOCKER_UPDATE_GUIDE_URL =
-  'https://github.com/perfectgf/lora-dataset-studio/blob/v2/docs/guide/docker.md#updates-and-restarts'
-
-export function dockerUpdateCommands(status) {
-  const commands = status?.instructions
-  return Array.isArray(commands) && commands.length > 0
-    && commands.every((command) => typeof command === 'string' && command.trim())
-    ? commands : DOCKER_UPDATE_COMMANDS
-}
-
-export function isDockerInstall(s) {
-  return s?.install_mode === 'docker'
-}
 
 // Pinokio's own three clicks. Not shell commands — the user never opens a
 // terminal in this install shape, so naming `git pull` here would send them
@@ -60,10 +37,6 @@ export function formatMB(bytes) {
 
 export function installMode(s) {
   if (!s) return 'unknown'
-  // Docker wins even if a defensive/future payload accidentally also reports a
-  // writable git checkout or ZIP asset. Never surface the in-app apply action in
-  // a container just because /app happens to contain .git metadata.
-  if (isDockerInstall(s)) return 'docker'
   // Before the is_git branch ON PURPOSE: a Pinokio install IS a git checkout,
   // and answering 'git' would put back the button that strands the launcher.
   if (isPinokioInstall(s)) return 'pinokio'

@@ -8,7 +8,7 @@ function setupStep(id, caps, runtimeReadiness) {
   return deriveSetupSteps(caps, runtimeReadiness).find((item) => item.id === id);
 }
 
-test('integrated ComfyUI is initializing and never offers the portable launcher', () => {
+test('a stale integrated readiness does not hide the portable launcher', () => {
   const step = setupStep('comfyui', {
     engines: {},
     comfyui: {
@@ -22,22 +22,15 @@ test('integrated ComfyUI is initializing and never offers the portable launcher'
     comfyui: { mode: 'integrated', state: 'starting', ready: false, poll: true },
   });
 
-  assert.equal(step.status, 'initializing');
-  assert.equal(step.managedMode, 'integrated');
-  assert.equal(step.managedInitializing, true);
-  assert.equal(step.skipped, false);
-  assert.deepEqual(comfyuiLauncherState(step, true), {
-    visible: false, enabled: false, reason: '',
-  });
-
-  // Runtime ownership must keep Start hidden even if lightweight readiness is
-  // already ahead of the full capability refresh.
-  assert.deepEqual(comfyuiLauncherState({ ...step, managedInitializing: false }, true), {
-    visible: false, enabled: false, reason: '',
+  assert.equal(step.managedMode, 'external');
+  assert.equal(step.managedInitializing, false);
+  assert.equal(step.skipped, true);
+  assert.deepEqual(comfyuiLauncherState({ ...step, skipped: false }, true), {
+    visible: true, enabled: true, reason: '',
   });
 });
 
-test('external-host Docker ComfyUI stays manual and never offers portable Start', () => {
+test('a reported external-host mode no longer hides the portable Start button', () => {
   const step = setupStep('comfyui', {
     engines: {},
     comfyui: {
@@ -51,10 +44,8 @@ test('external-host Docker ComfyUI stays manual and never offers portable Start'
   });
 
   assert.equal(step.status, 'available');
-  assert.equal(step.managedMode, 'external-host');
-  assert.equal(step.managedInitializing, false);
   assert.deepEqual(comfyuiLauncherState(step, true), {
-    visible: false, enabled: false, reason: '',
+    visible: true, enabled: true, reason: '',
   });
 });
 
@@ -78,29 +69,15 @@ test('external ComfyUI remains manual and can expose its safe portable launcher'
   });
 });
 
-test('Ollama none, host and docker modes have distinct stopped states', () => {
+test('Ollama readiness no longer switches the step off the direct install', () => {
   const caps = { ollama: { reachable: false, installed: false } };
-  const none = setupStep('ollama', caps, {
-    ollama: { mode: 'none', state: 'disabled', ready: false, poll: false },
-  });
-  const host = setupStep('ollama', caps, {
+  const step = setupStep('ollama', caps, {
     ollama: { mode: 'host', state: 'unreachable', ready: false, poll: false },
   });
-  const docker = setupStep('ollama', caps, {
-    ollama: { mode: 'docker', state: 'starting', ready: false, poll: true },
-  });
-
-  assert.equal(none.status, 'skipped');
-  assert.equal(none.disabled, true);
-  assert.equal(none.managedInitializing, false);
-
-  assert.equal(host.status, 'available');
-  assert.equal(host.deploymentMode, 'host');
-  assert.equal(host.managedInitializing, false);
-
-  assert.equal(docker.status, 'initializing');
-  assert.equal(docker.deploymentMode, 'docker');
-  assert.equal(docker.managedInitializing, true);
+  assert.equal(step.deploymentMode, 'local');
+  assert.equal(step.disabled, false);
+  assert.equal(step.managedInitializing, false);
+  assert.equal(step.status, 'available');
 });
 
 test('Setup polls the lightweight endpoint without overlap and cleans up timers', () => {
@@ -138,19 +115,8 @@ test('capability refresh reports silent failure instead of stopping managed poll
 test('Setup explains every managed runtime state in the UI', () => {
   const source = fs.readFileSync(new URL('../pages/SetupPage.jsx', import.meta.url), 'utf8');
 
-  assert.match(source, /Initializing ComfyUI…/);
-  assert.match(source, /first startup can\s*\n?\s*take several minutes/);
-  assert.match(source, /Starting Ollama…/);
-  assert.match(source, /Ollama is optional and disabled/);
-  assert.match(source, /start-docker\.bat --configure/);
-  assert.doesNotMatch(source, /start-docker-gpu\.bat --configure/);
-  assert.match(source, /start-docker-gpu\.bat/);
-  assert.match(source, /Host Ollama is selected/);
-  assert.match(source, /Windows Firewall/);
   assert.match(source, /No model is downloaded automatically/);
+  assert.match(source, /git clone https:\/\/github.com\/comfyanonymous\/ComfyUI/);
   assert.doesNotMatch(source, /LDS_OLLAMA_MODE/);
-  assert.doesNotMatch(source, /docker-compose\.ollama-sidecar\.yml/);
-  assert.match(source, /existing host ComfyUI, but its API is not reachable/);
-  assert.match(source, /\/external-comfyui/);
-  assert.match(source, /docs\/guide\/docker\.md/);
+  assert.doesNotMatch(source, /ollama-sidecar/);
 });
