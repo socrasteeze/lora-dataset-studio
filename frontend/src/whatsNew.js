@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-01-zzzzz-bank-pages',
+    date: '2026-10-01',
+    title: 'Page through the bank list',
+    blurb: 'The bank list uses pages of 24, 48, or 96. Search and sort return to the first page. Select Visible takes the page you are on, and Select all matching takes every bank in the search, up to 500.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-01-zzzz-dataset-pages',
     date: '2026-10-01',
     title: 'Browse the dataset library by page',

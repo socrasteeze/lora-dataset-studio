@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Globe } from 'lucide-react';
 import { postJson } from '@lds/plugin-sdk'
+import { controlHeight } from '../../../../frontend/src/components/common/Controls.jsx'
 import { useToast } from '@lds/plugin-sdk'
 import { HelpBadge } from '@lds/plugin-sdk'
 import ConceptSourcesPanel from './ConceptSourcesPanel'
@@ -70,7 +71,7 @@ export default function BankScrapePanel({ banks, onDone }) {
     <section className="rounded-lg border border-border bg-surface">
       <button type="button" onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center gap-2 px-4 py-3 text-left">
+        className={`flex w-full items-center gap-2 px-4 text-left ${controlHeight('md')}`}>
         <Globe aria-hidden="true" className="h-4 w-4" />
         <span className="text-sm font-semibold text-content">Scrape the web into a bank</span>
         <span className="hidden text-2xs text-content-subtle sm:inline">

@@ -15,20 +15,26 @@ import { Button } from '../common/Controls.jsx'
  * as facts. So the page says what it knows and offers the walk, instead of
  * doing it behind their back on every visit.
  *
- * flex-wrap + a growing sentence: at 400 px the text takes the row and the
- * button drops underneath it, rather than squeezing into two characters. */
+ * A fresh list keeps that sentence on the button title. A stale list prints
+ * it above the toolbar, because a late count has to be visible. */
 export default function FolderCheckLine({ banks, busy = false, onRescan }) {
   const note = folderCheckNote(banks)
   if (!note) return null
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-      <p className={`min-w-0 grow text-xs ${note.stale ? 'text-amber-300/90' : 'text-content-subtle'}`}>
-        {note.text}
-      </p>
-      <Button noShrink onClick={onRescan} disabled={busy}
-        title="Walk every bank's source folder now and pick up the images added to it">
-        <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />{busy ? 'Checking folders' : 'Rescan folders'}
-      </Button>
-    </div>
+    <>
+      {note.stale ? (
+        <>
+          <p className="basis-full text-xs text-amber-300/90">{note.text}</p>
+          <Button size="md" noShrink onClick={onRescan} disabled={busy}
+            title="Walk every bank's source folder now and pick up the images added to it">
+            <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />{busy ? 'Checking folders' : 'Rescan folders'}
+          </Button>
+        </>
+      ) : (
+        <Button size="md" noShrink onClick={onRescan} disabled={busy} title={note.text}>
+          <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />{busy ? 'Checking folders' : 'Rescan folders'}
+        </Button>
+      )}
+    </>
   )
 }

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   bankListOverview,
+  bankListSummaryLine,
   bankOverviewModel,
   displayPercent,
   widthPercent,
@@ -168,6 +169,11 @@ test('bank list derives undecided and scan coverage without another payload', ()
   assert.equal(model.scanText, '5 of 20 · 25%')
   assert.equal(bankListOverview({ total: 20, keep: 0, reject: 0, scanned: 0 }).scanText,
     'Not measured · Run Scan')
+  assert.equal(
+    bankListSummaryLine({ total: 259, keep: 0, reject: 53, scanned: 259 }),
+    'Kept 0 · Undecided 206 · Rejected 53 · Quality 259/259',
+  )
+  assert.equal(bankListSummaryLine({ total: 0, keep: 0, reject: 0, scanned: 0 }), 'No images.')
 })
 
 test('capped cluster payloads never pretend that the top 40 are an exact total', () => {

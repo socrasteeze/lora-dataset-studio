@@ -141,4 +141,7 @@ test('a search, kind chip, or tile size returns to page 1', () => {
   assert.equal(libraryPageFor(3, { ...prev, kindFilter: 'style' }, prev), 1);
   assert.equal(libraryPageFor(3, { ...prev, tileSize: 'S' }, prev), 1);
   assert.equal(libraryPageFor(3, prev, prev), 3);
+  assert.equal(libraryPageFor(4, { ...prev, sort: 'name' }, { ...prev, sort: 'newest' }), 1);
+  assert.equal(libraryPageFor(4, { ...prev, filter: 'kept' }, { ...prev, filter: 'all' }), 1);
+  assert.equal(libraryPageFor(4, prev, prev), 4);
 });

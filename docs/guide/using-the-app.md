@@ -2700,10 +2700,13 @@ this trap was found in the first place.
 
 ## Manage several banks
 
-From the Bank list, choose **Select Banks**. Each bank gets its own checkbox,
-including members normally shown in a group. **Select Visible** selects the
-current search results. Selected banks hidden by a later search remain selected;
-the selection count shows this. **Clear** removes the selection.
+From the Bank list, choose **Select Banks**. The list is paged. Each bank on
+the current page gets its own checkbox, including members normally shown in a
+group. **Select Visible** selects that page. **Select all N matching** selects
+every bank in the current search, up to 500, and the count says when the limit
+leaves some out. Selected banks hidden by a later search remain selected;
+the selection count shows this. **Clear** removes the selection. Search and
+sort return to the first page.
 
 Choose **Edit Banks** to change individual names or apply literal find/replace,
 a prefix or a suffix. Review the resulting names before saving. The grouping

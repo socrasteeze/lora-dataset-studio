@@ -7,6 +7,9 @@ import { HelpBadge } from '../help/HelpMode'
 import BankWorkspace from '../components/bank/BankWorkspace'
 import LaunchAllDialog from '../components/bank/LaunchAllDialog'
 import FolderPickerField from '../components/common/FolderPicker'
+import { Button, Input, Select, btnClass } from '../components/common/Controls.jsx'
+import Pagination from '../components/common/Pagination.jsx'
+import { libraryPageFor, normalizePageSize, paginate } from '../utils/datasetLibrary.js'
 import GpuBusyNotice from '../components/common/GpuBusyNotice'
 import { hiddenCount, previewSlots } from '../components/bank/bankPreview'
 import { bankListSyncToast } from '../components/bank/bankSync'
@@ -28,13 +31,14 @@ import RelocateBankDialog from '../components/bank/RelocateBankDialog'
 import ForgetMissingDialog from '../components/bank/ForgetMissingDialog'
 import PluginSlot from '../plugins/PluginSlot.jsx'
 import BankLaneTabs from '../components/bank/BankLaneTabs'
-import { bankListOverview } from '../components/bank/bankOverview.js'
+import { bankListOverview, bankListSummaryLine } from '../components/bank/bankOverview.js'
 import BankBulkDialog from '../components/bank/BankBulkDialog.jsx'
 import BankBulkDeleteDialog from '../components/bank/BankBulkDeleteDialog.jsx'
-import { BANK_BULK_LIMIT, bankSelectionKey, selectVisibleBanks, successfulBulkKeys } from '../components/bank/bankBulk.js'
+import { BANK_BULK_LIMIT, bankSelectionKey, bulkSelectionNote, selectVisibleBanks, successfulBulkKeys } from '../components/bank/bankBulk.js'
 
 const CURRENT_KEY = 'bankCurrentId'
 const SORT_KEY = 'bankListSort'
+const PAGE_SIZE_KEY = 'bankListPageSize'
 // Mirrors ImageBank.name's column width (image_bank_service.BANK_NAME_MAX): the
 // server refuses a longer name rather than let SQLite truncate it silently, so
 // stop it here too and the user never types into a 400.
@@ -169,9 +173,10 @@ const BANK_STATUS_TONE = {
 
 function BankListSummary({ bank }) {
   const summary = bankListOverview(bank)
+  const line = bankListSummaryLine(bank)
   return (
     <div className="space-y-1.5">
-      {summary.total > 0 ? (
+      {summary.total > 0 && (
         <div className="flex h-2 overflow-hidden rounded-full bg-surface-raised" role="img"
           aria-label={summary.status.map((row) => `${row.label}: ${row.value}, ${row.percent}%`).join('; ')}>
           {summary.status.filter((row) => row.value > 0).map((row) => (
@@ -179,21 +184,10 @@ function BankListSummary({ bank }) {
               style={{ width: `${row.widthPercent}%`, minWidth: '1px' }} />
           ))}
         </div>
-      ) : summary.total === 0
-        ? <p className="text-2xs text-content-subtle">No images.</p>
-        : <p className="text-2xs text-amber-300/90">Curation totals unavailable.</p>}
-      <ul className="flex flex-wrap gap-x-2 gap-y-0.5 text-2xs text-content-muted">
-        {summary.status.map((row) => (
-          <li key={row.id} className="tabular-nums">{row.label} <span className="text-content">{row.value ?? '—'}</span>
-            {row.percent != null && <span className="text-content-subtle"> · {row.percent}%</span>}</li>
-        ))}
-      </ul>
-      <div className="flex items-center gap-2 text-2xs">
-        <span className="text-content-muted">Quality</span>
-        <span className={summary.scanPercent == null ? 'text-amber-300/90' : 'text-content-subtle'}>
-          {summary.scanText}
-        </span>
-      </div>
+      )}
+      <p className={`text-2xs ${summary.total == null ? 'text-amber-300/90' : 'text-content-muted'}`}>
+        {line}
+      </p>
     </div>
   )
 }
@@ -223,6 +217,11 @@ export default function BankPage() {
   const [sort, setSort] = useState(() => {
     try { return normalizeBankSort(localStorage.getItem(SORT_KEY)) } catch { return DEFAULT_BANK_SORT }
   })
+  const [pageSize, setPageSize] = useState(() => {
+    try { return normalizePageSize(localStorage.getItem(PAGE_SIZE_KEY)) } catch { return 24 }
+  })
+  const [page, setPage] = useState(1)
+  const [appliedList, setAppliedList] = useState({ query: '', sort })
   // "One bank per subfolder": split a parent folder so each top-level subfolder
   // becomes its own bank (loose root images get their own bank too — nothing
   // dropped). A live preview shows what will be created before committing.
@@ -282,6 +281,9 @@ export default function BankPage() {
   }
 
   useEffect(() => { if (currentId == null) refresh() }, [currentId, refresh])
+  useEffect(() => {
+    try { localStorage.setItem(PAGE_SIZE_KEY, String(pageSize)) } catch { /* ignore */ }
+  }, [pageSize])
 
   // When the queue EMPTIES, say what became of the banks that drained — once,
   // not on a poll. "12 finished" alone is the sentence that let a night where
@@ -373,6 +375,12 @@ export default function BankPage() {
   // still forms its group, and a group filtered down to one member correctly
   // dissolves into a loose row (bankGroups needs 2+).
   const visibleBanks = sortBanks(banks || [], sort).filter((b) => bankMatches(b, query))
+  const viewPage = libraryPageFor(page, { query, sort }, appliedList)
+  if (viewPage !== page || appliedList.query !== query || appliedList.sort !== sort) {
+    setAppliedList({ query, sort })
+    if (viewPage !== page) setPage(viewPage)
+  }
+  const paged = paginate(visibleBanks, viewPage, pageSize)
   const selectedBankRows = (banks || []).filter((bank) => selectedBanks.has(bankSelectionKey(bank)))
   const visibleSelectedCount = visibleBanks.filter((bank) => selectedBanks.has(bankSelectionKey(bank))).length
   const hiddenSelectedCount = selectedBankRows.length - visibleSelectedCount
@@ -630,27 +638,24 @@ export default function BankPage() {
 
       <form onSubmit={create}
         className="space-y-3 rounded-lg border border-border bg-surface p-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="grow min-w-40">
-            <label htmlFor="bank-name" className="block text-sm font-medium text-content">Name</label>
-            <input id="bank-name" value={name} onChange={(e) => setName(e.target.value)}
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="min-w-40 grow">
+            <label htmlFor="bank-name" className="mb-1 block text-sm font-medium text-content">Name</label>
+            <Input id="bank-name" size="lg" value={name} onChange={(e) => setName(e.target.value)}
               placeholder={splitMode ? 'Named per subfolder automatically' : 'Telegram export 07/2026'}
               required={!splitMode} disabled={splitMode}
-              className="mt-1 w-full rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50" />
+              className="w-full" />
           </div>
-          <div className="grow-[3] min-w-64">
-            <FolderPickerField id="bank-folder" label="Folder"
-              value={folder} onChange={setFolder} required
-              placeholder="C:\path\to\unsorted-images (subfolders included)" />
-          </div>
-          <button type="submit" disabled={creating || !!folderNotice}
-            title={folderNotice ? 'That folder belongs to a dataset' : undefined}
-            className="rounded-md bg-gradient-primary px-4 py-2 text-sm font-semibold text-gray-950 disabled:opacity-50">
+          <FolderPickerField inline size="lg" id="bank-folder" label="Folder"
+            value={folder} onChange={setFolder} required
+            placeholder="C:\path\to\unsorted-images (subfolders included)" />
+          <Button type="submit" size="lg" variant="primary" disabled={creating || !!folderNotice}
+            title={folderNotice ? 'That folder belongs to a dataset' : undefined}>
             {creating ? 'Inventorying' : (
               <span className="inline-flex items-center gap-1.5"><Plus aria-hidden="true" className="h-4 w-4" />
                 {splitMode ? 'Create banks' : 'Create bank'}</span>
             )}
-          </button>
+          </Button>
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <label className="flex items-center gap-1.5 text-sm text-content">
@@ -728,7 +733,7 @@ export default function BankPage() {
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => setDialogScope({ kind: 'all' })}
             title="Line every bank that still has undecided images up to run, one after another on each machine"
-            className="rounded-md border border-indigo-400/50 bg-indigo-500/10 px-3 py-1.5 text-sm font-semibold text-indigo-200 hover:bg-indigo-500/20">
+            className={`${btnClass({ size: 'md' })} border-indigo-400/50 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20`}>
             ⏳ Queue all {queueAllCount} bank(s)
           </button>
           <span className="text-xs text-content-subtle">
@@ -747,8 +752,6 @@ export default function BankPage() {
           folder you prepared by hand — you can fill one straight from the web. */}
       <PluginSlot slot="sources.panel" surface="bank" banks={banks} onDone={() => refresh()} />
 
-      <FolderCheckLine banks={banks} busy={rescanning} onRescan={rescan} />
-
       {banks == null ? (
         <p className="text-sm text-content-muted">Loading</p>
       ) : banks.length === 0 ? (
@@ -757,57 +760,62 @@ export default function BankPage() {
         </p>
       ) : (
         <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <FolderCheckLine banks={banks} busy={rescanning} onRescan={rescan} />
           <p className="text-sm text-content-muted">
             {visibleBanks.length === banks.length
               ? `${banks.length} bank(s)`
               : `showing ${visibleBanks.length} of ${banks.length}`}
           </p>
-          <input
+          <Input
             type="search"
+            size="md"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Find a bank"
             aria-label="Find a bank"
-            className="min-w-[9rem] flex-1 rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-content placeholder:text-content-subtle focus:border-primary focus:outline-none sm:max-w-xs"
+            className="min-w-[9rem] flex-1"
           />
-          <label className="flex items-center gap-2 text-xs text-content-muted">
+          <label className="flex items-center gap-2 text-sm text-content-muted">
             Sort
-            <select value={sort} onChange={(e) => changeSort(e.target.value)}
-              aria-label="Sort the banks"
-              className="rounded-md border border-border bg-surface-raised px-2 py-1 text-xs text-content">
+            <Select size="md" value={sort} onChange={(e) => changeSort(e.target.value)}
+              aria-label="Sort the banks">
               {BANK_SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </select>
+            </Select>
           </label>
-          <button type="button" onClick={() => {
+          <Button size="md" type="button" onClick={() => {
             setSelectingBanks((value) => !value)
             if (selectingBanks) setSelectedBanks(new Set())
-          }} aria-pressed={selectingBanks}
-            className="min-h-10 rounded-md border border-border px-3 text-xs font-semibold text-content hover:bg-surface-raised">
+          }} aria-pressed={selectingBanks}>
             {selectingBanks ? 'Done Selecting' : 'Select Banks'}
-          </button>
+          </Button>
           <HelpBadge topic="bank-bulk-manage" />
         </div>
         {selectingBanks && (
           <div data-probe-chrome="bank-bulk-actions"
             className="space-y-2 rounded-lg border border-indigo-400/40 bg-indigo-500/10 p-3">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-content-muted">
-              <span>{selectedBankRows.length} selected{hiddenSelectedCount > 0 ? `, ${hiddenSelectedCount} hidden by the filter` : ''}</span>
-              <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-content-muted">
+              <span>{bulkSelectionNote({
+                selectedCount: selectedBankRows.length,
+                hiddenSelectedCount,
+                matchingCount: visibleBanks.length,
+              })}</span>
+              <button type="button" onClick={() => setSelectedBanks((prev) => selectVisibleBanks(prev, paged.items))}
+                disabled={paged.items.length === 0 || selectedBankRows.length >= BANK_BULK_LIMIT}
+                className={btnClass({ size: 'md' })}>Select Visible</button>
               <button type="button" onClick={() => setSelectedBanks((prev) => selectVisibleBanks(prev, visibleBanks))}
                 disabled={visibleBanks.length === 0 || selectedBankRows.length >= BANK_BULK_LIMIT}
-                className="min-h-10 rounded-md border border-border px-3 font-semibold text-content disabled:opacity-50">Select Visible</button>
+                className={btnClass({ size: 'md' })}>Select all {visibleBanks.length} matching</button>
               <button type="button" onClick={() => setSelectedBanks(new Set())} disabled={!selectedBankRows.length}
-                className="min-h-10 rounded-md border border-border px-3 font-semibold text-content disabled:opacity-50">Clear</button>
-              </div>
+                className={btnClass({ size: 'md' })}>Clear</button>
               <span className="sm:ml-auto">Limit {BANK_BULK_LIMIT}</span>
             </div>
             {selectedBankRows.length > 0 && (
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => setBulkDialog('edit')}
-                  className="min-h-10 rounded-md border border-indigo-400/50 px-3 text-sm font-semibold text-indigo-200">Edit Banks</button>
+                  className={`${btnClass({ size: 'md' })} w-full border-indigo-400/50 text-indigo-200`}>Edit Banks</button>
                 <button type="button" onClick={() => setBulkDialog('delete')}
-                  className="min-h-10 rounded-md border border-rose-500/60 px-3 text-sm font-semibold text-rose-200">Delete Banks</button>
+                  className={`${btnClass({ size: 'md' })} w-full border-rose-500/60 text-rose-200`}>Delete Banks</button>
               </div>
             )}
           </div>
@@ -828,7 +836,7 @@ export default function BankPage() {
               combined counts, one queue action and one promote. A member can opt
               out ("Keep separate"), which is a property of the BANK and survives
               a rename away and back. */}
-          {(selectingBanks ? visibleBanks.map((bank) => ({ kind: 'bank', key: `select-${bankSelectionKey(bank)}`, bank })) : groupRows(visibleBanks)).map((row) => {
+          {(selectingBanks ? paged.items.map((bank) => ({ kind: 'bank', key: `select-${bankSelectionKey(bank)}`, bank })) : groupRows(paged.items)).map((row) => {
             if (row.kind === 'group') {
               return (
                 <BankGroupCard key={row.key} row={row} queueStateOf={queueStateOf}
@@ -896,27 +904,34 @@ export default function BankPage() {
                   when nobody is watching. A clean run gets no badge: a tick on
                   every card makes the one amber card harder to spot. */}
               {!selectingBanks && <PipelineVerdictNote report={b.pipeline_report} />}
-              {!selectingBanks && <PassCoverageRow coverage={b.pass_coverage} />}
+              {!selectingBanks && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <PassCoverageRow coverage={b.pass_coverage} />
+                  <div className="ml-auto flex items-center gap-2">
+                    <button type="button" onClick={() => open(b.id)}
+                      className={btnClass({ size: 'sm' })}>
+                      Open →
+                    </button>
+                    {!qs && (
+                      <button type="button" onClick={() => setDialogScope({ kind: 'bank', bankId: b.id })} disabled={b.total === 0}
+                        title="Run Launch all now, or add this bank to the queue"
+                        className={btnClass({ size: 'sm', variant: 'ghost' })}>
+                        Launch all
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
               {!selectingBanks && <FolderSyncNote sync={b.folder_sync}
                 onRelocate={() => setRelocating(b)}
                 onForget={() => setForgetting(b)} />}
-              {!selectingBanks && <div className="flex items-center gap-2">
-                <button type="button" onClick={() => open(b.id)}
-                  className="rounded-md border border-border bg-surface-raised px-3 py-1 text-xs font-semibold text-content hover:bg-surface">
-                  Open →
-                </button>
-                {!qs && (
-                  <button type="button" onClick={() => setDialogScope({ kind: 'bank', bankId: b.id })} disabled={b.total === 0}
-                    title="Run Launch all now, or add this bank to the queue"
-                    className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-content-muted hover:text-content hover:bg-surface-raised disabled:opacity-50">
-                    Launch all
-                  </button>
-                )}
-              </div>}
             </li>
             )
           })}
         </ul>
+        <Pagination page={paged.page} pages={paged.pages} pageSize={paged.pageSize}
+          total={paged.total} rangeStart={paged.rangeStart} rangeEnd={paged.rangeEnd}
+          onPage={setPage} onPageSize={setPageSize} label="Banks per page" />
         </div>
       )}
 

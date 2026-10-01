@@ -36,6 +36,8 @@ test('a never-walked list warns that its counts can lag AND offers the walk', ()
 test('a freshly walked list states its age instead of crying stale', () => {
   const html = render(FolderCheckLine, { banks: [sync({ walked: true, age: 8 })] })
   assert.match(html, /Source folders checked just now/)
+  assert.match(html, /title="Source folders checked just now\."/)
+  assert.doesNotMatch(html, /<p[^>]*>[^<]*Source folders checked/)
   assert.doesNotMatch(html, /knew last time/i)
 })
 
