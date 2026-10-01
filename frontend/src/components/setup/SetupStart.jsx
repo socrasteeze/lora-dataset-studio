@@ -50,16 +50,12 @@ export default function SetupStart({ onTools, onRecheck, scanned = false, detect
     let alive = true
     const controller = new AbortController()
     const options = { cache: 'no-store', background: true, signal: controller.signal }
-    Promise.allSettled([
-      apiFetch('/api/plugins/', options),
-      goalId === 'plugins' ? apiFetch('/api/plugins/store/catalog', options) : Promise.resolve(null),
-    ]).then(([plugins, catalog]) => {
+    apiFetch('/api/plugins/', options).then((plugins) => {
       if (!alive) return
-      setResult({ key: requestKey,
-        data: plugins.status === 'fulfilled' ? plugins.value : null,
-        error: plugins.status === 'rejected' ? 'Could not check installed plugins. Check the connection and try again.' : '',
-        catalog: catalog.status === 'fulfilled' ? catalog.value
-          : { status: 'unavailable', products: [], message: 'The Store could not be reached. You can still set up your installed plugins.' } })
+      setResult({ key: requestKey, data: plugins, error: '', catalog: null })
+    }, () => {
+      if (!alive) return
+      setResult({ key: requestKey, data: null, error: 'Could not check installed plugins. Check the connection and try again.', catalog: null })
     })
     return () => { alive = false; controller.abort() }
   }, [needsChecks, goalId, requestKey])

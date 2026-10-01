@@ -40,14 +40,6 @@
    "calls": 1,
    "hosts": []
   },
-  "backend/app/plugins/store/client.py": {
-   "calls": 1,
-   "hosts": []
-  },
-  "backend/app/plugins/store/commerce.py": {
-   "calls": 1,
-   "hosts": []
-  },
   "backend/app/routes/backup.py": {
    "calls": 0,
    "hosts": [

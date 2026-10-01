@@ -83,7 +83,7 @@ def test_fork_build_marker_boots_the_exact_curated_registry_without_hidden_env(t
 @pytest.mark.parametrize('value, message', [
     ({'schema_version': 1, 'distribution': 'fork', 'plugins': ['video']}, 'curated fork policy'),
     ({'schema_version': 1, 'distribution': 'fork', 'plugins': list(reversed(fork_profile._POLICY['enabled']))}, 'curated fork policy'),
-    ({'schema_version': 1, 'distribution': 'store', 'plugins': list(fork_profile._POLICY['enabled'])}, 'Only a fork'),
+    ({'schema_version': 1, 'distribution': 'store', 'plugins': list(fork_profile._POLICY['enabled'])}, 'unknown distribution'),
     ({'schema_version': 99, 'distribution': 'fork', 'plugins': list(fork_profile._POLICY['enabled'])}, 'unsupported schema'),
     ({'schema_version': 1, 'distribution': 'mystery'}, 'unknown distribution'),
 ])

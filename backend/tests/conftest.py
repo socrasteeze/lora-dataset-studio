@@ -106,24 +106,6 @@ def _restore_secret_env():
         else:
             os.environ[k] = v
 
-# Fork Divergence 12 switches the plugin store off at its network doors. These
-# upstream suites exercise the store machinery against loopback fixtures, so
-# they, and only they, see it switched on. test_fork_outbound_gate.py pins that
-# the real switch stays off.
-_STORE_MACHINERY_SUITES = frozenset({
-    'test_public_store_commerce', 'test_public_store_media', 'test_public_store_plans',
-    'test_public_store_service', 'test_public_store_transport', 'test_public_store_tuf',
-    'test_private_plugin_sources', 'test_store_catalog_extensions',
-})
-
-
-@pytest.fixture(autouse=True)
-def _store_machinery_under_test(request, monkeypatch):
-    if request.module.__name__.rsplit('.', 1)[-1] in _STORE_MACHINERY_SUITES:
-        from app.plugins.store import client as store_client
-        monkeypatch.setattr(store_client, 'store_switched_off', lambda: False)
-
-
 @pytest.fixture(autouse=True)
 def _no_live_comfyui_vram_release(monkeypatch):
     """Every GPU-exclusive vision window POSTs /free to ComfyUI — for real.

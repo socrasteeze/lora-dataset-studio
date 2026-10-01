@@ -15,7 +15,7 @@ read-only. You can keep your current installation, datasets and settings.
 5. When it says **Done**, start LDS with your usual launcher. In Pinokio, run
    **Update** before **Start** so its Python dependencies are refreshed too.
 6. Check your datasets and settings. Choose the optional features you need in
-   **Plugins → Store**; the tool does not install or activate plugins for you.
+   **Plugins**; the tool does not install or activate extra plugins for you.
 
 The tool uses the installation's Python, or an existing Python 3.10+ on your
 computer, and Git. It does not install either of them or request administrator rights.

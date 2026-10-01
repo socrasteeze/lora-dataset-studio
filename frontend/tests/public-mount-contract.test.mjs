@@ -6,7 +6,7 @@ import { resetRegistry, registerDescriptor, setEnabled, contributions } from '..
 import { engineIds, engineLabel } from '../src/engines/catalog.js'
 import { canonicalEngines, readEngines, writeEngines, STORAGE_ENGINES } from '../src/components/dataset/engineSelection.js'
 import { settingsApiUrl, pluginSettingsAvailability, settingsPatch, reconcileSettings } from '../src/pages/pluginSettings.js'
-import { preparationState, startPreparation, watchPreparation } from '../src/pages/store/preparation.js'
+import { preparationState, startPreparation, watchPreparation } from '../src/pages/plugins/preparation.js'
 import { isDatasetImportBlocked, isStopGenerationBlocked } from '../src/components/dataset/activityGates.js'
 
 const { MemoryRouter } = await import('react-router')
@@ -15,7 +15,7 @@ const { CapabilitiesProvider } = await import('../src/context/CapabilitiesContex
 const { default: SetupStart } = await import('../src/components/setup/SetupStart.jsx')
 const { default: StudioPage } = await import('../src/pages/StudioPage.jsx')
 const { default: UnavailablePluginPage } = await import('../src/pages/UnavailablePluginPage.jsx')
-const { default: PluginPreparation } = await import('../src/pages/store/PluginPreparation.jsx')
+const { default: PluginPreparation } = await import('../src/pages/plugins/PluginPreparation.jsx')
 const { completeCoreSetup } = await import('../src/components/setup/completeCoreSetup.js')
 
 const mount = (Component, props = {}, route = '/') => renderToStaticMarkup(createElement(MemoryRouter, { initialEntries: [route] },
@@ -167,10 +167,10 @@ test('public shared import and stop guards survive removal of the scraper module
   assert.equal(isStopGenerationBlocked({ busy: true, activity: { kind: 'caption' } }), true)
 })
 
-test('Store entry has no bundled glob and development selects its separate source explicitly', async () => {
+test('the plugin build always selects the curated fork entry', async () => {
   const source=await fs.readFile(new URL('../src/plugins/bundled.js', import.meta.url), 'utf8')
   const config=await fs.readFile(new URL('../vite.config.js', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /import\.meta\.glob|\.\.\/.*bundled\//)
-  assert.match(config, /!storeBuild.*importer/s)
-  assert.match(config, /bundledDevelopment\.js/)
+  assert.match(config, /return FORK_ENTRY/)
+  assert.doesNotMatch(config, /storeBuild|bundledDevelopment\.js/)
 })

@@ -288,6 +288,9 @@ What's New entry and `host.docker.internal` if kept; gates green; probe at
 
 ## Wave 3 — remove the plugin store
 
+**Status (2026-10-01).** Implemented on `wave/3-store`. Not landed.
+`origin/main` is still `f3815e82e`. Gates have not been run.
+
 **Switch.** `backend/app/plugins/store/client.py:55` `store_switched_off()`
 returns `True`; the whole store is dead code behind it.
 

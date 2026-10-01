@@ -41,11 +41,9 @@ For scripted setups, a handful of environment variables override paths and binds
 
 The Overview section has **no settings of its own**. Its capabilities grid shows the shared tools that LDS can currently use. Optional product controls and their preparation belong to each plugin's **Settings** button in **Plugins**.
 
-The **Plugins** tab combines browsing and managing plugins on the same cards.
-Use **All**, **Installed** or **Updates** to filter them. Installed cards keep
-their controls even when the store is offline, including plugins absent from
-the catalog. To uninstall one, open **More actions → Remove plugin** on its
-card. **Purchases** is a separate tab for licenses.
+**Plugins** lists what is installed. Turn a plugin off from its card.
+To uninstall one you added, open **More actions → Remove plugin**.
+A ZIP you trust is installed from the same page.
 
 Every row is a **link to the control that turns that capability on**, not just to the right screen: picking *Person masks* opens the Setup wizard step that installs it. Use the grid as your first stop to answer "why is this feature greyed out?" — the answer is one click away on the row itself.
 

@@ -25,7 +25,7 @@ The app scales from "no GPU at all" to a full local training rig — each capabi
 
 ## Dependencies by feature
 
-Core tools are prepared in **Setup**. Install optional features from **Plugins → Store**, then use each plugin’s settings and preparation screen. Missing dependencies keep the affected feature unavailable.
+Core tools are prepared in **Setup**. Optional features that ship with the app are listed on **Plugins**; use each plugin’s settings and preparation screen. Missing dependencies keep the affected feature unavailable.
 
 | Feature | Requires |
 |---|---|
