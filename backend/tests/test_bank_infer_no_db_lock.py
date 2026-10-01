@@ -44,6 +44,7 @@ def file_db(tmp_path, monkeypatch):
     from app import config as cfg
     monkeypatch.setattr(cfg, 'ENV_PATH', tmp_path / '.env')
     monkeypatch.setattr(cfg, '_cache', None)
+    # Plugin and extension dirs come from the autouse _isolate_user_state fixture.
     from app import create_app
     from app.extensions import db
 

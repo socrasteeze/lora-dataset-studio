@@ -46,6 +46,7 @@ def _file_backed_app(tmp_path):
     """The suite's ``app`` fixture forces sqlite:///:memory:, where a second
     connection sees an EMPTY database — so contention cannot be observed at all.
     Precedent for a file-backed app: test_watermarks.py."""
+    # Plugin and extension dirs come from the autouse _isolate_user_state fixture.
     from app import create_app
     return create_app({
         'TESTING': True,

@@ -70,6 +70,7 @@ def test_bundle_is_executable_even_when_js_is_mapped_to_text_plain(
     import app.config as _cfg
     monkeypatch.setattr(_cfg, 'ENV_PATH', tmp_path / '.env')
     monkeypatch.setattr(_cfg, '_cache', None)
+    # Plugin and extension dirs come from the autouse _isolate_user_state fixture.
     from app import create_app
     application = create_app({'TESTING': True, 'WTF_CSRF_ENABLED': False,
                               'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:'})
@@ -94,6 +95,7 @@ def test_stylesheet_and_shell_survive_a_poisoned_table(
     import app.config as _cfg
     monkeypatch.setattr(_cfg, 'ENV_PATH', tmp_path / '.env')
     monkeypatch.setattr(_cfg, '_cache', None)
+    # Plugin and extension dirs come from the autouse _isolate_user_state fixture.
     from app import create_app
     application = create_app({'TESTING': True, 'WTF_CSRF_ENABLED': False,
                               'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:'})
