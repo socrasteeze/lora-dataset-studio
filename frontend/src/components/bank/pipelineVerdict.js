@@ -63,9 +63,15 @@ const count = (v) => {
  *  ran the step) the local LLM's share is named instead of "fallback".
  *
  *  Reads the counts the backend stores on the step; a report written before
- *  those counts existed has none and gets no note — never an invented one. */
+ *  those counts existed has none and gets no note — never an invented one.
+ *
+ *  A step re-run since the report (`superseded_at`, stamped by the server on
+ *  DONE steps too) gets no note: the standalone Caption run that filled the gaps
+ *  is the newer story, and "3 not captioned" would be nagging about images that
+ *  now have captions. */
 export function captionStepNote(step) {
   if (!step || step.step !== 'caption' || step.status !== 'done') return null
+  if (step.superseded_at) return null
   const c = step.counts || {}
   const missed = count(c.skipped) + count(c.failed)
   const writers = CAPTION_WRITERS.filter((w) => count(c[w.key]) > 0)
