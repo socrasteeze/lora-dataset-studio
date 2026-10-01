@@ -21,6 +21,11 @@ No tests ran on the tip, and the final lockdown commit ran none locally at all; 
 5. Drop the store's "Retry catalog" button; it can only return the store-off message — `frontend/src/pages/store/Catalog.jsx:56`.
 6. Re-shoot `docs/screenshots/training/runs-hub.png` and `advanced-options.png` on a fork instance; both still show the rental lane — FORK_NOTES.md D4.
 7. Physical-phone, real-model training and Docker qualification remain separate, unrun gates.
+8. Config isolation (2026-10-01): branch `fix/config-isolation` restores the autouse `_isolate_user_state` fixture that merge `891d61e33` dropped — FORK_NOTES.md D5. It is local and unpushed; no tests ran locally. Push it, then start CI by dispatch or a PR (item 9). Pass means the four `backend/tests/test_config_isolation.py` cases go green. Then carry it to `noble/bank-queue-stop`, which fails the same four. The `4af9136c7` message wrongly says upstream deleted the test; a squash before pushing keeps that out of history, and FORK_NOTES cites no SHA, so either way is safe.
+9. Decide the CI push trigger. `.github/workflows/ci.yml:12` has read `branches: [v2]` since `891d61e33`, so no push to `main` starts CI. Restore `[main]`, or keep CI dispatch-only on purpose.
+10. After item 8 is green, restore `assert not path.exists()` in `test_every_test_reads_an_isolated_config` (`f32e6acb1` loosened it, `backend/tests/test_config_isolation.py:28-29`) and confirm on CI.
+11. The autouse fixture redirects `LDS_CONFIG`, `LDS_DATA_DIR` and `LDS_ENV` but not `LDS_PLUGINS_DIR` or `LDS_EXTENSIONS_DIR`, which AGENTS.md also lists; only `create_test_app` covers those. The gap predates `891d61e33`.
+12. Between `891d61e33` and the fix landing, any plain local pytest run outside Gates could write the checkout's real `config.json`, `data/` and `.env`. Nobody has inspected them yet.
 
 ## Decisions
 - Exact-match review gate over a runtime egress block — the user's choice; a block would break click-driven HF export, the scraper and downloads.
