@@ -1,0 +1,1 @@
+import{eE as t}from"./index-D_Vup9jo.js";function a(n,r){const i=t();return i.React.createElement(i.training[n],r)}function o(...n){return t().training.famLabel(...n)}function s(...n){return t().training.postWithConfirmations(...n)}function f(n){return a("TrainingReadiness",n)}export{f as T,o as f,s as p};
