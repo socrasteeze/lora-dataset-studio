@@ -43,9 +43,11 @@ export function useModelFiles(slot) {
  * Searchable picker over the model files ComfyUI can actually load for one slot.
  *
  * The text input IS the value, exactly like KleinLoraCombobox — these fields
- * accept a full absolute path from outside every ComfyUI root (the Klein slots
- * hardlink it in), and no scan can enumerate that, so free text stays
- * first-class. What the dropdown adds is the list of what IS there.
+ * accept a full absolute path, and no scan can enumerate that, so free text
+ * stays first-class. A path under a ComfyUI root is converted to its loader
+ * name; one outside every root is reported with the folder to register, and
+ * nothing is copied or linked in. What the dropdown adds is the list of what
+ * IS there.
  *
  * A value that names no scanned file is shown FIRST, flagged "not found", and
  * kept selected — see utils/modelFileOptions.js for why nothing is silently
