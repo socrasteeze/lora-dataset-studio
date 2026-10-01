@@ -41,8 +41,8 @@
 | [Releases](https://github.com/perfectgf/lora-dataset-studio/releases) and [changelog](../CHANGELOG.md) | Current release notes and historical improvements |
 | [Plugin authoring](plugins/README.md) | SDK, package layout, compatibility and building plugins |
 | [Contributing](../CONTRIBUTING.md) | Development setup, tests and pull-request conventions |
-| [Upstream sync](UPSTREAM_SYNC.md) | **Fork maintainers only** — how to merge `upstream/main` into this fork: ordered procedure, derivation commands, verification gates and the expected-failure baseline |
-| [Fork notes](../FORK_NOTES.md) | **Fork maintainers only** — what diverges from upstream and why, the merge diagnostics, and the wave-by-wave record |
+| [Landing gate](../scripts/gates.ps1) | **Fork maintainers only** — `scripts/gates.ps1 -Phase Gates` qualifies a change before it lands on main |
+| [Fork notes](../FORK_NOTES.md) | **Fork maintainers only** — the current rule for each divergence. The old wave log is [history/FORK_CHANGELOG.md](history/FORK_CHANGELOG.md) |
 | [Design specs](specs/) | Dated records of why a change was built the way it was — read before reworking one of these areas |
 | [Code of Conduct](../CODE_OF_CONDUCT.md) | Community expectations |
 | [License](../LICENSE) | PolyForm Noncommercial License 1.0.0 |

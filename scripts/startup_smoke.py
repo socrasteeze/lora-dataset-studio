@@ -11,9 +11,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
-    if not os.environ.get('LDS_SYNC_SCRATCH'):
-        raise RuntimeError('Run this check through upstream_sync.ps1 with isolated scratch state.')
-    scratch = Path(os.environ['LDS_SYNC_SCRATCH']).resolve()
+    if not os.environ.get('LDS_GATES_SCRATCH'):
+        raise RuntimeError('Run this check through scripts/gates.ps1 with isolated scratch state.')
+    scratch = Path(os.environ['LDS_GATES_SCRATCH']).resolve()
     for key in ('LDS_DATA_DIR', 'LDS_CONFIG', 'LDS_ENV'):
         value = os.environ.get(key)
         if not value or not Path(value).resolve().is_relative_to(scratch):

@@ -71,9 +71,9 @@ it; `CLAUDE.md` step 2 is only about that granularity. A PR that changes
 `frontend/src` and carries no dist at all is incomplete either way.
 
 **This fork is local-only for image generation** (no Nano Banana / OpenAI Setup
-keys). After merging upstream, rebuild `frontend/dist` even if you only took
-upstream's dist commit — Flask serves the bundle, and upstream's can resurrect
-removed UI. See `FORK_NOTES.md` and run
+keys). After a cherry-pick from the read-only `upstream` remote, rebuild
+`frontend/dist` even if you only took upstream's dist commit. Flask serves the
+bundle, and an upstream bundle can resurrect removed UI. See `FORK_NOTES.md` and run
 `node --test tests/local-only-engines-contract.test.mjs` from `frontend/`.
 
 Flask serves `frontend/dist` **off disk, per request**, so a rebuilt bundle
@@ -174,7 +174,7 @@ genuinely like it. A fork usually carries two very different kinds of change:
 
 - **Your product decisions** — engines you removed, defaults you disagree with,
   behaviour you shaped around your own workflow. Keep them. They are why you
-  forked, and upstreaming them would only make your next merge harder.
+  forked. Sending those decisions upstream mixes them with work that stays here.
 - **The fixes underneath them** — a path that only resolved on your machine, a
   message that named the wrong cause, a crash on a layout we never tested. Those
   are ours too, and they are usually a small diff sitting inside a much larger
