@@ -63,8 +63,9 @@ _BUSY_WRITE_EXEMPT_ENDPOINTS = frozenset({
     'bank.bank_search_text',
     # Read-only host integration: opening Explorer/Finder never mutates the Bank.
     'bank.bank_open_source_folder',
-    # The one write that must stay reachable precisely while a job is live.
+    # Stop controls must stay reachable precisely while a job is live.
     'bank.bank_cancel',
+    'bank.bank_queue_remove',
 })
 
 
