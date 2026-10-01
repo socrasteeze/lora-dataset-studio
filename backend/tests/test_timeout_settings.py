@@ -41,20 +41,6 @@ def test_invalid_job_budget_cannot_remove_worker_limit(app, override):
     assert generation_limits.generation_timeout_seconds({'processing_timeout_seconds': override}) == 900
 
 
-@pytest.mark.skip(reason='civitai_publish is held on this fork; no app.services.civitai_publish')
-def test_civitai_upload_scales_at_transport_once(app, monkeypatch):
-    from app.services import civitai_publish
-    cfg.save_config({'timeouts': {'network_multiplier': 3}})
-    seen = {}
-    def request(*args, **kwargs):
-        seen.update(kwargs)
-        return SimpleNamespace(status_code=200, headers={}, content=b'ok')
-    monkeypatch.setattr(civitai_publish.requests, 'request', request)
-    civitai_publish._transport('PUT', 'https://example.invalid/upload',
-                              timeout=civitai_publish._UPLOAD_TIMEOUT)
-    assert seen['timeout'] == (6.1 * 3, 1800)
-
-
 def test_ollama_response_budget_is_independent_of_connection_budget(app, monkeypatch):
     from app.services import vision_ollama as vo
     cfg.save_config({'timeouts': {'network_multiplier': 3, 'processing_multiplier': 2}})

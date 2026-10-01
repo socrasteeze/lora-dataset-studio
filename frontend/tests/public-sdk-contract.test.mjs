@@ -58,5 +58,6 @@ test('every exported product descriptor imports with the public SDK and declares
     checked.push(manifest.id)
   }
   assert.deepEqual(fp8HelpOwners, ['model_tools'])
-  assert.ok(checked.includes('live') && checked.includes('resource_monitor') && checked.includes('civitai_publish'))
+  assert.ok(checked.includes('live') && checked.includes('resource_monitor'))
+  assert.ok(!checked.includes('civitai_publish'))
 })

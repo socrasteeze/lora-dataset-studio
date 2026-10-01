@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-01-zzzzzzzz-no-civitai-publish',
+    date: '2026-10-01',
+    title: 'Checkpoints stay on this machine',
+    blurb: 'This install does not publish a checkpoint to Civitai. The prompt browser and the scraper still use the Civitai API key you already saved.',
+    to: '/datasets',
+  },
+  {
     id: '2026-10-01-zzzzzzz-honest-bank-cards',
     date: '2026-10-01',
     title: 'Bank cards and the queue say what happened',
