@@ -642,7 +642,9 @@ clicking again is all it takes. Your decision is never partially applied.
 picks the *good* subset — and it's most of what makes a LoRA good. Once **✨
 Score** has run (the default CLIP semantic index), or the Bank's optional
 **SigLIP 2 semantic index** is ready, the **Curate** row under the selection bar
-offers two selectors that cost no extra inference:
+offers two selectors that cost no extra inference. The row starts folded to one
+line; click **Curate** to open it, and the Bank remembers whether you left it
+open or closed:
 
 - **🎨 Pick diverse** — enter a number and it selects the images that best
   *cover the variety* of what you're looking at (varied angles, outfits, scenes),
@@ -1071,9 +1073,9 @@ it lets the sampling go and launches the full pass.
 ## Pick a balanced set
 
 Advice is only half the gesture, so **📊 Coverage advice** ends with **⚖️ Pick a
-balanced set** (the same button sits in the **Curate** row). It answers a
-question no per-image score can ask: *does my set cover what I want to be able to
-generate?*
+balanced set**. It opens **⚖️ Balanced pick** in the **Curate** row, unfolding
+the row first if it is closed. It answers a question no per-image score can ask:
+*does my set cover what I want to be able to generate?*
 
 Ask **🎨 Pick diverse** for 20 images out of a bank that is 47% full body, 35%
 bust, 12% face and 6% back views, and you get roughly those proportions — on a

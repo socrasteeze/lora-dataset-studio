@@ -41,3 +41,12 @@ test('the workspace reads the remembered folds and the dismissal', () => {
   assert.match(ws, /loadFold\(FOLD_KEYS\.curate, false\)/)
   assert.match(ws, /aria-controls="bank-curate"/)
 })
+
+test('Pick a balanced set unfolds Curate, where the Balanced pick popover lives', () => {
+  // The Coverage panel stays up when Curate is folded; opening only the popover
+  // left the button doing nothing visible.
+  const ws = readFileSync(new URL('./BankWorkspace.jsx', import.meta.url), 'utf8')
+  const panel = ws.slice(ws.indexOf('<CoveragePanel'))
+  assert.match(panel,
+    /onBalance=\{balanceReady\.ready \? \(\) => \{\s*setCurateShownState\(saveFold\(FOLD_KEYS\.curate, true\)\)\s*setCurateOpen\('balanced'\)/)
+})

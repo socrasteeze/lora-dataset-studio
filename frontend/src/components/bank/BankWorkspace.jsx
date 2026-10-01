@@ -2503,11 +2503,17 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           )}
         </div>
 
+        {/* "Pick a balanced set" opens the Balanced pick popover, which lives in
+            the Curate row. This panel stays up when that row is folded, so the
+            click unfolds the row too; otherwise nothing would appear. */}
         {coverageOpen && (
           <CoveragePanel coverage={coverage} semanticEngine={coverage?.engine || semanticState.engine}
             semanticLabel={semanticEngineLabel(coverage?.engine || semanticState.engine)}
             onClose={() => setCoverageOpen(false)}
-            onBalance={balanceReady.ready ? () => setCurateOpen('balanced') : null}
+            onBalance={balanceReady.ready ? () => {
+              setCurateShownState(saveFold(FOLD_KEYS.curate, true))
+              setCurateOpen('balanced')
+            } : null}
             balanceReason={balanceReady.reason} />
         )}
 
