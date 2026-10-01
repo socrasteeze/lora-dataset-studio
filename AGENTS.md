@@ -102,7 +102,7 @@ than creating a second policy for another agent.
 Use the repository's pinned `.venv` and the Node version required by the current
 manifests and sync driver. Historical test counts are not a current baseline.
 
-- Run tests in a separate Codex cloud task by default. Do not start or rerun
+- Run tests in a separate cloud task by default. Do not start or rerun
   tests, responsive probes, fixture-backed checks, or the test-bearing
   `Quick`/`Gates` phases on the user's local machine without explicit permission
   for that local run. An implementation, clean, commit, or push request does not
@@ -114,9 +114,9 @@ manifests and sync driver. Historical test counts are not a current baseline.
   the exact source and bundle. This is validation transport, not a landing push.
   Keep main unchanged until the required cloud gates pass.
 
-- During implementation, run relevant backend tests with `.venv/Scripts/python.exe
-  -m pytest backend/tests/test_name.py -q` on Windows. Use the equivalent `.venv`
-  path on other systems.
+- Targeted backend tests: `.venv/Scripts/python.exe -m pytest
+  backend/tests/test_name.py -q` on Windows, or the equivalent `.venv` path on
+  other systems.
 - Targeted frontend tests: from `frontend`, run `node --import
   ./scripts/registerSdk.mjs --test <file>`. Bare discovery omits the SDK setup.
 - Before committing, run relevant tests, privacy and contract checks, and `npm test`.
@@ -144,7 +144,7 @@ manifests and sync driver. Historical test counts are not a current baseline.
 - Use a task branch for substantial work. Preserve worktrees and unrelated edits.
 - Follow the user's delivery authorization. Scrub attribution and sensitive
   data before committing or pushing a task branch for cloud validation. Run the
-  repository gates in Codex cloud before landing on main. Never publish main on
+  repository gates in a cloud task before landing on main. Never publish main on
   the strength of source inspection alone.
 - `upstream` is read-only. No upstream push or PR is implied by implementation or sync.
 - Rebuild `frontend/dist` after frontend changes. The app serves it directly.

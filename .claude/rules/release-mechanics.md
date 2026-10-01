@@ -6,12 +6,16 @@ paths:
 
 # Release mechanics
 
-Releases are cut on validated waves/milestones only — never per commit.
+Releases are cut on validated waves only — never per commit.
 Announcements tell users to "Update & restart".
 
-- The dist-freshness check runs at release time (`release.yml`).
-- CI on push gates heavy jobs on big changes (≥5 source files or ≥100 lines —
-  see `.github/workflows/ci.yml`).
+- `release.yml` rebuilds `frontend/dist` and only warns when it differs from
+  the committed build; it does not block the release. Commit a fresh build
+  before tagging.
+- Push CI runs only for pushes to `v2` (`.github/workflows/ci.yml`); a push to
+  `main` starts nothing, so use a manual dispatch or a PR. On a push, heavy
+  jobs run for any test change, any Torch-sensitive path, or at least 5 source
+  files or 100 changed lines.
 - `frontend/scripts/releaseNotes.mjs` builds the release body from the
   What's-new entries `frontend/src/whatsNew.js` gained since the previous tag
   (git diff of that file, not entry `date` — several releases can be cut on
