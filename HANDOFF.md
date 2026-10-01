@@ -1,13 +1,27 @@
 # HANDOFF
 
-## Current repair: Bank queue Stop (2026-09-30)
-- Branch: `noble/bank-queue-stop`, base `a8142c334`; source and bundle are prepared for validation transport.
-- Exempted `bank.bank_queue_remove` from the busy-write guard. Queue cancellation can reach the existing stop handler while the pipeline owns the Bank; other writes remain protected.
-- Added four regression cases in `backend/tests/test_bank_queue.py`, a What's New entry and a rebuilt fork bundle.
-- Verified: `git diff --check`, full Ruff, frontend lint (0 errors, 30 warnings in unchanged files), frontend build.
-- Pending: queue, reservation, pipeline, privacy and changelog tests, plus full cloud delivery Gates. The user authorized a separate cloud validation task; no local tests ran.
-- Both scrub passes found no unresolved findings. The privacy scanner checked 3,113 tracked and untracked text files; broader hits are synthetic fixtures and Docker hostnames.
-- Keep main unchanged until cloud Gates pass. Activation needs a backend restart; no restart occurred.
+## Current: integrate/2026-10-01 (2026-10-01)
+- Branch `integrate/2026-10-01`, pushed to origin. Main is still `f3815e82e`; it was NOT fast-forwarded because the gates failed.
+- Merged (no-ff) onto main `f3815e82e`: `fix/config-isolation` (restored autouse `_isolate_user_state`, FORK_NOTES D5), `noble/bank-queue-stop` (queued Bank runs can be stopped while active), `fix/settings-copy-restore` (Klein pin wording, usage-statistics entry withdrawn, Pick a balanced set opens Curate). Bundle `f3d66ad2c`.
+- Review fix `e14ed5585`: `captionStepNote` returns null for a step with `superseded_at`, so a standalone Caption re-run clears "N not captioned" and "needs attention". Test in `pipelineVerdict.test.js`. Bundle `21db95291`.
+- Stale branches `fix/config-isolation`, `fix/settings-copy-restore`, `noble/bank-queue-stop` are NOT deleted yet; delete them with the integrate branch once main lands.
+
+### Gate results at `21db95291`
+The run happened on this Windows machine, not in the cloud: the "remote" agent request ran locally. Treat it as local evidence only. Docker is not installed here, so the Docker smoke test did NOT run.
+- PASS: ruff 0.16.4; `npm run lint` (0 errors, 30 warnings); `npm run build`; `check_release_artifacts.py`; 6 bundled-plugin suites in separate processes; `testBundled.mjs` (1162 pass, 4 skip); `test_no_personal_data`, `test_fork_outbound_gate`, `test_config_isolation` (22 pass, 2 skip: no private-name list, so the name scan did not run).
+- FAIL `npm test`, 2 tests, both reproduce alone and are already on main by content:
+  - `frontend/src/pages/SetupPage.contract.test.js:76` regex expects `['ready', 'skipped']`; `SetupPage.jsx:1519` now has `'ignored'` too (f1bbcd3cf).
+  - `frontend/tests/plugin-framework-guide.test.mjs:20` wants `tagging-wd14` in `CORE_GUIDE_ANCHORS['settings-reference']` (`frontend/src/help/guideHosts.js`); the heading came in fb4ec40a4.
+- FAIL host suite: `backend/tests/test_setup_state.py::test_tracked_local_engine_is_not_a_regression_while_comfyui_is_down`. Its `SimpleNamespace` engine spec lacks `counts_as_recommended`. Reproduces alone and at main `f3815e82e`.
+- Isolation gap, also on main: with `LDS_PLUGINS_DIR` set for the whole run, `test_static_mime_types.py` and `test_bank_pass_write_lock.py` call `create_app()` without their own plugins dir, so xdist workers collide on `admission.lock` (`StorageError: Another process is preparing...`). Each passes alone; with the variable unset only the setup_state failure remains (10472 pass). Fix: per-test `LDS_PLUGINS_DIR`, or redirect it in the autouse fixture (see item 11).
+- Install trap: `pip install -r requirements-dev.txt -r requirements-torch-tests.txt` in ONE command fails, because the torch file's `--index-url` replaces PyPI. Install them in two commands.
+- Next: fix the three failing tests in a source commit, re-run the gates in a real cloud environment with Docker, then fast-forward main and delete the four branches.
+
+### Open low-severity review notes
+- `backend/app/capabilities.py:54` `_POSITIVE_IMPORT_TTL = 24 * 3600` keeps a JoyCaption "ready" verdict for 24 h, so an uninstall or a broken env reads as ready for up to a day.
+- `frontend/src/pages/BankPage.jsx:590` `cancelQueued`: the confirm reads a queue snapshot polled every 2 s. A ✕ on a row still shown as waiting can cancel a run that just started, without the running-row confirm.
+- `frontend/src/index.css:346` `.bank-tile__actions`: on touch the full-width 40px strip covers the tile bottom and blocks tap-to-select there.
+- The bank list payload `_report_steps` (`backend/app/services/image_bank_service.py:3052`) drops `counts`, `blocked` and `superseded_at`. List tiles therefore never show the caption note, and judge "blocked" from prose only.
 
 ## Previous session
 
@@ -28,12 +42,12 @@ No tests ran on the tip, and the final lockdown commit ran none locally at all; 
 1. Run Gates at `c49e5b67e` on the other machine. The full backend suite has not run for any D12 commit.
 2. Re-run the Bank probe: `883467b46` ("first images above the fold", another session) changed the header after the 123 px measurement.
 3. Activate on the live instance: pull, then restart. The update badge no longer checks by itself; press Check for updates. Do not serve the new bundle against an old backend.
-4. Remove or reword the "usage statistics" What's New entry and the Settings search terms that point at it; no code implements it — `frontend/src/whatsNew.js:335`, `frontend/src/components/settings/registry.js:48-50`.
+4. Done in `72380e23c` (merged via `fix/settings-copy-restore`): the usage-statistics entry is withdrawn.
 5. Drop the store's "Retry catalog" button; it can only return the store-off message — `frontend/src/pages/store/Catalog.jsx:56`.
 6. Re-shoot `docs/screenshots/training/runs-hub.png` and `advanced-options.png` on a fork instance; both still show the rental lane — FORK_NOTES.md D4.
 7. Physical-phone, real-model training and Docker qualification remain separate, unrun gates.
-8. Config isolation (2026-10-01): branch `fix/config-isolation` restores the autouse `_isolate_user_state` fixture that merge `891d61e33` dropped — FORK_NOTES.md D5. It is local and unpushed; no tests ran locally. Push it, then start CI by dispatch or a PR (item 9). Pass means the four `backend/tests/test_config_isolation.py` cases go green. Then carry it to `noble/bank-queue-stop`, which fails the same four. The `4af9136c7` message wrongly says upstream deleted the test; a squash before pushing keeps that out of history, and FORK_NOTES cites no SHA, so either way is safe.
-9. Decide the CI push trigger. `.github/workflows/ci.yml:12` has read `branches: [v2]` since `891d61e33`, so no push to `main` starts CI. Restore `[main]`, or keep CI dispatch-only on purpose.
+8. Merged into `integrate/2026-10-01`; `test_config_isolation.py` passes (5/5). Original note: branch `fix/config-isolation` restores the autouse `_isolate_user_state` fixture that merge `891d61e33` dropped — FORK_NOTES.md D5. It is local and unpushed; no tests ran locally. Push it, then start CI by dispatch or a PR (item 9). Pass means the four `backend/tests/test_config_isolation.py` cases go green. Then carry it to `noble/bank-queue-stop`, which fails the same four. The `4af9136c7` message wrongly says upstream deleted the test; a squash before pushing keeps that out of history, and FORK_NOTES cites no SHA, so either way is safe.
+9. Still open. Decide the CI push trigger. `.github/workflows/ci.yml:12` has read `branches: [v2]` since `891d61e33`, so no push to `main` starts CI. Restore `[main]`, or keep CI dispatch-only on purpose.
 10. After item 8 is green, restore `assert not path.exists()` in `test_every_test_reads_an_isolated_config` (`f32e6acb1` loosened it, `backend/tests/test_config_isolation.py:28-29`) and confirm on CI.
 11. The autouse fixture redirects `LDS_CONFIG`, `LDS_DATA_DIR` and `LDS_ENV` but not `LDS_PLUGINS_DIR` or `LDS_EXTENSIONS_DIR`, which AGENTS.md also lists; only `create_test_app` covers those. The gap predates `891d61e33`.
 12. Between `891d61e33` and the fix landing, any plain local pytest run outside Gates could write the checkout's real `config.json`, `data/` and `.env`. Nobody has inspected them yet.
