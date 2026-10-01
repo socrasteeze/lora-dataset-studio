@@ -115,7 +115,7 @@ function LocationEditor({
             className={`${INPUT_CLASS} sm:flex-1`} />
           <button type="button" onClick={validate} disabled={checking || busy}
             className={`${SIDE_BUTTON_CLASS} shrink-0`}>
-            {checking ? 'Checking…' : 'Check folder'}
+            {checking ? 'Checking' : 'Check folder'}
           </button>
         </div>
         <div className="mt-1">
@@ -204,16 +204,16 @@ function TrashCard({ reloadKey }) {
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-sm text-content">
           <span aria-hidden>🗑</span> Trash size:{' '}
-          <span className="font-semibold tabular-nums">{size == null ? '…' : formatSize(size)}</span>
+          <span className="font-semibold tabular-nums">{size == null ? '' : formatSize(size)}</span>
         </span>
         <button type="button" onClick={openFolder} disabled={opening}
           title="Open the trash folder in the file explorer"
           className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm font-medium text-content disabled:opacity-40">
-          {opening ? 'Opening…' : '📂 Open folder'}
+          {opening ? 'Opening' : '📂 Open folder'}
         </button>
         <button type="button" onClick={empty} disabled={busy || !size}
           className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-300 disabled:opacity-40">
-          {busy ? 'Emptying…' : 'Empty trash'}
+          {busy ? 'Emptying' : 'Empty trash'}
         </button>
       </div>
     </Card>
@@ -251,7 +251,7 @@ function RunArchiveCard() {
         <span className="text-sm text-content">
           <span aria-hidden>🗂</span> Archive size:{' '}
           <span className="font-semibold tabular-nums">
-            {info == null ? '…' : formatSize(info.size_bytes || 0)}
+            {info == null ? '' : formatSize(info.size_bytes || 0)}
           </span>
           {info?.max_bytes ? (
             <span className="text-content-subtle"> / {formatSize(info.max_bytes)} ceiling</span>
@@ -262,7 +262,7 @@ function RunArchiveCard() {
         )}
         <button type="button" onClick={clear} disabled={busy || !info?.size_bytes}
           className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-300 disabled:opacity-40">
-          {busy ? 'Clearing…' : 'Clear archive'}
+          {busy ? 'Clearing' : 'Clear archive'}
         </button>
       </div>
     </Card>
@@ -325,7 +325,7 @@ export default function StorageSection({
         <div className="flex flex-wrap items-center gap-3">
           <button id="storage-measure" type="button" onClick={measure} disabled={measuring}
             className="rounded-md border border-border-strong px-3 py-1.5 text-sm font-medium text-content hover:bg-surface-raised disabled:opacity-50">
-            {measuring ? 'Measuring…' : '📏 Measure everything'}
+            {measuring ? 'Measuring' : '📏 Measure everything'}
           </button>
           <span className="text-xs text-content-subtle">
             {Object.keys(sizes).length ? 'Measured just now.' : 'Not measured yet.'}

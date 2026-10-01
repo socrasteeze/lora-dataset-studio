@@ -82,7 +82,7 @@ Two consequences worth remembering:
 - **The Studio reads `config.json` and drives training.** That file belongs to
   this app (it sits in its data folder, and every key in it has a field in
   **Settings**). Editing anything inside ai-toolkit's `ui/` folder changes
-  nothing here — if you ever find yourself editing `ui/dist/…`, you are in the
+  nothing here — if you ever find yourself editing `ui/dist/`, you are in the
   wrong project.
 - **The two Python environments are not interchangeable.** The Studio's `.venv`
   runs the web app; ai-toolkit's venv is the one that must have `torch` and the

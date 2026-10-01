@@ -346,7 +346,7 @@ export default function RunLineageGraph({ tree, onSelect, onContinueCheckpoint,
               + (sel.enabled && !gen.busy
                 ? 'bg-indigo-500 text-gray-950 hover:bg-indigo-400 '
                 : 'cursor-not-allowed bg-app/60 text-content-subtle ')}>
-            {gen.busy ? 'Generating…' : 'Generate'}
+            {gen.busy ? 'Generating' : 'Generate'}
           </button>
           {sel.hint && <span className="text-2xs text-amber-200/90">{sel.hint}</span>}
           {gen.error && <span className="text-2xs text-red-300">{gen.error}</span>}

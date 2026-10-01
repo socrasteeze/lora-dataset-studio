@@ -39,12 +39,12 @@ export default function VideoDatasetImportPanel({ ds, refresh }) {
           onChange={upload} className="min-h-10 min-w-0 max-w-full text-xs" />
         <span className="text-xs text-content-subtle">MP4, MOV, MKV, WebM or AVI · 200 MB per file and 1 GB per upload.</span>
       </label>
-      {sending && <p role="status" className="text-sm text-content-muted">Uploading videos…</p>}
+      {sending && <p role="status" className="text-sm text-content-muted">Uploading videos</p>}
       {activity && <div role="status" className="rounded-lg border border-border p-3 text-sm text-content-muted">
-        {activity.cancelled ? 'Import stopped. ' : ''}{activity.error || activity.detail || 'Preparing videos…'}
+        {activity.cancelled ? 'Import stopped. ' : ''}{activity.error || activity.detail || 'Preparing videos'}
         {importing && <span> · {activity.done}/{activity.total}</span>}
         {importing && <button type="button" onClick={stop} disabled={activity.cancelled}
-          className="ml-2 min-h-10 rounded border border-border px-3">{activity.cancelled ? 'Stopping…' : 'Stop import'}</button>}
+          className="ml-2 min-h-10 rounded border border-border px-3">{activity.cancelled ? 'Stopping' : 'Stop import'}</button>}
       </div>}
       {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}
       <PluginSlot slot="sources.panel" surface="videoDataset" datasetId={ds.id}

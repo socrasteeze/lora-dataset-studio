@@ -41,7 +41,7 @@ test('while the estimate is still settling the banner says so and promises nothi
   // Rule one: "3 hours" that becomes "20 minutes" two minutes later does not
   // give the user a number, it teaches them to stop reading the number.
   const seen = bar({ ...INDEXING, eta_state: 'estimating' })
-  assert.match(seen, /12939 \/ 37800 · estimating time left…/)
+  assert.match(seen, /12939 \/ 37800 · estimating time left/)
   assert.doesNotMatch(seen, /about/)
   assert.doesNotMatch(seen, /left in/)
 })
@@ -66,7 +66,7 @@ test('after a phase change the banner scopes its promise to the current step', (
   const seen = bar({
     kind: 'score', done: 4200, total: 21220, finished: false,
     eta_state: 'ready', eta_seconds: 1200, eta_scope: 'phase',
-    detail: 'writing 21220 score(s) to the database…',
+    detail: 'writing 21220 score(s) to the database',
   })
   assert.match(seen, /4200 \/ 21220 · about 20 minutes left in this step/)
 })

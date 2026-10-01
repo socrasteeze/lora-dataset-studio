@@ -49,12 +49,12 @@ export default function BankGroupCard({
         <button type="button" onClick={() => onQueue?.(row)}
           title="Queue every bank in this group — one entry each, and only ever one of them running at a time"
           className="rounded-md border border-indigo-400/50 px-3 py-1 text-xs font-semibold text-indigo-200 hover:bg-indigo-500/10">
-          ⏳ Queue the group…
+          ⏳ Queue the group
         </button>
         <button type="button" onClick={() => onPromote?.(row)} disabled={row.keep === 0}
           title="Promote every kept image in this group into one dataset"
           className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-content-muted hover:text-content hover:bg-surface-raised disabled:opacity-50">
-          ⬆ Promote the group…
+          ⬆ Promote the group
         </button>
         <button type="button" onClick={() => setOpen((v) => !v)}
           aria-expanded={open}

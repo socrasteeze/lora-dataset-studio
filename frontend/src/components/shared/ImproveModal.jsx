@@ -154,7 +154,7 @@ export default function ImproveModal({ img, host = 'library', datasetId = null,
             <div className="flex flex-col items-center gap-3 py-8 text-center">
               <span aria-hidden className="animate-pulse text-2xl">✨</span>
               <p className="m-0 max-w-md text-sm text-gray-300" role="status">
-                Generating… you can close this dialog — the render keeps going and
+                Generating you can close this dialog — the render keeps going and
                 the result lands in {routes.dest}.
               </p>
             </div>

@@ -96,7 +96,7 @@ export function VideoCheckpointList({
                       <button type="button" disabled={rowBusy} onClick={() => onUndeploy?.(g, s)}
                         title="Remove this LoRA from ComfyUI's loras folder. Reversible: the training save is kept, so you can deploy it again"
                         className={ROW + ' border-emerald-500/40 bg-emerald-600/5 text-emerald-200/90 hover:bg-emerald-600/20'}>
-                        <span aria-hidden>⏏</span> {busy === `${a.key}:undeploy` ? 'Undeploying…' : 'Undeploy'}
+                        <span aria-hidden>⏏</span> {busy === `${a.key}:undeploy` ? 'Undeploying' : 'Undeploy'}
                       </button>
                     ) : (
                       <span className={MUTED}><span aria-hidden>⏏</span> {a.undeploy?.reason}</span>
@@ -104,7 +104,7 @@ export function VideoCheckpointList({
                       <button type="button" disabled={rowBusy} onClick={() => onDeploy?.(g, s)}
                         title={`Deploy this step into ComfyUI's ${a.deploy.folder} folder so the Video Test Studio can test it`}
                         className={ROW + ' border-primary/40 bg-primary/20 text-white hover:bg-primary/30'}>
-                        <span aria-hidden>📦</span> {busy === `${a.key}:deploy` ? 'Deploying…' : `Deploy → ${a.deploy.folder}`}
+                        <span aria-hidden>📦</span> {busy === `${a.key}:deploy` ? 'Deploying' : `Deploy → ${a.deploy.folder}`}
                       </button>
                     ) : (
                       <span className={MUTED}><span aria-hidden>📦</span> {a.deploy?.reason}</span>
@@ -117,7 +117,7 @@ export function VideoCheckpointList({
                         title={a.del.title}
                         className="ml-auto flex items-center gap-1 px-1 py-0.5 text-2xs text-content-subtle hover:text-rose-200 disabled:opacity-60">
                         <Trash2 aria-hidden="true" className="h-3 w-3" />
-                        {busy === `${a.key}:delete` ? 'Deleting…' : a.del.label}
+                        {busy === `${a.key}:delete` ? 'Deleting' : a.del.label}
                       </button>
                     ) : (
                       <span className={MUTED + ' ml-auto'}><span aria-hidden>🗑</span> {a.del.reason}</span>
@@ -232,7 +232,7 @@ export default function VideoCheckpointManager({ ds, refreshKey = 0, onSavesChan
       </p>
     )
   }
-  if (!payload) return <p className="m-0 text-xs text-content-subtle">Reading the saves…</p>
+  if (!payload) return <p className="m-0 text-xs text-content-subtle">Reading the saves</p>
   const hasGraph = (tree?.nodes?.length || 0) > 0
   const generatePreviews = (node, pill) => {
     if (node && pill) setSelected([previewKey(previewSelector(node, pill))])

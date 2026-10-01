@@ -40,7 +40,7 @@ const OPAQUE = /\bbg-(surface-overlay|surface-solid|app)\b|\bbg-black(?=["'\s])/
 
 // A dialog's classes do not all live in its own file. When a responsive shape
 // gets big enough to reason about, it is extracted to a sibling module of
-// CLASS CONSTANTS (`export const FACTS_PANEL_CLASS = '… bg-app …'`) so
+// CLASS CONSTANTS (`export const FACTS_PANEL_CLASS = ' bg-app '`) so
 // `node --test` can assert the breakpoints without a DOM — and this guard, which
 // only ever read .jsx, went blind the first time that happened: the opaque token
 // was still there, one import away, and the test called the dialog see-through.

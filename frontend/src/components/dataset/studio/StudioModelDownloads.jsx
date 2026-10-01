@@ -55,7 +55,7 @@ export default function StudioModelDownloads({ readiness, onRefresh }) {
       ))}
       <button type="button" onClick={refresh} disabled={checking}
         className="min-h-10 rounded-md border border-border px-2.5 py-1.5 text-xs text-content disabled:opacity-50">
-        {checking ? 'Checking model files…' : 'Check installed files again'}
+        {checking ? 'Checking model files' : 'Check installed files again'}
       </button>
       {error && <p role="alert" className="text-xs text-red-400">{error}</p>}
     </section>}

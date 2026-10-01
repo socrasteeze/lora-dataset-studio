@@ -126,7 +126,7 @@ export default function BankDecisionBar({
           </p>
           <button type="button" onClick={onUndo} disabled={undoBusy}
             className="rounded border border-sky-400/60 px-2 py-1 text-xs font-semibold hover:bg-white/10 disabled:opacity-50">
-            {undoBusy ? 'Undoing…' : '↩ Undo'}
+            {undoBusy ? 'Undoing' : '↩ Undo'}
           </button>
           <button type="button" onClick={onUndoDismiss} disabled={undoBusy}
             title="Keep the change and hide this"

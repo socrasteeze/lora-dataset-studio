@@ -181,7 +181,7 @@ export const PASSES_PANEL_DEFAULT_OPEN = false;
  * the fact that the bank is busy behind a click.
  */
 export function passesButtonLabel(live) {
-  return live ? '⚙ Passes (running…)' : '⚙ Passes';
+  return live ? '⚙ Passes (running)' : '⚙ Passes';
 }
 
 /**

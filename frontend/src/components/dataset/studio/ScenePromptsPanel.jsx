@@ -104,7 +104,7 @@ export default function ScenePromptsPanel({ value, onChange }) {
             aria-label={`${src.label.replace(/^\S+\s/, '')} to load scenes from`}
             className="max-w-56 rounded border border-border bg-app/60 px-1 py-1 text-2xs text-content">
             <option value="">
-              {options === undefined ? 'Loading…' : (options.length ? src.pick : src.empty)}
+              {options === undefined ? 'Loading' : (options.length ? src.pick : src.empty)}
             </option>
             {(options || []).map((o) => (
               <option key={o.id} value={o.id}>{o.name}</option>
@@ -112,7 +112,7 @@ export default function ScenePromptsPanel({ value, onChange }) {
           </select>
           <button type="button" onClick={load} disabled={!sourceId || busy}
             className="rounded-lg bg-gradient-primary px-2.5 py-1 text-2xs font-semibold text-gray-950 disabled:opacity-40">
-            {busy ? 'Loading…' : scenes.length ? '⟳ Reload' : '⬇ Load scenes'}
+            {busy ? 'Loading' : scenes.length ? '⟳ Reload' : '⬇ Load scenes'}
           </button>
           {scenes.length > 0 && (
             <>

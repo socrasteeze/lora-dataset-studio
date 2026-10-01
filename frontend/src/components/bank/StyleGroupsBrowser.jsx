@@ -67,7 +67,7 @@ export default function StyleGroupsBrowser({ bankId, activeStyle, onPick, onClos
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {error && <p className="text-sm text-red-300">{error}</p>}
-          {!error && !groups && <p className="text-sm text-content-muted">Loading style groups…</p>}
+          {!error && !groups && <p className="text-sm text-content-muted">Loading style groups</p>}
           {groups && groups.length === 0 && (
             <p className="text-sm text-content-muted">No style groups yet. Run ✨ Score to make them.</p>
           )}

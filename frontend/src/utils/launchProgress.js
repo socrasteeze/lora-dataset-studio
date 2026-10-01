@@ -123,5 +123,5 @@ export function stopButtonLabel(status) {
 export function launchButtonLabel({ launching, elapsedSeconds, fullMode }) {
   if (!launching) return fullMode ? '☁️ Rent GPU & train full model' : '☁️ Rent & train';
   const s = Math.max(0, Math.round(Number(elapsedSeconds) || 0));
-  return s < 3 ? 'Launching…' : `Launching… ${formatElapsed(s)}`;
+  return s < 3 ? 'Launching' : `Launching ${formatElapsed(s)}`;
 }

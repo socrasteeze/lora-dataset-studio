@@ -82,6 +82,6 @@ test('Curate chips share even columns; Coverage advice is a full-width row', () 
   assert.match(curate, /⚖️ Balanced pick\{/);
   assert.match(curate, /Similar to selected\{/);
   assert.match(curate, /Find by text\{/);
-  assert.doesNotMatch(curate, /Pick diverse…/);
-  assert.doesNotMatch(src, /Auto-reject…/);
+  assert.doesNotMatch(curate, /Pick diverse\u2026/);
+  assert.doesNotMatch(src, /Auto-reject\u2026/);
 });

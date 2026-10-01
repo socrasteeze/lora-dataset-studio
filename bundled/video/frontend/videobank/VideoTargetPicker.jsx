@@ -26,7 +26,7 @@ const BADGE_TONE = {
  */
 export default function VideoTargetPicker({ targets, targetKey, onPick }) {
   if (targets == null) {
-    return <p className="mt-1 text-sm text-content-muted">Loading targets…</p>
+    return <p className="mt-1 text-sm text-content-muted">Loading targets</p>
   }
   const selected = targets.find((t) => t.key === targetKey) || null
   return (

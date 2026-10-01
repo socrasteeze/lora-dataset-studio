@@ -14,7 +14,7 @@ const MAX_POLL_FAILURES = 5
 const ROW_META = {
   idle: { glyph: '○', cls: 'text-content-subtle', word: 'waiting' },
   queued: { glyph: '○', cls: 'text-content-subtle', word: 'queued' },
-  running: { glyph: '⟳', cls: 'text-primary', word: 'installing…' },
+  running: { glyph: '⟳', cls: 'text-primary', word: 'installing' },
   success: { glyph: '✓', cls: 'text-emerald-400', word: 'done' },
   error: { glyph: '✗', cls: 'text-rose-400', word: 'needs attention' },
 }
@@ -210,7 +210,7 @@ export default function VideoStudioInstallCard({ caps, onDone }) {
           <button type="button" onClick={start} disabled={phase === 'running'}
             className="mt-4 rounded-lg border border-border-strong px-4 py-2 text-sm font-medium text-content hover:bg-surface-raised disabled:opacity-60">
             {phase === 'running'
-              ? `Installing… (${doneCount}/${rows.length})`
+              ? `Installing (${doneCount}/${rows.length})`
               : `Install (${plan.length})`}
           </button>
           {phase === 'done' && !error && (

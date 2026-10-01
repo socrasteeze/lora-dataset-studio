@@ -720,7 +720,7 @@ def video_bank_promote(bank_id):
 def video_bank_scrape_import():
     """Download the picked scan items into a video bank.
 
-    Body: {items:[{url,title,…}], bank_id?} to APPEND to any existing bank, or
+    Body: {items:[{url,title,}], bank_id?} to APPEND to any existing bank, or
     {items, name} to create one. The SAME contract as the image lane's
     `/api/bank/scrape-import`, on purpose — the two destinations answer
     {'ok','bank_id','name','created','saved','already_there','added','skipped'}

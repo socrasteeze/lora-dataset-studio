@@ -60,7 +60,7 @@ export const COMPARE_SHORTCUTS = [
   { keys: 'N', what: 'Not duplicates — keep every copy and never propose this group again' },
   { keys: 'B', what: 'Put the cursor back on the app’s pick (BEST)' },
   { keys: '←  →', what: 'Move between the copies of this group' },
-  { keys: '1 … 9', what: 'Jump straight to a copy' },
+  { keys: '1 to 9', what: 'Jump straight to a copy' },
   { keys: 'S', what: 'Skip this group — decides nothing, not shown again in this run' },
   { keys: '⇧←  ⇧→', what: 'Previous / next group' },
   { keys: 'F', what: 'Switch between side by side and full screen' },

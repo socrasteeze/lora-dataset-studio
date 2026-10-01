@@ -288,7 +288,7 @@ export default function ConceptFaceMaskField({
           <div className="flex flex-wrap items-center gap-1.5">
             <button type="button" onClick={runPreview} disabled={running}
               className="min-h-8 rounded-lg border border-border bg-surface px-2.5 text-2xs font-semibold text-content hover:bg-surface-raised disabled:opacity-50">
-              {running ? 'Looking for faces…' : previewStartLabel(resume, Boolean(preview))}
+              {running ? 'Looking for faces' : previewStartLabel(resume, Boolean(preview))}
             </button>
             {running && (
               <button type="button" onClick={stopPreview} disabled={Boolean(job && job.stopping)}

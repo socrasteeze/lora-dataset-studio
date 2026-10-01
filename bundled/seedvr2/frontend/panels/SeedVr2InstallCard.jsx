@@ -12,7 +12,7 @@ const MAX_POLL_FAILURES = 5
 const PACK_URL = 'https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler'
 const WEIGHTS_URL = 'https://huggingface.co/numz/SeedVR2_comfyUI'
 const PROJECT_URL = 'https://github.com/ByteDance-Seed/SeedVR'
-const STATUS_WORDS = { idle: 'waiting', queued: 'queued', running: 'preparing…', success: 'prepared', error: 'needs attention' }
+const STATUS_WORDS = { idle: 'waiting', queued: 'queued', running: 'preparing', success: 'prepared', error: 'needs attention' }
 
 export default function SeedVr2InstallCard({ caps, onDone }) {
   const toast = useToast()
@@ -114,7 +114,7 @@ export default function SeedVr2InstallCard({ caps, onDone }) {
         <h3 className="text-base font-semibold text-content">
           SeedVR2 — fidelity upscaler <HelpBadge topic="setup-seedvr2-install" className="ml-2" />
         </h3>
-        {running && <span className="text-xs tabular-nums text-content-muted">Preparing {doneCount} / {rows.length || '…'}</span>}
+        {running && <span className="text-xs tabular-nums text-content-muted">Preparing {doneCount} / {rows.length || ''}</span>}
       </div>
       <p className="mt-1 text-sm text-content-muted">
         Restore detail at a higher resolution while preserving the image’s look.
@@ -164,11 +164,11 @@ export default function SeedVr2InstallCard({ caps, onDone }) {
           <div className="mt-4 flex flex-wrap gap-2">
             {(running || (!ready && plan.length > 0)) && <button type="button" onClick={start} disabled={running}
               className="w-full rounded-lg border border-primary/50 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary disabled:opacity-50 sm:w-auto">
-              {running ? 'Preparing SeedVR2…' : 'Prepare SeedVR2'}
+              {running ? 'Preparing SeedVR2' : 'Prepare SeedVR2'}
             </button>}
             {!running && <button type="button" onClick={recheck} disabled={checking}
               className="rounded-lg border border-border px-4 py-2 text-sm text-content-muted disabled:opacity-50">
-              {checking ? 'Checking…' : 'Re-check ComfyUI'}
+              {checking ? 'Checking' : 'Re-check ComfyUI'}
             </button>}
           </div>
           {!ready && !running && <p className="mt-2 text-xs text-content-subtle">

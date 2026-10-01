@@ -232,7 +232,7 @@ export function CheckpointPill({ pill, offX, offY, active, selected, preview, bi
                 className="h-full w-full cursor-zoom-in object-cover hover:opacity-90" />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-base">
-                {st === 'pending' ? <span aria-hidden title="Generating preview…" className="animate-pulse text-indigo-300">◌</span>
+                {st === 'pending' ? <span aria-hidden title="Generating preview" className="animate-pulse text-indigo-300">◌</span>
                   : st === 'failed' ? <span aria-hidden title="Preview failed" className="text-amber-300">⚠</span>
                   : <span aria-hidden title="Saved, no preview" className="opacity-50">▪</span>}
               </div>
@@ -258,7 +258,7 @@ export function CheckpointPill({ pill, offX, offY, active, selected, preview, bi
           <span className="min-w-0 truncate">{label}</span>
           {count > 0 ? resultsChip(true)
             : st === 'pending' ? (
-              <span aria-hidden title="Generating an image…" className="ml-0.5 shrink-0 animate-pulse text-indigo-300">◌</span>
+              <span aria-hidden title="Generating an image" className="ml-0.5 shrink-0 animate-pulse text-indigo-300">◌</span>
             ) : st === 'failed' ? (
               <span aria-hidden title="The generation failed" className="ml-0.5 shrink-0 text-amber-300">⚠</span>
             ) : (

@@ -106,7 +106,7 @@ function VarietyAxes({ variety }) {
 export default function CoveragePanel({ coverage, semanticEngine, semanticLabel,
   onClose, onBalance = null, balanceReason = '' }) {
   if (!coverage) {
-    return <p className="text-sm text-content-subtle">Reading coverage…</p>
+    return <p className="text-sm text-content-subtle">Reading coverage</p>
   }
   const poolWord = coverage.pool === 'kept' ? 'kept' : 'candidate (nothing kept yet)'
   return (

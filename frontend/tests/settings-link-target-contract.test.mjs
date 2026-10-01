@@ -88,7 +88,7 @@ const attr = (tag, name) => {
   return null
 }
 
-// Every <SettingsLink …> in the app, with where it is and what it aims at.
+// Every <SettingsLink > in the app, with where it is and what it aims at.
 const usages = () => {
   const out = []
   for (const { path, src } of SOURCES) {
@@ -151,7 +151,7 @@ test('every target a SettingsLink uses is a DOM id the Settings really render', 
   for (const u of usages()) {
     if (!u.focus || u.focus.kind !== 'literal') continue
     checked += 1
-    // A plugin-scoped link (pluginId="…", literal) targets a field on that
+    // A plugin-scoped link (pluginId="", literal) targets a field on that
     // plugin's OWN settings source, never one of core's.
     const ownerIds = u.plugin?.kind === 'literal' ? settingsDomIds(u.plugin.value) : ids
     assert.ok(ownerIds.has(u.focus.value),

@@ -73,7 +73,7 @@ test('a requested stop reads as "stopping", not as already stopped', () => {
   // load it cannot look at all. Claiming "Stopped" while the counter is visibly
   // still moving is the one lie the user can catch in the act.
   const j = job({ phase: 'detecting', done: 12, total: 153, stopping: true });
-  assert.equal(previewStopLabel(j), 'Stopping…');
+  assert.equal(previewStopLabel(j), 'Stopping');
   assert.match(previewStatusLabel(j), /stopping/i);
   assert.ok(previewRunning(j), 'the pass is still running until the child hands back');
   assert.equal(previewStopLabel(job({ phase: 'detecting' })), 'Stop');

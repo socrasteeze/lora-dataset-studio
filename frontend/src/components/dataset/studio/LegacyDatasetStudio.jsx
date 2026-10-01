@@ -64,7 +64,7 @@ function StudioBody({ datasetId, family, onFamilyChange, initialBase = null }) {
       <div className="flex flex-col gap-3">
         {d && <FamilySelector families={d.available_families} active={d.family} onSelect={onFamilyChange} />}
         <p className="text-content-subtle text-sm rounded-lg border border-border bg-surface px-3 py-6 text-center">
-          {studio.error || (d ? 'No testable checkpoint for this pipeline (train it first).' : 'Loading…')}
+          {studio.error || (d ? 'No testable checkpoint for this pipeline (train it first).' : 'Loading')}
         </p>
         {studio.error && <button type="button" onClick={studio.refresh} className="text-sm underline">Retry</button>}
       </div>

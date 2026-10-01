@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-01-zzz-status-without-ellipsis',
+    date: '2026-10-01',
+    title: 'Status text says the action',
+    blurb: 'Loading, saving, and buttons that open a dialog no longer end in a trailing ellipsis. The words stay, so a row stays easy to scan.',
+  },
+  {
     id: '2026-10-01-consistent-type-and-controls',
     date: '2026-10-01',
     title: 'Consistent text and control sizes',
@@ -536,7 +542,6 @@ export const WHATS_NEW = [
     id: '2026-09-14-v2-choose-your-plugins',
       date: '2026-09-14',
       title: 'Start with the LDS core and add the plugins you need',
-      image: 'docs/screenshots/plugins/public-store-catalog.png',
       blurb: 'V2 separates the core setup from optional features. Start importing and organising '
         + 'datasets, then choose plugins from the Store. Each plugin brings its own screens, '
         + 'settings and preparation steps, including required ComfyUI custom nodes. '
@@ -2467,7 +2472,7 @@ export const WHATS_NEW = [
     title: 'A bank can now let go of images that are really gone',
     blurb:
       'The "no longer in the folder" warning used to have one remedy — Move '
-      + 'folder… — which did not help when the files were really deleted (a '
+      + 'folder — which did not help when the files were really deleted (a '
       + 'downloader that cleans up after itself, a by-hand tidy): the ghost rows '
       + 'failed to load for ever and kept counting against the bank\'s ceiling. '
       + 'The warning now also offers 🧹 Forget missing: after a fresh check and '
@@ -2819,7 +2824,7 @@ export const WHATS_NEW = [
     date: '2026-08-19',
     title: 'Triage a video bank one keystroke per shot',
     blurb:
-      'A two-hour rush becomes three hundred shots, and until now judging them meant three gestures each: click a tile, click ✓ or ✕, come back to the grid. The 🎬 Video bank has a new ⌨ Burst mode above the gallery. Turn it on and one tile carries a cursor — K keeps it, R rejects it, P puts it back to untriaged, S or → moves on without deciding, ← steps back. They are the same keys as the image bank\'s ▶ Review, so the reflex you already have works here. The cursor then jumps to the next shot you have NOT judged yet, which on a half-triaged bank is most of the speed; untick Auto-advance and it stays put so K then R corrects the same shot. It never wraps silently: when nothing untriaged is left ahead, the bar says how many are still behind you and Home goes back to the first. U undoes the last decision and moves the cursor onto that shot so you can see what it fixed, ten steps deep, always restoring what the shot actually was before — undoing a reject on a shot you had kept puts the keep back. The offer sits in the bar rather than in a toast, because at one keystroke a second a toast is replaced before it can be read. Your keys never wait for the network either: the tile flips at once and the decisions are sent behind you, one request at a time, with a run of identical verdicts going out as a single batch and a "saving N…" counter so a run that has ended is never mistaken for a run that is saved. Press ? for the full list, and nothing fires while you are typing in the search box or a threshold field.',
+      'A two-hour rush becomes three hundred shots, and until now judging them meant three gestures each: click a tile, click ✓ or ✕, come back to the grid. The 🎬 Video bank has a new ⌨ Burst mode above the gallery. Turn it on and one tile carries a cursor — K keeps it, R rejects it, P puts it back to untriaged, S or → moves on without deciding, ← steps back. They are the same keys as the image bank\'s ▶ Review, so the reflex you already have works here. The cursor then jumps to the next shot you have NOT judged yet, which on a half-triaged bank is most of the speed; untick Auto-advance and it stays put so K then R corrects the same shot. It never wraps silently: when nothing untriaged is left ahead, the bar says how many are still behind you and Home goes back to the first. U undoes the last decision and moves the cursor onto that shot so you can see what it fixed, ten steps deep, always restoring what the shot actually was before — undoing a reject on a shot you had kept puts the keep back. The offer sits in the bar rather than in a toast, because at one keystroke a second a toast is replaced before it can be read. Your keys never wait for the network either: the tile flips at once and the decisions are sent behind you, one request at a time, with a run of identical verdicts going out as a single batch and a "saving N" counter so a run that has ended is never mistaken for a run that is saved. Press ? for the full list, and nothing fires while you are typing in the search box or a threshold field.',
   },
 {
     id: '2026-08-19-video-ai-check',
@@ -2945,7 +2950,7 @@ export const WHATS_NEW = [
     date: '2026-08-18',
     title: 'Bank chips and buttons sit in even rows, without the trailing dots',
     blurb:
-      'The Bank’s Curate row used to wrap four different-width pills plus a half-width Coverage advice chip, each labelled with a trailing “…”. The four actions now share a two-column grid, Coverage advice takes the full row underneath, and the idle labels are just the action — Auto-reject included. The same cleanup landed on the header: the counters sit in even chips with the semantic-ready line on its own full-width row, Filters / Passes / Launch all share one row, Promote / Delete rejected share the next, and Move folder, Launch all and Promote dropped the dots. Busy states still say when they are working.',
+      'The Bank’s Curate row used to wrap four different-width pills plus a half-width Coverage advice chip, each labelled with a trailing ellipsis. The four actions now share a two-column grid, Coverage advice takes the full row underneath, and the idle labels are just the action — Auto-reject included. The same cleanup landed on the header: the counters sit in even chips with the semantic-ready line on its own full-width row, Filters / Passes / Launch all share one row, Promote / Delete rejected share the next, and Move folder, Launch all and Promote dropped the dots. Busy states still say when they are working.',
     to: '/bank',
   },
 {
@@ -3009,7 +3014,7 @@ export const WHATS_NEW = [
     date: '2026-08-17',
     title: 'Undeploy a pile of LoRAs in one go',
     blurb:
-      'Taking LoRAs back out of ComfyUI was a one-at-a-time errand buried in a checkpoint popover, and nothing anywhere told you how many were deployed. ⏏ Undeploy… at the top of the Canvas now opens the whole list — every LoRA the app has put into ComfyUI, across all your datasets and families, grouped by dataset. Tick what goes, press once, done; Select all is there for the clear-out. Only what the app deployed is listed, so a LoRA you downloaded into the same folder is never shown and never touched. Your training saves are kept — anything you undeploy can be deployed again from its checkpoint — and the removed copies go to the trash. The result is reported in three parts rather than a flat "done": removed, already gone, and refused (each one named).',
+      'Taking LoRAs back out of ComfyUI was a one-at-a-time errand buried in a checkpoint popover, and nothing anywhere told you how many were deployed. ⏏ Undeploy at the top of the Canvas now opens the whole list — every LoRA the app has put into ComfyUI, across all your datasets and families, grouped by dataset. Tick what goes, press once, done; Select all is there for the clear-out. Only what the app deployed is listed, so a LoRA you downloaded into the same folder is never shown and never touched. Your training saves are kept — anything you undeploy can be deployed again from its checkpoint — and the removed copies go to the trash. The result is reported in three parts rather than a flat "done": removed, already gone, and refused (each one named).',
     to: '/canvas',
   },
 {

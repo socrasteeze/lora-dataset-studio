@@ -81,9 +81,9 @@ test('the progress label reads the running batch engine', () => {
   assert.equal(improveBatchLabel({ kind: 'improve', engine: 'seedvr2', total: 9, done: 2 }),
     '🔍 SeedVR2 2/9')
   assert.equal(improveBatchLabel({ kind: 'improve', engine: 'klein', total: 0, done: 0 }),
-    '✨ Klein…')
+    '✨ Klein')
   assert.equal(improveBatchLabel({ kind: 'improve', engine: 'seedvr2', cancelling: true }),
-    '🔍 Stopping…')
+    '🔍 Stopping')
 })
 
 // --- The lightbox's per-image buttons ---------------------------------------
@@ -153,7 +153,7 @@ test('image-level state blocks every engine, and says so before the engine name'
   assert.equal(klein.label, '✓ Review improvement first')
   const [running] = lightboxImproveButtons({
     caps: READY, engines: { klein: true }, improving: true })
-  assert.match(running.label, /Improving…/)
+  assert.match(running.label, /Improving/)
 })
 
 test('the idle labels name the engine, matching the selection toolbar', () => {

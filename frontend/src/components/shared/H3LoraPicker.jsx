@@ -193,7 +193,7 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
                         {!c.deployed_as && (
                           <Download aria-hidden="true" className="h-3 w-3 opacity-70" />
                         )}
-                        {copying ? '…' : ''}
+                        {copying ? '' : ''}
                       </button>
                     );
                   })}
@@ -258,12 +258,12 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
                   <button type="button" disabled={!importPath.trim() || importing}
                     onClick={() => runImport({ path: importPath.trim() })}
                     className="min-h-10 shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-content disabled:opacity-40 lg:min-h-0">
-                    {importing ? '…' : 'Import'}
+                    {importing ? '' : 'Import'}
                   </button>
                 </span>
               </label>
               <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-2 py-2 text-xs text-content-muted hover:border-primary/60 lg:min-h-0">
-                <span className="flex-1">…or choose the file (copied over the network)</span>
+                <span className="flex-1">or choose the file (copied over the network)</span>
                 <span className="shrink-0 rounded-md border border-border px-2 py-1">Browse</span>
                 <input type="file" accept=".safetensors" className="hidden"
                   onChange={(e) => {

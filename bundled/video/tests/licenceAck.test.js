@@ -14,7 +14,7 @@ function memoryStorage(seed = {}) {
 
 const H3 = {
   target_profile: 'minimax_h3',
-  licence_note: 'MiniMax H3 Community License grants NO rights in the EU…',
+  licence_note: 'MiniMax H3 Community License grants NO rights in the EU',
 }
 const WAN = { target_profile: 'wan22_14b', licence_note: null }
 

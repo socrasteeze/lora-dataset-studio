@@ -254,7 +254,7 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
       const d = await postJson(videoPassUrl(bankId, 'cancel'), {})
       // `cancelled: false` just means nothing was running — not an error, and
       // certainly not a red toast.
-      toast.info(d.cancelled ? 'Stopping…' : 'Nothing was running.')
+      toast.info(d.cancelled ? 'Stopping' : 'Nothing was running.')
       loadBank(false)
     } catch (e) {
       toast.error(e?.message || 'Could not stop the pass.')
@@ -593,7 +593,7 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
       + (d.kept ? `, ${d.kept} unchanged (triage and captions kept)` : '')
       + (d.replaced_manual ? `, replacing ${d.replaced_manual} hand-made.` : '.'))
 
-  if (!bank) return <p className="text-sm text-content-muted">Loading…</p>
+  if (!bank) return <p className="text-sm text-content-muted">Loading</p>
   const problems = countsProblems(counts)
 
   return (
@@ -798,7 +798,7 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
         <button type="button" onClick={() => triageEverything('reject')}
           disabled={!counts.clips}
           className="ml-auto rounded-md border border-border bg-surface-raised px-2.5 py-1 text-content-muted hover:bg-surface disabled:opacity-30">
-          Reject all…
+          Reject all
         </button>
       </div>
 
@@ -831,7 +831,7 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
         <div className="flex justify-center">
           <button type="button" onClick={() => loadClips(true)} disabled={loadingClips}
             className="rounded-md border border-border bg-surface-raised px-4 py-1.5 text-sm font-semibold text-content hover:bg-surface disabled:opacity-40">
-            {loadingClips ? 'Loading…' : `Load more (${total - clips.length} left)`}
+            {loadingClips ? 'Loading' : `Load more (${total - clips.length} left)`}
           </button>
         </div>
       )}

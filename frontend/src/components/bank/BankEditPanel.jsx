@@ -163,7 +163,7 @@ export default function BankEditPanel({
               <span className="text-sm font-semibold text-content">✨ Upscale &amp; improve</span>
               <span className="text-2xs text-content-subtle">
                 {todo == null
-                  ? 'counting…'
+                  ? 'counting'
                   : (todo ? `${todo} image(s) in this scope` : 'nothing left in this scope')}
               </span>
             </div>
@@ -194,7 +194,7 @@ export default function BankEditPanel({
               disabled={!picked || picked.disabled}
               title={picked?.disabled ? picked.reason : (picked?.title || 'Upscale & improve')}
               className="min-h-10 rounded-lg border border-sky-400/40 bg-sky-500/15 px-3 py-1.5 text-sm font-semibold text-sky-200 disabled:opacity-40 lg:min-h-0">
-              ✨ Upscale &amp; improve…
+              ✨ Upscale &amp; improve
             </button>
             <p className="text-2xs text-content-subtle">
               {picked?.disabled

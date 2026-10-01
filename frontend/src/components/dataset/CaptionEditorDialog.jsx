@@ -36,7 +36,7 @@ export default function CaptionEditorDialog({
   // "without the face" is a DATASET rule (identity must bind to the trigger, not to the
   // text). A bank caption is the opposite: a plain description whose job is search. The
   // dialog is mounted on both now, so the instruction belongs to the host.
-  captionPlaceholder = 'Caption (without the face)…',
+  captionPlaceholder = 'Caption (without the face)',
 }) {
   const recovery = useCaptionDraft(labSurface?.draftKey, initialCaption, initialShortCaption);
   const { caption: draft, short: shortDraft, setCaption: setDraft, setShort: setShortDraft } = recovery;
@@ -264,7 +264,7 @@ export default function CaptionEditorDialog({
                           save();
                         }
                       }}
-                      rows={2} placeholder="Short caption (optional)…"
+                      rows={2} placeholder="Short caption (optional)"
                       className="resize-none rounded-lg border border-border bg-app p-3 text-sm leading-6 text-content outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/25" />
                   </div>
                 )}
@@ -325,7 +325,7 @@ export default function CaptionEditorDialog({
                 </button>
                 <button type="button" onClick={save} disabled={busy || !!recovery.conflict}
                   className="min-h-11 min-w-0 rounded-lg bg-gradient-primary px-3 py-2 text-sm font-semibold text-gray-950 disabled:opacity-40">
-                  {busy ? 'Saving…' : 'Save Caption'}
+                  {busy ? 'Saving' : 'Save Caption'}
                 </button>
               </div>
             </div>

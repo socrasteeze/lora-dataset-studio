@@ -134,7 +134,7 @@ _STEP_BLOCK_RE = re.compile(r'_(\d{6,})(?:[_.]|$)')
 
 class CivitaiPublishError(Exception):
     """A structured, user-facing failure: `code` lets the UI branch (`no_key`,
-    `auth`, `link_missing`…), `message` is the sentence shown as-is."""
+    `auth`, `link_missing`), `message` is the sentence shown as-is."""
     def __init__(self, code, message):
         super().__init__(message)
         self.code = code
@@ -723,7 +723,7 @@ def draft_defaults(record_id, step, filename=None, hint=None) -> dict:
     hint_text = None
     if not base:
         hint_text = (f'Trained on a custom base ({_public_stem(rec.base_model)}): pick the lineage '
-                     'Civitai files it under (Pony, Illustrious, NoobAI, a Klein base…).')
+                     'Civitai files it under (Pony, Illustrious, NoobAI, a Klein base).')
     out = {
         'record_id': rec.id, 'step': int(step), 'dataset_id': rec.dataset_id,
         'filename': filename,

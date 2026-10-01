@@ -38,9 +38,9 @@ test('"Import backup" moved into the same menu, "+ New dataset" stayed out of it
 })
 
 test('a running backup stays visible with the menu closed', () => {
-  // The label itself reports the in-flight state…
-  assert.match(controls, /running \? 'Backing up…' : 'Backup'/)
-  // …and both overlays are siblings of the <details>, never nested in it.
+  // The label itself reports the in-flight state
+  assert.match(controls, /running \? 'Backing up' : 'Backup'/)
+  // and both overlays are siblings of the <details>, never nested in it.
   const detailsEnd = controls.indexOf('</details>')
   assert.ok(controls.indexOf('<BackupOverlay') > detailsEnd, 'BackupOverlay must live outside the menu')
   assert.ok(controls.indexOf('<RestoreOverlay') > detailsEnd, 'RestoreOverlay must live outside the menu')

@@ -139,7 +139,7 @@ export default function PromptPreview({ subject, identityPrompts }) {
             <span className="text-2xs text-content-subtle">
               {data
                 ? <>Shot <strong className="text-content-muted">{data.shot_label || data.shot_id}</strong> · {data.length} characters</>
-                : 'Composing…'}
+                : 'Composing'}
             </span>
             <button
               type="button"

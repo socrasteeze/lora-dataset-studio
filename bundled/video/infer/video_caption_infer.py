@@ -170,7 +170,7 @@ def main() -> int:
         return 1
 
     device = 'cuda' if (want != 'cpu' and torch.cuda.is_available()) else 'cpu'
-    _log(f'[caption] loading {model_id} ({device})…')
+    _log(f'[caption] loading {model_id} ({device})')
     try:
         kwargs = {'cache_dir': models_root} if models_root else {}
         processor = AutoProcessor.from_pretrained(model_id, **kwargs)
@@ -192,7 +192,7 @@ def main() -> int:
         Without metadata the processor warns and DEFAULTS TO 24 fps, then writes
         the resulting timestamps straight into the prompt
         (processing_qwen3_vl.py: `<{curr_time:.1f} seconds>`): eight frames of a
-        five-second shot read as <0.0 s>…<0.3 s>, and the model literally
+        five-second shot read as <0.0 s><0.3 s>, and the model literally
         believes the whole action took a third of a second — every judgement of
         speed and duration is wrong at the source. fps = (n-1)/span puts the
         last frame AT the span, which is what evenly-spread sampling means.
@@ -215,7 +215,7 @@ def main() -> int:
         """transformers >= 5: one `video_grid_thw` row PER TEMPORAL PATCH.
 
         The Qwen3-VL chat template writes the video as several timestamped
-        spans — `<t s><|vision_start|>…<|vision_end|>` once per temporal
+        spans — `<t s><|vision_start|><|vision_end|>` once per temporal
         patch — while the processor still returns ONE grid row `[t, h, w]` for
         the whole clip. transformers 4.57's rope indexing walked the spans and
         reused that row; 5.x pulls one grid per span and dies on the second

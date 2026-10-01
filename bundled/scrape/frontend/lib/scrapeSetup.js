@@ -8,5 +8,5 @@ export const SCRAPE_ML_CARDS = [
 export const SCRAPE_QUALITY_UNLOCKS = ['Scraping extras (optional)']
 
 export function scrapeSetupRows(caps) {
-  return [{ label: 'Scraping extras (optional)', what: 'Gallery links, keyless web image search and video sources (gallery-dl, yt-dlp…)', ok: !!caps?.scrape_deps, topic: 'setup-quality' }]
+  return [{ label: 'Scraping extras (optional)', what: 'Gallery links, keyless web image search and video sources (gallery-dl, yt-dlp)', ok: !!caps?.scrape_deps, topic: 'setup-quality' }]
 }

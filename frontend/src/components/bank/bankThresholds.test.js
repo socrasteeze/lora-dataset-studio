@@ -288,7 +288,7 @@ test('an occupied-bank refusal is reworded ONCE, for every bank action', () => {
   assert.match(ws,
     /busyRefusalLive\(\{ kind, fetchActivity: adoptActivity,\s*fallback: payload\?\.activity \}\)/);
   assert.match(ws, /e\?\.status === 409 && kind/);
-  // …and a 202 adopts the live snapshot BEFORE the heavy payload refresh: the
+  // and a 202 adopts the live snapshot BEFORE the heavy payload refresh: the
   // job is running right now, the dashboard it rides in can be 25 s away, and
   // the bar must not wait for it. Same lookup, so still no fourth mechanism.
   assert.match(ws, /await adoptActivity\(\)\s+await refreshPayload\(\)/);

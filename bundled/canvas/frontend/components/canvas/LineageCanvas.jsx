@@ -226,7 +226,7 @@ const LaneHeader = memo(function LaneHeader({ lane, onZoomRef }) {
         {lane.runs} run{lane.runs === 1 ? '' : 's'}
       </span>
       {lane.status === 'loading' && (
-        <span className="shrink-0 animate-pulse text-content-subtle text-2xs">loading…</span>
+        <span className="shrink-0 animate-pulse text-content-subtle text-2xs">loading</span>
       )}
       {lane.status === 'error' && (
         <span className="shrink-0 text-amber-300 text-2xs" title={lane.error || ''}>
@@ -1814,7 +1814,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
     setContinueError(null);
     setOpenCk(null);
     toast.success(`Continuing from step ${d.resumed_from} → ${d.target_steps} `
-      + (payload.lane === 'cloud' ? 'on a fresh pod…' : 'on this machine…'));
+      + (payload.lane === 'cloud' ? 'on a fresh pod' : 'on this machine'));
     onRefetchDataset?.(target.node.dataset_id);
   }, [continueTarget, continueRow, toast, onRefetchDataset]);
 
@@ -2238,7 +2238,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
           : 'Save the whole board as a PNG — every pinned picture and every run '
             + 'card, at full size. Buttons and badges are not drawn.'}
         className="flex h-10 items-center gap-1 rounded-md border border-border bg-app/60 px-2 sm:px-3 text-content-muted text-2xs font-semibold hover:text-content disabled:opacity-40 lg:h-9">
-        <Camera aria-hidden="true" className="h-3.5 w-3.5" /> {exporting ? 'Exporting…' : 'PNG'}
+        <Camera aria-hidden="true" className="h-3.5 w-3.5" /> {exporting ? 'Exporting' : 'PNG'}
       </button>
       {/* 🔌 A LoRA that never trained on this board — pinned as a node instead
           of a pill, and stacked on top of the next run when checked. See
@@ -2270,7 +2270,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
           data-testid="canvas-undeploy-more"
           title="List every LoRA this app deployed into ComfyUI and remove the ones you tick. Your training saves are kept — each one can be deployed again."
           className="flex h-10 items-center gap-1 rounded-md border border-border bg-app/60 px-2 sm:px-3 text-content-muted text-2xs font-semibold hover:text-content lg:hidden">
-          <span aria-hidden>⏏</span> Undeploy…
+          <span aria-hidden>⏏</span> Undeploy
         </button>
       )}
       {/* …and the page's own ? badge with it. The header that carried it is not

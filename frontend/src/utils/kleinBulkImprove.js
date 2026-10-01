@@ -40,8 +40,8 @@ export function kleinImproveBatchLabel(activity) {
   if (!activity || activity.kind !== 'improve') return null
   const total = Number(activity.total) || 0
   const done = Number(activity.done) || 0
-  if (activity.cancelling) return '✨ Stopping…'
-  return total ? `✨ Improving ${done}/${total}` : '✨ Improving…'
+  if (activity.cancelling) return '✨ Stopping'
+  return total ? `✨ Improving ${done}/${total}` : '✨ Improving'
 }
 
 /** Toast wording for a launched batch: what the server took, what it dropped. */

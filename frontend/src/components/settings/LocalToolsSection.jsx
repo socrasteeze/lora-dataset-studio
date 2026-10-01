@@ -120,7 +120,7 @@ function LmStudioStatus({ caps, active, refreshCaps, toast }) {
         <p className="text-xs text-content-muted">{l.detail}</p>
         <button type="button" onClick={loadModel} disabled={starting}
           className="inline-flex items-center gap-1.5 rounded-md bg-gradient-primary px-3 py-1.5 text-xs font-semibold text-gray-950 disabled:opacity-50">
-          {starting ? 'Loading…' : '⏬ Load the vision model'}
+          {starting ? 'Loading' : '⏬ Load the vision model'}
         </button>
       </div>
     )
@@ -152,7 +152,7 @@ function LmStudioStatus({ caps, active, refreshCaps, toast }) {
           disabled={starting}
           className="inline-flex items-center gap-1.5 rounded-md bg-gradient-primary px-3 py-1.5 text-xs font-semibold text-gray-950 disabled:opacity-50"
         >
-          {starting ? 'Starting…' : '▶ Start LM Studio'}
+          {starting ? 'Starting' : '▶ Start LM Studio'}
         </button>
       </div>
     )
@@ -210,7 +210,7 @@ function OllamaStatus({ caps, refreshCaps, toast }) {
             <span aria-hidden="true"
               className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
           )}
-          {starting ? 'Starting…' : '▶ Start Ollama'}
+          {starting ? 'Starting' : '▶ Start Ollama'}
         </button>
       </div>
     )

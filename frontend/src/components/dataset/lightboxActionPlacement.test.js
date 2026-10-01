@@ -187,7 +187,7 @@ test('the lightbox flips its axis from the rule, and only its axis', () => {
   assert.equal(RAIL_WIDTH_PX, 17 * 16);
   // A short window must still be able to reach the last action.
   assert.match(lightbox, /flex w-\[17rem\] flex-col[^']*overflow-y-auto/);
-  // …and the rail must clear the absolutely-positioned ✕ (top-3, h-9 = 48 px).
+  // and the rail must clear the absolutely-positioned ✕ (top-3, h-9 = 48 px).
   assert.match(lightbox, /flex w-\[17rem\][^']*pt-14/);
   // The image cell must be allowed to shrink, or the rail leaves the viewport.
   assert.match(lightbox, /flex-1 min-h-0 min-w-0 flex items-center justify-center/);

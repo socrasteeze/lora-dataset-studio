@@ -95,6 +95,6 @@ test('no loras root on this install: every 📦 is the refusal, no deploy button
 
 test('busy rows are disabled, and the verb says what it is doing', () => {
   const row = rowOf(html({ busy: 'local:50:deploy' }), 'local:50')
-  assert.ok(row.includes('Deploying…'))
+  assert.ok(row.includes('Deploying'))
   assert.ok((row.match(/<button[^>]*disabled=""/g) || []).length >= 2)
 })

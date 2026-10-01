@@ -114,7 +114,7 @@ export default function StudioShell({ preselectDataset = null, preselectFamily =
           generationReadiness={generationReadiness}
           defaultModel={defaultModel}
           onRefreshModels={() => setModelRevision((revision) => revision + 1)}
-          settingsError={loadedFamily === runType ? null : (baseError || 'Loading model settings…')} />
+          settingsError={loadedFamily === runType ? null : (baseError || 'Loading model settings')} />
       ) : soloDatasetId ? (
         // key forces a clean remount when the solo LoRA OR family changes, resetting full-Studio
         // hooks/state instead of retaining the previous grid.

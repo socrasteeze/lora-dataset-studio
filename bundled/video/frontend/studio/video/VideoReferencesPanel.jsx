@@ -67,7 +67,7 @@ function ReferenceCut({ reference, clipSeconds, disabled, onCut }) {
       {check.error && <p id={errorId} role="alert" className="text-2xs text-amber-200">{check.error}</p>}
       <div className="flex flex-wrap gap-2">
         <button type="button" className={BUTTON} disabled={disabled || !!check.error} data-testid="reference-cut-apply"
-          onClick={() => onCut(check.start, check.duration)}>Cut to {check.error ? '…' : `${check.duration.toFixed(1)} s`}</button>
+          onClick={() => onCut(check.start, check.duration)}>Cut to {check.error ? '' : `${check.duration.toFixed(1)} s`}</button>
         <button type="button" className={BUTTON} disabled={disabled} onClick={() => setOpen(false)}>Cancel</button>
       </div>
     </div>
@@ -216,7 +216,7 @@ export default function VideoReferencesPanel({ value, limits, disabled, onInsert
       </div>
       {!guideTarget && libraryPicker}
       {!identitiesOnly && <p className="text-2xs text-content-subtle">Videos: 2–15 s, prepared at 24 fps. Audio: 0.2–15 s. Video sound is off until you include it below. H3 uses video frames from the beginning of each reference, up to the generated clip length.</p>}
-      <div role="status" aria-live="polite" className="text-xs text-content-muted">{busy ? 'Preparing references…' : notice}</div>
+      <div role="status" aria-live="polite" className="text-xs text-content-muted">{busy ? 'Preparing references' : notice}</div>
       <div className="min-w-0 space-y-2">
         {rows.map((r) => {
           const siblings = rows.filter((x) => x.kind === r.kind);

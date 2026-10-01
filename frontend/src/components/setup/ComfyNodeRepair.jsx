@@ -102,7 +102,7 @@ export default function ComfyNodeRepair({ nodes = [], nodePacks = [], onRefresh 
         <button type="button" className={buttonClass} aria-expanded={expanded} aria-controls={helpId}
           onClick={() => setExpanded((value) => !value)}>Fix missing ComfyUI nodes</button>
         <button type="button" className={buttonClass} disabled={checking} onClick={recheck}>
-          {checking ? 'Checking ComfyUI…' : 'Check nodes again'}
+          {checking ? 'Checking ComfyUI' : 'Check nodes again'}
         </button>
       </div>
       <div aria-live="polite" className="space-y-1">

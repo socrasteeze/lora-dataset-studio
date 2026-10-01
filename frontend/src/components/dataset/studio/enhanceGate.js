@@ -12,7 +12,7 @@
  * is unused; the server validates the selected model and names it in any 409.
  */
 export function enhanceBlocker(ollama, { capsLoading = false, customModel = '' } = {}) {
-  if (capsLoading) return 'Checking local tools…';
+  if (capsLoading) return 'Checking local tools';
   const o = ollama || {};
   // LM Studio answers a different ladder: it cannot be started from here, and
   // "ready" means a model is LOADED, not pulled. Told to install Ollama, a user

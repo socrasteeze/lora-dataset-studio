@@ -84,7 +84,7 @@ export function shortenPrompt(text, max = QUOTE_MAX) {
   if (flat.length <= max) return flat;
   const cut = flat.slice(0, max);
   const lastSpace = cut.lastIndexOf(' ');
-  return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;.]+$/, '')}…`;
+  return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;.]+$/, '')}`;
 }
 
 /**

@@ -117,7 +117,7 @@ export default function VisionModelPicker({ caps = {}, disabled = false, onModel
           onChange={(e) => save(e.target.value)}
           className="max-w-full rounded border border-border bg-app px-1.5 py-0.5 text-content">
           {choices.length === 0 && (
-            <option value="">{loading ? 'Loading models…' : 'No model installed yet'}</option>
+            <option value="">{loading ? 'Loading models' : 'No model installed yet'}</option>
           )}
           {choices.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
@@ -135,13 +135,13 @@ export default function VisionModelPicker({ caps = {}, disabled = false, onModel
         />
         <button type="button" onClick={start} disabled={disabled || busy || running || !name.trim()}
           className="min-h-10 rounded border border-border px-2.5 py-1 font-semibold text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-50 lg:min-h-0">
-          {running ? `${copy.busy}…` : copy.button}
+          {running ? `${copy.busy}` : copy.button}
         </button>
       </div>
       {running && (
         <p role="status" aria-live="polite" className="text-content-muted">
           {copy.busy} <span className="font-mono">{job.model}</span>
-          {Number.isFinite(job.progress) ? ` — ${job.progress}%` : '…'}
+          {Number.isFinite(job.progress) ? ` — ${job.progress}%` : ''}
           {` It runs inside ${server}; leaving this window does not stop it.`}
         </p>
       )}

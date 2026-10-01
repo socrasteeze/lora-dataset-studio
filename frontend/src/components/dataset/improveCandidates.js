@@ -53,7 +53,7 @@ export function improvementBadge(state) {
   }
   if (state === 'generating') {
     return {
-      text: '✨ upscaling…',
+      text: '✨ upscaling',
       tone: 'generating',
       title: 'An upscale of this image is being generated. The original stays as'
         + ' it is; the result will arrive as its own tile.',

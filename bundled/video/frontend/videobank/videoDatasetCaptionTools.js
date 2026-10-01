@@ -85,7 +85,7 @@ export function captionEditConfirmation(plan, op) {
 /** What the progress line says while the plan is replayed. Named here so the
  * wording cannot drift between the button and the line under it. */
 export function captionEditProgressLabel(done, total) {
-  return `Rewriting captions — ${done} of ${total}…`;
+  return `Rewriting captions — ${done} of ${total}`;
 }
 
 /** The tail report, and it names FAILURES rather than rounding them off: a

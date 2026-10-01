@@ -69,7 +69,7 @@ function BackupOverlay({ job, onDownload, onOpenFolder, onDismiss }) {
       </h2>
       {job.state === 'running' && (
         <>
-          <p className="text-sm text-content-muted">{describeProgress(job) || 'Preparing…'}</p>
+          <p className="text-sm text-content-muted">{describeProgress(job) || 'Preparing'}</p>
           <ProgressBar status={job} />
           <p className="text-xs text-content-subtle">
             You can keep working — this runs in the background.
@@ -126,7 +126,7 @@ function RestoreOverlay({ job, onDismiss }) {
       {job.state === 'running' && (
         <>
           <p className="text-sm text-content-muted">
-            {describeProgress(job, 'Restoring') || 'Preparing…'}
+            {describeProgress(job, 'Restoring') || 'Preparing'}
           </p>
           <ProgressBar status={job} />
         </>
@@ -171,7 +171,7 @@ export default function FullBackupControls({ backup, onRestore }) {
             : <Save aria-hidden="true" className="h-4 w-4" />}
           {/* The label itself carries the in-flight state, so a closed menu
               still says a backup is running. */}
-          <span className="hidden sm:inline">{running ? 'Backing up…' : 'Backup'}</span>
+          <span className="hidden sm:inline">{running ? 'Backing up' : 'Backup'}</span>
           <span aria-hidden className="text-content-subtle">⋯</span>
         </summary>
         <div className="absolute right-0 top-full mt-1 z-20 w-80 rounded-lg border border-border bg-surface-overlay shadow-xl p-1.5 flex flex-col gap-0.5">
@@ -183,7 +183,7 @@ export default function FullBackupControls({ backup, onRestore }) {
                 className={MENU_ITEM}>
                 <span className="whitespace-nowrap inline-flex items-center gap-1.5"><Save aria-hidden="true" className="h-4 w-4" /> Back up everything</span>
                 <span className="ml-auto shrink-0 text-content-subtle text-2xs">
-                  {running ? 'running…' : 'datasets · settings'}
+                  {running ? 'running' : 'datasets · settings'}
                 </span>
               </button>
               {/* Option OF the action above — kept adjacent to it on purpose. */}

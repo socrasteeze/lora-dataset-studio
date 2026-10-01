@@ -87,7 +87,7 @@ export default function InstalledPlugins({ plugins = [], busy, caps, capsKnown =
                 )}
               </div>
               {plugin.error && <p className="mt-1 text-xs text-amber-500">{plugin.error}</p>}
-              {active && !capsKnown && <p className="text-xs text-content-muted">Checking configured components…</p>}
+              {active && !capsKnown && <p className="text-xs text-content-muted">Checking configured components</p>}
               {readiness.length > 0 && (
                 <p className="text-xs text-content-muted" data-plugin-readiness>
                   Configured components · {readiness.filter(row => row.state === 'ready').length}/{readiness.length} ready

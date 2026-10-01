@@ -121,7 +121,7 @@ export function neuralRenderTags(rec) {
 /** The one sentence the buttons show when the lane is not set up, built from the
  *  capability's own list so the wording lives in one place (the backend). */
 export function nrRefusal(status) {
-  if (!status) return 'Neural rendering: checking what this machine has…'
+  if (!status) return 'Neural rendering: checking what this machine has'
   if (status.ready) return null
   const parts = Array.isArray(status.missing) ? status.missing : []
   return parts.length ? `Neural rendering needs ${parts.join('; ')}.` : 'Neural rendering is not available on this machine.'

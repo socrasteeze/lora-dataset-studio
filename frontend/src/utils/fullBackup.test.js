@@ -19,12 +19,12 @@ test('formatBytes uses GB/MB/KB steps', () => {
 test('describeProgress: preparing before the count, then X / N', () => {
   assert.equal(describeProgress(null), '');
   assert.equal(describeProgress({ state: 'done', total: 3, done: 3 }), '');
-  assert.equal(describeProgress({ state: 'running', total: 0, done: 0 }), 'Preparing…');
-  assert.equal(describeProgress({ state: 'running', total: 12, done: 3 }), 'Backing up 3 / 12 datasets…');
+  assert.equal(describeProgress({ state: 'running', total: 0, done: 0 }), 'Preparing');
+  assert.equal(describeProgress({ state: 'running', total: 12, done: 3 }), 'Backing up 3 / 12 datasets');
   assert.equal(describeProgress({ state: 'running', total: 12, done: 3 }, 'Restoring'),
-    'Restoring 3 / 12 datasets…');
+    'Restoring 3 / 12 datasets');
   // done can never exceed total in the caption.
-  assert.equal(describeProgress({ state: 'running', total: 5, done: 9 }), 'Backing up 5 / 5 datasets…');
+  assert.equal(describeProgress({ state: 'running', total: 5, done: 9 }), 'Backing up 5 / 5 datasets');
 });
 
 test('progressPercent is null until a total is known', () => {

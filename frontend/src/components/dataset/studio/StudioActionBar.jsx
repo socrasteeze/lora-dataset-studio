@@ -38,7 +38,7 @@ export default function StudioActionBar({ shortcuts = [], canRun, running, onRun
         )}
         <button type="button" onClick={onRun} disabled={!canRun}
           className={`min-h-10 lg:min-h-0 ${note ? '' : 'ml-auto'} shrink-0 px-4 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40`}>
-          {running ? (runningLabel || '…') : runLabel}
+          {running ? (runningLabel || '') : runLabel}
         </button>
       </div>
     </nav>

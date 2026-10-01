@@ -11,7 +11,7 @@ const memory = () => {
 
 test('the motion comes back as typed, line breaks included', () => {
   const storage = memory();
-  const typed = 'She turns her head and smiles…\n[Shot 2] At 00:05.000, the camera cuts to a close-up.';
+  const typed = 'She turns her head and smiles\n[Shot 2] At 00:05.000, the camera cuts to a close-up.';
   writePromptDraft(typed, storage);
   assert.equal(readPromptDraft(storage), typed);
   assert.equal(JSON.parse(storage.map.get(PROMPT_STORAGE)).prompt, typed);

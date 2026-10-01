@@ -166,7 +166,7 @@ export default function EnhancePromptButton({ prompt, onResult, className = '' }
       <button type="button" onClick={run} disabled={!!blocked || empty || busy} title={title}
         aria-label="Enhance the prompt with the local model"
         className={`px-2 py-0.5 rounded border border-border bg-surface text-content-subtle text-2xs hover:text-content disabled:opacity-40 disabled:cursor-not-allowed ${className}`}>
-        {busy ? '✨ …' : '✨ Enhance'}
+        {busy ? '✨ ' : '✨ Enhance'}
       </button>
       {/* The ⚙️ stays clickable even while Enhance is blocked: seeing and changing
           the picked model is exactly what fixes a "model not pulled" block. */}

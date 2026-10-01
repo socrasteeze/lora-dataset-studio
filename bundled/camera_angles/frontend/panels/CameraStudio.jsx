@@ -8,8 +8,8 @@ const API = '/api/camera/studio/images'
 const active = view => ['queued', 'running', 'stalled', 'cancel_requested'].includes(view.status)
 const originalUrl = image => `${API}/${image.id}/original`
 const viewUrl = (image, view) => `${API}/${image.id}/views/${view.id}`
-const stateLabel = { queued: 'Queued', running: 'Rendering…', stalled: 'Paused — check the system queue',
-  cancel_requested: 'Cancelling…', failed: 'Failed' }
+const stateLabel = { queued: 'Queued', running: 'Rendering', stalled: 'Paused — check the system queue',
+  cancel_requested: 'Cancelling', failed: 'Failed' }
 
 export default function CameraStudio() {
   const [images, setImages] = useState([])
@@ -51,7 +51,7 @@ export default function CameraStudio() {
         if (data.image.views.some(active)) timer = setTimeout(refresh, 2500)
       } catch (err) {
         if (!alive) return
-        setPollError(err.message || 'Could not refresh camera views. Retrying…')
+        setPollError(err.message || 'Could not refresh camera views. Retrying')
         timer = setTimeout(refresh, 5000)
       }
     }
@@ -115,7 +115,7 @@ export default function CameraStudio() {
             onDrop={event => { event.preventDefault(); upload(event.dataTransfer.files?.[0]) }}
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-indigo-400/40 bg-indigo-500/10 px-4 py-4 text-sm font-semibold text-indigo-100 hover:bg-indigo-500/20 disabled:opacity-50">
             {uploading || loading ? <Loader2 className="size-5 animate-spin" /> : <ImagePlus className="size-5" />}
-            {loading ? 'Loading images…' : uploading ? 'Importing…' : 'Import image or drop it here'}
+            {loading ? 'Loading images' : uploading ? 'Importing' : 'Import image or drop it here'}
           </button>
           <p className="text-xs text-gray-500">PNG, JPEG or WebP · up to 32 MB / 40 MP</p>
           {selected ? <div className="overflow-hidden rounded-xl border border-white/10 bg-black/20">

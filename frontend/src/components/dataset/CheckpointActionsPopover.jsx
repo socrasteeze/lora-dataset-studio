@@ -91,7 +91,7 @@ export default function CheckpointActionsPopover({
               <button type="button" disabled={deleting}
                 onClick={() => onDelete(node, pill)} title={a.undeploy.title}
                 className={ROW + ' border-emerald-500/40 bg-emerald-600/5 text-emerald-200/90 hover:bg-emerald-600/20 disabled:cursor-not-allowed disabled:opacity-50'}>
-                <span aria-hidden>⏏</span> {deleting ? 'Undeploying…' : a.undeploy.label}
+                <span aria-hidden>⏏</span> {deleting ? 'Undeploying' : a.undeploy.label}
               </button>
             )}
           </div>
@@ -100,7 +100,7 @@ export default function CheckpointActionsPopover({
             onClick={() => onDeploy(node, pill)}
             title={`Deploy this checkpoint into ComfyUI's ${a.deploy.folder} folder so you can test and generate with it`}
             className={ROW + ' border-primary/40 bg-primary/20 text-white hover:bg-primary/30 disabled:cursor-not-allowed disabled:opacity-50'}>
-            {importing ? 'Deploying…' : `Deploy → ${a.deploy.folder}`}
+            {importing ? 'Deploying' : `Deploy → ${a.deploy.folder}`}
           </button>
         ) : (
           <span className={MUTED}>{a.deploy.reason}</span>
@@ -132,7 +132,7 @@ export default function CheckpointActionsPopover({
           <button type="button" disabled={deleting}
             onClick={() => onDelete(node, pill)} title={a.del.title}
             className="mt-1 flex items-center gap-1.5 border-t border-border px-2 pt-1.5 pb-0.5 text-left text-content-subtle text-2xs hover:text-rose-300 disabled:cursor-not-allowed disabled:opacity-50">
-            <Trash2 aria-hidden="true" className="h-3.5 w-3.5" /> {deleting ? 'Deleting…' : a.del.label}
+            <Trash2 aria-hidden="true" className="h-3.5 w-3.5" /> {deleting ? 'Deleting' : a.del.label}
           </button>
         )}
       </div>

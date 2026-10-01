@@ -87,7 +87,7 @@ export default function PeerTrainingCard({ datasetId, postJson, onChange, enable
                 }
               }}
               className="ml-auto px-3 py-1 rounded-lg bg-red-600/80 text-white text-xs font-semibold disabled:opacity-40">
-              {run.stop_requested ? 'Stopping…' : '⏹ Stop'}
+              {run.stop_requested ? 'Stopping' : '⏹ Stop'}
             </button>
           )}
         </div>

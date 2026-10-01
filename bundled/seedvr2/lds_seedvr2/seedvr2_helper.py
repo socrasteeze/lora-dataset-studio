@@ -36,7 +36,7 @@ WHY THE NODE PACK IS NOT AUTO-INSTALLED (unlike comfyui-krea2edit)
 -------------------------------------------------------------------
 The Krea pack declares `dependencies = []`, so installing it is a clone and the
 app does it. This one declares thirteen — diffusers, peft, omegaconf, einops,
-rotary_embedding_torch, gguf, opencv-python… — and they belong in ComfyUI's
+rotary_embedding_torch, gguf, opencv-python — and they belong in ComfyUI's
 interpreter, which this app does not own and must never pip into. A clone alone
 would land a pack that fails to import, and the user would read "install the
 pack" about a pack that is already there. So the pack is DETECTED and explained

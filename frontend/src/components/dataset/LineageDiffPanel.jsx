@@ -165,7 +165,7 @@ export default function LineageDiffPanel({ a, b, onClose }) {
       <section className="mt-4">
         <SectionTitle>Dataset</SectionTitle>
         {state === 'loading' && (
-          <p className="mt-1 text-xs italic text-content-subtle">Comparing datasets…</p>
+          <p className="mt-1 text-xs italic text-content-subtle">Comparing datasets</p>
         )}
         {state === 'error' && (
           <p className="mt-1 text-xs italic text-content-subtle">
@@ -288,7 +288,7 @@ function ImageList({ kind, items, withheld }) {
       ))}
       {withheld > 0 && (
         <p className="text-2xs italic text-content-subtle">
-          …and {withheld} more not shown.
+          and {withheld} more not shown.
         </p>
       )}
     </div>

@@ -25,7 +25,7 @@ Protocol (one JSON line in, one JSON line out — this is a batch, not a worker)
             "models_root": path|null}
   stdout : {"ok": true, "scores": {"<clip_id>": [float, ...]}, "frames": N}
            {"ok": false, "error": "<ExcType>: <message>"}
-  stderr : "[look] …" progress lines; the parent does not parse them.
+  stderr : "[look] " progress lines; the parent does not parse them.
 
 PER-FRAME SCORES, NOT A PER-CLIP ONE. How several frames become one number is a
 product decision with an argument attached (see `video_metrics.aesthetic_of`),

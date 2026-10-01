@@ -192,7 +192,7 @@ export const GLOBAL_PROMPT_PART_FIELDS = [
     // The incident, in one sentence, at the point of edit. Naming a feature in
     // this box is what summons it — the earlier wording enumerated "tattoos…"
     // and the model painted them on subjects who had none.
-    warn: 'Careful with this one. An earlier version listed what to preserve — “tattoos, scars, moles…” — and the model started painting tattoos on people who have none: naming a feature is enough to summon it. Describe what NOT to do (add, redraw, move, remove) without naming a single body feature.',
+    warn: 'Careful with this one. An earlier version listed what to preserve — “tattoos, scars, moles” — and the model started painting tattoos on people who have none: naming a feature is enough to summon it. Describe what NOT to do (add, redraw, move, remove) without naming a single body feature.',
   },
   {
     key: 'outfit_vary',

@@ -77,7 +77,7 @@ export function LoraMergePlan({ plan, busy = false, disabled = false, onStart = 
 
       <button type="button" onClick={onStart} disabled={busy || disabled}
         className="min-h-10 lg:min-h-0 mt-1 rounded-md border border-primary/50 bg-primary/20 px-2.5 py-1 font-semibold text-white hover:bg-primary/30 disabled:opacity-40">
-        {busy ? 'Starting…' : 'Merge into a full model'}
+        {busy ? 'Starting' : 'Merge into a full model'}
       </button>
     </div>
   );
@@ -91,7 +91,7 @@ function LoraMergeProgress({ state, onCancel = null }) {
     <div className="mt-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1.5 text-2xs leading-relaxed"
       role="status">
       <p className="m-0">
-        🧬 Merging on the CPU{state.total ? ` — ${state.done}/${state.total} tensors` : '…'}
+        🧬 Merging on the CPU{state.total ? ` — ${state.done}/${state.total} tensors` : ''}
       </p>
       <div className="mt-1 h-1.5 w-full overflow-hidden rounded bg-black/30"
         role="progressbar" aria-valuenow={width} aria-valuemin={0} aria-valuemax={100}>

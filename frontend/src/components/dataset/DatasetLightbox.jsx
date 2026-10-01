@@ -803,9 +803,9 @@ export default function DatasetLightbox({
             aria-label={pixelEditReason
               || (mirrorBusy ? `Mirroring ${alt} horizontally` : `Mirror ${alt} horizontally`)}
             title={refused
-              || (mirrorBusy ? 'Mirroring horizontally…' : 'Mirror horizontally (flip left and right)')}
+              || (mirrorBusy ? 'Mirroring horizontally' : 'Mirror horizontally (flip left and right)')}
             className="min-h-10 lg:min-h-9 w-full sm:w-auto px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45">
-            {mirrorBusy ? '⇆ Mirroring…' : '⇆ Mirror horizontally'}
+            {mirrorBusy ? '⇆ Mirroring' : '⇆ Mirror horizontally'}
           </button>
         )}
         {onRotate && (

@@ -29,7 +29,7 @@ test('the picker matches on the name, case-insensitively and mid-word', () => {
   assert.equal(matchesDatasetQuery(DS, 'bea'), false);
 });
 
-test('…and on the model family, which is what the old three-column list answered by eye', () => {
+test('and on the model family, which is what the old three-column list answered by eye', () => {
   assert.equal(matchesDatasetQuery(DS, 'krea'), true);
   assert.equal(matchesDatasetQuery(DS, 'zim'), true);
   assert.equal(matchesDatasetQuery({ id: 2, name: 'Bea' }, 'krea'), false);

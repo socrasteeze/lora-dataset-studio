@@ -199,8 +199,8 @@ export function failureNotice(outcome, fallback = 'The clip could not be queued.
  * how far it is. Text-only is always one clip whatever the strip holds. */
 export function generateLabel({ mode, count, busy, done = 0, total = 0, phase = 'queueing' }) {
   if (busy) {
-    if (phase === 'writing') return `Writing prompt ${Math.min(done + 1, total)} of ${total}…`;
-    return total > 1 ? `Queueing ${Math.min(done + 1, total)} of ${total}…` : 'Queueing…';
+    if (phase === 'writing') return `Writing prompt ${Math.min(done + 1, total)} of ${total}`;
+    return total > 1 ? `Queueing ${Math.min(done + 1, total)} of ${total}` : 'Queueing';
   }
   const n = mode === 't2v' || mode === 'ref2va' ? 1 : count;
   return n > 1 ? `Generate ${n} clips` : 'Generate clip';

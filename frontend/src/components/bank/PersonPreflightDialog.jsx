@@ -126,7 +126,7 @@ export default function PersonPreflightDialog({
         {phase !== 'choose' ? (
           <div className="rounded-md border border-border bg-surface-raised p-3 text-sm space-y-1">
             <p className="font-semibold text-content">
-              {phase === 'stopping' ? 'Stopping the check…' : 'Checking your folders…'}
+              {phase === 'stopping' ? 'Stopping the check' : 'Checking your folders'}
             </p>
             <p className="text-content-muted">{preflightCostLine(plan)}</p>
             {activity && !activity.finished && (
@@ -217,7 +217,7 @@ export default function PersonPreflightDialog({
           {phase === 'choose' && (
             <button type="button" onClick={accept} disabled={busy}
               className="order-1 rounded-md bg-gradient-primary px-4 py-2 text-sm font-semibold text-gray-950 disabled:opacity-50 sm:order-3">
-              {busy ? 'Starting…' : acceptLabel(picked)}
+              {busy ? 'Starting' : acceptLabel(picked)}
             </button>
           )}
         </div>

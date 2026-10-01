@@ -340,7 +340,7 @@ export default function LaunchAllDialog({
           )}
           <button type="button" onClick={launch} disabled={busy || nRun === 0}
             className="rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-50">
-            <Rocket aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{busy ? 'Starting…'
+            <Rocket aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{busy ? 'Starting'
               : `Launch${nRun ? ` ${nRun === nSent ? nRun : `${nRun} of ${nSent}`} pass${nSent > 1 ? 'es' : ''}` : ''}`}
           </button>
         </div>

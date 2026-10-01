@@ -1203,7 +1203,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     && !(semanticState.engine === 'siglip2' && capsLoading)
   const semanticIndexed = semanticState.indexed
   const semanticBlocked = semanticState.engine === 'siglip2' && capsLoading
-    ? 'Checking whether the SigLIP 2 Quality tool is installed…'
+    ? 'Checking whether the SigLIP 2 Quality tool is installed'
     : semanticPrerequisite(semanticState)
   const {
     curateOpen, setCurateOpen, diverseN, setDiverseN, diverseTypicality,
@@ -1756,7 +1756,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 disabled={openingSourceFolder} aria-busy={openingSourceFolder}
                 title="Open this Bank's source folder in the system file explorer."
                 className="min-h-10 lg:min-h-0 shrink-0 rounded border border-border px-2 py-0.5 text-xs text-content-muted hover:bg-surface-raised hover:text-content disabled:cursor-wait disabled:opacity-60">
-                <FolderOpen aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{openingSourceFolder ? 'Opening…' : 'Open folder'}
+                <FolderOpen aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{openingSourceFolder ? 'Opening' : 'Open folder'}
               </button>
               {/* Cold path. The folder-sync note below offers this too, but only once
                   the folder is already gone — and the real move is PLANNED: you look
@@ -2009,7 +2009,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           <button type="button" onClick={() => openReview(null)} disabled={reviewLoading}
             title="Review the images of this filter one at a time, full size: ✓ Keep / ✕ Reject / ⏭ Skip (K/R/S) each move to the next. Optional random order."
             className="inline-flex min-h-10 lg:min-h-0 lg:h-7 items-center whitespace-nowrap rounded-md border border-indigo-400/60 bg-indigo-500/20 px-2.5 text-xs font-semibold text-indigo-200 disabled:opacity-50 hover:bg-indigo-500/30">
-            {reviewLoading ? '▶ Preparing…' : '▶ Review'}
+            {reviewLoading ? '▶ Preparing' : '▶ Review'}
           </button>
           <span aria-hidden className="h-4 w-px bg-border" />
           <span className="text-content-muted">{selected.size} selected</span>
@@ -2144,7 +2144,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 ? `Pick the N images that best COVER the visual variety of the current filter (varied angles/outfits/scenes) using the ${semanticState.label} semantic index.`
                 : semanticBlocked}
               className={CURATE_BTN}>
-              <Palette aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Pick diverse{!semanticReady && ` (needs ${semanticState.label})`}{diverseBusy && ' (sampling…)'}
+              <Palette aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Pick diverse{!semanticReady && ` (needs ${semanticState.label})`}{diverseBusy && ' (sampling)'}
             </button>
             {curateOpen === 'diverse' && (
               <>
@@ -2189,7 +2189,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                   </p>
                   <button type="button" onClick={pickDiverse} disabled={diverseBusy}
                     className="w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-gray-950 disabled:opacity-60">
-                    {diverseBusy ? 'Sampling…' : `Select ${diverseN} most diverse`}
+                    {diverseBusy ? 'Sampling' : `Select ${diverseN} most diverse`}
                   </button>
                 </div>
               </>
@@ -2207,7 +2207,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 ? `Select N images SPREAD OVER the framings (face / bust / body / back), then diversify each bucket with the ${semanticState.label} semantic index.`
                 : balanceReady.reason}
               className={CURATE_BTN}>
-              ⚖️ Balanced pick{balanceBusy && ' (sampling…)'}
+              ⚖️ Balanced pick{balanceBusy && ' (sampling)'}
             </button>
             {curateOpen === 'balanced' && (
               <>
@@ -2246,7 +2246,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                   </p>
                   <button type="button" onClick={pickBalanced} disabled={balanceBusy}
                     className="w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-gray-950 disabled:opacity-60">
-                    {balanceBusy ? 'Sampling…' : `Select ${balanceN}, balanced`}
+                    {balanceBusy ? 'Sampling' : `Select ${balanceN}, balanced`}
                   </button>
                 </div>
               </>
@@ -2266,7 +2266,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                     ? 'Extend the last run — add the next closest images from the same ranking.'
                     : 'Select exactly one image to use as the reference'}
               className={CURATE_BTN}>
-              <Target aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Similar to selected{similarBusy && ' (ranking…)'}
+              <Target aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Similar to selected{similarBusy && ' (ranking)'}
             </button>
             {curateOpen === 'similar' && (
               <>
@@ -2287,7 +2287,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                       </label>
                       <button type="button" onClick={findSimilar} disabled={similarBusy}
                         className="w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-gray-950 disabled:opacity-60">
-                        {similarBusy ? 'Ranking…' : `Select ${similarN} most similar`}
+                        {similarBusy ? 'Ranking' : `Select ${similarN} most similar`}
                       </button>
                     </>
                   )}
@@ -2313,7 +2313,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                       </label>
                       <button type="button" onClick={addMoreSimilar} disabled={similarBusy}
                         className="w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-gray-950 disabled:opacity-60">
-                        {similarBusy ? 'Ranking…' : `Add ${similarAddN} more`}
+                        {similarBusy ? 'Ranking' : `Add ${similarAddN} more`}
                       </button>
                     </div>
                   )}
@@ -2692,7 +2692,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             /* A bank caption is a plain description whose job is SEARCH — the dataset's
                "without the face" rule is about binding identity to a trigger and does
                not apply here. */
-            captionPlaceholder="Caption — a plain description, used for search…"
+            captionPlaceholder="Caption — a plain description, used for search"
             labSurface={bankLabSurface({
               bankInstanceId: payload?.instance_id, imageInstanceId: labImage.instance_id,
               bankId, imageId: labImage.id, onApplyRunConfig: applyLabConfig })}

@@ -189,11 +189,11 @@ test('the button counts the clips a click queues, and where the walk is while it
   assert.equal(generateLabel({ mode: 'i2v', count: 3, busy: false }), 'Generate 3 clips')
   // Text-only ignores the strip: it is one clip however many frames wait.
   assert.equal(generateLabel({ mode: 't2v', count: 3, busy: false }), 'Generate clip')
-  assert.equal(generateLabel({ mode: 'i2v', count: 1, busy: true, done: 0, total: 1 }), 'Queueing…')
-  assert.equal(generateLabel({ mode: 'i2v', count: 3, busy: true, done: 0, total: 3 }), 'Queueing 1 of 3…')
-  assert.equal(generateLabel({ mode: 'i2v', count: 3, busy: true, done: 2, total: 3 }), 'Queueing 3 of 3…')
+  assert.equal(generateLabel({ mode: 'i2v', count: 1, busy: true, done: 0, total: 1 }), 'Queueing')
+  assert.equal(generateLabel({ mode: 'i2v', count: 3, busy: true, done: 0, total: 3 }), 'Queueing 1 of 3')
+  assert.equal(generateLabel({ mode: 'i2v', count: 3, busy: true, done: 2, total: 3 }), 'Queueing 3 of 3')
   // Never "4 of 3" between the last reply and the state reset.
-  assert.equal(generateLabel({ mode: 'i2v', count: 3, busy: true, done: 3, total: 3 }), 'Queueing 3 of 3…')
+  assert.equal(generateLabel({ mode: 'i2v', count: 3, busy: true, done: 3, total: 3 }), 'Queueing 3 of 3')
 })
 
 test('a frame with its own prompt launches as written, never enriched again; a continuation names its clip', async () => {
@@ -235,6 +235,6 @@ test('the per-picture mode writes one prompt per frame first, falls back to the 
 })
 
 test('the button says it is writing prompts while it writes them', () => {
-  assert.equal(generateLabel({ mode: 'i2v', count: 3, busy: true, done: 1, total: 3, phase: 'writing' }), 'Writing prompt 2 of 3…')
-  assert.equal(generateLabel({ mode: 'i2v', count: 3, busy: true, done: 1, total: 3 }), 'Queueing 2 of 3…')
+  assert.equal(generateLabel({ mode: 'i2v', count: 3, busy: true, done: 1, total: 3, phase: 'writing' }), 'Writing prompt 2 of 3')
+  assert.equal(generateLabel({ mode: 'i2v', count: 3, busy: true, done: 1, total: 3 }), 'Queueing 2 of 3')
 })

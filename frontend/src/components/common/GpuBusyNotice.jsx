@@ -56,7 +56,7 @@ export default function GpuBusyNotice({ onCleared, className = '' }) {
       {error && <p className="text-xs text-red-300">{error}</p>}
       <button type="button" onClick={clear} disabled={busy}
         className="rounded-md border border-amber-400/50 px-2.5 py-1 text-xs font-medium text-amber-200 hover:bg-amber-500/10 disabled:opacity-50">
-        {busy ? 'Clearing…' : notice.action}
+        {busy ? 'Clearing' : notice.action}
       </button>
     </div>
   )

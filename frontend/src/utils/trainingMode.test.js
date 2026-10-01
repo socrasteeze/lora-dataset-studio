@@ -92,7 +92,7 @@ test('the pending panel does not claim a model upload that has not started', () 
 
   // Once training is over, 'pending' does mean the weights are on their way.
   const delivering = fullTransformerArtifactView({ ...base, status: 'downloading' });
-  assert.equal(delivering.label, 'Uploading full model…');
+  assert.equal(delivering.label, 'Uploading full model');
 
   // The worst version of the same lie, caught on the proof screenshot: a run
   // the supervisor had already terminated still announced an upload in flight
@@ -108,14 +108,14 @@ test('the pending panel does not claim a model upload that has not started', () 
   // No status at all (an older payload) is not evidence of anything: it keeps
   // the neutral wording rather than announcing a failed delivery.
   const unknown = fullTransformerArtifactView(base);
-  assert.equal(unknown.label, 'Uploading full model…');
+  assert.equal(unknown.label, 'Uploading full model');
   assert.equal(unknown.tone, 'info');
 
   // Repository creation keeps its own label whatever the phase says, and a
   // detail the backend did send always wins over any of these fallbacks.
   assert.equal(fullTransformerArtifactView({
     ...base, artifact_status: 'creating_repository', status: 'preparing',
-  }).label, 'Creating Hugging Face repository…');
+  }).label, 'Creating Hugging Face repository');
   assert.equal(fullTransformerArtifactView({
     ...base, status: 'uploading', artifact_status_detail: 'from the backend',
   }).detail, 'from the backend');

@@ -150,7 +150,7 @@ test('re-caption posts force, and asks before it does', () => {
   assert.ok(confirmAt > 0, 're-caption does not confirm');
   assert.ok(postAt > confirmAt, 'the request is built before the question is asked');
   assert.match(call, /force: true/);
-  // …and it re-checks the inert reason itself, so a stale click cannot slip through.
+  // and it re-checks the inert reason itself, so a stale click cannot slip through.
   assert.match(call, /if \(captionRecaptionDisabledReason\(/);
 });
 
@@ -198,7 +198,7 @@ test('the button and the amber warning both live in the caption window', () => {
   // The warning is rendered, and only when the helper has something to say.
   assert.match(ws, /\{recaptionNote && \(/);
   assert.match(ws, /text-amber-400\/90">\{recaptionNote\}/);
-  // …and when it CANNOT run, the reason is on screen rather than only in a tooltip:
+  // and when it CANNOT run, the reason is on screen rather than only in a tooltip:
   // on a bank whose only captions are hand-written, that sentence is the sole place
   // the protection is visible.
   assert.match(ws, /\{recaptionInert && \(/);

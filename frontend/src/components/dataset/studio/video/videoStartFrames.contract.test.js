@@ -72,8 +72,8 @@ test('the button counts the clips — in the rail and in the phone bar — and t
   // 2026-09-02) — so the bar is handed the running text too.
   assert.match(STUDIO, /runLabel=\{`▶ \$\{label\}`\} runningLabel=\{`▶ \$\{label\}`\}/)
   const BAR = fs.readFileSync(new URL('../StudioActionBar.jsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
-  assert.match(BAR, /\{running \? \(runningLabel \|\| '…'\) : runLabel\}/)
-  assert.doesNotMatch(STUDIO, /'Queueing…' : 'Generate clip'|runLabel="▶ Generate clip"/)
+  assert.match(BAR, /\{running \? \(runningLabel \|\| ''\) : runLabel\}/)
+  assert.doesNotMatch(STUDIO, /'Queueing\u2026' : 'Generate clip'|runLabel="▶ Generate clip"/)
   // ↻ Reuse replaces the strip, and the frames it drops let go of their
   // upload previews first (the same release the picker's ✕ and Clear all do).
   // An explanatory comment on the Continue chain now sits between the two

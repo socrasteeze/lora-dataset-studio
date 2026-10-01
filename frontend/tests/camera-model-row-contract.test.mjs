@@ -37,7 +37,7 @@ test('the global picker PUTs inside the config envelope the endpoint reads', () 
   // Krea 2 base-model row never persisted); this pin is the regression guard.
   const gmp = read('src/components/shared/GlobalModelPicker.jsx');
   assert.match(gmp, /putJson\('\/api\/settings', \{ config: \{ \[section\]/,
-    'GlobalModelPicker must wrap its patch in { config: … }');
+    'GlobalModelPicker must wrap its patch in { config: }');
 });
 
 test('the slot the row lists from exists on the backend, as a diffusion-models slot', () => {

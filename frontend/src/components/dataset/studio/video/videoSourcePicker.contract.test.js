@@ -117,7 +117,7 @@ test('several start frames: a pick appends to a strip, each frame has its ✕, a
   // strip is the parent's list — what Generate walks — so the picker takes
   // it as a prop and hands additions up; it never keeps a frame of its own.
   // Prefix only, not the whole prop list: the ref2va/library-only lanes added
-  // more optional props (endFrame, libraryOnly, allowReferences, …) after
+  // more optional props (endFrame, libraryOnly, allowReferences, and more) after
   // these — the strip itself is still taken as a prop, never kept locally.
   assert.match(PICKER, /export default function VideoSourcePicker\(\{ mode, onMode, frames = \[\], onAdd, onRemove, onClear, aspect, onAspect,/)
   assert.doesNotMatch(PICKER, /onPicked|useState\(\{ image: null/)

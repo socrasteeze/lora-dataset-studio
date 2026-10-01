@@ -31,7 +31,7 @@ const HELP_CHAPTER = { id: 'getting-help', num: '06', title: 'Getting help', des
 const cleanHeading = (heading) => heading.replace(/[`*_]/g, '')
 
 // Append focus=<id> to a topic's app route, preserving any query already there
-// (e.g. /datasets?section=scrape&panel=scan → …&focus=ds-scrape-scan).
+// (e.g. /datasets?section=scrape&panel=scan → &focus=ds-scrape-scan).
 const routeWithFocus = (app) => {
   if (!app.focus) return app.route
   return `${app.route}${app.route.includes('?') ? '&' : '?'}focus=${app.focus}`

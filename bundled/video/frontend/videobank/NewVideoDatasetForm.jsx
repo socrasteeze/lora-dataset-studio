@@ -55,7 +55,7 @@ export default function NewVideoDatasetForm() {
         <select aria-label="Target model" value={targetKey} disabled={busy} className={field} onChange={(e) => {
           setTargetKey(e.target.value); setFrames(defaultFrames(targets.find((t) => t.key === e.target.value))); setSizeKey('source')
         }}>
-          {!targets.length && <option value="">Loading targets…</option>}
+          {!targets.length && <option value="">Loading targets</option>}
           {targets.map((t) => <option key={t.key} value={t.key}>{t.label}{t.training_verified ? '' : ' — training not verified'}</option>)}
         </select>
       </label>
@@ -76,7 +76,7 @@ export default function NewVideoDatasetForm() {
       {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}
       <button type="submit" disabled={busy || !name.trim() || !target}
         className="min-h-10 self-end rounded-lg bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-40">
-        {busy ? 'Creating…' : 'Create video dataset'}
+        {busy ? 'Creating' : 'Create video dataset'}
       </button>
     </form>
   )

@@ -394,7 +394,7 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
     return <div role="alert" className="space-y-3"><p>{loadError}</p><button type="button" onClick={load}>Retry loading settings</button></div>
   }
   if (loading || !config || pluginTarget) {
-    return <p className="text-content-muted">Loading settings…</p>
+    return <p className="text-content-muted">Loading settings</p>
   }
 
   const sectionProps = {
@@ -512,7 +512,7 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onSearchKeyDown}
-              placeholder="Find a setting…"
+              placeholder="Find a setting"
               aria-label="Find a setting"
               className="mb-2 w-full rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-content placeholder:text-content-subtle focus:border-primary focus:outline-none"
             />
@@ -569,7 +569,7 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
           </button>
           <button type="button" onClick={handleSave} disabled={saving}
             className="rounded-full bg-gradient-primary px-4 py-1 text-xs font-semibold text-gray-950 disabled:opacity-50">
-            {saving ? 'Saving…' : 'Save changes'}
+            {saving ? 'Saving' : 'Save changes'}
           </button>
         </div>
       )}

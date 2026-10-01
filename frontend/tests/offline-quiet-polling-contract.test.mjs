@@ -59,7 +59,7 @@ test('an unhappy ANSWER to a background poll is as quiet as no answer at all', (
   // exists to remove.
   assert.match(s, /\} else if \(background\) \{[\s\S]{0,600}?\} else if \(res\.status === 401\)/,
     'the background short-circuit must come BEFORE the status toasts');
-  // …but after the CSRF branch, which only rewrites the thrown message.
+  // but after the CSRF branch, which only rewrites the thrown message.
   assert.match(s, /res\.status === 400 && !parsed[\s\S]{0,400}?\} else if \(background\)/,
     'a background CSRF 400 must still get the actionable message');
 });
@@ -82,7 +82,7 @@ test('the app renders one persistent offline indicator', () => {
   assert.match(read('App.jsx'), /<ConnectionBanner \/>/);
   const banner = read('components/common/ConnectionBanner.jsx');
   assert.match(banner, /role="status"/, 'must be announceable');
-  assert.match(banner, /Offline — reconnecting…/);
+  assert.match(banner, /Offline — reconnecting/);
   // No timer/counter in the banner: its text must be stable while it is up,
   // or the live region re-announces on every tick.
   assert.doesNotMatch(banner, /setInterval|offlineSince/);

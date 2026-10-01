@@ -527,7 +527,7 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
   const selectedRegionExists = Number.isInteger(selectedRegion)
     && selectedRegion >= 0 && selectedRegion < regions.length;
   const saveLabel = saveState.status === 'saving'
-    ? 'Saving…'
+    ? 'Saving'
     : saveState.status === 'failed' ? 'Save failed' : 'Saved';
   const saveCls = saveState.status === 'saving'
     ? 'text-amber-200'
@@ -585,7 +585,7 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
                 <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-sm">
                   <span className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/75 text-amber-200 text-sm font-semibold">
                     <span aria-hidden className="w-4 h-4 rounded-full border-2 border-amber-200/40 border-t-amber-200 animate-spin" />
-                    {cleaning ? 'Cleaning…' : 'Restoring…'}
+                    {cleaning ? 'Cleaning' : 'Restoring'}
                   </span>
                 </div>
               )}
@@ -776,7 +776,7 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
             <button type="button" onClick={doRestore} disabled={working}
               title="Undo the clean — bring the watermarked original back so you can re-clean it (e.g. with the other engine) — shortcut r"
               className={`${btn} bg-sky-500/20 border border-sky-400/50 text-sky-100 hover:bg-sky-500/30`}>
-              {restoring ? '↩ Restoring…' : <>↩ Restore original <kbd className="text-2xs text-white/50">r</kbd></>}
+              {restoring ? '↩ Restoring' : <>↩ Restore original <kbd className="text-2xs text-white/50">r</kbd></>}
             </button>
           ) : (
             <button type="button" onClick={doClean} disabled={cleanDisabled}
@@ -792,7 +792,7 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
                       ? 'Save correction zones before cleaning'
                 : "Apply this image's watermark removal now (crop / inpaint / manual review) — shortcut c"}
               className={`${btn} bg-amber-500/20 border border-amber-400/50 text-amber-100 hover:bg-amber-500/30`}>
-              <Eraser aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{cleaning ? 'Cleaning…' : <>Clean <kbd className="text-2xs text-white/50">c</kbd></>}
+              <Eraser aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{cleaning ? 'Cleaning' : <>Clean <kbd className="text-2xs text-white/50">c</kbd></>}
             </button>
           )}
           {/* ✦ REPAIR opens the SAME fullscreen dialog the generated-image lane

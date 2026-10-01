@@ -128,7 +128,7 @@ export default function DupGroupsPanel({ bankId, live, onChanged, kind = 'exact'
     </p>
   )
 
-  if (data == null) return <p className="text-sm text-content-muted">Loading duplicate groups…</p>
+  if (data == null) return <p className="text-sm text-content-muted">Loading duplicate groups</p>
   if (data.total === 0) {
     return (
       <div className="space-y-2">

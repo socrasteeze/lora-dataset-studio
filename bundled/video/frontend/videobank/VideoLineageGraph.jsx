@@ -82,7 +82,7 @@ export function VideoCheckpointPopover({
       <div className="flex flex-col gap-1">
         {onGenerate && (pill.render_capability?.ok ? <button type="button" disabled={rowBusy}
           onClick={() => { onGenerate(node, pill); onClose?.() }}
-          className={ROW_CLS + ' border-primary/40 bg-primary/20 text-content'}>Generate preview…</button>
+          className={ROW_CLS + ' border-primary/40 bg-primary/20 text-content'}>Generate preview</button>
           : <span className={MUTED_CLS}>{pill.render_capability?.reason || 'Rendering availability unknown.'}</span>)}
         {pill.generated_preview && onRenderedPreviews && <button type="button"
           onClick={() => { onRenderedPreviews(node, pill); onClose?.() }}
@@ -226,7 +226,7 @@ export default function VideoLineageGraph({
     <>
       <div className="mb-1.5 flex flex-wrap items-center gap-2 text-2xs text-content-subtle" data-probe-reading data-probe-chrome="video-preview-toolbar">
         {onGenerate && <button type="button" onClick={() => onGenerate()}
-          className="min-h-10 rounded-md border border-primary/50 bg-primary/15 px-3 py-1 text-xs font-semibold text-content lg:min-h-0">Generate previews…{selected.length ? ` (${selected.length})` : ''}</button>}
+          className="min-h-10 rounded-md border border-primary/50 bg-primary/15 px-3 py-1 text-xs font-semibold text-content lg:min-h-0">Generate previews{selected.length ? ` (${selected.length})` : ''}</button>}
         {onRenderedPreviews && <button type="button" onClick={() => onRenderedPreviews()}
           className="min-h-10 rounded-md border border-border px-2 py-1 text-xs text-content lg:min-h-0">Rendered previews ({renderedCount})</button>}
         <button type="button" onClick={toggleBigPreviews} aria-pressed={bigPreviews}

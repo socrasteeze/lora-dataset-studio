@@ -13,7 +13,7 @@ const cases = [
     eta_state: 'ready', eta_seconds: 5220, eta_scope: 'job',
     detail: 'loading siglip2-base-p16-224 on CUDA (local files only)',
   }],
-  ['…while the estimate is still settling', {
+  ['while the estimate is still settling', {
     kind: 'semantic_index', done: 12939, total: 37800, finished: false,
     eta_state: 'estimating',
     detail: 'loading siglip2-base-p16-224 on CUDA (local files only)',
@@ -21,7 +21,7 @@ const cases = [
   ['✨ Score, write-back phase — scoped to the step', {
     kind: 'score', done: 4200, total: 21220, finished: false,
     eta_state: 'ready', eta_seconds: 1200, eta_scope: 'phase',
-    detail: 'writing 21220 score(s) to the database…',
+    detail: 'writing 21220 score(s) to the database',
   }],
   ['✨ Score, style grouping — nothing countable, no estimate', {
     kind: 'score', done: 0, total: 0, finished: false, eta_state: 'none',

@@ -172,8 +172,8 @@ test('run history errors render a diagnostic rather than indefinite initial load
   const html = mount(training.RunsHubContent, { host })
   assert.match(html, /role="alert"/)
   assert.match(html, /Fixture history unavailable/)
-  assert.doesNotMatch(html, /Loading…/)
-  assert.match(mount(training.RunsHub), /Loading…/)
+  assert.doesNotMatch(html, /Loading\u2026/)
+  assert.match(mount(training.RunsHub), /Loading/)
 })
 
 test('full-model metadata does not imply verified delivery or install an execution lane', () => {

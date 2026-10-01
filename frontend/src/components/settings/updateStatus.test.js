@@ -73,9 +73,9 @@ test('progressPercent clamps and is null without a total', () => {
 
 test('progressLabel renders each active phase and defers idle/done', () => {
   assert.match(progressLabel({ phase: 'downloading', downloaded: 21_000_000, total: 42_000_000 }),
-    /Downloading… 50% \(21\.0 MB \/ 42\.0 MB\)/);
+    /Downloading 50% \(21\.0 MB \/ 42\.0 MB\)/);
   assert.match(progressLabel({ phase: 'downloading', downloaded: 5_000_000, total: 0 }),
-    /Downloading… 5\.0 MB/);            // unknown total -> no percent
+    /Downloading 5\.0 MB/);            // unknown total -> no percent
   assert.match(progressLabel({ phase: 'extracting' }), /Extracting/);
   assert.match(progressLabel({ phase: 'installing' }), /Installing/);
   assert.match(progressLabel({ phase: 'restarting' }), /Restarting/);

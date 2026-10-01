@@ -150,7 +150,7 @@ export default function CanvasLayoutPresets({ positions, imageNodes, lanePlaceme
             className="h-10 min-w-0 flex-1 rounded border border-border bg-app/60 px-2 text-content text-xs focus:border-primary focus:outline-none lg:h-8" />
           <button type="button" onClick={save} disabled={busy === 'save'}
             className="h-10 shrink-0 rounded border border-indigo-400/50 bg-indigo-500/15 px-2 text-indigo-100 text-2xs font-semibold disabled:opacity-50 lg:h-8">
-            {busy === 'save' ? '…' : 'Save'}
+            {busy === 'save' ? '' : 'Save'}
           </button>
         </div>
         <p className="mt-1 mb-2 text-content-subtle text-2xs">
@@ -164,7 +164,7 @@ export default function CanvasLayoutPresets({ positions, imageNodes, lanePlaceme
           </p>
         )}
 
-        {presets == null && <p className="text-content-subtle text-2xs">Loading…</p>}
+        {presets == null && <p className="text-content-subtle text-2xs">Loading</p>}
         {presets != null && presets.length === 0 && (
           <p className="text-content-subtle text-2xs">
             No saved layout yet. Arrange the board, name it above, and it will be here.
@@ -188,7 +188,7 @@ export default function CanvasLayoutPresets({ positions, imageNodes, lanePlaceme
                      thing rather than nothing. Found by responsiveProbe.mjs,
                      which measures popovers now that it opens them. */
                   className="flex h-10 shrink-0 items-center rounded border border-border bg-surface px-2 text-content-muted text-2xs font-semibold hover:text-content disabled:opacity-50 lg:h-6 lg:px-1.5">
-                  {busy === `apply:${p.id}` ? '…' : 'Apply'}
+                  {busy === `apply:${p.id}` ? '' : 'Apply'}
                 </button>
                 <button type="button"
                   data-testid={`canvas-layout-delete-${p.id}`}

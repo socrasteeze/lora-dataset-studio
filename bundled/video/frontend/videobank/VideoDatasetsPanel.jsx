@@ -191,14 +191,14 @@ function StillsFromDatasetButton({ onCreated }) {
     <span className="flex items-center gap-1.5">
       <select value={picked} onChange={(e) => setPicked(e.target.value)}
         className="rounded border border-border bg-surface-raised px-1.5 py-0.5 text-2xs text-content">
-        <option value="">{choices === null ? 'Loading…' : 'Pick an image dataset'}</option>
+        <option value="">{choices === null ? 'Loading' : 'Pick an image dataset'}</option>
         {(choices || []).map((c) => (
           <option key={c.id} value={c.id}>{c.name} ({c.images_total})</option>
         ))}
       </select>
       <button type="button" disabled={busy || !picked} onClick={create}
         className="rounded border border-border bg-surface-raised px-2 py-0.5 text-2xs font-semibold text-content hover:bg-surface disabled:opacity-40">
-        {busy ? 'Building…' : 'Create'}
+        {busy ? 'Building' : 'Create'}
       </button>
       <button type="button" onClick={() => setOpen(false)}
         className="text-2xs text-content-subtle hover:underline">cancel</button>

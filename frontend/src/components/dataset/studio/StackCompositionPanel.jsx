@@ -81,7 +81,7 @@ export default function StackCompositionPanel({ members, onSaveBest, saving = fa
           {payload ? (
             <button type="button" onClick={() => onSaveBest?.(payload)} disabled={saving}
               className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-2 py-1 text-2xs font-semibold text-amber-200 disabled:opacity-40">
-              {saving ? 'Saving…' : '★ Save these weights as the best setting'}
+              {saving ? 'Saving' : '★ Save these weights as the best setting'}
             </button>
           ) : (
             <p className="m-0 text-content-subtle text-2xs">

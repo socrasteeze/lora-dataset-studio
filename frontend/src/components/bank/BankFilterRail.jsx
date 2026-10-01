@@ -178,7 +178,7 @@ export default function BankFilterRail({
       <div className="relative">
         <Search aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-content-subtle" />
         <input type="search" value={searchText} onChange={(e) => setSearchText(e.target.value)}
-          placeholder="Search captions and file names… (e.g. red dress)"
+          placeholder="Search captions and file names (e.g. red dress)"
           aria-label="Search the bank by caption or file name"
           className="w-full rounded-md border border-border bg-surface py-1.5 pl-8 pr-8 text-sm text-content placeholder:text-content-subtle" />
         {searchText && (
@@ -196,7 +196,7 @@ export default function BankFilterRail({
       <div className="relative">
         <Ban aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-content-subtle" />
         <input type="search" value={excludeText} onChange={(e) => setExcludeText(e.target.value)}
-          placeholder="Exclude words… (e.g. logo, watermark)"
+          placeholder="Exclude words (e.g. logo, watermark)"
           aria-label="Hide images whose caption or file name contains these words"
           title="Hides every image whose caption or file name contains one of these words (comma-separated). Matches anywhere in the text, so 'car' also hides 'scarf'. Images with no caption are never hidden."
           className="w-full rounded-md border border-border bg-surface py-1.5 pl-8 pr-8 text-sm text-content placeholder:text-content-subtle" />
@@ -585,7 +585,7 @@ export default function BankFilterRail({
           <SlidersVertical aria-hidden="true" className="h-3.5 w-3.5" />
           {/* No subtitle: in the rail it wrapped the row to three lines beside
               one-line neighbours. What it opens is said in the tooltip. */}
-          <span className="font-medium" title="What the chips above count as blurry, small, duplicate…">
+          <span className="font-medium" title="What the chips above count as blurry, small, duplicate">
             Filter thresholds
           </span>
           <span aria-hidden className="ml-auto text-content-subtle">{thresholdsOpen ? '▲' : '▼'}</span>

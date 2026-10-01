@@ -25,7 +25,7 @@ function Prepare({ action, label, onRefresh, restart = true }) {
   };
   return <div className="text-xs text-content-muted">
     {state === 'success' ? <span>{restart ? 'Installed — restart ComfyUI after your renders finish, then refresh.' : 'Download complete — refresh availability.'}</span>
-      : <button type="button" onClick={start} disabled={['running', 'queued'].includes(state)} className="min-h-10 text-primary underline disabled:opacity-50">{['running', 'queued'].includes(state) ? 'Preparing…' : label}</button>}
+      : <button type="button" onClick={start} disabled={['running', 'queued'].includes(state)} className="min-h-10 text-primary underline disabled:opacity-50">{['running', 'queued'].includes(state) ? 'Preparing' : label}</button>}
     {error && <p role="alert" className="break-words text-red-300">{error}</p>}
   </div>;
 }

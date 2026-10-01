@@ -12,7 +12,7 @@ test('the field opens the in-app folder browser, not the desktop explorer', () =
   assert.match(field, /setBrowsing\(true\)/);
   assert.match(field, /<FolderBrowserModal/);
   assert.match(field, /> Browse</);
-  assert.doesNotMatch(field, /Browse…/);
+  assert.doesNotMatch(field, /Browse\u2026/);
   // Folder selection stays in the browser on every client.
   assert.doesNotMatch(field, /pickNativeFolder/);
   assert.match(picker, /\/api\/system\/list-folders/);

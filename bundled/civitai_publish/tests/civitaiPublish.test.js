@@ -93,10 +93,10 @@ test('the form is stopped by a missing name, an unnamed base, a missing file, or
 });
 
 test('a job phase reads as a sentence with its percentage', () => {
-  assert.equal(jobPhaseLabel({ kind: 'model', phase: 'uploading', progress: 0.5 }), 'Uploading the checkpoint… 50%');
-  assert.equal(jobPhaseLabel({ kind: 'post', phase: 'uploading', progress: 1 }), 'Uploading images… 100%');
-  assert.equal(jobPhaseLabel({ kind: 'model', phase: 'creating' }), 'Creating the model page…');
-  assert.equal(jobPhaseLabel({ kind: 'post', phase: 'creating' }), 'Creating the post…');
+  assert.equal(jobPhaseLabel({ kind: 'model', phase: 'uploading', progress: 0.5 }), 'Uploading the checkpoint 50%');
+  assert.equal(jobPhaseLabel({ kind: 'post', phase: 'uploading', progress: 1 }), 'Uploading images 100%');
+  assert.equal(jobPhaseLabel({ kind: 'model', phase: 'creating' }), 'Creating the model page');
+  assert.equal(jobPhaseLabel({ kind: 'post', phase: 'creating' }), 'Creating the post');
   assert.equal(jobPhaseLabel(null), '');
 });
 

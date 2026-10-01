@@ -185,7 +185,7 @@ export default function CaptionLab({ surface, currentCaption, onKeep }) {
       </div>
 
       <p className="m-0 text-2xs text-content-subtle">{surface.promptHelp}</p>
-      {configLoading && <p role="status" className="text-xs text-content-muted">Loading saved caption method…</p>}
+      {configLoading && <p role="status" className="text-xs text-content-muted">Loading saved caption method</p>}
       {configError && <div role="alert" className="text-xs text-amber-300">
         {configError} <button type="button" onClick={() => setConfigAttempt((n) => n + 1)}
           className="min-h-10 underline">Retry</button>
@@ -255,7 +255,7 @@ export default function CaptionLab({ surface, currentCaption, onKeep }) {
 
             {/* Result */}
             <div className="flex min-h-[4rem] flex-1 flex-col rounded-lg border border-border bg-app/60 p-2">
-              {c.status === 'running' && <span className="text-xs text-content-subtle">Generating…</span>}
+              {c.status === 'running' && <span className="text-xs text-content-subtle">Generating</span>}
               {c.status === 'idle' && <span className="text-xs italic text-content-subtle">Not generated yet</span>}
               {c.status === 'cancelled' && <span className="text-xs text-amber-300">Stopped before it finished</span>}
               {c.status === 'error' && <span className="text-xs text-rose-400">{c.error}</span>}

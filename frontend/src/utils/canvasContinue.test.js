@@ -246,7 +246,7 @@ test('the board surfaces the backend’s refusal instead of swallowing it', () =
   // an explicit {ok:false} body is a refusal too, not a success toast — both
   // shapes go through the one classifier (utils/continueOutcome.js).
   assert.match(canvas, /continueAttemptOutcome\(d === null \? \{ declined: true \} : \{ response: d \}\)/);
-  // …and the dialog is NO LONGER dismissed before the request. It used to be, to
+  // and the dialog is NO LONGER dismissed before the request. It used to be, to
   // work around a toast container that rendered under every modal (fixed:
   // Toast.jsx is z-[10000]) — at the price of discarding the lane, the resume
   // checkpoint, the extra steps and the five folded settings on every refusal.

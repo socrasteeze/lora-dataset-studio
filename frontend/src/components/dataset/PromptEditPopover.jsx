@@ -61,7 +61,7 @@ export default function PromptEditPopover({ initialPrompt = '', onSubmit, onClos
             if (e.key === 'Escape') { e.preventDefault(); dismiss(); }
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submit(); }
           }}
-          rows={4} placeholder="describe the shot (the face is kept automatically)…"
+          rows={4} placeholder="describe the shot (the face is kept automatically)"
           aria-label="Edit the generation prompt"
           className="text-2xs bg-app/60 border border-border rounded p-1.5 text-content resize-none" />
         {/* shrink-0: this is a flex column with a max height, so the box would
@@ -84,7 +84,7 @@ export default function PromptEditPopover({ initialPrompt = '', onSubmit, onClos
           </button>
           <button type="button" onClick={submit} disabled={busy || !text.trim()}
             className="px-3 py-1 rounded text-2xs bg-gradient-primary text-gray-950 font-semibold disabled:opacity-40">
-            {busy ? '…' : 'OK'}
+            {busy ? '' : 'OK'}
           </button>
         </div>
       </div>

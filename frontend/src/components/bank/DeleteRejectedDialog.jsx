@@ -119,9 +119,9 @@ export default function DeleteRejectedDialog({ bankId, count, sourcePath, onClos
             disabled={busy || !armed || !check.ready || block.blocked}
             title={block.blocked ? block.title : (check.ready ? undefined : check.title)}
             className="rounded-md bg-rose-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-rose-500 disabled:opacity-40">
-            {busy ? 'Deleting…'
+            {busy ? 'Deleting'
               : block.blocked ? 'Blocked'
-                : check.state === 'checking' ? 'Checking…'
+                : check.state === 'checking' ? 'Checking'
                   : `Delete ${count} file${count === 1 ? '' : 's'}`}
           </button>
         </div>

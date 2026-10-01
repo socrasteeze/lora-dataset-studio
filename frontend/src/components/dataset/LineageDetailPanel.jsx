@@ -175,7 +175,7 @@ export default function LineageDetailPanel({ node, onClose, onNodeChanged, onNod
                   value={ckNotes[c.step] ?? ''}
                   onChange={(e) => setCkNotes((m) => ({ ...m, [c.step]: e.target.value }))}
                   onBlur={() => saveCkNote(c.step)}
-                  placeholder="note…"
+                  placeholder="note"
                   className="min-w-0 flex-1 rounded-md border border-border bg-app/60 px-2 py-1 text-xs text-content placeholder:text-content-subtle focus:border-indigo-400/60 focus:outline-none" />
               </li>
             ))}
@@ -187,7 +187,7 @@ export default function LineageDetailPanel({ node, onClose, onNodeChanged, onNod
         <section className="mt-auto pt-4">
           <button type="button" onClick={deleteRun} disabled={deleting}
             className="w-full rounded-md border border-rose-500/40 bg-rose-600/10 px-2 py-1.5 text-xs font-medium text-rose-200 hover:bg-rose-600/20 disabled:opacity-50">
-            {deleting ? 'Removing…' : 'Remove this run'}
+            {deleting ? 'Removing' : 'Remove this run'}
           </button>
           <p className="mt-1 text-2xs leading-snug text-content-subtle">
             No checkpoints left on disk. No LoRA file is deleted.

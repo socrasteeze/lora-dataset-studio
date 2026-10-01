@@ -31,7 +31,7 @@ const ATTRIBUTE = /\b(?:aria-label|title)="([^"{}]+)"/g
 const CUT = '\u0000'
 
 /** Index just past the ">" that closes the JSX opening tag starting at `from`,
- *  or -1. Skips over quoted strings and {…} expressions, which is what makes
+ *  or -1. Skips over quoted strings and {} expressions, which is what makes
  *  an attribute like onClick={() => setOpen(true)} stop confusing the scan. */
 function endOfOpeningTag(source, from) {
   let depth = 0
@@ -76,7 +76,7 @@ function buttonBodies(source) {
     if (open === -1) return bodies
     const bodyStart = endOfOpeningTag(source, open + 7)
     if (bodyStart === -1) return bodies
-    // A self-closing <button … /> has no body worth reading.
+    // A self-closing <button /> has no body worth reading.
     if (source[bodyStart - 2] === '/') { at = bodyStart; continue }
     const close = source.indexOf('</button>', bodyStart)
     if (close === -1) return bodies

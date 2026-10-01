@@ -76,7 +76,7 @@ test('the captioning Stop keeps the same convention: stop verb + what is kept', 
   // this button reads '⏹ Stop' again. Stripping it was what left several other
   // controls as blank rectangles. What this test guards is the WORDING — the
   // stop verb plus what is kept — which the glyph prefix does not change.
-  assert.match(block, />\s*\{act\?\.cancelling \? 'Stopping…' : '⏹ Stop'\}/);
+  assert.match(block, />\s*\{act\?\.cancelling \? 'Stopping' : '⏹ Stop'\}/);
   assert.doesNotMatch(block, /re-enable ComfyUI/);
   const title = block.match(/title="([^"]+)"/);
   assert.ok(title, 'the captioning Stop button has no title');

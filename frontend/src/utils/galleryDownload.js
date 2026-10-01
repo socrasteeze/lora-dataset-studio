@@ -201,7 +201,7 @@ export function zipButtonState({ picking = false, selectedCount = 0, totalCount 
     count,
     capped,
     disabled: busy || count === 0,
-    label: busy ? '⬇ Zipping…' : `⬇ ZIP (${count})`,
+    label: busy ? '⬇ Zipping' : `⬇ ZIP (${count})`,
     title,
   };
 }

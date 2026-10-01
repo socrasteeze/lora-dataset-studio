@@ -345,7 +345,7 @@ export default function PromoteVideoDialog({
           </button>
           <button type="submit" disabled={busy || !!problem} title={problem || undefined}
             className="rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-40">
-            {busy ? 'Starting…' : `🎬 Encode ${promoteScopeLabel((selectedIds || []).length, keepCount)}`}
+            {busy ? 'Starting' : `🎬 Encode ${promoteScopeLabel((selectedIds || []).length, keepCount)}`}
           </button>
         </div>
         {problem && <p className="text-right text-xs text-content-muted">{problem}</p>}

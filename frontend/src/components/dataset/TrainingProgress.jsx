@@ -146,7 +146,7 @@ export default function TrainingProgress({ datasetId, base, trainType, variant,
           </p>
         ) : (!cloud || prog?.active !== false) ? (
           <p className="m-0 text-content-subtle text-2xs">
-            Starting up… (the log appears once ai-toolkit begins writing)
+            Starting up (the log appears once ai-toolkit begins writing)
           </p>
         ) : null}
       </div>

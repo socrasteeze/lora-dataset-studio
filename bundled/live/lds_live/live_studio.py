@@ -230,7 +230,7 @@ SEGMENT_DIR = 'seg'   # the path element between the playlist and its segments
 
 
 def playlist_text(segments, ended=False, discontinuities=()) -> str:
-    """A live HLS playlist over `segments` = [(seq, name, seconds), …] in order.
+    """A live HLS playlist over `segments` = [(seq, name, seconds), and more] in order.
     `discontinuities`: the sequence numbers before which the elementary streams
     change (a segment without audio after ones with it) — tagged, so a player
     resets its decoders instead of stalling.
@@ -302,7 +302,7 @@ _FFMPEG_FACTS = {}
 
 
 def ffmpeg_facts(force=False) -> dict:
-    """{'path': …, 'rubberband': bool} — what the ffmpeg on this machine can do."""
+    """{'path': , 'rubberband': bool} — what the ffmpeg on this machine can do."""
     if _FFMPEG_FACTS and not force:
         return _FFMPEG_FACTS
     from lds_sdk.video_host import ffmpeg_tools

@@ -134,7 +134,7 @@ test('the FormData rule catches every shape that slipped past its first version'
   ]
   for (const text of escapes) {
     assert.ok(buildsFormData(text) && !carriesToken(text),
-      `an escape is not caught: ${text.slice(0, 60)}…`)
+      `an escape is not caught: ${text.slice(0, 60)}`)
   }
   // …and the two legal shapes stay legal.
   assert.equal(carriesToken('const fd = new FormData(); postForm(url, fd)'), true)
@@ -185,5 +185,5 @@ test('the set of files allowed to raw-fetch is closed', () => {
     if (directCalls(text).length && !ALLOWED.has(rel(path))) strays.push(rel(path))
   }
   assert.deepEqual(strays, [],
-    'new raw fetch("/api…") caller — use api/fetchClient.js, or justify an allowlist entry here')
+    'new raw fetch("/api") caller — use api/fetchClient.js, or justify an allowlist entry here')
 })

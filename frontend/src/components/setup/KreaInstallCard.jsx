@@ -14,7 +14,7 @@ const POLL_MS = 1200
 const ROW_META = {
   idle: { glyph: '○', cls: 'text-content-subtle', word: 'waiting' },
   queued: { glyph: '○', cls: 'text-content-subtle', word: 'queued' },
-  running: { glyph: '⟳', cls: 'text-primary', word: 'installing…' },
+  running: { glyph: '⟳', cls: 'text-primary', word: 'installing' },
   success: { glyph: '✓', cls: 'text-emerald-400', word: 'done' },
   error: { glyph: '✗', cls: 'text-rose-400', word: 'needs attention' },
 }
@@ -187,7 +187,7 @@ export default function KreaInstallCard({ caps, onDone }) {
           </ul>
           <button type="button" onClick={start} disabled={phase === 'running'}
             className="mt-4 w-full rounded-lg border border-primary/50 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary disabled:opacity-50 sm:w-auto">
-            {phase === 'running' ? 'Installing…' : `Install Krea 2 Edit (${plan.length})`}
+            {phase === 'running' ? 'Installing' : `Install Krea 2 Edit (${plan.length})`}
           </button>
         </>
       )}

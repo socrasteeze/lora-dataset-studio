@@ -94,10 +94,10 @@ export function improveBatchLabel(activity) {
   const engine = improveEngine(activity.engine)
   const total = Number(activity.total) || 0
   const done = Number(activity.done) || 0
-  if (activity.cancelling) return `${engine.emoji} Stopping…`
+  if (activity.cancelling) return `${engine.emoji} Stopping`
   return total
     ? `${engine.emoji} ${engine.label} ${done}/${total}`
-    : `${engine.emoji} ${engine.label}…`
+    : `${engine.emoji} ${engine.label}`
 }
 
 /** The per-image ✨ buttons for ONE image in the lightbox: one entry per engine
@@ -147,7 +147,7 @@ export function lightboxImproveButtons({ caps, engines, improving = false,
       label: improveReady
         ? '✓ Review improvement first'
         : active
-          ? `${engine.emoji} Improving…`
+          ? `${engine.emoji} Improving`
           : `${engine.emoji} ${engine.action}`,
       title: reason
         ? `${reason} ${engine.summary}`

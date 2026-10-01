@@ -367,7 +367,7 @@ export default function DupCompareLightbox({
         </div>
       ) : refilling ? (
         <p className="flex flex-1 items-center justify-center text-sm text-white/60">
-          Looking for the next groups…
+          Looking for the next groups
         </p>
       ) : layout === 'side' ? (
         <ul className={`grid min-h-0 flex-1 auto-rows-fr gap-3 overflow-y-auto p-3 ${colsFor(images.length)}`}>

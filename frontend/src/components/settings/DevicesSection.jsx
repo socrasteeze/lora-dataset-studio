@@ -219,7 +219,7 @@ export default function DevicesSection({ config, setField, handleSave, configDef
             peer. No auth — trusted network or Tailscale only.
           </p>
           {backends === null ? (
-            <p className="text-sm text-content-muted">Loading…</p>
+            <p className="text-sm text-content-muted">Loading</p>
           ) : backends.length === 0 ? (
             <p className="text-sm text-content-muted">
               No backends yet. Start ComfyUI on the other machine with
@@ -265,7 +265,7 @@ export default function DevicesSection({ config, setField, handleSave, configDef
               className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50">
               Add backend
             </button>
-            {backendTest === 'testing' && <span className="text-xs text-content-muted">testing…</span>}
+            {backendTest === 'testing' && <span className="text-xs text-content-muted">testing</span>}
             {backendTest === 'online' && <span className="text-xs text-emerald-400">✓ reachable</span>}
             {backendTest === 'offline' && <span className="text-xs text-rose-400">✕ not answering</span>}
           </div>

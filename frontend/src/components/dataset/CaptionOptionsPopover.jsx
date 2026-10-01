@@ -282,7 +282,7 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
         </div>
 
         {loading ? (
-          <p className="text-content-subtle text-sm py-6 text-center">Loading…</p>
+          <p className="text-content-subtle text-sm py-6 text-center">Loading</p>
         ) : (
           <>
             {/* Engine */}
@@ -327,7 +327,7 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
                       aria-busy={kreaModelPulling}
                       className="w-full shrink-0 rounded-lg border border-sky-400/40 bg-sky-500/20 px-3 py-2 text-xs font-semibold text-sky-100 hover:bg-sky-500/30 disabled:opacity-40 sm:w-auto">
                       {kreaModelSelected ? 'Selected'
-                        : kreaModelPulling ? 'Pulling…'
+                        : kreaModelPulling ? 'Pulling'
                         : kreaModelInstalled ? 'Use'
                         : 'Pull & use'}
                     </button>
@@ -358,7 +358,7 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
                   className="min-w-0 w-full flex-1 px-2 py-1.5 rounded-lg bg-app/60 border border-border text-content text-xs" />
                 <button type="button" onClick={startPull} disabled={pulling || !pullName.trim() || !modelsReachable}
                   className="w-full px-3 py-1.5 rounded-lg bg-surface-raised border border-border text-content text-xs font-semibold disabled:opacity-40 hover:bg-surface sm:w-auto">
-                  {pulling ? 'Pulling…' : '⇩ Pull'}
+                  {pulling ? 'Pulling' : '⇩ Pull'}
                 </button>
               </div>
               {pull && (
@@ -486,7 +486,7 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
               </button>
               <button type="button" onClick={save} disabled={saving}
                 className="px-4 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
-                {saving ? 'Saving…' : 'Save'}
+                {saving ? 'Saving' : 'Save'}
               </button>
             </div>
           </>

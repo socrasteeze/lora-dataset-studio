@@ -492,8 +492,8 @@ function UpdateBanner() {
         {applying ? (
           <span className="text-content">
             {phase === 'restarting'
-              ? '↻ Updated — the app is restarting. This page reloads automatically when it’s back…'
-              : '⬇ Pulling the latest version…'}
+              ? '↻ Updated — the app is restarting. This page reloads automatically when it’s back'
+              : '⬇ Pulling the latest version'}
           </span>
         ) : (
           <>

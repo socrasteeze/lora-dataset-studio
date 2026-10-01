@@ -126,7 +126,7 @@ export default function VideoPreviewDialog({ datasetId, tree, selected, onSelect
               </section>
               <section className="min-w-0 rounded-lg border border-border p-3">
                 <h3 className="mb-2 text-sm font-semibold text-content">2. Shared motion</h3>
-                <textarea aria-label="Shared motion prompt" maxLength={4000} rows={4} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe the scene and motion to compare…"
+                <textarea aria-label="Shared motion prompt" maxLength={4000} rows={4} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe the scene and motion to compare"
                   className="w-full resize-y rounded border border-border bg-app p-2 text-sm text-content" />
                 <label className="mt-2 flex flex-wrap items-center gap-2 text-xs text-content">LoRA strength
                   <input type="number" min={0} max={2} step={0.05} value={strength} onChange={(e) => setStrength(e.target.value)} className="min-h-10 w-24 rounded border border-border bg-app px-2 lg:min-h-0" />
@@ -147,7 +147,7 @@ export default function VideoPreviewDialog({ datasetId, tree, selected, onSelect
       {tab === 'render' && <footer className="flex shrink-0 flex-wrap items-center gap-2 border-t border-border bg-surface-overlay p-3">
         <p className="min-w-0 flex-1 text-xs text-content-muted">{selected.length} clip{selected.length === 1 ? '' : 's'} · one shared seed{opts.seed === '' ? ' (chosen at launch)' : `: ${opts.seed}`}</p>
         <button type="button" disabled={busy || !options || !selected.length} onClick={submit}
-          className="min-h-10 rounded-md border border-primary bg-primary px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Queueing…' : 'Generate previews'}</button>
+          className="min-h-10 rounded-md border border-primary bg-primary px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Queueing' : 'Generate previews'}</button>
       </footer>}
     </div>
   </div>, document.body)

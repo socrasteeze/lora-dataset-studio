@@ -147,10 +147,10 @@ export function fullTransformerArtifactView(run = {}) {
     // and it is only made about a run whose phase actually says so.
     const ended = !!runStatus && !['preparing', 'provisioning', 'uploading',
       'training', 'downloading', 'terminating'].includes(runStatus);
-    let label = 'Uploading full model…';
+    let label = 'Uploading full model';
     let fallbackDetail = 'Keep the run and pod active until the repository is verified.';
     if (status === 'creating_repository') {
-      label = 'Creating Hugging Face repository…';
+      label = 'Creating Hugging Face repository';
     } else if (beforeTraining) {
       label = 'Full model not created yet';
       fallbackDetail = 'The run is still starting up — the weights are created on Hugging '

@@ -129,7 +129,7 @@ export default function DatasetToBankDialog({ datasetName, keptCount, onClose, o
           </button>
           <button type="submit" disabled={!canStart}
             className="rounded-lg bg-gradient-primary px-4 py-2 text-sm font-semibold text-gray-950 disabled:opacity-40">
-            {busy ? 'Starting…' : 'Create bank'}
+            {busy ? 'Starting' : 'Create bank'}
           </button>
         </div>
       </form>

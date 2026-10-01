@@ -411,7 +411,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
         </div>
         <button type="button" onClick={handleImport} disabled={busy || importing || selected.size === 0}
           className="ml-auto px-3 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
-          {importing ? 'Importing…' : `⬇ Import ${selected.size || ''}`}
+          {importing ? 'Importing' : `⬇ Import ${selected.size || ''}`}
         </button>
       </div>
 
@@ -441,7 +441,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
             <button type="button" onClick={runRedditSearch}
               disabled={scanning || (!kw.trim() && !sub.trim())}
               className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm hover:bg-white/10 disabled:opacity-40 shrink-0">
-              {scanning ? 'Searching…' : 'Search Reddit'}
+              {scanning ? 'Searching' : 'Search Reddit'}
             </button>
           </div>
           <p className="text-content-muted text-2xs leading-relaxed">
@@ -497,7 +497,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
               disabled={scanning || !pexelsAuthorized || !normalizePexelsKeyword(pexelsKeyword)}
               title={pexelsAuthorized ? 'Search the official Pexels API' : 'Confirm explicit Pexels authorization first'}
               className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm hover:bg-white/10 disabled:opacity-40 shrink-0">
-              {scanning ? 'Searching…' : 'Search Pexels'}
+              {scanning ? 'Searching' : 'Search Pexels'}
             </button>
           </div>
         </div>
@@ -521,7 +521,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
               disabled={scanning || !normalizeWebSearchKeyword(websearchKeyword)}
               title="Search images across the open web"
               className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm hover:bg-white/10 disabled:opacity-40 shrink-0">
-              {scanning ? 'Searching…' : 'Search the web'}
+              {scanning ? 'Searching' : 'Search the web'}
             </button>
             <HelpBadge topic="action-scrape-websearch" className="self-center" />
           </div>
@@ -543,7 +543,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
               className="flex-1 min-w-[14rem] px-3 py-1.5 rounded-lg bg-surface-raised border border-border text-content text-sm placeholder:text-content-subtle focus:border-indigo-500 outline-none" />
             <button type="submit" disabled={scanning || !url.trim()}
               className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm hover:bg-white/10 disabled:opacity-40">
-              {scanning ? 'Scanning…' : 'Scan URL'}
+              {scanning ? 'Scanning' : 'Scan URL'}
             </button>
             <HelpBadge topic="action-scrape-scan" className="self-center" />
           </form>
@@ -741,7 +741,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
           {paginated && (
             <button type="button" onClick={() => runScan(page + 1)} disabled={scanning}
               className="self-start px-3 py-1.5 rounded-lg border border-border bg-surface text-content-muted hover:text-content text-xs disabled:opacity-40">
-              {scanning ? 'Loading…' : `Load more ${destinationMediaLabel(destination)}`}
+              {scanning ? 'Loading' : `Load more ${destinationMediaLabel(destination)}`}
             </button>
           )}
         </>

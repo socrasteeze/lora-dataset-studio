@@ -79,7 +79,7 @@ test('the button arms only when its destination is actually specified', () => {
 test('the button names what it makes', () => {
   assert.equal(promoteButtonLabel({ destination: 'bank' }), 'Create bank')
   assert.equal(promoteButtonLabel({ destination: 'dataset' }), 'Promote')
-  assert.equal(promoteButtonLabel({ destination: 'bank', busy: true }), 'Starting…')
+  assert.equal(promoteButtonLabel({ destination: 'bank', busy: true }), 'Starting')
 })
 
 /* ── the third door: a dataset that does not exist yet ─────────────────────── */
@@ -106,7 +106,7 @@ test('the button names what it makes', () => {
   assert.equal(promoteButtonLabel({ destination: 'new-dataset' }), 'Create dataset')
   assert.equal(promoteButtonLabel({ destination: 'bank' }), 'Create bank')
   assert.equal(promoteButtonLabel({ destination: 'dataset' }), 'Promote')
-  assert.equal(promoteButtonLabel({ destination: 'new-dataset', busy: true }), 'Starting…')
+  assert.equal(promoteButtonLabel({ destination: 'new-dataset', busy: true }), 'Starting')
 })
 
 test('the new-dataset summary never says "the chosen dataset"', () => {

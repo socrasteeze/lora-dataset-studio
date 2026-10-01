@@ -431,7 +431,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
               value={negative}
               onChange={(e) => setNegative(e.target.value)}
               rows={3}
-              placeholder="Leave empty for the pipeline default…"
+              placeholder="Leave empty for the pipeline default"
               aria-label="Negative prompt"
               className="rounded-lg border border-border bg-app/60 px-2.5 py-1.5 text-content text-sm resize-y min-h-[4rem]"
             />

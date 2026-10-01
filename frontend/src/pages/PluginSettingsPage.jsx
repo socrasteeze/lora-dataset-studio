@@ -19,7 +19,7 @@ export default function PluginSettingsPage() {
     })
     return () => { alive = false }
   }, [pluginId, attempt])
-  if (result?.pluginId !== pluginId) return <p role="status">Loading plugin settings…</p>
+  if (result?.pluginId !== pluginId) return <p role="status">Loading plugin settings</p>
   const loadProblem = window.lds?.loadProblems?.find(item => item.plugin === pluginId)
   const reason = result.error || (result.stale && 'LDS has restarted. Reload this page to use its current plugins.')
     || pluginSettingsAvailability(result.plugin)

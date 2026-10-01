@@ -216,7 +216,7 @@ export default function BankBulkDialog({ banks, onClose, onResults }) {
             className="min-h-10 min-w-0 rounded-md border border-border px-2 text-sm font-semibold text-content disabled:opacity-50">Cancel</button>
           <button type="button" onClick={save} disabled={busy || invalidNames.length > 0 || !(submittedPayload || payload).banks.length}
             className="min-h-10 min-w-0 rounded-md bg-gradient-primary px-2 text-sm font-semibold text-gray-950 disabled:opacity-50">
-            {busy ? 'Saving…' : networkUnknown ? 'Retry Exact Changes' : 'Save Changes'}
+            {busy ? 'Saving' : networkUnknown ? 'Retry Exact Changes' : 'Save Changes'}
           </button>
         </footer>
       </section>

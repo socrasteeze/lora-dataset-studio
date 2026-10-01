@@ -82,10 +82,10 @@ const KREA_CATALOG = [
     trainable: true, quantization: '', note: null },
   { value: 'D:\\ComfyUI\\models\\unet\\Krea\\krea2_turbo_fp8.safetensors',
     label: 'krea2_turbo_fp8', trainable: true, quantization: 'bare_cast',
-    note: 'krea2_turbo_fp8.safetensors is a quantized cast: 266 of its 432 tensors…' },
+    note: 'krea2_turbo_fp8.safetensors is a quantized cast: 266 of its 432 tensors' },
   { value: 'D:\\ComfyUI\\models\\unet\\Krea\\packed_fp8.safetensors',
     label: 'packed_fp8', trainable: false, quantization: 'structured',
-    note: 'This is a packed inference export…' },
+    note: 'This is a packed inference export' },
 ];
 
 test('a base the catalog offers is a dropdown pick, not custom weights', () => {
@@ -134,7 +134,7 @@ const TYPED = 'D:\\downloads\\fresh_krea.safetensors';
 const PACKED_ANSWER = {
   for: TYPED, status: 'ok', filename: 'fresh_krea.safetensors',
   trainable: false, level: 'error', quantization: 'structured',
-  note: 'This is a packed inference export…',
+  note: 'This is a packed inference export',
 };
 
 test('a typed path shows the same verdict a listed one would', () => {

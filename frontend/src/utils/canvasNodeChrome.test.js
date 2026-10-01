@@ -121,7 +121,7 @@ test('the row leaves the resize corner alone', () => {
 
 test('a group MEMBER draws no corner, and the last one still has one over it', () => {
   assert.ok(hasOwnResizeCorner('node'), 'a node of its own draws its handle');
-  assert.equal(hasOwnResizeCorner('member'), false, 'a member draws none…');
+  assert.equal(hasOwnResizeCorner('member'), false, 'a member draws none');
   // …but the strip's handle lands on exactly one of them.
   assert.ok(hasResizeCornerOver('member', true), 'the LAST tile is under the strip’s ◢');
   assert.equal(hasResizeCornerOver('member', false), false, 'no other member is');

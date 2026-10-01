@@ -175,7 +175,7 @@ export function RecoveryBannerBody({ model, busy = false, starting = false,
               className="rounded-md border border-amber-400/50 bg-amber-500/20 px-3 py-1.5
                          text-xs font-medium text-content hover:bg-amber-500/30
                          disabled:cursor-not-allowed disabled:opacity-60">
-              {starting ? 'Starting…' : model.startLabel}
+              {starting ? 'Starting' : model.startLabel}
             </button>
           )}
           {model.canConfirm && (
@@ -183,7 +183,7 @@ export function RecoveryBannerBody({ model, busy = false, starting = false,
               className="rounded-md border border-amber-400/50 bg-amber-500/20 px-3 py-1.5
                          text-xs font-medium text-content hover:bg-amber-500/30
                          disabled:cursor-not-allowed disabled:opacity-60">
-              {busy ? 'Clearing…' : model.actionLabel}
+              {busy ? 'Clearing' : model.actionLabel}
             </button>
           )}
           {model.datasetId != null && (

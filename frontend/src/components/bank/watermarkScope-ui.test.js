@@ -31,7 +31,7 @@ test('level 1 delegates Find to the workspace launch dialog', () => {
   const panelCall = workspace.slice(panelCallStart, panelCallEnd);
   assert.match(panelCall, /onFind=\{\(\) => onPassOpen\('watermark'\)\}/,
     'the passes panel must open the shared watermark PassDialog');
-  // …through the workspace's own opener, so there is still ONE pass router.
+  // through the workspace's own opener, so there is still ONE pass router.
   assert.match(workspace, /onPassOpen=\{setPassOpen\}/);
   assert.match(workspace, /\{passOpen && \(\s*<PassDialog passId=\{passOpen\}/,
     'passOpen must render the shared PassDialog');

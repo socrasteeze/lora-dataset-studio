@@ -17,7 +17,7 @@ Upload goes through `huggingface_hub.HfApi`, built by the core's Hub seam
 preflight (`whoami`) refuses a read-only token BEFORE any upload. NOTHING
 secret is ever written into
 the repo, and every line of the README passes through `redact_user_paths` so no
-local `C:\\Users\\<name>\\…` path can leak. The HF token is the app's existing
+local `C:\\Users\\<name>\\` path can leak. The HF token is the app's existing
 `HF_TOKEN` secret (same one cloud training / model downloads read).
 
 The long part is the upload of potentially hundreds of files: `start_publish`

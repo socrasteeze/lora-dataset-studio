@@ -93,7 +93,7 @@ export function LocationEditor({
             className={`${INPUT_CLASS} sm:flex-1`} />
           <button type="button" onClick={validate} disabled={checking || busy}
             className="shrink-0 rounded-md border border-border-strong px-3 py-1.5 text-sm font-medium text-content hover:bg-surface-raised disabled:opacity-50">
-            {checking ? 'Checking…' : 'Check folder'}
+            {checking ? 'Checking' : 'Check folder'}
           </button>
         </div>
         <div className="mt-1">

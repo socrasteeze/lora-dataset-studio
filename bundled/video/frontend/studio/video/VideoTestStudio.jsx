@@ -519,7 +519,7 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
     try {
       const r = await postJson(clipVfiUrl(clip.id), { multiplier });
       setVfiClip(null);
-      toast.info?.(`Smoothing to ${Math.round(r?.fps || 0) || '…'} fps queued — the new clip appears below when it is done.`);
+      toast.info?.(`Smoothing to ${Math.round(r?.fps || 0) || ''} fps queued — the new clip appears below when it is done.`);
       await refreshClips();
     } catch (e) {
       toast.error(e?.message || 'That clip could not be smoothed.');
@@ -1047,13 +1047,13 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
                   : (source.image ? 'Write the movement from the start frame'
                     : 'Pick a start frame first')}
                 className="ml-auto min-h-10 rounded-lg border border-border px-2 py-1 text-2xs text-content-muted hover:text-content disabled:opacity-40 lg:min-h-0">
-                {motionBusy === 'auto' ? '…' : '✨ Auto'}
+                {motionBusy === 'auto' ? '' : '✨ Auto'}
               </button>
               <button type="button" onClick={enhanceMotion}
                 disabled={busy || reference.staging || !!motionBusy || !prompt.trim()}
                 title="Rewrite what is written with more of the detail a sampler can use"
                 className="min-h-10 rounded-lg border border-border px-2 py-1 text-2xs text-content-muted hover:text-content disabled:opacity-40 lg:min-h-0">
-                {motionBusy === 'enhance' ? '…' : '✨ Enrich'}
+                {motionBusy === 'enhance' ? '' : '✨ Enrich'}
               </button>
               {/* ⌫ Clear: one press empties the field. A textarea that only
                   empties by select-all + delete is a chore on a phone, and the
@@ -1078,8 +1078,8 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
               </button>
             </span>
             <textarea id="vs-motion-text" value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={5}
-              placeholder={isReference ? 'The person in <Picture 1> wears the outfit from <Picture 2> and follows the movement in <Video 1>…'
-                : 'What happens in the shot — she turns her head and smiles, the camera pushes in slowly…'}
+              placeholder={isReference ? 'The person in <Picture 1> wears the outfit from <Picture 2> and follows the movement in <Video 1>'
+                : 'What happens in the shot — she turns her head and smiles, the camera pushes in slowly'}
               className="w-full resize-y rounded-lg border border-border bg-app px-2.5 py-2 text-sm text-content" />
             <span className="text-2xs text-content-subtle">
               {isReference ? 'Name the tags above to say what each reference contributes. Auto and Enrich read the references together and keep those roles in H3’s reference prompt.' : <>Describe the movement, not the picture: the start frame already says
@@ -1124,7 +1124,7 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
                 {shotsCap === 1
                   ? `Too short to cut: ${shotsCapNote}. Lengthen the clip for timecoded shots.`
                   : opts.shots > 1
-                    ? `${opts.shots} shots: ✨ cuts the clip evenly, each cut written as “[Shot K] At mm:ss.mmm, the camera cuts to…”.`
+                    ? `${opts.shots} shots: ✨ cuts the clip evenly, each cut written as “[Shot K] At mm:ss.mmm, the camera cuts to”.`
                     : `One continuous take: no cuts, no timecodes. Pick 2 or more for timecoded shots${
                       shotsCap < SHOT_CHOICES.length ? ` (${shotsCapNote})` : ''}.`}
               </span>

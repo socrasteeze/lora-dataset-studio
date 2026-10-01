@@ -145,7 +145,7 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
 
         <ul aria-busy={loading} className="mt-2 min-h-0 grow overflow-y-auto rounded-md border border-border bg-surface-raised">
           {loading ? (
-            <li className="px-3 py-2 text-xs text-content-muted">Loading…</li>
+            <li className="px-3 py-2 text-xs text-content-muted">Loading</li>
           ) : entries.length === 0 ? (
             <li className="px-3 py-2 text-xs text-content-muted">{query ? 'No matching folders.' : 'No folders available.'}</li>
           ) : entries.map((e) => (
@@ -181,7 +181,7 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
           </button>
           <button type="button" disabled={busy || atRoot || loading} onClick={use}
             className="min-h-11 rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-50">
-            {busy ? 'Using…' : 'Use Folder'}
+            {busy ? 'Using' : 'Use Folder'}
           </button>
         </div>
       </div>

@@ -399,7 +399,7 @@ def graph_value(path) -> str:
     Three parsers read this string — the graph, the filter description, then the
     option — and each eats one level of escaping, so a Windows drive colon needs
     TWO backslashes to reach drawtext. Measured on the bundled ffmpeg 7.1:
-    ``C\\\\:/Windows/…`` parses, while ``C\\:/Windows/…`` and ``C\\:\\\\Windows\\\\…``
+    ``C\\\\:/Windows/`` parses, while ``C\\:/Windows/`` and ``C\\:\\\\Windows\\\\``
     both die with "No option name near". Backslashes become forward slashes for
     the same reason; a path with no colon comes back unchanged.
     """
@@ -423,7 +423,7 @@ def comparison_argv(left, right, out, *, left_label, right_label,
 
     ``-map_metadata -1`` is not tidiness. A studio clip carries ComfyUI's ENTIRE
     workflow in its ``comment`` tag — every prompt and every absolute path,
-    ``C:\\Users\\<name>\\…`` included — and ffmpeg copies that to the output by
+    ``C:\\Users\\<name>\\`` included — and ffmpeg copies that to the output by
     default. This file exists to be handed to other people, so it starts with no
     metadata at all. (Measured: the tag was there, in full, before this flag was.)
 
@@ -651,8 +651,8 @@ def install_bridge(log=None, fetch=None) -> int:
         return 1
     digest = hashlib.sha256(data).hexdigest()
     if len(data) != rel['size'] or digest != rel['sha256']:
-        say(f"refused: the download is {len(data)} bytes, sha256 {digest[:16]}…, "
-            f"not the pinned release ({rel['size']} bytes, {rel['sha256'][:16]}…). "
+        say(f"refused: the download is {len(data)} bytes, sha256 {digest[:16]}, "
+            f"not the pinned release ({rel['size']} bytes, {rel['sha256'][:16]}). "
             'The asset may have been re-uploaded — this app only installs the bytes it verified.')
         return 1
     root = runtime_dir(create=True)

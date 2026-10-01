@@ -65,7 +65,7 @@ test('a group RENDERS while a picture is being dragged out of it', () => {
   assert.match(html, /Drag it off the group to take it out/)
 })
 
-test('…and the hint is SIZED, not merely present', () => {
+test('and the hint is SIZED, not merely present', () => {
   // `barH` came back as a number or it did not come back: an undefined one
   // would render font-size:NaNpx, which is a hint nobody can read — a second,
   // quieter way for this branch to be broken while a "does it throw" test

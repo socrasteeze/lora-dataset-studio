@@ -151,7 +151,7 @@ export default function NeuralRenderDialog({
             onClick={() => onRender?.(normalizeNrParams(params))}
             title={refusal || undefined}
             className="min-h-10 rounded-md border border-border-strong bg-surface-raised px-3 py-1 text-sm font-semibold text-content hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0">
-            {busy ? '…' : costMultiplier(params) > 1 ? `✨ Render (≈ ×${costMultiplier(params)} time)` : '✨ Render'}
+            {busy ? '' : costMultiplier(params) > 1 ? `✨ Render (≈ ×${costMultiplier(params)} time)` : '✨ Render'}
           </button>
         </div>
       </div>

@@ -143,7 +143,7 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
       </p>
 
       {banks == null ? (
-        <p className="text-content-subtle text-xs">Loading banks…</p>
+        <p className="text-content-subtle text-xs">Loading banks</p>
       ) : rows.length === 0 ? (
         <p className="text-content-subtle text-xs">
           No bank yet —{' '}
@@ -161,10 +161,10 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
             <select id="ds-bank-import-select" value={chosen} disabled={busy}
               onChange={(e) => setChosen(e.target.value)}
               className="mt-1 w-full rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50">
-              <option value="">Choose a bank…</option>
+              <option value="">Choose a bank</option>
               {rows.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.name} — {r.count == null ? 'counting…' : `${r.count} to import`} ({r.keep}/{r.total} kept)
+                  {r.name} — {r.count == null ? 'counting' : `${r.count} to import`} ({r.keep}/{r.total} kept)
                 </option>
               ))}
             </select>
@@ -186,7 +186,7 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
           <div className="flex items-center gap-2">
             <button type="button" onClick={start} disabled={busy || !current?.ready}
               className="rounded-md bg-gradient-primary px-3 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-40">
-              {watching != null ? 'Importing…' : starting ? 'Starting…' : 'Import'}
+              {watching != null ? 'Importing' : starting ? 'Starting' : 'Import'}
             </button>
             {watching != null && (
               <span className="text-content-subtle text-2xs">

@@ -45,7 +45,7 @@ export default function QwenPreparation({ caps = {}, onDone }) {
     </p>}
     <button type="button" onClick={recheck} disabled={checking}
       className="min-h-10 self-start rounded-md border border-border px-3 py-2 text-sm text-content disabled:opacity-50">
-      {checking ? 'Checking…' : 'Re-check preparation'}
+      {checking ? 'Checking' : 'Re-check preparation'}
     </button>
   </Card>
 }

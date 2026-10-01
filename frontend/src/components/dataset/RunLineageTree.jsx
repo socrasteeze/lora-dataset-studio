@@ -157,7 +157,7 @@ export default function RunLineageTree({ tree, loading, error, onSelect, onConti
     return (
       <div className="lds-lineage-in flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-content-subtle text-2xs">
         <span aria-hidden className="h-3 w-3 animate-spin rounded-full border-2 border-border-strong border-t-indigo-400" />
-        Resolving lineage…
+        Resolving lineage
       </div>
     );
   }

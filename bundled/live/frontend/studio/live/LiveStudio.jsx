@@ -340,7 +340,7 @@ export default function LiveStudio() {
               )}
               {streamReady && liveOptions?.token_required && (
                 <p className="mt-1 text-content-subtle">
-                  This app asks other machines for its access token: in VLC, add <code>?token=…</code> to the
+                  This app asks other machines for its access token: in VLC, add <code>?token=</code> to the
                   address (the token is under Settings › Server).
                 </p>
               )}

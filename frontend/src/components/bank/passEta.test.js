@@ -53,7 +53,7 @@ test('once the pass has changed phase the sentence says which step it means', ()
 });
 
 test('an unsettled estimate promises nothing', () => {
-  assert.equal(etaPhrase({ eta_state: 'estimating' }), 'estimating time left…');
+  assert.equal(etaPhrase({ eta_state: 'estimating' }), 'estimating time left');
 });
 
 test('a phase with nothing to count says nothing', () => {

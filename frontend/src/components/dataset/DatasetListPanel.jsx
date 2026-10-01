@@ -524,7 +524,7 @@ function ListStatusNotice({ status, onRetry }) {
   return (
     <p role="status"
       className="rounded-xl border border-dashed border-border bg-app/30 px-4 py-8 text-center text-sm text-content-muted">
-      Loading datasets…
+      Loading datasets
     </p>
   );
 }
@@ -621,7 +621,7 @@ export default function DatasetListPanel({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Find a dataset…"
+              placeholder="Find a dataset"
               aria-label="Find a dataset"
               className="min-w-[9rem] flex-1 rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-content placeholder:text-content-subtle focus:border-primary focus:outline-none sm:max-w-xs"
             />

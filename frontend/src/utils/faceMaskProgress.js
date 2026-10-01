@@ -12,13 +12,13 @@
 
 
 const PHASE_LABELS = {
-  starting: 'Starting the face detector…',
+  starting: 'Starting the face detector',
   // First run only, and worth its own sentence: several hundred megabytes over
   // the network is not a slow detection, and telling the user it is would earn
   // exactly the "is this broken?" it is meant to answer.
-  downloading: 'Downloading the face-detection model (~350 MB, first run only)…',
-  loading: 'Loading the face-detection model…',
-  detecting: 'Analyzing images…',
+  downloading: 'Downloading the face-detection model (~350 MB, first run only)',
+  loading: 'Loading the face-detection model',
+  detecting: 'Analyzing images',
 };
 
 /** The one line under the button. Never a bare spinner: it always names either a
@@ -36,11 +36,11 @@ export function previewStatusLabel(job) {
   // only looks at the stop request between two images, and during the model load
   // it cannot look at all. Saying "Stopped" here would be the one lie the user
   // can catch — the counter is still moving in front of them.
-  if (job.stopping) return 'Stopping — finishing the current image…';
+  if (job.stopping) return 'Stopping — finishing the current image';
   if (job.phase === 'detecting' && job.total > 0) {
-    return `Analyzing image ${Math.min(job.done + 1, job.total)} of ${job.total}…`;
+    return `Analyzing image ${Math.min(job.done + 1, job.total)} of ${job.total}`;
   }
-  return PHASE_LABELS[job.phase] || 'Working…';
+  return PHASE_LABELS[job.phase] || 'Working';
 }
 
 /** {done, total} once there is a real count to show, else null = indeterminate.
@@ -96,7 +96,7 @@ export function previewStopCost(job) {
 
 /** The Stop button's own label. */
 export function previewStopLabel(job) {
-  return job && job.stopping ? 'Stopping…' : 'Stop';
+  return job && job.stopping ? 'Stopping' : 'Stop';
 }
 
 /** The start button's label, so a resume ANNOUNCES its credit instead of looking

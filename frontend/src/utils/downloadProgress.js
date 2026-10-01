@@ -24,7 +24,7 @@ export function downloadLabel(raw) {
   const label = String(raw || '').trim();
   if (!label) return 'Downloading';
   if (MODEL_FILE.test(label)) return 'Fetching model weights';
-  const clean = label.replace(/\s+/g, ' ').replace(/[.…\s]+$/, '');
+  const clean = label.replace(/\s+/g, ' ').replace(/[.\s]+$/, '');
   if (/^download/i.test(clean)) return clean.slice(0, 48);
   return `Downloading ${clean}`.slice(0, 48);
 }

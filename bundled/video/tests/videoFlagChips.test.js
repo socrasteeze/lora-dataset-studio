@@ -54,7 +54,7 @@ test('the counts say when they cover only the loaded page', () => {
   assert.match(flagFilterNote(120, 900), /120 shots loaded, not all 900/)
 })
 
-test('…and stay silent once everything is loaded', () => {
+test('and stay silent once everything is loaded', () => {
   assert.equal(flagFilterNote(90, 90), '')
   assert.equal(flagFilterNote(90, 0), '')
 })

@@ -124,7 +124,7 @@ export default function RunDeleteSection({ recordId, datasetId, onDeleted, onClo
         onClick={() => { setError(null); setOpen(true); }}
         title={blocked || 'Delete this run, its checkpoints and the images it produced'}
         className="rounded-md border border-rose-500/40 px-2 py-1.5 text-rose-300/90 text-2xs hover:bg-rose-500/10 disabled:opacity-40">
-        Delete run &amp; its files…
+        Delete run &amp; its files
       </button>
       <p className="m-0 mt-1 break-words text-content-subtle text-2xs leading-snug">
         {blocked || 'Removes the checkpoints and generated images too. Runs that '
@@ -181,7 +181,7 @@ export default function RunDeleteSection({ recordId, datasetId, onDeleted, onClo
               <button type="button" data-testid="run-delete-confirm-go"
                 disabled={busy} onClick={doDelete}
                 className="rounded-md border border-rose-500/60 bg-rose-500/15 px-3 py-2 text-xs text-rose-100 disabled:opacity-40 hover:bg-rose-500/25">
-                {busy ? 'Deleting…' : 'Delete run'}
+                {busy ? 'Deleting' : 'Delete run'}
               </button>
             </div>
           </div>

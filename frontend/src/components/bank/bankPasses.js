@@ -265,7 +265,7 @@ export const BANK_PASSES = {
       '“Try on a sample first” reads only the first N images of the scope — '
         + 'deterministic, so a re-read hits the same pages. What the sample '
         + 'does not reach simply stays unscanned; the 🔤 card then offers '
-        + '“Read the remaining …”.',
+        + '“Read the remaining ”.',
     ],
     binCost: 'each rejected image is read by the OCR engine',
   },

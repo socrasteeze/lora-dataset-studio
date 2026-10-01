@@ -76,7 +76,7 @@ function BankTitle({ bank, onOpen, onRename }) {
           className="min-w-0 grow rounded-md border border-border bg-surface-raised px-2 py-1 text-sm text-content" />
         <button type="submit" disabled={saving}
           className="rounded-md border border-border px-2 py-1 text-xs font-semibold text-emerald-300 disabled:opacity-50">
-          {saving ? '…' : 'Save'}
+          {saving ? '' : 'Save'}
         </button>
         <button type="button" onClick={cancel}
           className="px-1 text-xs text-content-subtle hover:text-content">Cancel</button>
@@ -646,7 +646,7 @@ export default function BankPage() {
           <button type="submit" disabled={creating || !!folderNotice}
             title={folderNotice ? 'That folder belongs to a dataset' : undefined}
             className="rounded-md bg-gradient-primary px-4 py-2 text-sm font-semibold text-gray-950 disabled:opacity-50">
-            {creating ? 'Inventorying…' : (
+            {creating ? 'Inventorying' : (
               <span className="inline-flex items-center gap-1.5"><Plus aria-hidden="true" className="h-4 w-4" />
                 {splitMode ? 'Create banks' : 'Create bank'}</span>
             )}
@@ -729,7 +729,7 @@ export default function BankPage() {
           <button type="button" onClick={() => setDialogScope({ kind: 'all' })}
             title="Line every bank that still has undecided images up to run, one after another on each machine"
             className="rounded-md border border-indigo-400/50 bg-indigo-500/10 px-3 py-1.5 text-sm font-semibold text-indigo-200 hover:bg-indigo-500/20">
-            ⏳ Queue all {queueAllCount} bank(s)…
+            ⏳ Queue all {queueAllCount} bank(s)
           </button>
           <span className="text-xs text-content-subtle">
             One at a time on this machine — a bank sent to another one runs alongside it.
@@ -750,7 +750,7 @@ export default function BankPage() {
       <FolderCheckLine banks={banks} busy={rescanning} onRescan={rescan} />
 
       {banks == null ? (
-        <p className="text-sm text-content-muted">Loading…</p>
+        <p className="text-sm text-content-muted">Loading</p>
       ) : banks.length === 0 ? (
         <p className="text-sm text-content-muted">
           No bank yet — create one above to start triaging a folder.
@@ -767,7 +767,7 @@ export default function BankPage() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Find a bank…"
+            placeholder="Find a bank"
             aria-label="Find a bank"
             className="min-w-[9rem] flex-1 rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-content placeholder:text-content-subtle focus:border-primary focus:outline-none sm:max-w-xs"
           />
@@ -867,7 +867,7 @@ export default function BankPage() {
                 ) : <BankTitle bank={b} onOpen={() => open(b.id)}
                   onRename={(newName) => rename(b, newName)} />}
                 {b.activity && !b.activity.finished && (
-                  <span className="text-xs text-amber-300">⏳ {b.activity.kind}…</span>
+                  <span className="text-xs text-amber-300">⏳ {b.activity.kind}</span>
                 )}
                 {qs && (
                   <span className="rounded bg-indigo-500/15 px-1.5 py-px text-2xs font-semibold text-indigo-300">

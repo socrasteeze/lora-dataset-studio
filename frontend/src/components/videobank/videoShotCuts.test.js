@@ -92,7 +92,7 @@ test('the summary names the files it could NOT answer for', () => {
   assert.match(note, /Find shots/)
 })
 
-test('…and stays quiet about them when every file answered', () => {
+test('and stays quiet about them when every file answered', () => {
   const note = dryRunSummary({ rows: [], sources: 4, skipped: 0 })
   assert.match(note, /4 files/)
   assert.ok(!/could not/i.test(note), note)

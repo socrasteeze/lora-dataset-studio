@@ -14,7 +14,7 @@ export default function GuidedChecklist({ steps, currentId, onJump }) {
       </p>
       <ol className="flex flex-col gap-0.5">
         {steps.map((s, i) => {
-          const glyph = s.done ? '✓' : s.busy ? '…' : s.id === currentId ? '◉' : '○';
+          const glyph = s.done ? '✓' : s.busy ? '' : s.id === currentId ? '◉' : '○';
           const tone = s.unavailable ? 'text-content-subtle opacity-60'
             : s.done ? 'text-emerald-400'
             : s.id === currentId ? 'text-content font-semibold'

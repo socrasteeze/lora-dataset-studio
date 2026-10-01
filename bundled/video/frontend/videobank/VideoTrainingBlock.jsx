@@ -184,7 +184,7 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
             <button type="button" onClick={() => start(false)}
               disabled={busy || !ds.clips || Boolean(controlsError)}
               className="min-h-10 lg:min-h-0 rounded border border-border bg-surface-raised px-2 py-1 text-2xs font-semibold text-content hover:bg-surface disabled:opacity-50">
-              {busy ? 'Starting…' : '▶ Train this dataset'}
+              {busy ? 'Starting' : '▶ Train this dataset'}
             </button>
             <HelpBadge topic="video-train-local" />
           </div>
@@ -203,7 +203,7 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
             ? `Downloading weights — ${dl.percent ?? 0}%`
             : progress.step != null
               ? `Step ${progress.step}${progress.total ? ` / ${progress.total}` : ''}${progress.loss != null ? ` · loss ${progress.loss}` : ''}${progress.eta ? ` · ${progress.eta} left` : ''}`
-              : 'Starting up…'}
+              : 'Starting up'}
         </p>
       )}
 
