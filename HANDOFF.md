@@ -1,9 +1,18 @@
 # HANDOFF
 
-## Current: integrate/2026-10-01 (2026-10-01)
-- PLAN.md is the execution plan for what follows (detach, prune, UI consistency). It supersedes PLAN_BRIEF.md, which is deleted. Wave 0 of the plan is landing this branch.
-- Agent-rules audit applied in `7e9f69f73`: `.claude/rules/release-mechanics.md` now states the real CI trigger and the warn-only release dist check; AGENTS.md no longer names a Codex cloud task.
-- Branch `integrate/2026-10-01`, pushed to origin. Main is still `f3815e82e`; it was NOT fast-forwarded because the gates failed.
+## Current: wave/1-detach (2026-10-01)
+- COA 2 is in progress on `wave/1-detach`, cut from `integrate/2026-10-01` at `13bdcc646`. `origin/main` is still `f3815e82e`. The tag, the main merge, and deletion of `fix/config-isolation`, `fix/settings-copy-restore`, `noble/bank-queue-stop`, and `integrate/2026-10-01` are not done.
+- Wave 1a picked `19f13edaa`, `3658f9766`, `1e520ab1f`, `16510a496`, and `7df8eaf8b` with `-x`. `af799647d` was not picked. The bank-history help keywords went into `frontend/src/help/helpRegistry.js`. `help/topics/actions.js` stayed deleted.
+- Wave 1b–1d are in the tree: `ci.yml` pushes on `main` and has no `docker-smoke` job. `test_no_personal_data.py` scans `origin/main..HEAD`. `scripts/gates.ps1` replaces `scripts/upstream_sync.ps1`. `scripts/startup_smoke.py` reads `LDS_GATES_SCRATCH`. The sync docs and `scripts/tests/test_upstream_sync_driver.py` are gone. `FORK_NOTES.md` is the current rules. The old wave log is `docs/history/FORK_CHANGELOG.md`.
+- `APP_VERSION` is `2026.10.01+fork`. The annotated tag `v2026.10.01` is not created. GitHub release attachment stays with the user.
+- The user-level `sync-lds-fork` skill lives outside this repo. It is obsolete.
+- Gates have not been run on this branch. The last recorded run is still the local one at `21db95291` below. Do not call this wave done until `scripts/gates.ps1 -Phase Gates` is green on a named host.
+- PLAN.md waves 2–12 are still open. Wave 12 still needs an answer before it starts. Defaults remain: remove `bundled/civitai_publish`, keep the cloud shims, keep all 12 enabled plugins, remove `docs/guide/runpod.md` with Docker.
+
+## Previous integrate tip (2026-10-01)
+- PLAN.md is the execution plan for what follows (detach, prune, UI consistency). It supersedes PLAN_BRIEF.md, which is deleted. Wave 0 of the plan was going to land `integrate/2026-10-01` first. This session folded that landing into the gated Wave 1 head instead.
+- Agent-rules audit applied in `7e9f69f73`: `.claude/rules/release-mechanics.md` stated the real CI trigger at that time. This wave then pointed push CI at `main`.
+- Branch `integrate/2026-10-01` was pushed to origin. Main is still `f3815e82e`; it was NOT fast-forwarded.
 - Merged (no-ff) onto main `f3815e82e`: `fix/config-isolation` (restored autouse `_isolate_user_state`, FORK_NOTES D5), `noble/bank-queue-stop` (queued Bank runs can be stopped while active), `fix/settings-copy-restore` (Klein pin wording, usage-statistics entry withdrawn, Pick a balanced set opens Curate). Bundle `f3d66ad2c`.
 - Review fix `e14ed5585`: `captionStepNote` returns null for a step with `superseded_at`, so a standalone Caption re-run clears "N not captioned" and "needs attention". Test in `pipelineVerdict.test.js`. Bundle `21db95291`.
 - Stale branches `fix/config-isolation`, `fix/settings-copy-restore`, `noble/bank-queue-stop` are NOT deleted yet; delete them with the integrate branch once main lands.
@@ -50,7 +59,7 @@ No tests ran on the tip, and the final lockdown commit ran none locally at all; 
 6. Re-shoot `docs/screenshots/training/runs-hub.png` and `advanced-options.png` on a fork instance; both still show the rental lane — FORK_NOTES.md D4.
 7. Physical-phone, real-model training and Docker qualification remain separate, unrun gates.
 8. Merged into `integrate/2026-10-01`; `test_config_isolation.py` passes (5/5). Original note: branch `fix/config-isolation` restores the autouse `_isolate_user_state` fixture that merge `891d61e33` dropped — FORK_NOTES.md D5. It is local and unpushed; no tests ran locally. Push it, then start CI by dispatch or a PR (item 9). Pass means the four `backend/tests/test_config_isolation.py` cases go green. Then carry it to `noble/bank-queue-stop`, which fails the same four. The `4af9136c7` message wrongly says upstream deleted the test; a squash before pushing keeps that out of history, and FORK_NOTES cites no SHA, so either way is safe.
-9. Still open. Decide the CI push trigger. `.github/workflows/ci.yml:12` has read `branches: [v2]` since `891d61e33`, so no push to `main` starts CI. Restore `[main]`, or keep CI dispatch-only on purpose.
+9. Done on `wave/1-detach`: `.github/workflows/ci.yml` push branches are `[main]`. GitHub Actions billing was reported blocked in PLAN.md and was not rechecked.
 10. After item 8 is green, restore `assert not path.exists()` in `test_every_test_reads_an_isolated_config` (`f32e6acb1` loosened it, `backend/tests/test_config_isolation.py:28-29`) and confirm on CI.
 11. The autouse fixture redirects `LDS_CONFIG`, `LDS_DATA_DIR` and `LDS_ENV` but not `LDS_PLUGINS_DIR` or `LDS_EXTENSIONS_DIR`, which AGENTS.md also lists; only `create_test_app` covers those. The gap predates `891d61e33`.
 12. Between `891d61e33` and the fix landing, any plain local pytest run outside Gates could write the checkout's real `config.json`, `data/` and `.env`. Nobody has inspected them yet.
@@ -66,15 +75,15 @@ No tests ran on the tip, and the final lockdown commit ran none locally at all; 
 ## Traps
 - ruff F811 misses duplicated top-level defs; run the AST scan in FORK_NOTES.md D9 after syncs that touch long modules.
 - Worktrees have no `.venv`: `scripts/scan-sensitive.sh` exits 127 there, so run its heredoc with the main checkout's interpreter. `npm install` re-sorts devDependencies in both `package.json` and the lockfile; restore the order. Several sources are CRLF in the repo; preserve line endings.
-- `upstream_sync.ps1` stops at the first red step, so a red frontend hides the backend baseline. Upstream commits marked "tests intentionally not run" arrive red.
+- `scripts/gates.ps1` stops at the first red step, so a red frontend hides the backend suite.
 - Update-check tests must stub `is_git_checkout`: the checkout is a git repo, so `?force=1` would run a real `git fetch`.
 - The runtime outbound test only sees sockets in the TESTING app. It misses subprocesses (git, pip, inference) and production-only boot threads; the inventory is the only cover there.
 - Probe coverage of the Bank caption-lab states changes between runs on identical code; a skipped state there is timing, not a regression.
 
 ## Verify
 ```powershell
-pwsh -File scripts/upstream_sync.ps1 -Phase Quick
-pwsh -File scripts/upstream_sync.ps1 -Phase Gates
+pwsh -File scripts/gates.ps1 -Phase Quick
+pwsh -File scripts/gates.ps1 -Phase Gates
 .venv/Scripts/python.exe -m ruff check .
 .venv/Scripts/python.exe -m pytest backend/tests/test_fork_outbound_gate.py -q
 .venv/Scripts/python.exe backend/tests/fork_outbound_scan.py --write   # only after reviewing a gate diff
