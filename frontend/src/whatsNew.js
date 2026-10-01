@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-01-zzzz-dataset-pages',
+    date: '2026-10-01',
+    title: 'Browse the dataset library by page',
+    blurb: 'The dataset library uses compact tiles in columns that follow the window, and pages of 24, 48, or 96. Changing the search, the kind, or the tile size returns to the first page.',
+    to: '/datasets',
+  },
+  {
     id: '2026-10-01-zzz-status-without-ellipsis',
     date: '2026-10-01',
     title: 'Status text says the action',

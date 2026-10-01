@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router'
 import { apiFetch, del, postJson } from '@lds/plugin-sdk';
 import { useToast } from '@lds/plugin-sdk';
 import { HelpBadge } from '@lds/plugin-sdk';
+import Pagination from '../../../../frontend/src/components/common/Pagination.jsx';
+import { paginate } from '../../../../frontend/src/utils/datasetLibrary.js';
 
 /** 🎬 Video training sets, in the library, next to the image datasets.
  *
@@ -35,6 +37,8 @@ export default function VideoDatasetsPanel() {
   const [folded, setFolded] = useState(() => {
     try { return localStorage.getItem(FOLD_KEY) === '1' } catch { return false }
   })
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(24)
   useEffect(() => {
     try { localStorage.setItem(FOLD_KEY, folded ? '1' : '0') } catch { /* private mode */ }
   }, [folded])
@@ -65,6 +69,7 @@ export default function VideoDatasetsPanel() {
   // an entry point of its own, and hiding it would hide the only place a user
   // with zero video datasets can start one from their image datasets.
   if (datasets === null) return null
+  const paged = paginate(datasets, page, pageSize)
 
   return (
     <section className="flex flex-col gap-2">
@@ -87,8 +92,9 @@ export default function VideoDatasetsPanel() {
         <StillsFromDatasetButton onCreated={refresh} />
       </h2>
       {folded ? null : (
+      <>
       <ul className="grid gap-2 grid-cols-1 sm:grid-cols-2">
-        {datasets.map((d) => (
+        {paged.items.map((d) => (
           <li key={d.id}
             className="flex min-w-0 flex-col gap-1.5 rounded-lg border border-border bg-surface p-3">
             <div className="flex min-w-0 items-center gap-2">
@@ -134,6 +140,20 @@ export default function VideoDatasetsPanel() {
           </li>
         ))}
       </ul>
+      {datasets.length > 24 && (
+        <Pagination
+          page={paged.page}
+          pages={paged.pages}
+          pageSize={paged.pageSize}
+          total={paged.total}
+          rangeStart={paged.rangeStart}
+          rangeEnd={paged.rangeEnd}
+          onPage={setPage}
+          onPageSize={setPageSize}
+          label="Video sets per page"
+        />
+      )}
+      </>
       )}
     </section>
   )

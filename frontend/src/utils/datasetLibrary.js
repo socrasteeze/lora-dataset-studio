@@ -16,14 +16,55 @@ import { CircleDashed, GraduationCap } from 'lucide-react';
 export const TRAINED = ['trained', 'Trained', GraduationCap];
 export const NOT_TRAINED = ['not-trained', 'Not trained yet', CircleDashed];
 
-// Tile size: 'S' compact list rows (maximum density), 'M' the historical
-// photo grid, 'L' large previews. Same 3-step segmented idiom as the
-// workspace image grid — no slider (mouse-fragile, no useful granularity).
+// Tile size: 'S' compact tiles, 'M' the historical photo grid, 'L' large
+// previews. Same 3-step segmented idiom as the workspace image grid.
 const LIBRARY_TILE_SIZES = ['S', 'M', 'L'];
+export const LIBRARY_PAGE_SIZES = [24, 48, 96];
 
 /** Clamp a stored tile-size preference to a valid value (default 'M'). */
 export function normalizeTileSize(v) {
   return LIBRARY_TILE_SIZES.includes(v) ? v : 'M';
+}
+
+/** Page size is one of 24, 48, or 96. Anything else is the first page size. */
+export function normalizePageSize(value) {
+  const n = Number(value);
+  return LIBRARY_PAGE_SIZES.includes(n) ? n : LIBRARY_PAGE_SIZES[0];
+}
+
+/** Page 1 when the search, kind chip, or tile size changed. Otherwise the
+ *  page the caller already has. */
+export function libraryPageFor(page, next, prev) {
+  if (!prev
+    || next.query !== prev.query
+    || next.kindFilter !== prev.kindFilter
+    || next.tileSize !== prev.tileSize) {
+    return 1;
+  }
+  const n = Number(page);
+  return Number.isInteger(n) && n > 0 ? n : 1;
+}
+
+/** Slice a filtered list. `start` is 0-based and `rangeStart` is the first
+ *  item number the pager shows (0 when the list is empty). */
+export function paginate(items, page, pageSize) {
+  const list = Array.isArray(items) ? items : [];
+  const size = normalizePageSize(pageSize);
+  const pages = Math.max(1, Math.ceil(list.length / size) || 1);
+  const current = Math.min(Math.max(1, Number(page) || 1), pages);
+  const start = (current - 1) * size;
+  const end = Math.min(start + size, list.length);
+  return {
+    page: current,
+    pages,
+    pageSize: size,
+    start,
+    end,
+    total: list.length,
+    items: list.slice(start, end),
+    rangeStart: list.length ? start + 1 : 0,
+    rangeEnd: end,
+  };
 }
 
 /** Parse the persisted {family: 1} collapsed-sections map; any malformed or

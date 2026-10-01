@@ -11,7 +11,7 @@ export default function TileSizeControl({ size, onChange, titles, className = ''
     <div role="group" aria-label="Thumbnail size" className={`flex items-center gap-1 shrink-0 ${className}`}>
       <LayoutGrid aria-hidden="true" className="h-3.5 w-3.5 text-content-subtle" />
       {['S', 'M', 'L'].map((s) => (
-        <Chip key={s} pressed={size === s} onClick={() => onChange(s)}
+        <Chip key={s} size="md" pressed={size === s} onClick={() => onChange(s)}
           title={titles[s]}
           aria-label={`${titles[s]}${size === s ? ' (active)' : ''}`}>
           {s}

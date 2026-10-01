@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   TRAINED, NOT_TRAINED, normalizeTileSize, normalizeCollapsedMap,
   datasetKind, datasetMatches, kindsPresent, isTrained, groupDatasets,
+  normalizePageSize, libraryPageFor, paginate,
 } from './datasetLibrary.js';
 
 test('tile size preference only accepts S/M/L and defaults to M', () => {
@@ -111,4 +112,33 @@ test('isTrained: any real trained family counts, absence/malformed does not', ()
 
 test('groupDatasets on an empty library returns no sections', () => {
   assert.deepEqual(groupDatasets([]), []);
+});
+
+test('page size is 24, 48, or 96', () => {
+  assert.equal(normalizePageSize('24'), 24);
+  assert.equal(normalizePageSize(48), 48);
+  assert.equal(normalizePageSize('96'), 96);
+  assert.equal(normalizePageSize('12'), 24);
+  assert.equal(normalizePageSize(null), 24);
+});
+
+test('paginate slices after the filter and before a section split', () => {
+  const items = Array.from({ length: 30 }, (_, i) => ({ id: i + 1 }));
+  const page = paginate(items, 2, 24);
+  assert.equal(page.pages, 2);
+  assert.equal(page.rangeStart, 25);
+  assert.equal(page.rangeEnd, 30);
+  assert.deepEqual(page.items.map((d) => d.id), [25, 26, 27, 28, 29, 30]);
+  const mixed = groupDatasets(page.items.map((d) => (
+    d.id % 2 ? { ...d, trained_families: ['zimage'] } : { ...d, trained_families: [] }
+  )));
+  assert.equal(mixed.length, 2);
+});
+
+test('a search, kind chip, or tile size returns to page 1', () => {
+  const prev = { query: '', kindFilter: 'all', tileSize: 'M' };
+  assert.equal(libraryPageFor(3, { ...prev, query: 'ada' }, prev), 1);
+  assert.equal(libraryPageFor(3, { ...prev, kindFilter: 'style' }, prev), 1);
+  assert.equal(libraryPageFor(3, { ...prev, tileSize: 'S' }, prev), 1);
+  assert.equal(libraryPageFor(3, prev, prev), 3);
 });
