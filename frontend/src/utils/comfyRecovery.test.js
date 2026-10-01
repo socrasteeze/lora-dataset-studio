@@ -171,3 +171,18 @@ test('the automatic-clear toast fires once per notice, not once per poll', () =>
   assert.equal(autoClearedMessage(state, 'n1'), null);
   assert.equal(autoClearedMessage({ auto_cleared: null }, null), null);
 });
+
+/* Ignore ComfyUI is on: LDS did not try to reach it, so the banner must not
+   accuse the connection, and it must not offer a clear the server refuses. */
+test('an ignored ComfyUI is named as the setting, with no button that would refuse', () => {
+  const model = recoveryBannerModel({
+    recovery: { ...UNREACHABLE.recovery,
+      connection: { reachable: false, url: 'http://127.0.0.1:8188', status: 'ignored',
+        ignored: true, hint: 'x' } },
+  }, { now: NOW });
+  assert.equal(model.tone, 'warning');
+  assert.match(model.headline, /Ignore/);
+  assert.doesNotMatch(model.headline, /cannot reach/);
+  assert.equal(model.canConfirm, false);
+  assert.equal(model.canStart, false);
+});

@@ -220,9 +220,10 @@ def comfyui_sees_input(name) -> bool | None:
     only when ComfyUI has SAID, in the same terms the validator uses, that it
     cannot see the file. Never raises.
     """
+    from .comfyui import comfyui_ignored
     base = os.path.basename(str(name or ''))
     api = (cfg.get('comfyui.api_url') or '').strip()
-    if not base or not api:
+    if not base or not api or comfyui_ignored():
         return None
     try:
         r = requests.head(urljoin(api.rstrip('/') + '/', 'view'),
@@ -250,8 +251,9 @@ def _comfy_folder_note() -> str:
     guess about somebody else's install — the same guess `parse_comfy_argv_dirs`
     refuses to make for the Setup fields. Never raises.
     """
+    from .comfyui import comfyui_ignored
     api = (cfg.get('comfyui.api_url') or '').strip()
-    if not api:
+    if not api or comfyui_ignored():
         return ''
     try:
         r = requests.get(f'{api.rstrip("/")}/system_stats', timeout=network_timeout(VISIBILITY_TIMEOUT))

@@ -260,6 +260,10 @@ def snapshot(max_age=_CACHE_SECONDS) -> dict:
     if not api_url:
         return {'available': False, 'reason': 'ComfyUI is not configured.',
                 'lines': [], 'progress': None, 'fetched_at': time.time()}
+    from ..utils.comfyui import COMFYUI_IGNORED_MESSAGE, comfyui_ignored
+    if comfyui_ignored():
+        return {'available': False, 'reason': COMFYUI_IGNORED_MESSAGE,
+                'lines': [], 'progress': None, 'fetched_at': time.time()}
     now = time.monotonic()
     with _lock:
         cached = _cache['snapshot']

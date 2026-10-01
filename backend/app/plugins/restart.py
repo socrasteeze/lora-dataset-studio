@@ -191,6 +191,9 @@ def _comfy_restart_warning():
     whether ComfyUI is reachable or has unrelated prompts in its queue.
     """
     from .. import config as cfg
+    from ..utils.comfyui import comfyui_ignored
+    if comfyui_ignored():
+        return None  # ignored in Settings: not asked, nothing to warn about
     url = str(cfg.get('comfyui.api_url') or '').rstrip('/')
     unavailable = 'ComfyUI could not be reached or its queue could not be read. LDS will restart anyway.'
     try:

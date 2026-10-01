@@ -367,6 +367,21 @@ export default function LocalToolsSection(props) {
           <TestButton target="comfyui" beforeTest={() => saveConfigSection('comfyui')}
             onResult={(r) => recordTestResult('comfyui', r)} />
         </div>
+        {/* comfyui.ignored: the backend sends ComfyUI no request while this is on
+            and reports it as "ignored", not as an error. The URL stays saved. */}
+        <label htmlFor="comfyui-ignored" className="flex min-h-10 items-start gap-2 text-sm text-content lg:min-h-0">
+          <input id="comfyui-ignored" type="checkbox"
+            checked={config.comfyui.ignored === true}
+            onChange={(e) => setField('comfyui', 'ignored', e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-border-strong" />
+          <span>
+            <span className="font-medium">Ignore ComfyUI</span>
+            <span className="block text-xs text-content-muted">
+              Stop contacting ComfyUI. Local generation is unavailable until you turn
+              this off. The URL stays saved.
+            </span>
+          </span>
+        </label>
         <TextField
           id="comfyui-base-dir"
           label="ComfyUI install directory"

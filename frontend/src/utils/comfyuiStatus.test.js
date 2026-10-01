@@ -7,7 +7,7 @@
    catch-all coming back. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { comfyuiAnswering, comfyuiDownReason } from './comfyuiStatus.js';
+import { comfyuiAnswering, comfyuiDownReason, comfyuiIgnored } from './comfyuiStatus.js';
 import { kreaUnavailableReason } from './kreaEngine.js';
 import { localEngineUnavailableReason } from './localEngineReason.js';
 
@@ -61,4 +61,16 @@ test('both local engines read the same capabilities block, so they agree', () =>
   const krea = localEngineUnavailableReason('krea', caps);
   assert.equal(klein, krea);
   assert.match(klein, /45s/);
+});
+
+/* Ignore ComfyUI (Settings ▸ Local tools): the operator's own choice. LDS asked
+   nothing, so the engine cards must not show it as a fault. */
+test('an ignored ComfyUI reads as Ignored, neutral, never as broken', () => {
+  const comfy = { reachable: false, status: 'ignored', ignored: true, hint: 'SERVER WORDS' };
+  assert.equal(comfyuiIgnored(comfy), true);
+  assert.equal(comfyuiAnswering(comfy), false);
+  const reason = comfyuiDownReason(comfy);
+  assert.match(reason, /Ignore/);
+  assert.doesNotMatch(reason, /⚠/);
+  assert.equal(comfyuiIgnored({ reachable: false, status: 'unreachable' }), false);
 });

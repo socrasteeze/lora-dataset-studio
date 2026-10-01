@@ -305,7 +305,8 @@ def comfyui_down_message(status, waited) -> str:
 
 def probe_comfyui() -> dict:
     """{ok, detail, status, hint}. `status` is 'ok' / 'slow' / 'unreachable' /
-    'unconfigured' — the two failure modes are published SEPARATELY so every
+    'unconfigured' / 'ignored' (`comfyui.ignored`: no request at all) — the two
+    failure modes are published SEPARATELY so every
     surface (Test button, engine cards, the 409 on a blocked generation) can say
     the true one instead of the convenient one.
 
@@ -320,11 +321,17 @@ def probe_comfyui() -> dict:
         return {'ok': False, 'detail': 'comfyui.api_url not configured',
                 'status': 'unconfigured',
                 'hint': 'Set the ComfyUI API URL in Settings ▸ Local tools.'}
+    from .utils import comfyui as _cu
+    if _cu.comfyui_ignored():
+        # The operator's choice, not a fault: no request, a neutral 'ignored'
+        # status, and `severity` so the Settings Test reads as a warning.
+        return {'ok': False, 'status': 'ignored', 'ignored': True,
+                'severity': 'warning', 'detail': _cu.COMFYUI_IGNORED_MESSAGE,
+                'hint': _cu.COMFYUI_IGNORED_MESSAGE}
     reason = {}
     ok = _http_ok(f'{api_url}/system_stats', reason=reason)
     if ok:
         return {'ok': True, 'detail': api_url, 'status': 'ok', 'hint': ''}
-    from .utils import comfyui as _cu
     health = _cu.object_info_health()
     why, waited = reason.get('why'), reason.get('waited', 3)
     if why != 'timeout' and health['status'] == 'timeout':
@@ -631,8 +638,9 @@ def comfyui_runtime(timeout=3) -> dict:
     Returns {} when ComfyUI isn't configured / doesn't answer. Paste-safe: only the
     ComfyUI version string, the GPU name + VRAM totals (GPU model is not identity)
     and the queue counts — never a path or a secret. Never raises."""
+    from .utils.comfyui import comfyui_ignored
     api = (cfg.get('comfyui.api_url') or '').rstrip('/')
-    if not api:
+    if not api or comfyui_ignored():
         return {}
     out = {}
     try:
@@ -2104,8 +2112,9 @@ def detect_comfyui_folders(timeout=3) -> dict:
     argv (the field landed in 2025 releases), or simply started with no custom
     folder flags. An empty dict means "nothing to offer", never "use the defaults" —
     the caller leaves the manual field alone. Never raises."""
+    from .utils.comfyui import comfyui_ignored
     api = (cfg.get('comfyui.api_url') or '').rstrip('/')
-    if not api:
+    if not api or comfyui_ignored():
         return {}
     try:
         r = requests.get(f'{api}/system_stats', timeout=network_timeout(timeout))
@@ -2117,8 +2126,9 @@ def detect_comfyui_folders(timeout=3) -> dict:
 
 
 def _detect_comfyui() -> dict:
+    from .utils.comfyui import comfyui_ignored
     out = {}
-    if _http_ok(f'{_COMFYUI_DEFAULT_URL}/history'):
+    if not comfyui_ignored() and _http_ok(f'{_COMFYUI_DEFAULT_URL}/history'):
         out['api_url'] = _COMFYUI_DEFAULT_URL
     base = _find_install_dir(('ComfyUI', 'comfyui'), _is_comfyui_dir)
     if not base:
@@ -2331,6 +2341,9 @@ def _comfyui_caps_section(comfy, base_dir, comfy_dir, comfy_launcher,
         # re-invented per card. See probe_comfyui / comfyui_down_message.
         'status': comfy.get('status', 'ok' if comfy['ok'] else 'unreachable'),
         'hint': comfy.get('hint', ''),
+        # The operator set `comfyui.ignored`: no request was made, and a screen
+        # shows a neutral "Ignored" instead of an error.
+        'ignored': bool(comfy.get('ignored')),
         # Read budget currently granted to the heavy /object_info enumeration,
         # so a screen can quote the number the user would raise.
         'object_info_timeout_s': _object_info_timeout(),
@@ -2486,6 +2499,7 @@ def probe_startup() -> dict:
             'reachable': comfy['ok'],
             'status': comfy.get('status', 'ok' if comfy['ok'] else 'unreachable'),
             'hint': comfy.get('hint', ''),
+            'ignored': bool(comfy.get('ignored')),
             'api_url': cfg.get('comfyui.api_url') or '',
         },
         'aitoolkit': {

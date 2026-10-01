@@ -71,6 +71,25 @@ const CONNECTION_CHECKS = [
 function connectionFirstModel(recovery) {
   const connection = recovery.connection;
   if (!connection || connection.reachable !== false) return null;
+  if (connection.ignored === true || connection.status === 'ignored') {
+    // The operator set Ignore ComfyUI: LDS asked nothing, so this is not an
+    // outage. The paused job can only be checked or cleared once LDS may talk
+    // to ComfyUI again (the clear route refuses while it is ignored).
+    return {
+      tone: 'warning',
+      headline: 'ComfyUI is set to Ignore in Settings',
+      detail: 'A paused generation is waiting. Turn off Ignore ComfyUI in Settings ▸'
+        + ' Local tools so LDS can check on it.',
+      checks: [],
+      footnote: null,
+      actionLabel: null,
+      canConfirm: false,
+      canStart: false,
+      startLabel: null,
+      datasetId: recovery.dataset_id ?? null,
+      datasetName: recovery.dataset_name ?? null,
+    };
+  }
   const url = connection.url || '';
   const unconfigured = connection.status === 'unconfigured' || !url;
   // An unconfirmed submission is the fresh-install shape: LDS asked ComfyUI to

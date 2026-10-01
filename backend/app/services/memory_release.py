@@ -59,7 +59,9 @@ class MemoryReleaseBusy(RuntimeError):
 def comfyui_queue_busy():
     """True when ComfyUI is rendering or has jobs waiting, False when its queue
     is empty, None when it cannot be asked (offline = nothing to free there)."""
-    from ..utils.comfyui import api_address
+    from ..utils.comfyui import api_address, comfyui_ignored
+    if comfyui_ignored():
+        return None
     try:
         api_addr = (api_address() or '').rstrip('/')
         if not api_addr:

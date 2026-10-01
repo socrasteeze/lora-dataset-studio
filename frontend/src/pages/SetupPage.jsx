@@ -60,6 +60,8 @@ const STATUS_META = {
   available: { glyph: '○', label: 'Not set up', cls: 'text-content-subtle' },
   // Neutral, deliberately not red: the user chose to continue without ComfyUI.
   skipped: { glyph: '⊘', label: 'Skipped', cls: 'text-content-subtle' },
+  // Neutral too: Settings ▸ Local tools ▸ Ignore ComfyUI is on.
+  ignored: { glyph: '⊘', label: 'Ignored', cls: 'text-content-subtle' },
 }
 
 // Map each capability in the "What's unlocked" review list (deriveCapabilitySummary,
@@ -864,6 +866,18 @@ export default function SetupPage() {
         )
       }
       if (skipConfirm) return skipPanel
+      // Ignore ComfyUI is on in Settings: neutral, and LDS is not contacting it.
+      if (step.ignored) {
+        return (
+          <div className="space-y-4">
+            <div className="rounded-md border border-border bg-surface-raised px-3 py-2 text-sm text-content-muted">
+              ⊘ ComfyUI is set to Ignore in Settings ▸ Local tools, so LDS does not contact it.
+              Local generation and the Test Studio stay off until you turn that off.
+            </div>
+            {fields}
+          </div>
+        )
+      }
       // Already skipped by choice: neutral confirmation (not a warning) + the fields,
       // so typing a directory silently un-skips and re-enables local generation.
       if (step.skipped) {
@@ -1502,7 +1516,7 @@ export default function SetupPage() {
   // 'skipped' counts as settled. A Docker "No Ollama" already did, through `disabled`;
   // leaving the native skip out meant the welcome screen kept saying "Start setup" and
   // kept landing the user back on the step they had just deliberately closed.
-  const isReady = (id) => ['ready', 'skipped'].includes(stepById[id].status)
+  const isReady = (id) => ['ready', 'skipped', 'ignored'].includes(stepById[id].status)
     || stepById[id].disabled
   // welcome=0, tools=1..N — and, for the two screens that are not tool steps
   // ('install', 'done'), their index in SCREENS. Without that second lookup a
@@ -1546,7 +1560,7 @@ export default function SetupPage() {
     if (kind === 'comfyui') {
       const cfgDir = ((config.comfyui && config.comfyui.base_dir) || '').trim()
       const s = stepById.comfyui
-      if (!cfgDir && !s.reachable && !s.skipped && !s.managedInitializing
+      if (!cfgDir && !s.reachable && !s.skipped && !s.ignored && !s.managedInitializing
           && s.managedMode !== 'external-host') {
         setSkipConfirm(true); return
       }
@@ -1668,10 +1682,11 @@ export default function SetupPage() {
         // doesn't keep nagging about a choice the user already made. (partial text is
         // only used for the reachable-but-incomplete case.)
         state: stepById.comfyui.managedInitializing ? 'initializing'
-          : stepById.comfyui.skipped ? 'skipped'
+          : (stepById.comfyui.skipped || stepById.comfyui.ignored) ? 'skipped'
             : triState(stepById.comfyui.reachable, stepById.comfyui.hasKlein),
         partial: stepById.comfyui.managedInitializing
-          ? 'first startup in progress' : 'running — Klein model optional' },
+          ? 'first startup in progress'
+          : stepById.comfyui.ignored ? 'ignored in Settings' : 'running — Klein model optional' },
       // Optional whenever something else already covers captioning (JoyCaption), or
       // the user has said they don't want it — not merely when a Docker deployment
       // turned it off. What Ollama alone unlocks stays counted in the capability

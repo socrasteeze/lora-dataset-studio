@@ -134,6 +134,10 @@ def _require_comfyui(*, force=False):
     signatures: the answer is always fresh now, so it means nothing more."""
     del force
     comfy = capabilities.probe_comfyui()
+    if comfy.get('ignored'):
+        return jsonify({'error': 'ComfyUI is set to Ignore in Settings',
+                        'code': 'comfyui_ignored',
+                        'hint': comfy.get('hint') or ''}), 409
     if not comfy.get('ok'):
         # Two causes, two sentences: "not reachable / check the URL" was returned
         # for a ComfyUI that was up and merely slow to enumerate itself, which sent

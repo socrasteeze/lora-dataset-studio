@@ -1982,6 +1982,9 @@ const TOPICS = [
   // local-tools
   setting('comfyui.api_url', 'local-tools', 'comfyui-api-url', 'ComfyUI API URL',
     ['comfyui', 'api', 'url', 'klein', 'studio', 'local']),
+  setting('comfyui.ignored', 'local-tools', 'comfyui-ignored', 'Ignore ComfyUI',
+    ['comfyui', 'ignore', 'offline', 'remote', 'disable', 'stop contacting', 'unreachable',
+     'free did not complete', 'object_info', 'keep url']),
   setting('comfyui.base_dir', 'local-tools', 'comfyui-base-dir', 'ComfyUI install directory',
     ['comfyui', 'directory', 'path', 'install', 'base dir', 'models', 'loras',
      // ComfyUI Desktop keeps a SHARED models folder and one inside its install

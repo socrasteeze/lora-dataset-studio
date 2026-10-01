@@ -78,3 +78,12 @@ test('focus=HF_CLOUD_TOKEN lands on the secret input id', () => {
   assert.match(primitives, /\{f\.testTarget && <TestResult result=\{testResults\[f\.testTarget\]\} \/>\}/)
   assert.match(primitives, /onResult\(await postJson\(settingsApiUrl\(pluginId, `\/api\/settings\/test\/\$\{encodeURIComponent\(target\)\}`\), \{\}\)\)/)
 })
+
+test('Ignore ComfyUI is a checkbox bound to comfyui.ignored', () => {
+  assert.match(source, /id="comfyui-ignored" type="checkbox"/)
+  assert.match(source, /checked=\{config\.comfyui\.ignored === true\}/)
+  assert.match(source, /setField\('comfyui', 'ignored', e\.target\.checked\)/)
+  assert.match(source, /Ignore ComfyUI/)
+  // Finger-sized below lg, per the touch-target contract.
+  assert.match(source, /htmlFor="comfyui-ignored" className="[^"]*min-h-10[^"]*lg:min-h-0/)
+})

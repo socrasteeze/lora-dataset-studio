@@ -129,6 +129,27 @@ def api_address() -> str:
     return cfg.get('comfyui.api_url')
 
 
+COMFYUI_IGNORED_MESSAGE = ('ComfyUI is set to Ignore in Settings. Turn off '
+                           '"Ignore ComfyUI" in Settings ▸ Local tools to generate.')
+
+
+def comfyui_ignored() -> bool:
+    """True while the operator set `comfyui.ignored`: LDS must send no request to
+    the configured ComfyUI (`api_address()`) and treat it as offline. The URL is
+    kept. Explicit remote backends (a `worker_url` that is not the configured
+    address) are configured separately and are not covered."""
+    return cfg.get('comfyui.ignored') is True
+
+
+def _ignored_target(worker_url=None) -> bool:
+    """True when this call would reach the configured ComfyUI while it is ignored."""
+    if not comfyui_ignored():
+        return False
+    if not worker_url:
+        return True
+    return str(worker_url).rstrip('/') == str(api_address() or '').rstrip('/')
+
+
 
 
 # --- Per-model optimal sampler/scheduler parameters (SDXL dropdown only) ---
@@ -441,6 +462,11 @@ def queue_prompt_to_comfyui(prompt_workflow, client_id, worker_url=None):
     api_addr = worker_url or local_api
     is_local = not worker_url or api_addr.rstrip('/') == local_api.rstrip('/')
 
+    # Ignored by the operator: refuse before any request. Same tag as a refused
+    # connection, so job_queue fails the job cleanly instead of pausing it.
+    if is_local and comfyui_ignored():
+        return None, f"COMFYUI_UNREACHABLE (nothing was submitted): {COMFYUI_IGNORED_MESSAGE}"
+
     # Check ComfyUI availability for the local worker only.
     if is_local:
         result = _ensure_comfyui_before_generation()
@@ -608,6 +634,8 @@ def queue_prompt_to_comfyui(prompt_workflow, client_id, worker_url=None):
 
 def get_comfyui_history_probe(prompt_id, worker_url=None) -> ComfyHistoryProbe:
     """Classify /history without confusing a worker outage with no output yet."""
+    if _ignored_target(worker_url):
+        return ComfyHistoryProbe(ComfyHistoryHealth.UNHEALTHY, detail=COMFYUI_IGNORED_MESSAGE)
     api_addr = worker_url or api_address()
     try:
         response = requests.get(
@@ -693,7 +721,7 @@ def comfyui_prompt_is_absent(prompt_id, worker_url=None):
     None means unknown: malformed /queue, transport trouble, or an unparseable
     entry must never grant permission to resume/requeue an old GPU prompt.
     """
-    if not prompt_id:
+    if not prompt_id or _ignored_target(worker_url):
         return None
     try:
         api_addr = worker_url or api_address()
@@ -724,7 +752,7 @@ def comfyui_prompt_is_absent(prompt_id, worker_url=None):
 
 def cancel_comfyui_prompt_state(prompt_id, client_id, worker_url=None) -> ComfyPromptState:
     """Delete only LDS's exact queued prompt; never use global /interrupt."""
-    if not prompt_id or not client_id:
+    if not prompt_id or not client_id or _ignored_target(worker_url):
         return ComfyPromptState.UNKNOWN
     api_addr = worker_url or api_address()
 
@@ -780,6 +808,8 @@ def cancel_comfyui_prompt(prompt_id, client_id=None, worker_url=None) -> bool:
 
 def _running_entries(worker_url=None):
     """ComfyUI's `queue_running` list, or None when it cannot be asked."""
+    if _ignored_target(worker_url):
+        return None
     api_addr = worker_url or api_address()
     # A read timeout tolerant of a starved HTTP loop: under a paging GPU the
     # repo measured 3-second /queue timeouts two in a row while the render
@@ -905,6 +935,8 @@ def fetch_output_image_bytes(filename, subfolder='', timeout=30):
 
     Returns the raw bytes, or None on any failure so the caller can fall back to
     its existing disk / not-found handling."""
+    if comfyui_ignored():
+        return None
     try:
         qs = urlencode({'filename': filename, 'subfolder': subfolder or '', 'type': 'output'})
         url = urljoin(api_address(), f"/view?{qs}")
@@ -1185,7 +1217,12 @@ def _fetch_object_info(timeout=None, force=False):
     `force` skips BOTH caches for this one call and refreshes them with what comes
     back. It exists for exactly one caller — the model-file refusal in
     `queue_prompt`, which must not kill a job on a snapshot that predates the model
-    (see `confirm_unavailable_model_files`). Nothing on a hot path may pass it."""
+    (see `confirm_unavailable_model_files`). Nothing on a hot path may pass it.
+
+    An ignored ComfyUI (`comfyui_ignored()`) answers like an unreachable one,
+    without a request and without the warning: every consumer fails OPEN."""
+    if comfyui_ignored():
+        return None, None, None
     addr = api_address()
     now = time.time()
     cached_here = (not force and _object_info_cache["data"] is not None
@@ -1573,7 +1610,12 @@ def format_unsupported_enums_message(items):
 
 
 def free_comfyui_vram(worker_url=None, timeout=10) -> ComfyVramFreeVerdict:
-    """Ask ComfyUI to unload only when it can positively acknowledge the request."""
+    """Ask ComfyUI to unload only when it can positively acknowledge the request.
+
+    An ignored ComfyUI is reported COMFYUI_OFFLINE with no request: the operator
+    said it is not part of this setup, so it must not hold up a vision pass."""
+    if _ignored_target(worker_url):
+        return ComfyVramFreeVerdict.COMFYUI_OFFLINE
     try:
         api_addr = (worker_url or api_address()).rstrip('/')
         if not api_addr:
@@ -2918,7 +2960,7 @@ def fetch_node_info(class_type, timeout=10, worker_url=None):
     one node, such as which attention backends the block-attention switch can
     offer on THIS ComfyUI."""
     api = (worker_url or api_address() or '').rstrip('/')
-    if not api or not class_type:
+    if not api or not class_type or _ignored_target(worker_url):
         return None
     try:
         r = requests.get(f'{api}/object_info/{class_type}', timeout=network_timeout(timeout))
