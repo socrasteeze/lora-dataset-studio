@@ -5,6 +5,9 @@ import { improveEngine, availableImproveEngines, improvementAvailable } from './
 // JSX services are wired by the application entry, keeping loadPlugins.js
 // importable in Node. Every context here is the same one the app provides.
 import { useToast } from '../components/common/Toast.jsx'
+import { controlHeight } from '../components/common/controls.js'
+import Pagination from '../components/common/Pagination.jsx'
+import { paginate } from '../utils/datasetLibrary.js'
 import { HelpBadge } from '../help/HelpMode.jsx'
 import { requestHelpTip } from '../help/helpTips.js'
 import GlobalModelPicker from '../components/shared/GlobalModelPicker.jsx'
@@ -62,11 +65,11 @@ import { isAbort, saveUrlAsFile } from '../utils/fileSave.js'
 
 export function configureHostRuntime() {
   configureRuntimeServices({ canvas: canvasServices, useToast, HelpBadge, requestHelpTip, GlobalModelPicker, installActionLabel,
-    useFocusTrap, useCapabilities, localEngineUnavailableReason, postJsonResult, hasContributions, useSliderLock,
+    useFocusTrap, useCapabilities, localEngineUnavailableReason, postJsonResult, hasContributions, useSliderLock, controlHeight, paginate,
     ui: { H3LoraPicker, Card, SecretField, TextField, StatusBadge, ResetToDefault, EngineCard, SettingsLink,
       PexelsAttribution, InstallRunner, KleinModelSetting, PromptOverrideField, PluginSlot, LocationEditor,
       FolderPickerField, GuideInfoDot, GeneratedImageLightbox, SliderLock, StudioActionBar,
-      Stat, Chip, FilterGroup, GroupLabel, PassButton, BankLaneTabs },
+      Stat, Chip, FilterGroup, GroupLabel, PassButton, BankLaneTabs, Pagination },
     training: { TrainingProgress, BaseModelChip, DatasetVersionChip, RunIdChip,
       UseDatasetCaptionsButton, RunsHub, RunsHubContent, FullArtifactStatus, RunStatusBadge,
       timeAgo, famLabel, AutoRetryBadges, RecipeWarning, checkpointHref,

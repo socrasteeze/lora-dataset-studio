@@ -43,6 +43,16 @@ test.beforeEach(t => {
 test('the real host graph resolves all services with the application context identities', () => {
   const host = window.lds
   assert.equal(host.useToast, useToast)
+  const savedHeight = host.controlHeight
+  host.controlHeight = () => 'fixture-height'
+  assert.equal(ui.controlHeight('md'), 'fixture-height')
+  host.controlHeight = savedHeight
+  assert.equal(ui.controlHeight('md'), savedHeight('md'))
+  const savedPage = host.paginate
+  host.paginate = () => 'fixture-page'
+  assert.equal(ui.paginate([]), 'fixture-page')
+  host.paginate = savedPage
+  assert.equal(ui.paginate(['a'], 1, 24).total, savedPage(['a'], 1, 24).total)
   assert.equal(host.useCapabilities, useCapabilities)
   assert.equal(host.canvas, canvasServices)
   assert.equal(host.canvas.pillSelectScale, pillSelectScale)

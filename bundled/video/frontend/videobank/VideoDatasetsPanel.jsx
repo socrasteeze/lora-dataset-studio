@@ -4,8 +4,7 @@ import { useNavigate } from 'react-router'
 import { apiFetch, del, postJson } from '@lds/plugin-sdk';
 import { useToast } from '@lds/plugin-sdk';
 import { HelpBadge } from '@lds/plugin-sdk';
-import Pagination from '../../../../frontend/src/components/common/Pagination.jsx';
-import { paginate } from '../../../../frontend/src/utils/datasetLibrary.js';
+import { Pagination, paginate } from '@lds/plugin-sdk/ui';
 
 /** 🎬 Video training sets, in the library, next to the image datasets.
  *

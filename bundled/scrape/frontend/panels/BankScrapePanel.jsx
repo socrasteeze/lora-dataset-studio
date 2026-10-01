@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Globe } from 'lucide-react';
 import { postJson } from '@lds/plugin-sdk'
-import { controlHeight } from '../../../../frontend/src/components/common/Controls.jsx'
+import { controlHeight } from '@lds/plugin-sdk/ui'
 import { useToast } from '@lds/plugin-sdk'
 import { HelpBadge } from '@lds/plugin-sdk'
 import ConceptSourcesPanel from './ConceptSourcesPanel'

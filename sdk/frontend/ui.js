@@ -15,6 +15,17 @@ function control(name, props) {
   if (!Component) throw new Error(`LDS does not provide the UI control ${name}.`)
   return host.React.createElement(Component, props)
 }
+export function controlHeight(size = 'md') {
+  const fn = runtime().controlHeight
+  if (typeof fn !== 'function') throw new Error('LDS does not provide controlHeight.')
+  return fn(size)
+}
+export function paginate(...args) {
+  const fn = runtime().paginate
+  if (typeof fn !== 'function') throw new Error('LDS does not provide paginate.')
+  return fn(...args)
+}
+export function Pagination(props) { return control('Pagination', props) }
 export function Card(props) { return control('Card', props) }
 export function SecretField(props) { return control('SecretField', props) }
 export function TextField(props) { return control('TextField', props) }
