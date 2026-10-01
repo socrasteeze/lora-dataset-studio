@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   captionStepNote, pipelineBadge, pipelineReportVerdict, queueOutcomeLine,
 } from './pipelineVerdict.js'
+import { reportHeadline } from './pipelineReportView.js'
 
 const step = (name, status = 'done', reason = null) => ({ step: name, status, reason })
 const report = (steps, over = {}) => ({ steps, ...over })
@@ -226,4 +227,24 @@ test('a blocked or failed step outranks a caption that needs attention', () => {
 test('the queue line counts a bank that needs attention as a problem', () => {
   assert.match(queueOutcomeLine([{ state: 'ok' }, { state: 'attention' }]),
     /1 finished, 1 with problems/)
+})
+
+test('a caption step re-run since the report owes nothing — the re-run is the newer story', () => {
+  // A partial Launch-all left 3 uncaptioned; a standalone Caption run filled
+  // them. The server stamps superseded_at on that DONE step, and the card must
+  // stop saying "3 not captioned" and the report must stop saying it needs
+  // attention. pipelineReportView's isSuperseded() deliberately ignores done
+  // steps, so this guard has to live in captionStepNote itself.
+  const short = caption({ captioned: 40, joycaption: 40, skipped: 2, failed: 1,
+    first_choice: 'joycaption' })
+  const redone = { ...short, superseded_at: 1759300000, superseded_detail: '3 captioned' }
+  assert.equal(captionStepNote(short).text, '3 not captioned', 'the precondition')
+  assert.equal(captionStepNote(redone), null)
+  const v = pipelineReportVerdict(report([step('scan'), redone]))
+  assert.equal(v.state, 'ok')
+  assert.equal(v.attention, 0)
+  assert.equal(pipelineBadge(v), null)
+  const head = reportHeadline(report([step('scan'), redone]))
+  assert.equal(head.attention, 0)
+  assert.equal(head.attentionLabel, '')
 })
