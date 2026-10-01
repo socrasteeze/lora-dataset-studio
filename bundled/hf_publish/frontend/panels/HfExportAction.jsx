@@ -39,7 +39,7 @@ export default function HfExportAction({ dataset, context }) {
         className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm disabled:opacity-50">
         🤗 {HF_EXPORT_ROW.title}
       </button>}
-      {configured && <span className="text-content-subtle text-[0.6875rem]">
+      {configured && <span className="text-content-subtle text-2xs">
         {ready ? 'dataset repo on the Hub — private by default' : 'Keep at least one image to publish this dataset.'}
       </span>}
       {open && ready && typeof document !== 'undefined' && createPortal(

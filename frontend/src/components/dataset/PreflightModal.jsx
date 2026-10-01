@@ -46,7 +46,7 @@ export default function PreflightModal({ report, datasetId, ds, onResolve }) {
         </div>
         {/* Summary — the aggregate message, kept verbatim. */}
         {warnings.length > 0 && (
-          <ul className="m-0 pl-4 flex flex-col gap-1 text-content-muted text-[0.8125rem] list-disc">
+          <ul className="m-0 pl-4 flex flex-col gap-1 text-content-muted text-xs list-disc">
             {warnings.map((w, i) => <li key={i}>{w}</li>)}
           </ul>
         )}
@@ -54,7 +54,7 @@ export default function PreflightModal({ report, datasetId, ds, onResolve }) {
         {/* WHICH captions leak — edit in place (saves when you click away). */}
         {leaks.length > 0 && (
           <div className="rounded-lg border border-amber-400/30 bg-amber-500/5 p-2.5 flex flex-col gap-2">
-            <span className="text-amber-300 text-[0.8125rem] font-semibold">
+            <span className="text-amber-300 text-xs font-semibold">
               Captions describing the identity ({leaks.length}) — remove the face / hair words
             </span>
             {leaks.map((li) => (
@@ -73,7 +73,7 @@ export default function PreflightModal({ report, datasetId, ds, onResolve }) {
         {/* WHICH pairs are near-duplicate — reject one of each. */}
         {dups.length > 0 && (
           <div className="rounded-lg border border-amber-400/30 bg-amber-500/5 p-2.5 flex flex-col gap-2">
-            <span className="text-amber-300 text-[0.8125rem] font-semibold">
+            <span className="text-amber-300 text-xs font-semibold">
               Near-duplicate pairs ({dups.length}) — reject one of each
             </span>
             {dups.map((p, i) => {

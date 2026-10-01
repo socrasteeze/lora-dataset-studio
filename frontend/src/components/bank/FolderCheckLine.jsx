@@ -1,5 +1,6 @@
 import { folderCheckNote } from './bankSync'
 import { RefreshCw } from 'lucide-react';
+import { Button } from '../common/Controls.jsx'
 
 /** 🗃️ Bank list — how fresh these cards are, and the one click that refreshes them.
  *
@@ -24,11 +25,10 @@ export default function FolderCheckLine({ banks, busy = false, onRescan }) {
       <p className={`min-w-0 grow text-xs ${note.stale ? 'text-amber-300/90' : 'text-content-subtle'}`}>
         {note.text}
       </p>
-      <button type="button" onClick={onRescan} disabled={busy}
-        title="Walk every bank's source folder now and pick up the images added to it"
-        className="shrink-0 rounded-md border border-border bg-surface-raised px-3 py-1.5 text-xs font-semibold text-content hover:bg-surface disabled:opacity-50">
-        <RefreshCw aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{busy ? 'Checking folders…' : 'Rescan folders'}
-      </button>
+      <Button noShrink onClick={onRescan} disabled={busy}
+        title="Walk every bank's source folder now and pick up the images added to it">
+        <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />{busy ? 'Checking folders…' : 'Rescan folders'}
+      </Button>
     </div>
   )
 }

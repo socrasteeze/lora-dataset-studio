@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Folder, FolderOpen } from 'lucide-react';
 import { apiFetch } from '../../api/fetchClient'
+import { Button, Input } from './Controls.jsx'
 import { attemptModalSubmit } from '../../utils/submitOutcome.js'
 import { useFocusTrap } from '../../hooks/useFocusTrap.js'
 
@@ -202,13 +203,11 @@ export default function FolderPickerField({
         <label htmlFor={id} className="block text-sm font-medium text-content">{label}</label>
       )}
       <div className="mt-1 flex items-stretch gap-2">
-        <input id={id} value={value} onChange={(e) => onChange(e.target.value)}
+        <Input id={id} value={value} onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder} required={required}
-          className="w-full min-w-0 grow rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content font-mono" />
-        <button type="button" onClick={() => setBrowsing(true)}
-          className="shrink-0 rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm font-semibold text-content hover:bg-surface">
-          <span className="inline-flex items-center gap-1.5"><FolderOpen aria-hidden="true" className="h-4 w-4" /> Browse</span>
-        </button>
+          className="w-full min-w-0 grow font-mono" />
+        <Button noShrink onClick={() => setBrowsing(true)}>
+          <FolderOpen aria-hidden="true" className="h-4 w-4" /> Browse</Button>
       </div>
       {hint && <p className="mt-1 text-xs text-content-muted">{hint}</p>}
       {browsing && (

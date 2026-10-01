@@ -416,6 +416,9 @@ top-20 durations; no threshold or probe limit was loosened.
 
 ## Wave 6 — type scale and control sizes (foundation for 7-10)
 
+**Status (2026-10-01).** Implemented on `wave/6-type-scale`. Not landed.
+`origin/main` is still `f3815e82e`. Gates have not been run.
+
 **Type scale.** Allowed classes in `frontend/src` and `bundled/*/frontend`:
 `text-2xs` (11), `text-xs` (12), `text-sm` (14), `text-base` (16),
 `text-xl` (20), `text-2xl` (24). Nothing else.

@@ -46,7 +46,7 @@ export default function VideoTargetPicker({ targets, targetKey, onPick }) {
               <span className="min-w-0 flex-1">
                 <span className="flex flex-wrap items-center gap-1.5">
                   <span className="font-semibold text-content">{t.label}</span>
-                  <span className={`rounded px-1.5 py-0.5 text-[0.625rem] font-bold ${BADGE_TONE[badge.tone]}`}>
+                  <span className={`rounded px-1.5 py-0.5 text-2xs font-bold ${BADGE_TONE[badge.tone]}`}>
                     {badge.text}
                   </span>
                 </span>

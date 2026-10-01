@@ -605,7 +605,7 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
             className="min-h-10 lg:min-h-0 rounded-md border border-border bg-surface-raised px-2.5 py-1 text-sm text-content hover:bg-surface">
             ← Banks
           </button>
-          <h1 className="min-w-0 truncate text-lg font-bold text-content">🎬 {bank.name}</h1>
+          <h1 className="min-w-0 truncate text-xl font-bold text-content">🎬 {bank.name}</h1>
           <HelpBadge topic="page-video-bank" />
           <button type="button" onClick={rescan}
             title="Re-walk the folder and inventory anything new"

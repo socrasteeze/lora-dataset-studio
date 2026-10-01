@@ -75,7 +75,7 @@ test('the per-clip Saving line RESERVES its space instead of inserting a row', (
   // everything below it down MID-CLICK — measured at +15 px between mousedown
   // and mouseup — and the click meant for a Caption tools button landed beside
   // it. The height has to exist whether or not anything is being saved.
-  assert.match(workspace, /min-h-4 text-\[0\.625rem\] text-content-subtle/)
+  assert.match(workspace, /min-h-4 text-2xs text-content-subtle/)
   assert.match(workspace, /\{savingId === clip\.id \? 'Saving…' : ''\}/)
   assert.ok(!/\{savingId === clip\.id && \(/.test(workspace),
     'a conditionally INSERTED status line shifts the page under the pointer')

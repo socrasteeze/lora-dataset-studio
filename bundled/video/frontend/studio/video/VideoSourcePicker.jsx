@@ -332,7 +332,7 @@ export default function VideoSourcePicker({ mode, onMode, frames = [], onAdd, on
               {label}
             </button>
           ))}
-          <p className="w-full text-[0.6875rem] text-content-subtle">
+          <p className="w-full text-2xs text-content-subtle">
             {identityReferences ? 'The model composes the shot from the prompt and identity references. A last frame is optional.'
               : 'No start frame: the model composes the shot from the prompt alone — pick a last frame below and the clip resolves onto that picture.'}
           </p>
@@ -356,7 +356,7 @@ export default function VideoSourcePicker({ mode, onMode, frames = [], onAdd, on
             ))}
           </div>
           </div>
-          <p className="w-full text-[0.6875rem] text-content-subtle">
+          <p className="w-full text-2xs text-content-subtle">
             {target === 'end'
               ? 'The picture the clip ENDS on — H3 renders from the first frame to it. One per launch; a pick replaces it.'
               : singleFrame ? 'One start frame shared by all selected checkpoints. A new pick replaces it.'
@@ -387,7 +387,7 @@ export default function VideoSourcePicker({ mode, onMode, frames = [], onAdd, on
               folded in two. Not padlocked like the render dials — a drift
               here shows itself at once and changes nothing about the clip. */}
           {gridShown && (
-            <label className="ml-auto flex items-center gap-1.5 text-[0.6875rem] text-content-muted"
+            <label className="ml-auto flex items-center gap-1.5 text-2xs text-content-muted"
               title="Preview size — enlarge the tiles to judge a frame before you pick it">
               <ZoomIn aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
               <span className="shrink-0">Preview size</span>
@@ -492,7 +492,7 @@ export default function VideoSourcePicker({ mode, onMode, frames = [], onAdd, on
             {/* How much of the feed is on screen, and the way to the rest.
                 Without this the newest 60 read as the whole Gallery. */}
             <div className="flex flex-wrap items-center gap-2">
-              <p className="min-w-0 flex-1 text-[0.6875rem] text-content-subtle">
+              <p className="min-w-0 flex-1 text-2xs text-content-subtle">
                 Animates the picture at full size, not its thumbnail.
                 {gallery.length > 0 && (
                   <span className="ml-1">
@@ -502,7 +502,7 @@ export default function VideoSourcePicker({ mode, onMode, frames = [], onAdd, on
               </p>
               {more?.more && (
                 <button type="button" onClick={showMore} disabled={paging}
-                  className="shrink-0 rounded-lg border border-border px-2 py-1 text-[0.6875rem] text-content-muted hover:border-primary hover:text-content disabled:opacity-50 min-h-10 lg:min-h-0">
+                  className="shrink-0 rounded-lg border border-border px-2 py-1 text-2xs text-content-muted hover:border-primary hover:text-content disabled:opacity-50 min-h-10 lg:min-h-0">
                   {paging ? 'Loading…' : 'Show older'}
                 </button>
               )}
@@ -549,7 +549,7 @@ export default function VideoSourcePicker({ mode, onMode, frames = [], onAdd, on
                             🎞
                           </span>
                         )} />
-                      <span className="w-full truncate px-1 text-left text-[0.625rem] text-content-muted">
+                      <span className="w-full truncate px-1 text-left text-2xs text-content-muted">
                         {c.filename}
                       </span>
                     </button>
@@ -557,7 +557,7 @@ export default function VideoSourcePicker({ mode, onMode, frames = [], onAdd, on
                 })}
               </div>
             )}
-            <p className="text-[0.6875rem] text-content-subtle">
+            <p className="text-2xs text-content-subtle">
               Uses the clip’s first frame, at full size — the same material the
               LoRA trained on.
             </p>
@@ -591,13 +591,13 @@ export default function VideoSourcePicker({ mode, onMode, frames = [], onAdd, on
                             <Film aria-hidden="true" className="h-5 w-5" />
                           </span>
                         )} />
-                      <span className="absolute bottom-0 left-0 rounded-tr bg-black/70 px-1 text-[0.625rem] text-white">#{c.id}</span>
+                      <span className="absolute bottom-0 left-0 rounded-tr bg-black/70 px-1 text-2xs text-white">#{c.id}</span>
                     </button>
                   );
                 })}
               </div>
             )}
-            <p className="text-[0.6875rem] text-content-subtle">
+            <p className="text-2xs text-content-subtle">
               A finished clip’s last frame, at full size — the first frame of the
               next shot, or the last frame of this one. To join the next clip
               behind it instead, use ⏭ Continue on the clip’s card.
@@ -639,12 +639,12 @@ export default function VideoSourcePicker({ mode, onMode, frames = [], onAdd, on
                 )}
                 <button type="button" onClick={() => { releasePreview(f); onRemove(f.key); }} disabled={busy}
                   aria-label={`Remove start frame ${i + 1}`} title="Remove this start frame"
-                  className="absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-bl bg-black/70 text-[0.625rem] leading-none text-white disabled:opacity-40">
+                  className="absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-bl bg-black/70 text-2xs leading-none text-white disabled:opacity-40">
                   ✕
                 </button>
               </div>
             ))}
-            <span className="min-w-[10rem] flex-1 text-[0.6875rem] text-content-muted">
+            <span className="min-w-[10rem] flex-1 text-2xs text-content-muted">
               {frames.length === 1 ? (
                 <>
                   Ready — staged into ComfyUI as
@@ -656,7 +656,7 @@ export default function VideoSourcePicker({ mode, onMode, frames = [], onAdd, on
             </span>
             {frames.length > 1 && (
               <button type="button" onClick={() => { frames.forEach(releasePreview); onClear(); }} disabled={busy}
-                className="shrink-0 rounded-lg border border-border px-2 py-1 text-[0.6875rem] text-content-muted hover:border-primary hover:text-content disabled:opacity-50 min-h-10 lg:min-h-0">
+                className="shrink-0 rounded-lg border border-border px-2 py-1 text-2xs text-content-muted hover:border-primary hover:text-content disabled:opacity-50 min-h-10 lg:min-h-0">
                 Clear all
               </button>
             )}
@@ -689,11 +689,11 @@ export default function VideoSourcePicker({ mode, onMode, frames = [], onAdd, on
               )}
               <button type="button" onClick={() => { releasePreview(endFrame); onClearEnd?.(); }} disabled={busy}
                 aria-label="Remove the last frame" title="Remove the last frame"
-                className="absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-bl bg-black/70 text-[0.625rem] leading-none text-white disabled:opacity-40">
+                className="absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-bl bg-black/70 text-2xs leading-none text-white disabled:opacity-40">
                 ✕
               </button>
             </div>
-            <span className="min-w-[10rem] flex-1 text-[0.6875rem] text-content-muted">
+            <span className="min-w-[10rem] flex-1 text-2xs text-content-muted">
               Last frame — the clip ends on this picture, staged as
               <code className="ml-1 break-all">{endFrame.image}</code>
             </span>

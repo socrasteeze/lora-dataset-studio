@@ -17,6 +17,7 @@
 import { useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Download, FolderOpen, Loader2, Package, RefreshCw, Save } from 'lucide-react';
 import { HelpBadge } from '../../help/HelpMode';
+import { btnClass } from '../common/controls';
 import {
   describeProgress, progressPercent, summarizeBackupResult, summarizeRestoreReport,
 } from '../../utils/fullBackup';
@@ -164,7 +165,7 @@ export default function FullBackupControls({ backup, onRestore }) {
       <details ref={menuRef} className="relative">
         <summary
           title="Back up the whole library, or import a backup archive"
-          className="flex items-center gap-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-content-muted hover:text-content hover:bg-surface-raised cursor-pointer select-none">
+          className={`${btnClass({ size: 'md' })} cursor-pointer select-none`}>
           {running
             ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
             : <Save aria-hidden="true" className="h-4 w-4" />}

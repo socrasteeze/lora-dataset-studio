@@ -38,7 +38,7 @@ export default function EngineCard({ id, checked, available, generating, onToggl
           ? `${accent.pill} border-transparent` : 'border-border text-transparent'}`}>✓</span>
       {icon}
       <span className="flex flex-col gap-1 min-w-0">
-        <span className={`text-[0.8125rem] font-semibold ${checked ? accent.title : 'text-content-muted'}`}>
+        <span className={`text-xs font-semibold ${checked ? accent.title : 'text-content-muted'}`}>
           {title}
         </span>
         <span className="flex flex-wrap gap-1">{tags}</span>

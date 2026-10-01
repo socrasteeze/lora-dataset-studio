@@ -6,7 +6,7 @@ const STATES = { ready: 'Ready', setup: 'Needs preparation', pending: 'Waiting f
 export default function SetupJourneyChoices({ plan, journey, products, catalog, engines, rows, onChoose, onBrowse }) {
   const [search, setSearch] = useState('')
   if (plan.chooseEngine) return <section className="space-y-4" aria-label="Choose an image engine">
-    <h2 className="text-lg font-semibold text-content">Where should your images be generated?</h2>
+    <h2 className="text-xl font-semibold text-content">Where should your images be generated?</h2>
     <p className="text-sm text-content-muted">Local engines use your GPU and model downloads. Online engines come from installed plugins and may use a paid account or API key.</p>
     <div className="grid gap-3 sm:grid-cols-2">{engines.map(engine => <button type="button" key={engine.id} className={CHOICE}
       onClick={() => onChoose({ ...journey, engine: engine.id })}>
@@ -16,7 +16,7 @@ export default function SetupJourneyChoices({ plan, journey, products, catalog, 
     <button type="button" onClick={() => onChoose({ goal: 'plugins' })} className="min-h-10 text-sm text-primary underline">Find more engines in the plugin Store</button>
   </section>
   if (plan.chooseCapability) return <section className="space-y-4" aria-label="Choose a plugin function">
-    <h2 className="text-lg font-semibold text-content">What would you like to use first?</h2>
+    <h2 className="text-xl font-semibold text-content">What would you like to use first?</h2>
     <p className="text-sm text-content-muted">This plugin has several functions. Choose one to see its next action; other optional tools will not hold it up.</p>
     <div className="space-y-3">{rows.map((item, index) => <button type="button" key={item.label + index} className={CHOICE}
       onClick={() => onChoose({ ...journey, capability: item.label })}>
@@ -29,7 +29,7 @@ export default function SetupJourneyChoices({ plan, journey, products, catalog, 
   </section>
   const matches = products.filter(product => (product.name + ' ' + product.description).toLowerCase().includes(search.toLowerCase()))
   return <section className="space-y-4" aria-label="Choose a plugin">
-    <h2 className="text-lg font-semibold text-content">Choose the tool you want to add</h2>
+    <h2 className="text-xl font-semibold text-content">Choose the tool you want to add</h2>
     <p className="text-sm text-content-muted">Pick a plugin to see its plan: installation, activation, then the models or services for your chosen function.</p>
     <label className="block text-sm text-content">Find a plugin
       <input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search by name or use…"

@@ -116,7 +116,7 @@ export default function BankWatermarkMaskDialog({ bankId, image, onSaved, onClos
         <HelpBadge topic="bank-edit-watermark-mask" className="self-center" />
         <button type="button" onClick={onClose} disabled={saving}
           title="Close (the mask saves as you edit)" aria-label="Close the mask editor"
-          className="ml-auto h-11 w-11 rounded-full bg-white/10 text-lg leading-none text-white hover:bg-white/20 disabled:opacity-40">
+          className="ml-auto h-11 w-11 rounded-full bg-white/10 text-xl leading-none text-white hover:bg-white/20 disabled:opacity-40">
           ✕
         </button>
       </div>

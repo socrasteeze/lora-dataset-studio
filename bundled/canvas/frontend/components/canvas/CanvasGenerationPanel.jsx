@@ -49,20 +49,20 @@ function CanvasCheckpointRecap({ selection, onToggle, onClear }) {
   return (
     <div id="st-loras" className="scroll-mt-16 rounded-lg border border-border bg-app/40 p-2">
       <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-[0.6875rem] font-semibold text-content">
+        <span className="text-2xs font-semibold text-content">
           Checkpoints
         </span>
-        <span className="text-[0.625rem] text-content-muted">{canvasSelectionSummary(selection)}</span>
+        <span className="text-2xs text-content-muted">{canvasSelectionSummary(selection)}</span>
         <HelpBadge topic="canvas-generate" />
         {selection.length > 0 && (
           <button type="button" onClick={onClear}
-            className="ml-auto text-content-subtle text-[0.625rem] underline decoration-dotted hover:text-content">
+            className="ml-auto text-content-subtle text-2xs underline decoration-dotted hover:text-content">
             Clear
           </button>
         )}
       </div>
       {selection.length === 0 ? (
-        <p className="m-0 text-content-subtle text-[0.6875rem]">
+        <p className="m-0 text-content-subtle text-2xs">
           Tick the ✓ box on a checkpoint pill to add it here. Picks from several datasets
           run together — that is what the board is for.
         </p>
@@ -70,7 +70,7 @@ function CanvasCheckpointRecap({ selection, onToggle, onClear }) {
         <div className="flex flex-col gap-1.5">
           {lanes.map(([datasetId, lane]) => (
             <div key={datasetId} className="min-w-0">
-              <div className="truncate text-content-subtle text-[0.5625rem] font-semibold uppercase tracking-wide">
+              <div className="truncate text-content-subtle text-2xs font-semibold uppercase tracking-wide">
                 {lane.name || `Dataset ${datasetId}`}
               </div>
               <div className="mt-0.5 flex flex-wrap gap-1">
@@ -85,7 +85,7 @@ function CanvasCheckpointRecap({ selection, onToggle, onClear }) {
                     title={`Remove step ${e.step} of run ${runNumber({ record_id: e.recordId })} from this run`
                       + (e.deployed ? ' — deployed to ComfyUI'
                         : ' — on disk but not deployed yet; the launch deploys it first')}
-                    className={'flex max-w-full items-center gap-1 rounded-md border px-1.5 py-0.5 text-[0.625rem] tabular-nums '
+                    className={'flex max-w-full items-center gap-1 rounded-md border px-1.5 py-0.5 text-2xs tabular-nums '
                       + (e.deployed
                         ? 'border-indigo-400/60 bg-indigo-500/15 text-indigo-100 '
                         : 'border-amber-400/50 bg-amber-500/10 text-amber-100 ')
@@ -197,7 +197,7 @@ export default function CanvasGenerationPanel({ selection, onToggle, onClear, on
       {/* 🔌 Checked board nodes that are not a checkpoint at all — pinned LoRA
           files stacked on top of whichever checkpoints are picked above. */}
       {externalLoras.length > 0 && (
-        <p className="m-0 text-cyan-200 text-[0.6875rem]">
+        <p className="m-0 text-cyan-200 text-2xs">
           <Plug aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{externalLoras.length} external LoRA{externalLoras.length > 1 ? 's' : ''} will be stacked on this run.
         </p>
       )}
@@ -238,7 +238,7 @@ export default function CanvasGenerationPanel({ selection, onToggle, onClear, on
           // and an empty panel would read as "the board did not register my click".
           <div className="flex flex-col gap-2">
             {recap}
-            <p className="m-0 text-content-subtle text-[0.75rem]">
+            <p className="m-0 text-content-subtle text-xs">
               {selection.length
                 ? 'Loading this family’s settings…'
                 : 'Tick a checkpoint on the board to set up a run.'}

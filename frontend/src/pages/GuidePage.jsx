@@ -153,7 +153,7 @@ export default function GuidePage({ helpOnly = false }) {
               <span>{readingMinutes} min read</span>
               {!helpOnly && <><span aria-hidden>·</span><span>{idx + 1} of {chapters.length}</span></>}
             </div>
-            <h1 className="m-0 max-w-2xl text-2xl font-bold tracking-tight text-content sm:text-3xl">{chapter.title}</h1>
+            <h1 className="m-0 max-w-2xl text-2xl font-bold tracking-tight text-content sm:text-2xl">{chapter.title}</h1>
             <p className="mb-0 mt-2 max-w-2xl text-sm leading-relaxed text-content-muted sm:text-base">{chapter.description}</p>
           </div>
         </header>

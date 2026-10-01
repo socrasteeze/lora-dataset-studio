@@ -125,7 +125,7 @@ export default function VideoFilterRail({
       )}
       {/* The counts cover the LOADED page, and a chip that read like a bank-wide
           total would be a wrong number rather than a filter. */}
-      {flagNote && <p className="text-[0.6875rem] text-content-subtle">{flagNote}</p>}
+      {flagNote && <p className="text-2xs text-content-subtle">{flagNote}</p>}
 
       {/* 🎥 The camera facet describes rather than accuses — the wobble one user
           filters out is what the next user is filtering FOR. Chips marked ᐩ are
@@ -145,7 +145,7 @@ export default function VideoFilterRail({
               show all ✕
             </button>
           )}
-          <span className="text-[0.6875rem] text-content-subtle">{CAMERA_FACET_NOTE}</span>
+          <span className="text-2xs text-content-subtle">{CAMERA_FACET_NOTE}</span>
         </FilterGroup>
       )}
 

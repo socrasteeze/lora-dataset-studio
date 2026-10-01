@@ -109,7 +109,7 @@ function CanvasImageGroup({ group, datasetId, laneName, boardScale = 1,
         style={{ position: 'absolute', right: 0, bottom: 0, width: 28, height: 28,
           transform: `scale(${groupCornerScale(boardScale)})`,
           transformOrigin: 'bottom right' }}
-        className="cursor-nwse-resize touch-none rounded-tl-md border-l border-t border-indigo-400/40 bg-app/80 text-content-subtle after:absolute after:bottom-1 after:right-1 after:text-[0.625rem] after:content-['◢']" />
+        className="cursor-nwse-resize touch-none rounded-tl-md border-l border-t border-indigo-400/40 bg-app/80 text-content-subtle after:absolute after:bottom-1 after:right-1 after:text-2xs after:content-['◢']" />
 
       {/* ⤢ While a picture is being dragged out, say so — and say it INSIDE the
           strip, where the finger is. Without it, letting go one pixel too early

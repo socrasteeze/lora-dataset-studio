@@ -77,7 +77,7 @@ export default function VideoThresholdsPanel({ bankId, saved, totalClips, onAppl
                 placeholder="off"
                 className="mt-0.5 w-full rounded-md border border-border bg-app px-2 py-1 text-sm text-content"
               />
-              <span className="mt-0.5 block text-[0.7rem] leading-tight text-content-subtle">
+              <span className="mt-0.5 block text-2xs leading-tight text-content-subtle">
                 {f.hint}
               </span>
             </label>

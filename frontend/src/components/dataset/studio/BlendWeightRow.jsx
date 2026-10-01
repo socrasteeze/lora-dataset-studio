@@ -18,7 +18,7 @@ export default function BlendWeightRow({
     <li className="flex flex-col gap-1 rounded-lg border border-border bg-surface-raised px-2.5 py-1.5">
       <div className="flex min-w-0 items-center gap-2">
         <span className="shrink-0 text-content-subtle text-2xs tabular-nums">{index}.</span>
-        <span className="min-w-0 flex-1 truncate text-content text-[0.8125rem]" title={title || label}>
+        <span className="min-w-0 flex-1 truncate text-content text-xs" title={title || label}>
           {label}
         </span>
         {trigger}

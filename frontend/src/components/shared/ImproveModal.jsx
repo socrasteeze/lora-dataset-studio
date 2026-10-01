@@ -134,7 +134,7 @@ export default function ImproveModal({ img, host = 'library', datasetId = null,
           <span aria-hidden className="mt-0.5">✨</span>
           <div className="min-w-0 flex-1">
             <h2 className="font-sans text-base font-semibold text-gray-100">Upscale &amp; improve via Klein</h2>
-            <p className="mt-0.5 text-[0.78rem] leading-snug text-gray-400">
+            <p className="mt-0.5 text-xs leading-snug text-gray-400">
               {phase === 'done'
                 ? 'Done — the result below also lives in ' + routes.dest + '.'
                 : 'Check the instruction and the dials, then Generate. The result shows here — or in ' + routes.dest + ' if you leave.'}
@@ -153,7 +153,7 @@ export default function ImproveModal({ img, host = 'library', datasetId = null,
           {phase === 'generating' && (
             <div className="flex flex-col items-center gap-3 py-8 text-center">
               <span aria-hidden className="animate-pulse text-2xl">✨</span>
-              <p className="m-0 max-w-md text-[0.85rem] text-gray-300" role="status">
+              <p className="m-0 max-w-md text-sm text-gray-300" role="status">
                 Generating… you can close this dialog — the render keeps going and
                 the result lands in {routes.dest}.
               </p>
@@ -165,7 +165,7 @@ export default function ImproveModal({ img, host = 'library', datasetId = null,
             <ImproveResultView url={result.url} />
           )}
           {phase === 'failed' && (
-            <p role="alert" className="m-0 rounded-md border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-[0.85rem] text-amber-100">
+            <p role="alert" className="m-0 rounded-md border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
               {error}
             </p>
           )}
@@ -180,17 +180,17 @@ export default function ImproveModal({ img, host = 'library', datasetId = null,
                 // candidate and flips straight back to this same error.
                 setCandidateId(null); setResult(null); setError(null); setPhase('settings');
               }}
-              className="min-h-10 lg:min-h-0 rounded-lg border border-white/10 px-3 py-1.5 text-[0.78rem] text-gray-300 hover:border-white/25">
+              className="min-h-10 lg:min-h-0 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-gray-300 hover:border-white/25">
               Back to settings
             </button>
           )}
           <button type="button" onClick={close}
-            className="min-h-10 lg:min-h-0 rounded-lg border border-white/10 px-3 py-1.5 text-[0.78rem] text-gray-300 hover:border-white/25">
+            className="min-h-10 lg:min-h-0 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-gray-300 hover:border-white/25">
             {phase === 'done' ? 'Done' : 'Close'}
           </button>
           {phase === 'settings' && (
             <button type="button" data-testid="improve-modal-generate" onClick={generate}
-              className="min-h-10 lg:min-h-0 rounded-lg bg-gradient-primary px-4 py-1.5 text-[0.8rem] font-semibold text-gray-950">
+              className="min-h-10 lg:min-h-0 rounded-lg bg-gradient-primary px-4 py-1.5 text-xs font-semibold text-gray-950">
               ✨ Generate
             </button>
           )}

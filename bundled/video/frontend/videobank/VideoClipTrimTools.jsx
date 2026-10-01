@@ -99,7 +99,7 @@ export default function VideoClipTrimTools({
       <div className="space-y-2 border-t border-white/10 p-2.5">
         {['start', 'end'].map((edge) => (
           <div key={edge} className="flex flex-wrap items-center gap-1">
-            <span className="w-14 shrink-0 text-[0.6875rem] font-semibold uppercase tracking-wide text-white/60">
+            <span className="w-14 shrink-0 text-2xs font-semibold uppercase tracking-wide text-white/60">
               {edge}
             </span>
             <span className="w-16 shrink-0 font-mono text-xs text-white">
@@ -109,31 +109,31 @@ export default function VideoClipTrimTools({
               <button key={label} type="button" onClick={() => nudge(edge, d)}
                 disabled={saving}
                 title={`${label} on ${edge} (one frame = ${step.toFixed(3)}s at this file's rate)`}
-                className="rounded border border-white/20 px-1.5 py-0.5 font-mono text-[0.6875rem] text-white hover:bg-white/10 disabled:opacity-30">
+                className="rounded border border-white/20 px-1.5 py-0.5 font-mono text-2xs text-white hover:bg-white/10 disabled:opacity-30">
                 {label}
               </button>
             ))}
             <button type="button" onClick={() => toPlayhead(edge)} disabled={saving}
-              className="rounded border border-white/20 px-1.5 py-0.5 text-[0.6875rem] text-white hover:bg-white/10 disabled:opacity-30">
+              className="rounded border border-white/20 px-1.5 py-0.5 text-2xs text-white hover:bg-white/10 disabled:opacity-30">
               ⇤ playhead
             </button>
           </div>
         ))}
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-[0.6875rem] text-white/70">
+          <span className="font-mono text-2xs text-white/70">
             {draftSummary(draft)}
           </span>
           <div className="ml-auto flex flex-wrap gap-1.5">
             {dirty && (
               <button type="button" disabled={saving}
                 onClick={() => setDraft({ start_s: clip.start_s, end_s: clip.end_s })}
-                className="rounded border border-white/20 px-2 py-1 text-[0.6875rem] text-white hover:bg-white/10 disabled:opacity-30">
+                className="rounded border border-white/20 px-2 py-1 text-2xs text-white hover:bg-white/10 disabled:opacity-30">
                 Reset
               </button>
             )}
             <button type="button" onClick={saveBounds} disabled={!dirty || saving}
-              className="rounded bg-indigo-600 px-2.5 py-1 text-[0.6875rem] font-semibold text-gray-950 hover:bg-indigo-500 disabled:opacity-30">
+              className="rounded bg-indigo-600 px-2.5 py-1 text-2xs font-semibold text-gray-950 hover:bg-indigo-500 disabled:opacity-30">
               Save bounds
             </button>
           </div>
@@ -142,24 +142,24 @@ export default function VideoClipTrimTools({
         <div className="flex flex-wrap gap-1.5">
           <button type="button" onClick={doSplit} disabled={!split.at || saving}
             title={split.why || `Split at ${split.at}s`}
-            className="rounded border border-amber-400/50 bg-amber-500/10 px-2.5 py-1 text-[0.6875rem] font-semibold text-amber-200 hover:bg-amber-500/20 disabled:opacity-30">
+            className="rounded border border-amber-400/50 bg-amber-500/10 px-2.5 py-1 text-2xs font-semibold text-amber-200 hover:bg-amber-500/20 disabled:opacity-30">
             ✂ Split here
           </button>
           <button type="button" onClick={doCreate} disabled={!newShot || saving}
             title={newShot
               ? `Add a shot from ${newShot.start_s}s to ${newShot.end_s}s`
               : 'There is no room for a shot at this point of the file.'}
-            className="rounded border border-white/20 px-2.5 py-1 text-[0.6875rem] font-semibold text-white hover:bg-white/10 disabled:opacity-30">
+            className="rounded border border-white/20 px-2.5 py-1 text-2xs font-semibold text-white hover:bg-white/10 disabled:opacity-30">
             ＋ New shot from here
           </button>
         </div>
         {split.why && (
-          <p className="text-[0.6875rem] text-white/50">{split.why}</p>
+          <p className="text-2xs text-white/50">{split.why}</p>
         )}
 
         {/* The line that repays the whole panel. Nothing else in the app says it,
             and no one would guess it from a control called "trim". */}
-        <p className="text-[0.6875rem] leading-snug text-sky-200/80">
+        <p className="text-2xs leading-snug text-sky-200/80">
           🎯 {I2V_FIRST_FRAME_HINT}
         </p>
       </div>

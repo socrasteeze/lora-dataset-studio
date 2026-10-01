@@ -34,7 +34,7 @@ function ReferenceCut({ reference, clipSeconds, disabled, onCut }) {
   const errorId = `reference-cut-error-${String(reference.name).replace(/[^A-Za-z0-9]/g, '')}`;
   if (!open) {
     return (
-      <div className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-content-subtle">
+      <div className="flex flex-wrap items-center gap-2 text-2xs text-content-subtle">
         <button type="button" className={BUTTON} disabled={disabled || total < CUT_MIN_SECONDS + 0.05} onClick={() => setOpen(true)}
           data-testid="reference-cut-open" aria-label={`Cut ${reference.tag}`}><Scissors className="mr-1 inline h-3.5 w-3.5" />Cut</button>
         <HelpBadge topic="video-reference-cut" />
@@ -50,7 +50,7 @@ function ReferenceCut({ reference, clipSeconds, disabled, onCut }) {
   }
   return (
     <div className="flex flex-col gap-1 rounded-md border border-border p-2" data-testid="reference-cut">
-      <p className="text-[0.6875rem] text-content-subtle">
+      <p className="text-2xs text-content-subtle">
         Keep this interval of the video ({CUT_MIN_SECONDS}–{CUT_MAX_SECONDS} s); the rest is dropped. Times start at the beginning of this copy.
         {Number.isFinite(clipSeconds) && clipSeconds > 0 ? ` Only a cut shorter than the clip (${clipSeconds.toFixed(1)} s) lightens the render.` : ''}
       </p>
@@ -64,7 +64,7 @@ function ReferenceCut({ reference, clipSeconds, disabled, onCut }) {
             aria-invalid={!!check.error} aria-describedby={check.error ? errorId : undefined}
             onChange={(e) => setDuration(e.target.value)} className={INPUT} /></label>
       </div>
-      {check.error && <p id={errorId} role="alert" className="text-[0.6875rem] text-amber-200">{check.error}</p>}
+      {check.error && <p id={errorId} role="alert" className="text-2xs text-amber-200">{check.error}</p>}
       <div className="flex flex-wrap gap-2">
         <button type="button" className={BUTTON} disabled={disabled || !!check.error} data-testid="reference-cut-apply"
           onClick={() => onCut(check.start, check.duration)}>Cut to {check.error ? '…' : `${check.duration.toFixed(1)} s`}</button>
@@ -215,7 +215,7 @@ export default function VideoReferencesPanel({ value, limits, disabled, onInsert
         })}
       </div>
       {!guideTarget && libraryPicker}
-      {!identitiesOnly && <p className="text-[0.6875rem] text-content-subtle">Videos: 2–15 s, prepared at 24 fps. Audio: 0.2–15 s. Video sound is off until you include it below. H3 uses video frames from the beginning of each reference, up to the generated clip length.</p>}
+      {!identitiesOnly && <p className="text-2xs text-content-subtle">Videos: 2–15 s, prepared at 24 fps. Audio: 0.2–15 s. Video sound is off until you include it below. H3 uses video frames from the beginning of each reference, up to the generated clip length.</p>}
       <div role="status" aria-live="polite" className="text-xs text-content-muted">{busy ? 'Preparing references…' : notice}</div>
       <div className="min-w-0 space-y-2">
         {rows.map((r) => {
@@ -230,14 +230,14 @@ export default function VideoReferencesPanel({ value, limits, disabled, onInsert
               <fieldset disabled={busy || disabled} className="flex min-w-0 flex-1 flex-col gap-2 disabled:opacity-60">
                 <div className="flex flex-wrap items-center gap-1">
                   {[r.tag, r.audioTag].filter(Boolean).map((tag) => <button key={tag} type="button" className={`${BUTTON} font-mono text-primary`} onClick={() => onInsertTag(tag)} title="Insert this tag in the motion">{tag}</button>)}
-                  {r.duration > 0 && <span className="text-[0.6875rem] text-content-subtle">{Number(r.duration).toFixed(1)} s</span>}
+                  {r.duration > 0 && <span className="text-2xs text-content-subtle">{Number(r.duration).toFixed(1)} s</span>}
                   <span className="ml-auto flex gap-1">
                     <button type="button" className={BUTTON} disabled={at === 0} aria-label={`Move ${r.tag} earlier`} onClick={() => value.setReferences((list) => moveReference(list, r.name, -1))}><ArrowUp className="h-3.5 w-3.5" /></button>
                     <button type="button" className={BUTTON} disabled={at === siblings.length - 1} aria-label={`Move ${r.tag} later`} onClick={() => value.setReferences((list) => moveReference(list, r.name, 1))}><ArrowDown className="h-3.5 w-3.5" /></button>
                     <button type="button" className={BUTTON} aria-label={`Remove ${r.tag}`} onClick={() => remove(r.name)}><Trash2 className="h-3.5 w-3.5" /></button>
                   </span>
                 </div>
-                {r.source_label && <p className="break-words text-[0.6875rem] text-content-subtle">{r.source_label}{r.frame ? ` · ${r.frame} frame` : Number.isFinite(r.start_seconds) ? ` · from ${r.start_seconds} s` : ''}</p>}
+                {r.source_label && <p className="break-words text-2xs text-content-subtle">{r.source_label}{r.frame ? ` · ${r.frame} frame` : Number.isFinite(r.start_seconds) ? ` · from ${r.start_seconds} s` : ''}</p>}
                 <label className="flex flex-col gap-1 text-xs text-content-muted">Role of {r.tag}
                   <input value={r.role || ''} maxLength={500} onChange={(e) => change(r.name, { role: e.target.value })} placeholder={r.kind === 'image' ? 'e.g. main character, red outfit, background' : r.kind === 'video' ? 'e.g. camera movement or dance to follow' : 'e.g. voice, rhythm or ambience'} className="min-h-10 w-full rounded-md border border-border bg-surface px-2 text-xs text-content lg:min-h-0 lg:py-1.5" />
                 </label>
@@ -251,7 +251,7 @@ export default function VideoReferencesPanel({ value, limits, disabled, onInsert
                     </label>
                     <HelpBadge topic="video-reference-format" />
                   </div>
-                  {r.use_format === true && <p className="text-[0.6875rem] text-content-subtle">Keeps this video’s proportions. Resolution still follows Render.</p>}
+                  {r.use_format === true && <p className="text-2xs text-content-subtle">Keeps this video’s proportions. Resolution still follows Render.</p>}
                   <ReferenceCut key={r.name} reference={r} clipSeconds={clipSeconds} disabled={busy || disabled} onCut={(start, duration) => cut(r, start, duration)} />
                 </>}
               </fieldset>
@@ -259,7 +259,7 @@ export default function VideoReferencesPanel({ value, limits, disabled, onInsert
           );
         })}
       </div>
-      <p className="text-[0.6875rem] text-content-subtle">Tags follow the order within each media type. Moving a reference updates its tags in your prompt; removing one marks its old mentions for you to edit.</p>
+      <p className="text-2xs text-content-subtle">Tags follow the order within each media type. Moving a reference updates its tags in your prompt; removing one marks its old mentions for you to edit.</p>
       {/* Open when a guide is actually set: ⏭ Continue arms the first frame
           guide, and a picture that decides the render must not sit behind a
           closed summary (2026-09-07). Toggling it stays the reader's. */}

@@ -152,7 +152,7 @@ export default function CaptionEditorDialog({
               ) : (
                 <p className="m-0 text-2xs font-semibold uppercase tracking-[0.18em] text-content-subtle">Dataset image</p>
               )}
-              <h2 id="caption-editor-title" className="m-0 mt-0.5 text-lg font-semibold text-content">
+              <h2 id="caption-editor-title" className="m-0 mt-0.5 text-xl font-semibold text-content">
                 {mode === 'lab' ? 'Caption Lab' : 'Edit caption'}
               </h2>
             </div>

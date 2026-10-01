@@ -354,7 +354,7 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
     const s = sectionMeta[id]
     return (
       <div className="flex flex-col gap-0.5 border-b border-border pb-2">
-        <p className="m-0 font-mono text-[11px] uppercase tracking-[0.18em] text-content-subtle">
+        <p className="m-0 font-mono text-2xs uppercase tracking-[0.18em] text-content-subtle">
           {s.eyebrow}
         </p>
         <h2 className="flex items-center gap-2 text-base font-semibold text-content">
@@ -380,7 +380,7 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
         <h1 className="flex items-center gap-2 font-bold text-content">
           <Clapperboard aria-hidden="true" className="h-5 w-5" />{ds.name}
         </h1>
-        <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+        <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
           Beta
         </span>
         <HelpBadge topic="page-video-dataset" />
@@ -388,7 +388,7 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
           <button type="button"
             onClick={() => { try { navigator.clipboard.writeText(ds.trigger_word) } catch { /* denied */ } }}
             title="Copy the trigger word — it is prepended to every sidecar at write time"
-            className="flex min-h-10 items-center gap-1 rounded-lg border border-indigo-400/40 bg-indigo-500/10 px-2 py-0.5 text-[0.6875rem] lg:min-h-0">
+            className="flex min-h-10 items-center gap-1 rounded-lg border border-indigo-400/40 bg-indigo-500/10 px-2 py-0.5 text-2xs lg:min-h-0">
             <span className="text-content-subtle">trigger:</span>
             <code className="font-semibold text-indigo-300">{ds.trigger_word}</code>
             <Copy aria-hidden="true" className="h-3 w-3 text-content-subtle" />
@@ -465,7 +465,7 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
           <div data-probe-panel="sections-rail"
             className="hidden lg:sticky lg:top-20 lg:flex lg:flex-col lg:gap-3">
             <nav aria-label="Video dataset sections">
-              <p className="m-0 px-3 pb-2 font-mono text-[11px] uppercase tracking-[0.18em] text-content-subtle">
+              <p className="m-0 px-3 pb-2 font-mono text-2xs uppercase tracking-[0.18em] text-content-subtle">
                 Video dataset
               </p>
               <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
@@ -532,7 +532,7 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
                 {CLIP_FILTERS.map((f) => (
                   <button key={f.id} type="button" onClick={() => setFilter(f.id)}
                     aria-pressed={filter === f.id}
-                    className={`min-h-10 rounded-full border px-3 py-0.5 text-[0.6875rem] font-semibold tabular-nums lg:min-h-0 ${
+                    className={`min-h-10 rounded-full border px-3 py-0.5 text-2xs font-semibold tabular-nums lg:min-h-0 ${
                       filter === f.id
                         ? 'border-border-strong bg-surface-raised text-content'
                         : 'border-border text-content-muted hover:text-content'}`}>
@@ -561,7 +561,7 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
                     <>
                       <span>✨ Neural render: {nr.job.done} of {nr.job.total} clips{nr.job.detail ? ` — ${nr.job.detail}` : ''}</span>
                       <button type="button" onClick={cancelNr}
-                        className="min-h-10 rounded border border-border bg-surface-raised px-2 py-0.5 text-[0.6875rem] text-content-muted hover:text-content lg:min-h-0">
+                        className="min-h-10 rounded border border-border bg-surface-raised px-2 py-0.5 text-2xs text-content-muted hover:text-content lg:min-h-0">
                         Stop
                       </button>
                     </>
@@ -569,7 +569,7 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
                     <>
                       <span>✨ {renderedIds.length} clip{renderedIds.length === 1 ? '' : 's'} play{renderedIds.length === 1 ? 's' : ''} a neural render (originals kept).</span>
                       <button type="button" onClick={() => restoreNr([])}
-                        className="min-h-10 rounded border border-border bg-surface-raised px-2 py-0.5 text-[0.6875rem] text-content-muted hover:text-content lg:min-h-0">
+                        className="min-h-10 rounded border border-border bg-surface-raised px-2 py-0.5 text-2xs text-content-muted hover:text-content lg:min-h-0">
                         🩹 Restore all originals
                       </button>
                     </>
@@ -589,11 +589,11 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
                   {selected.length} selected
                 </span>
                 <button type="button" onClick={() => setSelected(shownIds)}
-                  className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] text-content-muted hover:bg-surface lg:min-h-0">
+                  className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-2xs text-content-muted hover:bg-surface lg:min-h-0">
                   Select all shown ({shown.length})
                 </button>
                 <button type="button" onClick={() => setSelected([])}
-                  className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] text-content-muted hover:bg-surface lg:min-h-0">
+                  className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-2xs text-content-muted hover:bg-surface lg:min-h-0">
                   Clear
                 </button>
                 {/* ✨ DLSS 5 over the selection, in place — the dialog says what
@@ -602,17 +602,17 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
                     card still reads what this button would have done. */}
                 {hasContributions('video.neural-render-dialog', 'dataset') && <button type="button" onClick={() => setNrOpen(selected)} disabled={nrRunning}
                   title={nr?.status && !nr.status.ready ? 'Neural rendering is not set up on this machine — open the dialog to see what is missing' : 'Re-render the selected clips with DLSS 5 Neural Rendering (originals kept)'}
-                  className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] font-semibold text-content hover:bg-surface disabled:opacity-50 lg:min-h-0">
+                  className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-2xs font-semibold text-content hover:bg-surface disabled:opacity-50 lg:min-h-0">
                   ✨ Neural render
                 </button>}
                 {selectedRendered.length > 0 && !nrRunning && (
                   <button type="button" onClick={() => restoreNr(selectedRendered)}
-                    className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] text-content-muted hover:text-content lg:min-h-0">
+                    className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-2xs text-content-muted hover:text-content lg:min-h-0">
                     🩹 Restore original{selectedRendered.length === 1 ? '' : 's'} ({selectedRendered.length})
                   </button>
                 )}
                 <button type="button" onClick={() => removeClips(selected)}
-                  className="ml-auto min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] font-semibold text-content hover:border-rose-500/60 hover:text-rose-300 lg:min-h-0">
+                  className="ml-auto min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-2xs font-semibold text-content hover:border-rose-500/60 hover:text-rose-300 lg:min-h-0">
                   🗑 Remove from dataset
                 </button>
               </div>
@@ -630,15 +630,15 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
                   <li key={clip.id} className="min-w-0 rounded-lg border border-border bg-surface p-2">
                     <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                       <button type="button" onClick={() => setOpenId(clip.id)}
-                        className="min-h-10 rounded border border-border bg-surface-raised px-1.5 py-0.5 text-[0.625rem] font-semibold text-content hover:bg-surface lg:min-h-0">
+                        className="min-h-10 rounded border border-border bg-surface-raised px-1.5 py-0.5 text-2xs font-semibold text-content hover:bg-surface lg:min-h-0">
                         ▶ Open
                       </button>
-                      <span className="min-w-0 truncate font-mono text-[0.625rem] text-content-subtle"
+                      <span className="min-w-0 truncate font-mono text-2xs text-content-subtle"
                         title={clip.src_relpath || clip.filename}>
                         {clip.filename}
                       </span>
                       {!hasCaption(clip) && (
-                        <span className="rounded bg-amber-600/80 px-1 text-[0.625rem] font-bold text-white">
+                        <span className="rounded bg-amber-600/80 px-1 text-2xs font-bold text-white">
                           no caption
                         </span>
                       )}
@@ -648,7 +648,7 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
                       onBlur={() => saveCaption(clip)}
                       aria-label={`Caption for ${clip.filename}`}
                       placeholder="Describe the clip — this is written to the .txt next to it."
-                      className="mt-1 w-full rounded border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] text-content" />
+                      className="mt-1 w-full rounded border border-border bg-surface-raised px-2 py-1 text-2xs text-content" />
                     {/* The space is RESERVED, not inserted. Blur is a discrete
                         event, so React flushes this before the browser delivers
                         the mouseup: a line appearing here pushed everything
@@ -656,7 +656,7 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
                         landed beside the Caption tools button it was aimed at
                         (measured: +15 px between mousedown and mouseup). */}
                     <p aria-live="polite"
-                      className="min-h-4 text-[0.625rem] text-content-subtle">
+                      className="min-h-4 text-2xs text-content-subtle">
                       {savingId === clip.id ? 'Saving…' : ''}
                     </p>
                   </li>
@@ -822,17 +822,17 @@ function CaptionTools({ id, clips, selected, busy, onApply }) {
         </span>
       </p>
       <div className="flex flex-wrap items-end gap-1.5">
-        <label className="flex flex-col text-[0.625rem] text-content-subtle">
+        <label className="flex flex-col text-2xs text-content-subtle">
           Find
           <input value={find} onChange={(e) => setFind(e.target.value)}
-            className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] text-content lg:min-h-0" />
+            className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-2xs text-content lg:min-h-0" />
         </label>
-        <label className="flex flex-col text-[0.625rem] text-content-subtle">
+        <label className="flex flex-col text-2xs text-content-subtle">
           Replace with (empty removes it)
           <input value={replace} onChange={(e) => setReplace(e.target.value)}
-            className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] text-content lg:min-h-0" />
+            className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-2xs text-content lg:min-h-0" />
         </label>
-        <label className="flex items-center gap-1 text-[0.625rem] text-content-muted">
+        <label className="flex items-center gap-1 text-2xs text-content-muted">
           <input type="checkbox" checked={wholeWord}
             onChange={(e) => setWholeWord(e.target.checked)}
             className="h-3.5 w-3.5 accent-indigo-500" />
@@ -840,31 +840,31 @@ function CaptionTools({ id, clips, selected, busy, onApply }) {
         </label>
         <button type="button" disabled={!find.trim() || !!busy}
           onClick={() => onApply({ kind: 'replace', find, replace, wholeWord })}
-          className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] font-semibold text-content hover:bg-surface disabled:opacity-40 lg:min-h-0">
+          className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-2xs font-semibold text-content hover:bg-surface disabled:opacity-40 lg:min-h-0">
           Replace
         </button>
       </div>
       <div className="flex flex-wrap items-end gap-1.5">
-        <label className="flex flex-col text-[0.625rem] text-content-subtle">
+        <label className="flex flex-col text-2xs text-content-subtle">
           Text to add
           <input value={affix} onChange={(e) => setAffix(e.target.value)}
-            className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] text-content lg:min-h-0" />
+            className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-2xs text-content lg:min-h-0" />
         </label>
         <button type="button" disabled={!affix.trim() || !!busy}
           onClick={() => onApply({ kind: 'prefix', text: affix })}
           title="Added in front of every caption — including the clips that have none"
-          className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] text-content hover:bg-surface disabled:opacity-40 lg:min-h-0">
+          className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-2xs text-content hover:bg-surface disabled:opacity-40 lg:min-h-0">
           Add as prefix
         </button>
         <button type="button" disabled={!affix.trim() || !!busy}
           onClick={() => onApply({ kind: 'suffix', text: affix })}
           title="Appended to captions that already say something — never to an empty one"
-          className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] text-content hover:bg-surface disabled:opacity-40 lg:min-h-0">
+          className="min-h-10 rounded border border-border bg-surface-raised px-2 py-1 text-2xs text-content hover:bg-surface disabled:opacity-40 lg:min-h-0">
           Add as suffix
         </button>
       </div>
       {busy && (
-        <p className="text-[0.6875rem] text-content-muted">
+        <p className="text-2xs text-content-muted">
           {captionEditProgressLabel(busy.done, busy.total)}
         </p>
       )}
@@ -873,11 +873,11 @@ function CaptionTools({ id, clips, selected, busy, onApply }) {
           {/* The same frequency read the image lane offers, over the same helper —
               a term that shows up in every caption is a term the LoRA will bind
               to the trigger whether or not you meant it to. */}
-          <span className="text-[0.625rem] text-content-subtle">Most repeated words:</span>
+          <span className="text-2xs text-content-subtle">Most repeated words:</span>
           {freq.slice(0, 12).map(([term, n]) => (
             <button key={term} type="button" onClick={() => setFind(term)}
               title={`In ${n} caption${n === 1 ? '' : 's'} — click to put it in the Find field`}
-              className="rounded border border-border bg-surface-raised px-1.5 py-0.5 text-[0.625rem] text-content-muted hover:text-content">
+              className="rounded border border-border bg-surface-raised px-1.5 py-0.5 text-2xs text-content-muted hover:text-content">
               {term} <span className="tabular-nums text-content-subtle">{n}</span>
             </button>
           ))}
@@ -927,7 +927,7 @@ function ReferenceAttach({ ds, onChanged }) {
       <span className={`text-xs ${ds.references > 0 ? 'text-content-muted' : 'text-amber-300'}`}>
         📎 References: {ds.references || 0}{ds.references > 0 ? '' : ' — required, the launch is refused without them'}
       </span>
-      <label className="min-h-10 cursor-pointer rounded border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] font-semibold text-content hover:bg-surface lg:min-h-0">
+      <label className="min-h-10 cursor-pointer rounded border border-border bg-surface-raised px-2 py-1 text-2xs font-semibold text-content hover:bg-surface lg:min-h-0">
         <input type="file" multiple accept="image/*" hidden disabled={busy}
           onChange={(e) => { upload(e.target.files); e.target.value = '' }} />
         {busy ? 'Attaching…' : ds.references > 0 ? 'Replace them' : 'Attach 1-4 images'}

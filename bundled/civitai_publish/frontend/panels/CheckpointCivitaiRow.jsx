@@ -10,7 +10,7 @@ import { openCheckpointPublish } from '../lib/checkpointPublishStore.js';
    Never on a run card: a page is made from ONE save. The row only ASKS for the
    dialog (checkpointPublishStore) — the popover unmounts on the click, and the
    dialog is the host-mounted layer's to show. */
-const ROW = 'flex items-center gap-1.5 rounded-md border px-2 py-1 text-[0.6875rem] font-medium';
+const ROW = 'flex items-center gap-1.5 rounded-md border px-2 py-1 text-2xs font-medium';
 
 export default function CheckpointCivitaiRow({ node, pill, isRun = false, onClose }) {
   if (isRun || !pill) return null;

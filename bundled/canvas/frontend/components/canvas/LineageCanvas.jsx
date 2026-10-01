@@ -219,22 +219,22 @@ const LaneHeader = memo(function LaneHeader({ lane, onZoomRef }) {
       <span aria-hidden data-testid="lane-tint-dot"
         className="shrink-0 rounded-full"
         style={{ width: 6, height: 6, background: tintFor(lane.datasetId) }} />
-      <span className="truncate text-[0.8125rem] font-semibold text-content" title={lane.name}>
+      <span className="truncate text-xs font-semibold text-content" title={lane.name}>
         {lane.name}
       </span>
-      <span className="shrink-0 rounded-full border border-border bg-app/60 px-1.5 py-0.5 text-content-muted text-[0.5625rem] font-medium tabular-nums">
+      <span className="shrink-0 rounded-full border border-border bg-app/60 px-1.5 py-0.5 text-content-muted text-2xs font-medium tabular-nums">
         {lane.runs} run{lane.runs === 1 ? '' : 's'}
       </span>
       {lane.status === 'loading' && (
-        <span className="shrink-0 animate-pulse text-content-subtle text-[0.625rem]">loading…</span>
+        <span className="shrink-0 animate-pulse text-content-subtle text-2xs">loading…</span>
       )}
       {lane.status === 'error' && (
-        <span className="shrink-0 text-amber-300 text-[0.625rem]" title={lane.error || ''}>
+        <span className="shrink-0 text-amber-300 text-2xs" title={lane.error || ''}>
           could not load this dataset
         </span>
       )}
       {lane.status === 'ready' && !lane.height && (
-        <span className="shrink-0 text-content-subtle text-[0.625rem]">no runs to draw</span>
+        <span className="shrink-0 text-content-subtle text-2xs">no runs to draw</span>
       )}
     </div>
   );
@@ -373,7 +373,7 @@ const LaneGraph = memo(function LaneGraph({ lane, isLit, onHover, onNodeClick, d
                   style={{ position: 'absolute', left: 4, top: 4,
                     transform: `scale(${zoomLabelScale(boardScale, CARD_W)})`,
                     transformOrigin: 'top left' }}
-                  className="pointer-events-none max-w-[240px] truncate rounded border border-indigo-300/40 bg-black/70 px-1.5 py-0.5 text-[0.6875rem] font-semibold text-indigo-100 backdrop-blur-sm">
+                  className="pointer-events-none max-w-[240px] truncate rounded border border-indigo-300/40 bg-black/70 px-1.5 py-0.5 text-2xs font-semibold text-indigo-100 backdrop-blur-sm">
                   {zoomLabelText(n.node, lane.name, boardScale)}
                 </span>
               )}
@@ -2217,7 +2217,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
           ? 'Forget every moved card, rebuild the automatic tree, and bring '
             + 'every pinned image back beside its run'
           : 'Nothing has been moved yet'}
-        className="flex h-10 items-center gap-1 rounded-md border border-border bg-app/60 px-2 sm:px-3 text-content-muted text-[0.6875rem] font-semibold hover:text-content disabled:opacity-40 lg:h-9">
+        className="flex h-10 items-center gap-1 rounded-md border border-border bg-app/60 px-2 sm:px-3 text-content-muted text-2xs font-semibold hover:text-content disabled:opacity-40 lg:h-9">
         <span aria-hidden>✦</span> Tidy up
       </button>
       <HelpBadge topic="canvas-arrange" />
@@ -2237,7 +2237,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
           ? 'There is nothing on the board to export yet'
           : 'Save the whole board as a PNG — every pinned picture and every run '
             + 'card, at full size. Buttons and badges are not drawn.'}
-        className="flex h-10 items-center gap-1 rounded-md border border-border bg-app/60 px-2 sm:px-3 text-content-muted text-[0.6875rem] font-semibold hover:text-content disabled:opacity-40 lg:h-9">
+        className="flex h-10 items-center gap-1 rounded-md border border-border bg-app/60 px-2 sm:px-3 text-content-muted text-2xs font-semibold hover:text-content disabled:opacity-40 lg:h-9">
         <Camera aria-hidden="true" className="h-3.5 w-3.5" /> {exporting ? 'Exporting…' : 'PNG'}
       </button>
       {/* 🔌 A LoRA that never trained on this board — pinned as a node instead
@@ -2250,7 +2250,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
            toggle it straight back open — leaving no way to close it here. */
         data-canvas-ext-lora-toggle
         title="Add an external LoRA to the board"
-        className={'flex h-10 items-center gap-1 rounded-md border px-2 sm:px-3 text-[0.6875rem] font-semibold lg:h-9 '
+        className={'flex h-10 items-center gap-1 rounded-md border px-2 sm:px-3 text-2xs font-semibold lg:h-9 '
           + (extPickerOpen
             ? 'border-cyan-400/60 bg-cyan-500/15 text-cyan-100 '
             : 'border-border bg-app/60 text-content-muted hover:text-content ')}>
@@ -2269,7 +2269,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
         <button type="button" onClick={onOpenUndeploy}
           data-testid="canvas-undeploy-more"
           title="List every LoRA this app deployed into ComfyUI and remove the ones you tick. Your training saves are kept — each one can be deployed again."
-          className="flex h-10 items-center gap-1 rounded-md border border-border bg-app/60 px-2 sm:px-3 text-content-muted text-[0.6875rem] font-semibold hover:text-content lg:hidden">
+          className="flex h-10 items-center gap-1 rounded-md border border-border bg-app/60 px-2 sm:px-3 text-content-muted text-2xs font-semibold hover:text-content lg:hidden">
           <span aria-hidden>⏏</span> Undeploy…
         </button>
       )}
@@ -2294,7 +2294,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
           It renders from utils/checkpointDeployState, the same source the
           pills read, so the key cannot drift from what it explains. */}
       <span data-testid="canvas-deploy-legend"
-        className="flex items-center gap-2 text-content-subtle text-[0.625rem]">
+        className="flex items-center gap-2 text-content-subtle text-2xs">
         {DEPLOY_LEGEND.map((l) => (
           <span key={l.tone} className="flex items-center gap-1 whitespace-nowrap">
             {/* The swatch is the pill's OWN bar class, so the key is drawn by
@@ -2323,7 +2323,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
       aria-label="How the board is driven"
       title="How the board is driven — mouse, trackpad and touch"
       className={'flex h-10 shrink-0 items-center gap-1.5 rounded-md border border-border px-2 '
-        + 'text-[0.6875rem] font-semibold sm:px-3 lg:h-9 '
+        + 'text-2xs font-semibold sm:px-3 lg:h-9 '
         + (gesturesOpen ? 'bg-indigo-500/15 text-content' : 'bg-app/60 text-content-muted hover:text-content')}>
       <span aria-hidden>ⓘ</span> How this board works
     </button>
@@ -2390,7 +2390,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
         onPointerUp={endPointer}
         onPointerCancel={endPointer}>
         {empty ? (
-          <div className="flex h-full items-center justify-center px-6 text-center text-content-subtle text-[0.8125rem]">
+          <div className="flex h-full items-center justify-center px-6 text-center text-content-subtle text-xs">
             No dataset selected — pick one in the filter above to put its runs on the board.
           </div>
         ) : (
@@ -2617,7 +2617,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
                  opens. */
               className="pointer-events-auto mb-1.5 min-h-0 max-w-full overflow-y-auto rounded-xl border border-border bg-surface-overlay/95 p-2.5 shadow-xl backdrop-blur sm:max-w-md">
               <div className="mb-1.5 flex items-center justify-between gap-2">
-                <span className="text-content text-[0.6875rem] font-semibold">
+                <span className="text-content text-2xs font-semibold">
                   <span aria-hidden>ⓘ</span> How this board works
                 </span>
                 <button type="button" onClick={() => setGesturesOpen(false)}
@@ -2628,7 +2628,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
                      time it opened the bubble and measured what was inside. */
                   className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-app/60 text-content-muted hover:text-content lg:h-7 lg:w-7">×</button>
               </div>
-              <p className="m-0 text-content-subtle text-[0.6875rem] leading-relaxed">
+              <p className="m-0 text-content-subtle text-2xs leading-relaxed">
                 {BOARD_GESTURES}
               </p>
             </div>
@@ -2661,7 +2661,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
                 {inlineActions && gestureChip}
                 <button type="button" onClick={() => setMoreOpen(false)}
                   aria-label="Close the board tools"
-                  className="ml-auto flex h-10 items-center rounded-md border border-border bg-app/60 px-3 text-content-muted text-[0.6875rem] font-semibold hover:text-content lg:h-9">
+                  className="ml-auto flex h-10 items-center rounded-md border border-border bg-app/60 px-3 text-content-muted text-2xs font-semibold hover:text-content lg:h-9">
                   Close
                 </button>
               </div>
@@ -2685,7 +2685,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
               disabled={view.scale <= MIN_SCALE + 1e-9}
               title="Zoom out" aria-label="Zoom out"
               className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-app/60 text-content-muted hover:text-content disabled:opacity-40 lg:h-9 lg:w-9">−</button>
-            <span className="min-w-[2.5rem] sm:min-w-[3.25rem] text-center text-content-muted text-[0.6875rem] tabular-nums">{pct}%</span>
+            <span className="min-w-[2.5rem] sm:min-w-[3.25rem] text-center text-content-muted text-2xs tabular-nums">{pct}%</span>
             <button type="button" onClick={() => zoomByButton(ZOOM_STEP)}
               disabled={view.scale >= MAX_SCALE - 1e-9}
               title="Zoom in" aria-label="Zoom in"
@@ -2693,7 +2693,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
           </div>
           <button type="button" onClick={fitNow}
             title="Fit the whole board in view"
-            className="flex h-10 items-center rounded-md border border-border bg-app/60 px-2 sm:px-3 text-content-muted text-[0.6875rem] font-semibold hover:text-content lg:h-9">
+            className="flex h-10 items-center rounded-md border border-border bg-app/60 px-2 sm:px-3 text-content-muted text-2xs font-semibold hover:text-content lg:h-9">
             Fit
           </button>
           {/* 🎨 The board's own launch button. It carries the pick count so the
@@ -2704,7 +2704,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
             title={picks.length
               ? `${picks.length} checkpoint(s) picked — open the run settings`
               : 'Tick checkpoints on the board, then set the run up here'}
-            className={'flex h-10 items-center gap-1 rounded-md border px-2 sm:px-3 text-[0.6875rem] font-semibold lg:h-9 '
+            className={'flex h-10 items-center gap-1 rounded-md border px-2 sm:px-3 text-2xs font-semibold lg:h-9 '
               + (picks.length
                 ? 'border-indigo-400/60 bg-indigo-500/15 text-indigo-100 '
                 : 'border-border bg-app/60 text-content-muted hover:text-content ')}>
@@ -2725,7 +2725,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
             data-testid="canvas-more-toggle"
             title="Tidy up, Layouts, PNG, external LoRAs, the colour key and what every gesture on this board does"
             aria-label="More board tools"
-            className={'ml-auto flex h-10 items-center gap-1 rounded-md border px-2 sm:px-3 text-[0.6875rem] font-semibold lg:h-9 '
+            className={'ml-auto flex h-10 items-center gap-1 rounded-md border px-2 sm:px-3 text-2xs font-semibold lg:h-9 '
               + (moreOpen
                 ? 'border-primary/60 bg-primary/15 text-content '
                 : 'border-border bg-app/60 text-content-muted hover:text-content ')}>
@@ -2736,7 +2736,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
           </button>
           {selectedForDiff.length > 0 && (
             <button type="button" onClick={() => setSelectedForDiff([])}
-              className="rounded-md border border-amber-400/50 bg-amber-500/10 px-2 py-1 text-amber-100 text-[0.625rem]">
+              className="rounded-md border border-amber-400/50 bg-amber-500/10 px-2 py-1 text-amber-100 text-2xs">
               Clear compare ({selectedForDiff.length})
             </button>
           )}
@@ -2901,7 +2901,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
           may be closed and the ✓ boxes are small. Also the only place the
           mixed-family refusal is visible without opening the panel. */}
       {!panelOpen && picks.length > 0 && (
-        <p className={'mt-2 rounded-lg border px-3 py-1.5 text-[0.6875rem] '
+        <p className={'mt-2 rounded-lg border px-3 py-1.5 text-2xs '
           + (launchVerdict.blocked
             ? 'border-amber-400/40 bg-amber-500/10 text-amber-100 '
             : 'border-indigo-400/40 bg-indigo-500/10 text-indigo-100 ')}>

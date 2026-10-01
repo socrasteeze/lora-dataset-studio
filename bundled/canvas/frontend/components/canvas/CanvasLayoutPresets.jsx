@@ -107,7 +107,7 @@ export default function CanvasLayoutPresets({ positions, imageNodes, lanePlaceme
       onToggle={(e) => setOpen(e.currentTarget.open)}
       className="relative">
       <summary title="Layouts — save this arrangement, or put a saved one back"
-        className="flex h-10 cursor-pointer list-none items-center gap-1 rounded-md border border-border bg-app/60 px-2 text-content-muted text-[0.6875rem] font-semibold hover:text-content sm:px-3 lg:h-9">
+        className="flex h-10 cursor-pointer list-none items-center gap-1 rounded-md border border-border bg-app/60 px-2 text-content-muted text-2xs font-semibold hover:text-content sm:px-3 lg:h-9">
         {/* 📱 This was icon-only below `sm`, because at 400 px the board's
             toolbar wrapped into five rows and ate a quarter of the screen. It is
             not in that toolbar below `lg` any more — it is in the board's ⋯
@@ -134,7 +134,7 @@ export default function CanvasLayoutPresets({ positions, imageNodes, lanePlaceme
           did. From `sm` up it is the anchored menu it has always been. */}
       <div className="fixed inset-x-2 bottom-28 z-40 w-auto rounded-lg border border-border bg-surface-overlay p-2 shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:top-full sm:mt-1 sm:w-[min(18rem,calc(100vw-2rem))]">
         <div className="mb-1.5 flex items-center gap-1">
-          <span className="text-content text-[0.6875rem] font-semibold">Save this arrangement</span>
+          <span className="text-content text-2xs font-semibold">Save this arrangement</span>
           <HelpBadge topic="canvas-layouts" />
         </div>
         <div className="flex items-center gap-1">
@@ -147,26 +147,26 @@ export default function CanvasLayoutPresets({ positions, imageNodes, lanePlaceme
             placeholder="e.g. likeness review"
             aria-label="Name for this board layout"
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } }}
-            className="h-10 min-w-0 flex-1 rounded border border-border bg-app/60 px-2 text-content text-[0.75rem] focus:border-primary focus:outline-none lg:h-8" />
+            className="h-10 min-w-0 flex-1 rounded border border-border bg-app/60 px-2 text-content text-xs focus:border-primary focus:outline-none lg:h-8" />
           <button type="button" onClick={save} disabled={busy === 'save'}
-            className="h-10 shrink-0 rounded border border-indigo-400/50 bg-indigo-500/15 px-2 text-indigo-100 text-[0.6875rem] font-semibold disabled:opacity-50 lg:h-8">
+            className="h-10 shrink-0 rounded border border-indigo-400/50 bg-indigo-500/15 px-2 text-indigo-100 text-2xs font-semibold disabled:opacity-50 lg:h-8">
             {busy === 'save' ? '…' : 'Save'}
           </button>
         </div>
-        <p className="mt-1 mb-2 text-content-subtle text-[0.625rem]">
+        <p className="mt-1 mb-2 text-content-subtle text-2xs">
           Where every run card and every pinned picture sits — closed pictures
           included. Saving under a name you already used replaces it.
         </p>
 
         {error && (
-          <p role="alert" className="mb-2 rounded border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-amber-100 text-[0.625rem]">
+          <p role="alert" className="mb-2 rounded border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-amber-100 text-2xs">
             {error}
           </p>
         )}
 
-        {presets == null && <p className="text-content-subtle text-[0.625rem]">Loading…</p>}
+        {presets == null && <p className="text-content-subtle text-2xs">Loading…</p>}
         {presets != null && presets.length === 0 && (
-          <p className="text-content-subtle text-[0.625rem]">
+          <p className="text-content-subtle text-2xs">
             No saved layout yet. Arrange the board, name it above, and it will be here.
           </p>
         )}
@@ -176,8 +176,8 @@ export default function CanvasLayoutPresets({ positions, imageNodes, lanePlaceme
               <li key={p.id}
                 className="flex items-center gap-1 rounded border border-border bg-app/40 px-1.5 py-1">
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-content text-[0.75rem]" title={p.name}>{p.name}</span>
-                  <span className="block text-content-subtle text-[0.5625rem]">{canvasPresetSummary(p)}</span>
+                  <span className="block truncate text-content text-xs" title={p.name}>{p.name}</span>
+                  <span className="block text-content-subtle text-2xs">{canvasPresetSummary(p)}</span>
                 </span>
                 <button type="button" onClick={() => apply(p)}
                   disabled={busy === `apply:${p.id}`}
@@ -187,7 +187,7 @@ export default function CanvasLayoutPresets({ positions, imageNodes, lanePlaceme
                      Apply sits one row from Delete: a miss here does the wrong
                      thing rather than nothing. Found by responsiveProbe.mjs,
                      which measures popovers now that it opens them. */
-                  className="flex h-10 shrink-0 items-center rounded border border-border bg-surface px-2 text-content-muted text-[0.625rem] font-semibold hover:text-content disabled:opacity-50 lg:h-6 lg:px-1.5">
+                  className="flex h-10 shrink-0 items-center rounded border border-border bg-surface px-2 text-content-muted text-2xs font-semibold hover:text-content disabled:opacity-50 lg:h-6 lg:px-1.5">
                   {busy === `apply:${p.id}` ? '…' : 'Apply'}
                 </button>
                 <button type="button"
@@ -200,7 +200,7 @@ export default function CanvasLayoutPresets({ positions, imageNodes, lanePlaceme
                     : `Forget the layout “${p.name}” — the board itself is not touched`}
                   aria-label={confirmDelete === p.id
                     ? `Confirm forgetting ${p.name}` : `Forget the layout ${p.name}`}
-                  className={'flex h-10 shrink-0 items-center rounded border px-2 text-[0.625rem] font-semibold lg:h-6 lg:px-1.5 '
+                  className={'flex h-10 shrink-0 items-center rounded border px-2 text-2xs font-semibold lg:h-6 lg:px-1.5 '
                     + (confirmDelete === p.id
                       ? 'border-red-300 bg-red-600/90 text-white'
                       : 'border-border bg-surface text-content-muted hover:border-red-400/60 hover:text-content')}>

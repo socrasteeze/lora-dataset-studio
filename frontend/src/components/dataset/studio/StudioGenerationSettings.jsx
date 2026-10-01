@@ -255,7 +255,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
                 value={sampler}
                 onChange={(e) => setSampler(e.target.value)}
                 aria-label="Krea sampler"
-                className="w-full bg-app/60 border border-border rounded-md px-2 py-1.5 text-content text-[0.8125rem] focus:border-primary focus:outline-none normal-case tracking-normal"
+                className="w-full bg-app/60 border border-border rounded-md px-2 py-1.5 text-content text-xs focus:border-primary focus:outline-none normal-case tracking-normal"
               >
                 <option value="">Auto (er_sde)</option>
                 <optgroup label="ComfyUI samplers">
@@ -274,7 +274,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
                 value={scheduler}
                 onChange={(e) => setScheduler(e.target.value)}
                 aria-label="Krea scheduler"
-                className="w-full bg-app/60 border border-border rounded-md px-2 py-1.5 text-content text-[0.8125rem] focus:border-primary focus:outline-none normal-case tracking-normal"
+                className="w-full bg-app/60 border border-border rounded-md px-2 py-1.5 text-content text-xs focus:border-primary focus:outline-none normal-case tracking-normal"
               >
                 <option value="">Auto (simple)</option>
                 {kreaSchedulers.map((s) => (<option key={s} value={s}>{s}</option>))}
@@ -294,7 +294,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
                 value={hiresScale}
                 onChange={(e) => setHiresScale(e.target.value)}
                 aria-label="Krea hi-res fix (second sampling pass)"
-                className="w-full bg-app/60 border border-border rounded-md px-2 py-1.5 text-content text-[0.8125rem] focus:border-primary focus:outline-none normal-case tracking-normal"
+                className="w-full bg-app/60 border border-border rounded-md px-2 py-1.5 text-content text-xs focus:border-primary focus:outline-none normal-case tracking-normal"
               >
                 <option value="">{hiresDefaultLabel(hiresDefaults)}</option>
                 <option value="1">Off for this run</option>
@@ -354,7 +354,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
                 value={weightDtype}
                 onChange={(e) => setWeightDtype(e.target.value)}
                 aria-label="Krea loader precision (weight dtype)"
-                className="w-full bg-app/60 border border-border rounded-md px-2 py-1.5 text-content text-[0.8125rem] focus:border-primary focus:outline-none normal-case tracking-normal"
+                className="w-full bg-app/60 border border-border rounded-md px-2 py-1.5 text-content text-xs focus:border-primary focus:outline-none normal-case tracking-normal"
               >
                 <option value="default">ComfyUI default (auto · dtype varies)</option>
                 <option value="fp8_e4m3fn">FP8 e4m3fn (recommended)</option>

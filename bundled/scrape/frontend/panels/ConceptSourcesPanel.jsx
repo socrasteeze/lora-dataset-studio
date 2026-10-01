@@ -340,7 +340,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
           <><Globe aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{toVideoDataset ? 'Import videos from the web' : toVideoBank ? 'Scrape videos into the bank'
             : toBank ? 'Scrape into the bank' : 'Build from scraped images'}</>
         </h2>
-        <span className="text-content-subtle text-[0.6875rem]"
+        <span className="text-content-subtle text-2xs"
           title={toVideoDataset ? 'Scan a website, choose videos and add encoded clips to this dataset.' : toVideoBank
             ? 'A video bank is the triage step for footage: bring back more than you need, then cut it into shots and keep the ones worth training on.'
             : toBank
@@ -357,12 +357,12 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
             className={`rounded-lg border px-2.5 py-2 ${group.tone === 'emerald'
               ? 'border-emerald-400/30 bg-emerald-500/5'
               : 'border-rose-400/30 bg-rose-500/5'}`}>
-            <span className={`mr-2 text-[0.6875rem] font-bold ${group.tone === 'emerald'
+            <span className={`mr-2 text-2xs font-bold ${group.tone === 'emerald'
               ? 'text-emerald-300' : 'text-rose-300'}`}>{group.label}</span>
             <span className="inline-flex flex-wrap gap-x-2 gap-y-1">
               {group.sources.map(([name, href]) => (
                 <a key={name} href={href} target="_blank" rel="noreferrer"
-                  className="text-[0.6875rem] text-content-muted underline decoration-white/20 underline-offset-2 hover:text-content">
+                  className="text-2xs text-content-muted underline decoration-white/20 underline-offset-2 hover:text-content">
                   {name} ↗
                 </a>
               ))}
@@ -378,7 +378,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
           what the probe actually reported missing (caps.scrape_deps_detail). */}
       {caps.scrape_deps === false && (
         <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-2 flex flex-col gap-1.5">
-          <p className="text-amber-200 text-[0.6875rem]">
+          <p className="text-amber-200 text-2xs">
             {scrapeDepsBanner(caps.scrape_deps_detail)} Install them for image previews,
             imports, the keyless web image search and video sources. Pexels uses its
             official API for listing, but still needs curl_cffi to fetch images.
@@ -417,7 +417,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
 
       {modeInUse === 'reddit' && (
         <div className="rounded-lg border border-border bg-white/5 px-2 py-2 flex flex-col gap-1.5">
-          <span className="text-content-subtle text-[0.6875rem] flex items-center gap-1">
+          <span className="text-content-subtle text-2xs flex items-center gap-1">
             <Search aria-hidden="true" className="h-3.5 w-3.5" /> Search Reddit
           </span>
           <div className="flex flex-wrap items-center gap-2">
@@ -444,7 +444,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
               {scanning ? 'Searching…' : 'Search Reddit'}
             </button>
           </div>
-          <p className="text-content-muted text-[0.6875rem] leading-relaxed">
+          <p className="text-content-muted text-2xs leading-relaxed">
             <b className="text-content-subtle">Keyword</b> searches all of Reddit for a term.
             Add a <b className="text-content-subtle">subreddit</b> (the part after
             <code className="px-1 text-content-subtle">r/</code>) to search inside one community.
@@ -455,7 +455,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
 
       {modeInUse === 'pexels' && (
         <div className="rounded-lg border border-border bg-white/5 px-2.5 py-2 flex flex-col gap-2">
-          <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-2 text-[0.6875rem] leading-relaxed text-amber-100">
+          <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-2 text-2xs leading-relaxed text-amber-100">
             <p>
               <b>Pexels authorization required.</b> An API key alone does not authorize
               dataset or machine-learning use. Search only if Pexels explicitly authorized
@@ -511,7 +511,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
               placeholder="keyword — e.g. curly hair portrait"
               aria-label="Web image search keyword"
               className="min-w-[12rem] flex-[2] px-2.5 py-1.5 rounded-lg bg-surface-raised border border-border text-content text-sm placeholder:text-content-subtle focus:border-indigo-500 outline-none" />
-            <label className="flex items-center gap-2 text-[0.6875rem] text-content-muted cursor-pointer shrink-0">
+            <label className="flex items-center gap-2 text-2xs text-content-muted cursor-pointer shrink-0">
               <input type="checkbox" checked={websearchSafe}
                 onChange={(e) => setWebsearchSafe(e.target.checked)}
                 className="h-4 w-4 rounded border-border accent-indigo-500" />
@@ -525,7 +525,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
             </button>
             <HelpBadge topic="action-scrape-websearch" className="self-center" />
           </div>
-          <p className="text-content-muted text-[0.6875rem] leading-relaxed">
+          <p className="text-content-muted text-2xs leading-relaxed">
             Searches images across the open web — no account and no API key.
             Results come from third-party sites: check the licence before using an
             image, and expect a broader mix than a curated source like Pexels.
@@ -547,14 +547,14 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
             </button>
             <HelpBadge topic="action-scrape-scan" className="self-center" />
           </form>
-          <p className="text-content-muted text-[0.6875rem] leading-relaxed">
+          <p className="text-content-muted text-2xs leading-relaxed">
             {toVideo ? 'Paste a supported video page, gallery or album URL, scan, then select the videos to import.' : <>
               Use this for supported galleries and albums, or direct Pexels photos and collections.
               Normal Pexels keyword searches belong in the Pexels tab.
             </>}
           </p>
           {/pornpics\.com/i.test(url) && !/\/galleries\//i.test(url) && (
-            <label className="flex items-center gap-2 text-[0.6875rem] text-content-muted cursor-pointer"
+            <label className="flex items-center gap-2 text-2xs text-content-muted cursor-pointer"
               title="Off: one listing cover per gallery. On: every photo from each matched gallery.">
               <input type="checkbox" checked={fullAlbums}
                 onChange={(e) => setFullAlbums(e.target.checked)}
@@ -566,7 +566,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
       )}
 
       {!toBank && !toVideo && (
-      <label className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 text-[0.75rem] ${
+      <label className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 text-xs ${
         rescueSmall
           ? 'border-indigo-400/50 bg-indigo-500/10 text-content'
           : 'border-border bg-white/[0.03] text-content-muted'} ${
@@ -579,7 +579,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
           <span className="font-semibold text-content">
             Rescue images under 768 px with Klein (generative)
           </span>
-          <span className="text-[0.6875rem] leading-relaxed text-content-subtle">
+          <span className="text-2xs leading-relaxed text-content-subtle">
             Off by default. Only small images are sent to Klein. The original is preserved,
             and neither version enters training until you choose one in Curation.
             {/* This used to be a bare "not ready in this setup" — a verdict with no
@@ -611,7 +611,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
         const asideNote = setAsideNotice(destination, setAside.length);
         return (
         <>
-          <div className="flex items-center gap-2 text-[0.6875rem] text-content-subtle flex-wrap">
+          <div className="flex items-center gap-2 text-2xs text-content-subtle flex-wrap">
             <span className="rounded-full border border-border bg-surface-raised px-2 py-0.5 font-semibold text-content"
               title={activeScanUrl || undefined}>
               Results from {platformLabel(activePlatform)}
@@ -708,18 +708,18 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
                     )}
                     {isVideo && (
                       <span aria-hidden
-                        className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-[0.625rem] font-semibold leading-none text-white">
+                        className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-2xs font-semibold leading-none text-white">
                         ▶{duration ? ` ${duration}` : ''}
                       </span>
                     )}
                     <span aria-hidden
-                      className={`absolute top-1 right-1 w-4 h-4 rounded-full text-[0.625rem] leading-4 text-center font-bold
+                      className={`absolute top-1 right-1 w-4 h-4 rounded-full text-2xs leading-4 text-center font-bold
                         ${on ? 'bg-indigo-500 text-gray-950' : 'bg-black/50 text-gray-950/70'}`}>
                       {on ? '✓' : ''}
                     </span>
                   </button>
                   <PexelsAttribution metadata={it}
-                    className="mt-1 block px-0.5 text-[0.625rem] leading-tight text-content-subtle" />
+                    className="mt-1 block px-0.5 text-2xs leading-tight text-content-subtle" />
                 </div>
               );
             })}
@@ -733,7 +733,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
             // can happen even when `paginated` is false (a truncated album dive
             // still looks "final" otherwise, cf. the gdl.enumerate `from_albums`
             // note). Say so in plain English.
-            <p className="text-[0.6875rem] text-amber-500">
+            <p className="text-2xs text-amber-500">
               This scan stopped before the end of the listing — some results may be missing.
             </p>
           )}

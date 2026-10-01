@@ -3161,7 +3161,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 <input type="datetime-local" value={schedAt}
                   onChange={(e) => setSchedAt(e.target.value)}
                   aria-label="Scheduled training date and time"
-                  className="rounded border border-border bg-app/60 px-2 py-1 text-content text-[0.8125rem]" />
+                  className="rounded border border-border bg-app/60 px-2 py-1 text-content text-xs" />
               </label>
               <span className="text-content-subtle text-2xs">
                 Base “{baseLabel}” — if another training is running at that time, it waits in the queue.
@@ -3772,7 +3772,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             <h3 className="m-0 text-content font-bold text-sm">
               ⚠ Previous run found ({resumeAsk.final ? 'complete' : 'stopped'} · step {resumeAsk.latest})
             </h3>
-            <p className="m-0 text-content-muted text-[0.8125rem] leading-relaxed">
+            <p className="m-0 text-content-muted text-xs leading-relaxed">
               Training will <b className="text-content">resume that LoRA</b> from its last
               checkpoint — anything it learned from images you have since removed stays in
               its weights. If the dataset changed, start fresh instead: the old run is

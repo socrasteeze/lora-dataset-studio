@@ -164,7 +164,7 @@ function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBacku
               alt="" loading="lazy" decoding="async" aria-hidden="true"
               className="h-full w-full object-cover" />
           ) : (
-            <span className={`grid h-full w-full place-items-center bg-gradient-to-br ${gradientFor(d.name)} text-white text-3xl font-bold`}
+            <span className={`grid h-full w-full place-items-center bg-gradient-to-br ${gradientFor(d.name)} text-white text-2xl font-bold`}
               aria-hidden="true">
               {(d.name || '?').charAt(0).toUpperCase()}
             </span>
@@ -277,7 +277,7 @@ function DatasetRow({ d, onOpen, onDelete, onRename, onExportZip, onExportBackup
             {(d.trained_families || []).map((f) => {
               const [lbl, cls] = familyBadge(f);
               return (
-                <span key={f} className={`shrink-0 rounded border px-1 py-px text-[0.5rem] font-semibold uppercase ${cls}`}
+                <span key={f} className={`shrink-0 rounded border px-1 py-px text-2xs font-semibold uppercase ${cls}`}
                   title={`A ${lbl} LoRA has been trained from this dataset`}>
                   {lbl}
                 </span>

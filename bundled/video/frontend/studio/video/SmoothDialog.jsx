@@ -71,7 +71,7 @@ export default function SmoothDialog({ clip, busy, onSmooth, onClose }) {
                   className={`flex min-h-10 flex-col items-center justify-center rounded-md px-2 py-1.5 text-sm font-semibold lg:min-h-0 ${
                     t.multiplier === multiplier ? 'bg-primary text-white' : 'text-content-muted hover:text-content'}`}>
                   <span>{t.fps} fps</span>
-                  <span className="text-[0.6875rem] font-normal opacity-80">×{t.multiplier}</span>
+                  <span className="text-2xs font-normal opacity-80">×{t.multiplier}</span>
                 </button>
               ))}
             </div>
@@ -85,7 +85,7 @@ export default function SmoothDialog({ clip, busy, onSmooth, onClose }) {
           {tooFewFrames && <p role="alert" className="text-xs text-content-muted">
             Smooth needs at least 2 frames in the source clip.
           </p>}
-          <p className="text-[0.6875rem] text-content-subtle">
+          <p className="text-2xs text-content-subtle">
             Whole factors only: the interpolator writes 1, 2 or 3 frames between each pair. Any other
             rate would mean dropping frames unevenly afterwards, which reads as judder.
             {' '}The saved video can be slightly shorter, by less than one source frame.

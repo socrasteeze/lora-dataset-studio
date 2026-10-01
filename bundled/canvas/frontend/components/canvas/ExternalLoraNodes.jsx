@@ -35,11 +35,11 @@ export const ExternalLoraCard = forwardRef(function ExternalLoraCard(
         {...dragHandlers}
         className="flex cursor-grab items-center gap-1 border-b border-cyan-400/30 bg-cyan-500/10 px-1.5 py-1 active:cursor-grabbing">
         <Plug aria-hidden="true" className="h-3.5 w-3.5" />
-        <span className="min-w-0 flex-1 truncate text-[0.6875rem] font-semibold text-content" title={node.filename}>
+        <span className="min-w-0 flex-1 truncate text-2xs font-semibold text-content" title={node.filename}>
           {baseName(node.filename)}
         </span>
         {info && (
-          <span className="shrink-0 rounded border border-cyan-400/40 bg-cyan-500/10 px-1 py-px text-[0.5625rem] text-cyan-200">
+          <span className="shrink-0 rounded border border-cyan-400/40 bg-cyan-500/10 px-1 py-px text-2xs text-cyan-200">
             {info.label || info.arch}
           </span>
         )}
@@ -51,7 +51,7 @@ export const ExternalLoraCard = forwardRef(function ExternalLoraCard(
       <div className="flex items-center gap-1.5 px-1.5 py-1">
         <input type="checkbox" checked={!!checked} onChange={() => onToggleChecked(node.filename)}
           aria-label={`Stack ${baseName(node.filename)} on the next run`} />
-        <label className="min-w-0 flex-1 text-[0.625rem] text-content-muted">
+        <label className="min-w-0 flex-1 text-2xs text-content-muted">
           Strength {node.strength}
           <input type="range" min="0" max="2" step="0.05" value={node.strength}
             onChange={(e) => onUpdate(node.filename, { strength: clampStrength(e.target.value) })}
@@ -126,7 +126,7 @@ export function ExternalLoraAddFlow({ nodes = [], onNodesChange, family = 'zimag
     <div data-canvas-control
       className="lds-extlora-add fixed right-2 top-16 z-50 w-[min(20rem,calc(100vw-1rem))] rounded-lg border border-border bg-surface-overlay p-2 shadow-xl">
       <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-[0.6875rem] font-semibold text-content">
+        <span className="text-2xs font-semibold text-content">
           <span aria-hidden>🔌</span> Add an external LoRA
         </span>
         <button type="button" onClick={() => onClose?.()} aria-label="Close"
@@ -138,11 +138,11 @@ export function ExternalLoraAddFlow({ nodes = [], onNodesChange, family = 'zimag
         placeholder="path/to/lora.safetensors" />
       <button type="button" onClick={addNode}
         disabled={!pickText.trim() || nodes.length >= MAX_EXTERNAL_LORAS}
-        className="mt-1.5 w-full rounded-md border border-cyan-400/50 bg-cyan-500/10 px-2 py-1 text-[0.6875rem] font-semibold text-cyan-100 disabled:opacity-40">
+        className="mt-1.5 w-full rounded-md border border-cyan-400/50 bg-cyan-500/10 px-2 py-1 text-2xs font-semibold text-cyan-100 disabled:opacity-40">
         Add to board
       </button>
       {nodes.length >= MAX_EXTERNAL_LORAS && (
-        <p className="mt-1 text-[0.625rem] text-amber-300">
+        <p className="mt-1 text-2xs text-amber-300">
           Limit of {MAX_EXTERNAL_LORAS} external LoRAs reached — remove one to add another.
         </p>
       )}

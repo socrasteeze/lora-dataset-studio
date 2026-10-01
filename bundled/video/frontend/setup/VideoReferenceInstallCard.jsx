@@ -97,7 +97,7 @@ export default function VideoReferenceInstallCard({ caps, onDone }) {
       <button type="button" disabled={!caps.comfyui.dir_valid || running || !plan.length} onClick={install} className="min-h-10 rounded-lg border border-primary px-3 py-2 text-xs font-semibold text-content disabled:opacity-40">
         {running ? 'Installing selected profile…' : plan.length ? `Install ${plan.length} missing component${plan.length === 1 ? '' : 's'}` : 'Selected profile files are installed'}
       </button>
-      <p className="text-[0.6875rem] text-content-subtle">The reference helper ships with LDS and installs without pip changes. Restart ComfyUI after its installation. If core MiniMax reference nodes are missing, update ComfyUI too.</p>
+      <p className="text-2xs text-content-subtle">The reference helper ships with LDS and installs without pip changes. Restart ComfyUI after its installation. If core MiniMax reference nodes are missing, update ComfyUI too.</p>
       {!!coreMissing.length && <p className="break-words text-xs text-amber-200">Update ComfyUI to provide: {coreMissing.join(', ')}.</p>}
       {message && <p role="status" className="text-xs text-content-muted">{message}</p>}
     </section>

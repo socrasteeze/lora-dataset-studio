@@ -30,7 +30,7 @@ export default function ImproveFinishCard({ config, setField, configDefaults }) 
       help="Three small operations applied to the finished image by the app, not by ComfyUI: put the source's colours back, sharpen the finest detail, and add a little film grain. They are what separate a render that looks processed from one that looks photographed. Nothing to install — no model, no GPU, no node pack. All three ship off; the image you get today is byte-for-byte the one ComfyUI wrote."
     >
       {!anyOn && (
-        <p className="rounded border border-border-subtle bg-surface-subtle px-2 py-1.5 text-[0.6875rem] text-content-subtle">
+        <p className="rounded border border-border-subtle bg-surface-subtle px-2 py-1.5 text-2xs text-content-subtle">
           Every stage is off — the finished image is left exactly as ComfyUI wrote it.
           The reference workflow this was ported from runs colour match{' '}
           {IMPROVE_REFERENCE.colour_match}, sharpen {IMPROVE_REFERENCE.sharpen}, grain{' '}
@@ -52,7 +52,7 @@ export default function ImproveFinishCard({ config, setField, configDefaults }) 
           onChange={(e) => setField('improve', 'colour_match', Number(e.target.value))}
           className="mt-1 w-full accent-violet-500"
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
 
             <>
               A Klein improve keeps the content and loses the grade: skin warms or cools and
@@ -81,7 +81,7 @@ export default function ImproveFinishCard({ config, setField, configDefaults }) 
           onChange={(e) => setField('improve', 'sharpen', Number(e.target.value))}
           className="mt-1 w-full accent-violet-500"
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           Local contrast at a 1&nbsp;px radius — the finest octave, the one diffusion leaves
           empty — not a global sharpness slider. {IMPROVE_REFERENCE.sharpen} is the reference
           value; past about 1 the halo starts reading as an outline.
@@ -103,7 +103,7 @@ export default function ImproveFinishCard({ config, setField, configDefaults }) 
           onChange={(e) => setField('improve', 'grain', Number(e.target.value))}
           className="mt-1 w-full accent-violet-500"
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           Diffusion output is smooth in a way photographs are not — the model resolves
           structure confidently and leaves the finest octave nearly empty. A very small
           amount of noise refills it and the eye reads the result as a photograph.
@@ -131,7 +131,7 @@ export default function ImproveFinishCard({ config, setField, configDefaults }) 
           onChange={(e) => setField('improve', 'grain_saturation', Number(e.target.value))}
           className="mt-1 w-full accent-violet-500"
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           0 puts identical noise on the three channels, which is what film does and what
           reads as grain. 1 makes each channel independent, which reads as sensor noise.
         </p>

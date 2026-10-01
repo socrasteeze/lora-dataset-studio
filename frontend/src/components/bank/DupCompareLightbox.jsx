@@ -320,7 +320,7 @@ export default function DupCompareLightbox({
           {shortcut('F')}
         </button>
         <button type="button" onClick={onClose} title="Close (Esc)" aria-label="Close the comparison"
-          className="ml-auto h-10 w-10 lg:h-9 lg:w-9 rounded-full bg-white/10 text-lg leading-none text-white hover:bg-white/20">✕</button>
+          className="ml-auto h-10 w-10 lg:h-9 lg:w-9 rounded-full bg-white/10 text-xl leading-none text-white hover:bg-white/20">✕</button>
       </div>
 
       {done ? (

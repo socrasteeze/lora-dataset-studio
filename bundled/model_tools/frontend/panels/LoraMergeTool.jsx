@@ -43,7 +43,7 @@ export function LoraMergePlan({ plan, busy = false, disabled = false, onStart = 
   if (!plan?.ok) return null;
   const carried = carriedOverNote(plan);
   return (
-    <div className="mt-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1.5 text-[0.6875rem] leading-relaxed">
+    <div className="mt-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1.5 text-2xs leading-relaxed">
       <p className="m-0">{planHeadline(plan)}</p>
       <p className="m-0 mt-1 opacity-85">
         {plan.merged_tensors} of {plan.base_tensors} tensors change
@@ -88,7 +88,7 @@ function LoraMergeProgress({ state, onCancel = null }) {
   if (!state || !MERGE_RUNNING_STATES.includes(state.status)) return null;
   const width = pct(state.done, state.total);
   return (
-    <div className="mt-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1.5 text-[0.6875rem] leading-relaxed"
+    <div className="mt-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1.5 text-2xs leading-relaxed"
       role="status">
       <p className="m-0">
         🧬 Merging on the CPU{state.total ? ` — ${state.done}/${state.total} tensors` : '…'}
@@ -115,7 +115,7 @@ function LoraMergeOutcome({ state }) {
   const result = state.result || null;
   if (state.status === 'done') {
     return (
-      <div className="mt-1.5 text-emerald-200 text-[0.6875rem] leading-relaxed" role="status">
+      <div className="mt-1.5 text-emerald-200 text-2xs leading-relaxed" role="status">
         <p className="m-0">
           ✓ <span className="font-mono break-all">{state.destination_name}</span>
           {' '}({fmtGB(result?.bytes_after)}) is in
@@ -132,14 +132,14 @@ function LoraMergeOutcome({ state }) {
   }
   if (state.status === 'cancelled') {
     return (
-      <p className="m-0 mt-1.5 text-amber-200 text-[0.6875rem] leading-relaxed" role="status">
+      <p className="m-0 mt-1.5 text-amber-200 text-2xs leading-relaxed" role="status">
         ■ Stopped. The partial file was removed; the base and the LoRAs are untouched.
       </p>
     );
   }
   if (state.status === 'error') {
     return (
-      <p className="m-0 mt-1.5 text-rose-200 text-[0.6875rem] leading-relaxed" role="alert">
+      <p className="m-0 mt-1.5 text-rose-200 text-2xs leading-relaxed" role="alert">
         ✗ {state.error || 'The merge failed.'} Nothing was overwritten.
       </p>
     );
@@ -259,7 +259,7 @@ export default function LoraMergeTool({
   };
 
   const running = MERGE_RUNNING_STATES.includes(state?.status);
-  const fieldClass = 'min-h-10 lg:min-h-0 w-full sm:flex-1 sm:min-w-[12rem] rounded border border-sky-300/40 bg-app/70 px-2 py-1 text-content text-[0.75rem] font-mono disabled:opacity-50';
+  const fieldClass = 'min-h-10 lg:min-h-0 w-full sm:flex-1 sm:min-w-[12rem] rounded border border-sky-300/40 bg-app/70 px-2 py-1 text-content text-xs font-mono disabled:opacity-50';
 
   return (
     <div className={framed
@@ -268,14 +268,14 @@ export default function LoraMergeTool({
       {framed && (
         <>
           <span className="font-semibold">Merge a LoRA into a base — get a full model</span>
-          <p className="m-0 mt-1 text-sky-200/75 text-[0.6875rem] leading-relaxed">
+          <p className="m-0 mt-1 text-sky-200/75 text-2xs leading-relaxed">
             {HONESTY_NOTE}
           </p>
         </>
       )}
 
       <div className={framed ? 'mt-2' : ''}>
-        <label className="m-0 mb-1 block text-sky-200/75 text-[0.625rem] uppercase tracking-wide"
+        <label className="m-0 mb-1 block text-sky-200/75 text-2xs uppercase tracking-wide"
           htmlFor="lora-merge-base">
           Base checkpoint {baseLabel ? `— ${baseLabel}` : ''}
         </label>
@@ -287,7 +287,7 @@ export default function LoraMergeTool({
           className={fieldClass} />
       </div>
 
-      <p className="m-0 mt-2 mb-1 text-sky-200/75 text-[0.625rem] uppercase tracking-wide">
+      <p className="m-0 mt-2 mb-1 text-sky-200/75 text-2xs uppercase tracking-wide">
         LoRAs to fold in
       </p>
       <datalist id="lora-merge-known">
@@ -308,15 +308,15 @@ export default function LoraMergeTool({
             disabled={running || disabled}
             aria-label="Weight for this LoRA"
             title="1.0 applies the LoRA exactly as trained"
-            className="min-h-10 lg:min-h-0 w-full sm:w-20 shrink-0 rounded border border-sky-300/40 bg-app/70 px-2 py-1 text-content text-[0.75rem] disabled:opacity-50" />
+            className="min-h-10 lg:min-h-0 w-full sm:w-20 shrink-0 rounded border border-sky-300/40 bg-app/70 px-2 py-1 text-content text-xs disabled:opacity-50" />
           <button type="button" onClick={() => dropRow(row.id)}
             disabled={running || disabled}
             aria-label="Remove this LoRA"
-            className="min-h-10 lg:min-h-0 shrink-0 self-start rounded-md border border-white/30 bg-black/20 px-2.5 py-1 text-[0.75rem] font-semibold hover:bg-black/30 disabled:opacity-40">
+            className="min-h-10 lg:min-h-0 shrink-0 self-start rounded-md border border-white/30 bg-black/20 px-2.5 py-1 text-xs font-semibold hover:bg-black/30 disabled:opacity-40">
             Remove
           </button>
           {weightHint(row.weight) && (
-            <span className="basis-full text-sky-200/70 text-[0.625rem]">
+            <span className="basis-full text-sky-200/70 text-2xs">
               {weightHint(row.weight)}
             </span>
           )}
@@ -325,21 +325,21 @@ export default function LoraMergeTool({
 
       <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center">
         <button type="button" onClick={addRow} disabled={running || disabled}
-          className="min-h-10 lg:min-h-0 shrink-0 self-start rounded-md border border-white/30 bg-black/20 px-2.5 py-1 text-[0.75rem] font-semibold hover:bg-black/30 disabled:opacity-40">
+          className="min-h-10 lg:min-h-0 shrink-0 self-start rounded-md border border-white/30 bg-black/20 px-2.5 py-1 text-xs font-semibold hover:bg-black/30 disabled:opacity-40">
           + Another LoRA
         </button>
         <button type="button" onClick={askPlan}
           disabled={disabled || busy || running || !canAskPlan(basePath, rows)}
-          className="min-h-10 lg:min-h-0 shrink-0 self-start rounded-lg border border-primary/40 bg-primary/20 px-2.5 py-1 text-[0.75rem] font-semibold text-white disabled:opacity-40">
+          className="min-h-10 lg:min-h-0 shrink-0 self-start rounded-lg border border-primary/40 bg-primary/20 px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-40">
           Check this merge
         </button>
       </div>
 
-      <p className="m-0 mt-1.5 text-sky-200/70 text-[0.625rem] leading-relaxed">{TURBO_NOTE}</p>
-      <p className="m-0 mt-1 text-sky-200/70 text-[0.625rem] leading-relaxed">{PRECISION_NOTE}</p>
+      <p className="m-0 mt-1.5 text-sky-200/70 text-2xs leading-relaxed">{TURBO_NOTE}</p>
+      <p className="m-0 mt-1 text-sky-200/70 text-2xs leading-relaxed">{PRECISION_NOTE}</p>
 
       {plan && !plan.ok && !running && (
-        <p className="m-0 mt-1 text-amber-200 text-[0.6875rem]" role="alert">⚠ {plan.error}</p>
+        <p className="m-0 mt-1 text-amber-200 text-2xs" role="alert">⚠ {plan.error}</p>
       )}
       {!running && (
         <LoraMergePlan plan={plan} busy={busy} disabled={disabled} onStart={start} />

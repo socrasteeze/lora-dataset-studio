@@ -28,22 +28,22 @@ export default function VideoReferenceOptions({ options, value, onChange, onRefr
           {bases.map((b) => <option key={b.id} value={b.id}>{b.label}{!remote && b.available === false ? ' — needs Setup' : ''}</option>)}
         </select>
       </label>
-      <p className="text-[0.6875rem] text-content-subtle">{base?.hint || REFERENCE_BASES.find((b) => b.id === value.base)?.hint}</p>
+      <p className="text-2xs text-content-subtle">{base?.hint || REFERENCE_BASES.find((b) => b.id === value.base)?.hint}</p>
       <label className="flex flex-col gap-1 text-xs text-content-muted">Reference acceleration
         <select disabled={value.base === 'fused'} value={value.accel || ''} onChange={(e) => onChange({ accel: e.target.value, steps: '', ...(e.target.value === 'vdn' ? { h3_attention: 'native', h3_spectrum: false, sparse: '' } : {}) })} className={select}>
           <option value="">Off · dense reference model</option>
           {accels.map((a) => <option key={a.id} value={a.id}>{a.label}{!remote && a.available === false ? ' — needs Setup' : ''}</option>)}
         </select>
       </label>
-      <p className="text-[0.6875rem] text-content-subtle">{accel?.hint || (value.accel ? 'A distillation made for reference conditioning. Compare its speed and fidelity with the dense model.' : 'Use the undistilled reference base for comparison.')}</p>
-      {value.accel === 'vdn' && <p className="text-[0.6875rem] text-content-subtle">Use the VDN stage from Setup and the <a href="https://github.com/Saganaki22/ComfyUI-VDN-H3" target="_blank" rel="noopener noreferrer" className="underline">ComfyUI-VDN-H3 pack by Saganaki22</a>. Its Turbo adapter replaces LightX acceleration.</p>}
+      <p className="text-2xs text-content-subtle">{accel?.hint || (value.accel ? 'A distillation made for reference conditioning. Compare its speed and fidelity with the dense model.' : 'Use the undistilled reference base for comparison.')}</p>
+      {value.accel === 'vdn' && <p className="text-2xs text-content-subtle">Use the VDN stage from Setup and the <a href="https://github.com/Saganaki22/ComfyUI-VDN-H3" target="_blank" rel="noopener noreferrer" className="underline">ComfyUI-VDN-H3 pack by Saganaki22</a>. Its Turbo adapter replaces LightX acceleration.</p>}
       <label className="flex flex-col gap-1 text-xs text-content-muted">Reference image detail
         <select value={value.imageSize} onChange={(e) => onChange({ imageSize: e.target.value })} className={select}>
           <option value="match">Match output size</option>
           <option value="max">More reference detail · higher memory use</option>
         </select>
       </label>
-      <p className="text-[0.6875rem] text-content-subtle">More detail keeps references up to a 2048 px short edge. Every reference adds work at every sampling step.</p>
+      <p className="text-2xs text-content-subtle">More detail keeps references up to a 2048 px short edge. Every reference adds work at every sampling step.</p>
       {remote && <p className="text-xs text-content-muted">Prepare the rented GPU above to install this model and acceleration there.</p>}
       {!remote && (referenceBaseMissing(base, value, performance) || accel?.available === false) && (
         <div role="status" className="rounded-lg border border-amber-400/40 bg-amber-400/10 p-2 text-xs text-amber-200">

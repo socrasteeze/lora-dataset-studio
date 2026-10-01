@@ -131,14 +131,14 @@ export default function ZImageLoraConfig({ loras = [], onChange, zModel = '', is
                 aria-pressed={fav}
                 aria-label={fav ? `Remove ${l.displayName} from this model's favorites` : `Mark ${l.displayName} as favorite for this model`}
                 title={fav ? 'Favorite for this model — click to remove' : 'Mark as favorite for this model'}
-                className={`shrink-0 leading-none text-[0.95rem] ${fav ? 'text-amber-300' : 'text-content-muted/40 hover:text-amber-300'} ${zModel ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'}`}
+                className={`shrink-0 leading-none text-base ${fav ? 'text-amber-300' : 'text-content-muted/40 hover:text-amber-300'} ${zModel ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'}`}
               >
                 {fav ? '★' : '☆'}
               </button>
               <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
                 <input type="checkbox" checked={!!c.enabled} onChange={() => toggle(l.filename)}
                   aria-label={`Enable ${l.displayName}`} />
-                <span className="text-content text-[0.8125rem] truncate">{visibleLabel || l.displayName}</span>
+                <span className="text-content text-xs truncate">{visibleLabel || l.displayName}</span>
               </label>
               {c.enabled && (
                 <>
@@ -201,9 +201,9 @@ export default function ZImageLoraConfig({ loras = [], onChange, zModel = '', is
               <button type="button" onClick={() => toggleGroup(key)} aria-expanded={open}
                 title={open ? 'Collapse this dataset' : 'Expand to pick a checkpoint'}
                 className="flex items-center gap-2 w-full px-2 py-1.5 text-left">
-                <span aria-hidden className="shrink-0 w-3 text-content-muted text-[0.7rem]">{open ? '▾' : '▸'}</span>
-                {anyFav && <span aria-hidden className="shrink-0 text-amber-300 text-[0.85rem] leading-none">★</span>}
-                <span className="flex-1 min-w-0 truncate text-content text-[0.8125rem]">{key}</span>
+                <span aria-hidden className="shrink-0 w-3 text-content-muted text-2xs">{open ? '▾' : '▸'}</span>
+                {anyFav && <span aria-hidden className="shrink-0 text-amber-300 text-sm leading-none">★</span>}
+                <span className="flex-1 min-w-0 truncate text-content text-xs">{key}</span>
                 {active ? (
                   <span className="shrink-0 whitespace-nowrap text-content-muted text-2xs">
                     using {stepLabel(active)}{enabledItems.length > 1 ? ` (+${enabledItems.length - 1})` : ''}

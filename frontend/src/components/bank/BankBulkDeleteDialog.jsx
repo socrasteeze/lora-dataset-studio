@@ -91,7 +91,7 @@ export default function BankBulkDeleteDialog({ banks, onClose, onResults }) {
         data-probe-chrome="bank-bulk-dialog" data-probe-layer
         className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-rose-500/60 bg-surface-overlay shadow-2xl">
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
-          <h2 id="bank-bulk-delete-title" className="text-lg font-semibold text-content">Delete {pending.length} Bank(s)?</h2>
+          <h2 id="bank-bulk-delete-title" className="text-xl font-semibold text-content">Delete {pending.length} Bank(s)?</h2>
           <p className="rounded-md border border-rose-500/50 bg-rose-500/10 p-3 text-sm text-rose-100">
             This removes triage records, decisions, and caches. Trash does not restore that data. External source files stay. App-managed imported copies go to Trash.
           </p>

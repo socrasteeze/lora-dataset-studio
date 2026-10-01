@@ -141,7 +141,7 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
       {active ? (
         <div className="flex flex-wrap items-center gap-1.5">
           <button type="button" onClick={stop}
-            className="min-h-10 lg:min-h-0 rounded border border-rose-500/60 bg-rose-500/10 px-2 py-1 text-[0.6875rem] font-semibold text-rose-100 hover:bg-rose-500/20">
+            className="min-h-10 lg:min-h-0 rounded border border-rose-500/60 bg-rose-500/10 px-2 py-1 text-2xs font-semibold text-rose-100 hover:bg-rose-500/20">
             ⏹ Stop training
           </button>
           <HelpBadge topic="video-train-local" />
@@ -150,19 +150,19 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
         <>
           <VideoTrainingControls value={controls} onChange={setControls} error={controlsError} />
           <div className="flex flex-wrap items-center gap-1.5">
-            <label className="flex items-center gap-1 text-[0.6875rem] text-content-muted">
+            <label className="flex items-center gap-1 text-2xs text-content-muted">
               Steps
               <input type="number" min={100} step={100} value={steps}
                 onChange={(e) => setSteps(Number(e.target.value) || 1000)}
-                className="w-20 rounded border border-border bg-surface-raised px-1.5 py-0.5 text-[0.6875rem] text-content" />
+                className="w-20 rounded border border-border bg-surface-raised px-1.5 py-0.5 text-2xs text-content" />
             </label>
             {Boolean(ds?.suggested_steps) && (
-              <span className="text-[0.625rem] text-content-subtle">
+              <span className="text-2xs text-content-subtle">
                 suggested for {ds.clips} clips
               </span>
             )}
             {ds.target_profile === 'minimax_h3' && (
-              <label className="flex items-center gap-1 text-[0.6875rem] text-content-muted">
+              <label className="flex items-center gap-1 text-2xs text-content-muted">
                 <input type="checkbox" checked={doI2v}
                   onChange={(e) => setDoI2v(e.target.checked)} />
                 i2v (first-frame)
@@ -175,7 +175,7 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
                 rough edges" costs less than a user who assumed a settled
                 feature. Upstream words this "same chip both destinations"; this
                 build has only the local one, and the beta is still the RAIL. */}
-            <span className="rounded border border-amber-500/50 bg-amber-500/10 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wider text-amber-200">
+            <span className="rounded border border-amber-500/50 bg-amber-500/10 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wider text-amber-200">
               Beta
             </span>
             {/* Upstream reads "▶ Train on this PC" because it has a second
@@ -183,7 +183,7 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
                 the machine would advertise a lane this build does not offer. */}
             <button type="button" onClick={() => start(false)}
               disabled={busy || !ds.clips || Boolean(controlsError)}
-              className="min-h-10 lg:min-h-0 rounded border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] font-semibold text-content hover:bg-surface disabled:opacity-50">
+              className="min-h-10 lg:min-h-0 rounded border border-border bg-surface-raised px-2 py-1 text-2xs font-semibold text-content hover:bg-surface disabled:opacity-50">
               {busy ? 'Starting…' : '▶ Train this dataset'}
             </button>
             <HelpBadge topic="video-train-local" />
@@ -192,13 +192,13 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
       )}
 
       {!active && !ds.clips && (
-        <p className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-[0.6875rem] text-amber-100">
+        <p className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-2xs text-amber-100">
           This set has no clips yet — promote some shots into it first.
         </p>
       )}
 
       {active && (
-        <p className="text-[0.6875rem] text-content-muted">
+        <p className="text-2xs text-content-muted">
           {dl
             ? `Downloading weights — ${dl.percent ?? 0}%`
             : progress.step != null
@@ -208,7 +208,7 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
       )}
 
       {!active && !PROVEN_TARGETS.has(ds.target_profile) && (
-        <p className="text-[0.6875rem] text-content-subtle">
+        <p className="text-2xs text-content-subtle">
           {ds.target_label} is wired from ai-toolkit’s own settings but has not
           been trained end to end yet.
         </p>
@@ -216,12 +216,12 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
       {/* On the card, not only in the toast after launching: a warning that
           arrives once the run is up is a warning about a decision already made. */}
       {!active && progress?.resolution_note && (
-        <p className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-[0.6875rem] text-amber-100">
+        <p className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-2xs text-amber-100">
           ⚠ {progress.resolution_note}
         </p>
       )}
       {!!progress?.checkpoints?.length && (
-        <p className="text-[0.6875rem] text-content-muted">
+        <p className="text-2xs text-content-muted">
           {progress.checkpoints.length} saved checkpoint
           {progress.checkpoints.length === 1 ? '' : 's'} in {progress.run_name}
         </p>

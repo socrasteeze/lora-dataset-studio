@@ -1275,7 +1275,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
               (a moment when nothing is in flight). */}
           {(pending > 0 || act?.kind === 'improve') && (
             <div className="flex items-center gap-3 rounded-lg border-2 border-indigo-400/60 bg-indigo-500/15 px-3 py-2.5">
-              <span className="animate-pulse text-lg" aria-hidden>⏳</span>
+              <span className="animate-pulse text-xl" aria-hidden>⏳</span>
               <div className="flex flex-col">
                 <span className="text-content text-sm font-semibold">
                   {act?.kind === 'improve' && act.total
@@ -1893,7 +1893,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     explainer panel; the count is spelled out ("N checked") so a green 0
                     reads as a REAL result, not a scan that never ran. */}
                 {isStyle ? (
-                  <span className={`ml-auto text-[0.8125rem] ${keptUncaptioned ? 'text-amber-300' : 'text-emerald-400'}`}
+                  <span className={`ml-auto text-xs ${keptUncaptioned ? 'text-amber-300' : 'text-emerald-400'}`}
                     title="Every Style image needs a content-only caption: describe subject, action and setting, but do not name the aesthetic, medium or artist. No activation trigger is added.">
                     {keptUncaptioned
                       ? `${keptUncaptioned} missing · content-only captions required · no trigger`
@@ -1911,7 +1911,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                         : (isConcept
                             ? "These captions name the concept → it won't bind to the trigger. Click to see what's watched and fix them here."
                             : "These captions mention hair/face/skin → identity won't bind to the trigger. Click to see what's watched and fix them here.")}
-                      className={`${controlHeight()} inline-flex items-center ml-auto text-[0.8125rem] underline decoration-dashed scroll-mt-20 ${
+                      className={`${controlHeight()} inline-flex items-center ml-auto text-xs underline decoration-dashed scroll-mt-20 ${
                         d.caption_leak.leaking === 0
                           ? 'text-emerald-400 decoration-emerald-400/40'
                           : 'text-amber-400 decoration-amber-400/50'}`}>
@@ -1925,7 +1925,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       onClick={toggleLeakReview}
                       aria-expanded={showLeaks}
                       title={`The ${isConcept ? 'concept' : 'identity'}-leak scan runs on captions. Caption the kept images first. Click to learn what it checks.`}
-                      className={`${controlHeight()} inline-flex items-center ml-auto text-content-subtle text-[0.8125rem] underline decoration-dashed decoration-border scroll-mt-20`}>
+                      className={`${controlHeight()} inline-flex items-center ml-auto text-content-subtle text-xs underline decoration-dashed decoration-border scroll-mt-20`}>
                       {isConcept ? 'concept' : 'identity'}-leak scan: no captions yet {showLeaks ? '▴' : '▾'}
                     </button>
                   ) : null
@@ -2032,7 +2032,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                         const recaptionLocked = ds.busy || ds.captioning || ds.recaptioningIds.size > 0;
                         return (
                           <div className="flex items-start justify-between gap-2 flex-wrap">
-                            <span className="text-amber-300 text-[0.8125rem] font-semibold">
+                            <span className="text-amber-300 text-xs font-semibold">
                               {isConcept
                                 ? <>Captions naming the concept ({d.caption_leak?.leaking}) — remove the concept words, or Re-caption. Edits save when you click away.</>
                                 : <>Captions leaking identity ({d.caption_leak?.leaking}) — remove the highlighted words, or Re-caption. Edits save when you click away.</>}
@@ -2096,7 +2096,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                         );
                       })}
                       {leakingImages.length === 0 && (
-                        <p className="m-0 text-emerald-400 text-[0.8125rem]"><CheckCircle2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />All clear — no leaking caption left.</p>
+                        <p className="m-0 text-emerald-400 text-xs"><CheckCircle2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />All clear — no leaking caption left.</p>
                       )}
                     </div>
                   )}
@@ -2121,7 +2121,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   🧪 Caption Lab
                 </button>
                 <HelpBadge topic="action-caption-lab" />
-                <span className="text-content-subtle text-[0.8125rem]">
+                <span className="text-content-subtle text-xs">
                   compare engines, models and vocabulary on one image — before re-captioning the whole set
                 </span>
               </div>

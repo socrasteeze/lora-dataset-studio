@@ -26,7 +26,7 @@ export default function QuickVoteModal({ vote, datasetId, fmt }) {
       onTouchStart={vote.onTouchStart} onTouchEnd={vote.onTouchEnd}
       role="dialog" aria-modal="true" aria-label="Quick vote">
       <button type="button" onClick={() => vote.close()} aria-label="Close vote"
-        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 border border-white/20 text-white text-lg z-10 hover:bg-white/20">×</button>
+        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 border border-white/20 text-white text-xl z-10 hover:bg-white/20">×</button>
       {vote.voteTitle && (
         <div className="px-3 py-1 rounded-full bg-green-500/20 border border-green-400/50 text-green-200 text-xs font-semibold">
           {vote.voteTitle}

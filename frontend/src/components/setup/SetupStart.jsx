@@ -175,7 +175,7 @@ export default function SetupStart({ onTools, onRecheck, scanned = false, detect
           </ol>
           {plan.next?.action && <section className="space-y-3 rounded-xl border border-primary/40 bg-surface p-5" aria-label="Your next action" aria-live="polite">
             <p className="text-xs font-semibold uppercase tracking-wide text-primary">Your next action</p>
-            <h2 className="text-lg font-semibold text-content">{plan.next.title}</h2>
+            <h2 className="text-xl font-semibold text-content">{plan.next.title}</h2>
             <p className="text-sm text-content-muted">{plan.next.description}</p>
             <button type="button" disabled={busy} className={PRIMARY}
               onClick={() => plan.next.action.kind === 'reload' ? window.location.reload() : follow(plan.next.action.to)}>
@@ -187,7 +187,7 @@ export default function SetupStart({ onTools, onRecheck, scanned = false, detect
             <p className={'text-xs font-medium ' + (ready ? 'text-emerald-400' : 'text-content-muted')}>
               {ready ? 'Ready for your first try' : 'First try — follow the plugin’s checks'}
             </p>
-            <h2 className="text-lg font-semibold text-content">{plan.first.title}</h2>
+            <h2 className="text-xl font-semibold text-content">{plan.first.title}</h2>
             <p className="text-sm text-content-muted">{plan.first.description}</p>
             <div className="flex flex-wrap gap-2">{plan.first.links.map(link => <button type="button" key={link.to}
               disabled={busy} className={PRIMARY} onClick={() => follow(link.to, true)}>{busy ? 'Opening…' : link.label}</button>)}</div>

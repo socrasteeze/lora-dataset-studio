@@ -69,7 +69,7 @@ export function GraphCard({ node, lit, annotated, compareRole, onSelect }) {
             ? <span className="font-normal text-content-muted"> · {variantLabel(node)}</span> : null}
         </span>
         {cur && (
-          <span className="shrink-0 rounded-full bg-indigo-500/25 px-1.5 py-0.5 text-indigo-100 text-[0.5rem] font-bold uppercase tracking-wider">
+          <span className="shrink-0 rounded-full bg-indigo-500/25 px-1.5 py-0.5 text-indigo-100 text-2xs font-bold uppercase tracking-wider">
             this run
           </span>
         )}
@@ -78,7 +78,7 @@ export function GraphCard({ node, lit, annotated, compareRole, onSelect }) {
         )}
         {compareRole && (
           <span title={`Selected for compare (${compareRole})`}
-            className="shrink-0 rounded-full bg-amber-500/25 px-1.5 py-0.5 text-amber-100 text-[0.5rem] font-bold uppercase tracking-wider">
+            className="shrink-0 rounded-full bg-amber-500/25 px-1.5 py-0.5 text-amber-100 text-2xs font-bold uppercase tracking-wider">
             {compareRole}
           </span>
         )}
@@ -197,13 +197,13 @@ export function CheckpointPill({ pill, offX, offY, active, selected, preview, bi
         aria-label={`Open the ${count} ${resultNoun}${count > 1 ? 's' : ''} of step ${pill.step}`}
         title={resultsTitle}
         className={'lds-ckcount flex shrink-0 cursor-pointer items-center gap-px rounded-full border border-indigo-400/70 bg-indigo-500/25 font-semibold leading-none tabular-nums text-indigo-100 hover:bg-indigo-500 hover:text-gray-950 '
-          + (inline ? 'ml-0.5 h-3.5 px-1 text-[0.5rem] ' : 'h-4 px-1 text-2xs shadow-sm ')}>
+          + (inline ? 'ml-0.5 h-3.5 px-1 text-2xs ' : 'h-4 px-1 text-2xs shadow-sm ')}>
         <span aria-hidden>{resultIcon}</span>{count}
       </span>
     ) : (
       <span title={resultsTitle}
         className={'lds-ckcount flex shrink-0 items-center gap-px rounded-full border border-border bg-surface-overlay font-semibold leading-none tabular-nums text-content-muted '
-          + (inline ? 'ml-0.5 h-3.5 px-1 text-[0.5rem] ' : 'h-4 px-1 text-2xs ')}>
+          + (inline ? 'ml-0.5 h-3.5 px-1 text-2xs ' : 'h-4 px-1 text-2xs ')}>
         <span aria-hidden>{resultIcon}</span>{count}
       </span>
     )
@@ -290,7 +290,7 @@ export function CheckpointPill({ pill, offX, offY, active, selected, preview, bi
               ? { transform: `scale(${selScale})`, transformOrigin: '100% 100%' }
               : null) }}
           className={'lds-cksel flex items-center justify-center rounded-[3px] border leading-none shadow-sm '
-            + (big ? 'h-5 w-5 text-2xs ' : 'h-3 w-3 text-[0.5rem] ')
+            + (big ? 'h-5 w-5 text-2xs ' : 'h-3 w-3 text-2xs ')
             + (selected ? 'border-indigo-400 bg-indigo-500 text-gray-950 ' : 'border-border-strong bg-surface-overlay text-transparent hover:border-indigo-400 ')}>
           ✓
         </button>

@@ -290,7 +290,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
             aria-label="Pin this image to the canvas"
             title="📌 Pin to canvas — put this image on the board, beside the checkpoint that made it"
             className="absolute bottom-1 right-1 flex h-7 w-7 items-center justify-center rounded-full
-                       border border-indigo-300/70 bg-black/60 text-[0.8125rem] text-indigo-100
+                       border border-indigo-300/70 bg-black/60 text-xs text-indigo-100
                        hover:bg-indigo-500/50 focus-visible:bg-indigo-500/50
                        sm:bottom-0.5 sm:right-0.5 sm:h-5 sm:w-5 sm:text-2xs">
             <span aria-hidden>◉</span>

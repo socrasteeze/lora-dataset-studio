@@ -20,7 +20,7 @@ export default function SeedFinishCard({ config, setField, configDefaults }) {
             <input id={id} type="range" min={0} max={max} step={step} value={value}
               onChange={event => setField('seedvr2', field, Number(event.target.value))}
               className="mt-1 w-full accent-violet-500" />
-            <p className="mt-1 text-[0.6875rem] text-content-subtle">{hint}</p>
+            <p className="mt-1 text-2xs text-content-subtle">{hint}</p>
             <ResetToDefault label={label} section="seedvr2" field={field}
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>

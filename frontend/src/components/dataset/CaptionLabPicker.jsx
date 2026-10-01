@@ -70,7 +70,7 @@ export default function CaptionLabPicker({ images, thumbUrl, onPick, onClose,
         <header className="flex items-start justify-between gap-3 border-b border-border bg-surface px-4 py-3 sm:px-5">
           <div className="min-w-0">
             <p className="m-0 text-2xs font-semibold uppercase tracking-[0.18em] text-content-subtle">Captions</p>
-            <h2 id="caption-lab-picker-title" className="m-0 mt-0.5 text-lg font-semibold text-content">🧪 Caption Lab</h2>
+            <h2 id="caption-lab-picker-title" className="m-0 mt-0.5 text-xl font-semibold text-content">🧪 Caption Lab</h2>
           </div>
           <button type="button" onClick={onClose} aria-label="Close the Caption Lab picker"
             className="inline-flex min-h-10 shrink-0 items-center rounded-lg border border-border bg-app px-2.5 text-sm text-content-muted hover:text-content lg:min-h-0 lg:py-1.5">

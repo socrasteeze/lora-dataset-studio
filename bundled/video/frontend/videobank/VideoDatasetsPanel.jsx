@@ -73,9 +73,9 @@ export default function VideoDatasetsPanel() {
           aria-expanded={!folded}
           title={folded ? 'Expand the Video training sets section'
             : 'Collapse the Video training sets section'}
-          className="flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-content-subtle transition-colors hover:text-content">
+          className="flex items-center gap-2 font-mono text-2xs font-semibold uppercase tracking-[0.18em] text-content-subtle transition-colors hover:text-content">
           <span aria-hidden="true"
-            className={`text-[0.625rem] transition-transform ${folded ? '' : 'rotate-90'}`}>
+            className={`text-2xs transition-transform ${folded ? '' : 'rotate-90'}`}>
             ▶
           </span>
           <Clapperboard aria-hidden="true" className="h-4 w-4" /> Video training sets
@@ -110,21 +110,21 @@ export default function VideoDatasetsPanel() {
             {/* Read-only here, attachable in the workspace: the card's job is to
                 say which set is not launchable yet, not to fix it. */}
             {d.requires_references && d.references === 0 && (
-              <p className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-[0.6875rem] text-amber-100">
+              <p className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-2xs text-amber-100">
                 📎 No identity reference attached — the launch is refused without one.
               </p>
             )}
             {!d.training_verified && (
-              <p className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-[0.6875rem] text-amber-100">
+              <p className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-2xs text-amber-100">
                 ⚠ No LoRA trainer is known to exist for {d.target_label} yet.
               </p>
             )}
             {d.licence_note && (
-              <p className="rounded border border-rose-500/60 bg-rose-500/10 px-2 py-1 text-[0.6875rem] text-rose-100">
+              <p className="rounded border border-rose-500/60 bg-rose-500/10 px-2 py-1 text-2xs text-rose-100">
                 ⚖ {d.licence_note}
               </p>
             )}
-            <p className="truncate font-mono text-[0.625rem] text-content-subtle" title={d.output_dir}>
+            <p className="truncate font-mono text-2xs text-content-subtle" title={d.output_dir}>
               {d.output_dir}
             </p>
             <button type="button" onClick={() => navigate(`/video-dataset/${d.id}`)}
@@ -182,7 +182,7 @@ function StillsFromDatasetButton({ onCreated }) {
   if (!open) {
     return (
       <button type="button" onClick={openForm}
-        className="rounded border border-border bg-surface-raised px-2 py-0.5 text-[0.6875rem] text-content-muted hover:bg-surface">
+        className="rounded border border-border bg-surface-raised px-2 py-0.5 text-2xs text-content-muted hover:bg-surface">
         🖼 Stills set from an image dataset
       </button>
     )
@@ -190,18 +190,18 @@ function StillsFromDatasetButton({ onCreated }) {
   return (
     <span className="flex items-center gap-1.5">
       <select value={picked} onChange={(e) => setPicked(e.target.value)}
-        className="rounded border border-border bg-surface-raised px-1.5 py-0.5 text-[0.6875rem] text-content">
+        className="rounded border border-border bg-surface-raised px-1.5 py-0.5 text-2xs text-content">
         <option value="">{choices === null ? 'Loading…' : 'Pick an image dataset'}</option>
         {(choices || []).map((c) => (
           <option key={c.id} value={c.id}>{c.name} ({c.images_total})</option>
         ))}
       </select>
       <button type="button" disabled={busy || !picked} onClick={create}
-        className="rounded border border-border bg-surface-raised px-2 py-0.5 text-[0.6875rem] font-semibold text-content hover:bg-surface disabled:opacity-40">
+        className="rounded border border-border bg-surface-raised px-2 py-0.5 text-2xs font-semibold text-content hover:bg-surface disabled:opacity-40">
         {busy ? 'Building…' : 'Create'}
       </button>
       <button type="button" onClick={() => setOpen(false)}
-        className="text-[0.6875rem] text-content-subtle hover:underline">cancel</button>
+        className="text-2xs text-content-subtle hover:underline">cancel</button>
     </span>
   )
 }

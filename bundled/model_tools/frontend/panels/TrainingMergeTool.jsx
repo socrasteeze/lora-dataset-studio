@@ -36,7 +36,7 @@ export default function TrainingMergeTool({ family }) {
         className="min-h-10 lg:min-h-0 cursor-pointer text-content text-xs font-semibold">
         <Dna aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Merge a LoRA into a base checkpoint
       </summary>
-      <p className="m-0 mt-1 text-content-subtle text-[0.625rem] leading-relaxed">
+      <p className="m-0 mt-1 text-content-subtle text-2xs leading-relaxed">
         Folds one or more LoRAs into a full-precision checkpoint and writes a new
         full model — the step between “I trained a LoRA” and “I have a model to
         publish”. Nothing is overwritten, and the result says in its own metadata

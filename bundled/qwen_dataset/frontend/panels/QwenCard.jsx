@@ -16,7 +16,7 @@ export default function QwenCard({ spec, checked, available, generating, onToggl
       <span key="price" className={TAG_CLASS}>No API cost</span>,
       <span key="license" className={TAG_CLASS}>Non-commercial</span>,
     ]}
-    hint={<span className={`text-[0.625rem] ${available ? 'text-content-subtle' : 'text-amber-300'}`}>
+    hint={<span className={`text-2xs ${available ? 'text-content-subtle' : 'text-amber-300'}`}>
       {available ? 'Generate the selected shots from your reference photos. Dataset Forge keeps the usual curation and retry flow.'
         : qwenUnavailableReason(caps, enabledInSettings)}
     </span>}

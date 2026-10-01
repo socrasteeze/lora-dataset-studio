@@ -188,9 +188,9 @@ export default function LiveStudio() {
     <div className="flex flex-col gap-3" data-testid="live-studio">
       <header data-probe-chrome="live-studio-header"
         className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
+        <h2 className="flex items-center gap-2 text-xl font-semibold">
           <Radio aria-hidden="true" className="h-5 w-5 text-primary" /> Live channel
-          <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-px text-[0.625rem] font-semibold uppercase tracking-wide text-amber-200">beta</span>
+          <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-px text-2xs font-semibold uppercase tracking-wide text-amber-200">beta</span>
           <HelpBadge topic="page-video-live" />
         </h2>
         <span className="hidden text-xs text-content-subtle sm:inline">
@@ -226,7 +226,7 @@ export default function LiveStudio() {
           <section className="rounded-xl border border-border bg-surface p-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="text-sm font-semibold">Scenes</h3>
-              <span className="text-[0.6875rem] text-content-subtle">
+              <span className="text-2xs text-content-subtle">
                 one per block, separated by a line with <code>---</code> · <code>{'{NAME}'}</code> becomes the subject
               </span>
             </div>
@@ -241,7 +241,7 @@ export default function LiveStudio() {
                 disabled={running} aria-label="Subject"
                 className="min-w-0 flex-1 rounded-lg border border-border bg-surface-raised px-2 py-1 text-xs min-h-10 lg:min-h-0" />
             </label>
-            <p className="mt-1 text-[0.6875rem] text-content-subtle">
+            <p className="mt-1 text-2xs text-content-subtle">
               Scenes are drawn in a shuffled order and never repeat until every one has played.
               Write them in H3&apos;s own grammar — what is shown, then the soundscape.
             </p>
@@ -298,11 +298,11 @@ export default function LiveStudio() {
                 <span className="text-content-muted">⚡ turbo ({options?.turbo_steps || 6}-step LoRA)</span>
               </label>
             </div>
-            <p className="mt-2 text-[0.6875rem] text-content-subtle">
+            <p className="mt-2 text-2xs text-content-subtle">
               H3 authors motion at 24 fps. A rate under that plays the same frames slower, with the
               sound stretched to match — the only way one card keeps a channel fed.
             </p>
-            <p className="mt-2 truncate text-[0.6875rem] text-content-subtle" title={readback}>{readback}</p>
+            <p className="mt-2 truncate text-2xs text-content-subtle" title={readback}>{readback}</p>
             <div className="mt-3 flex gap-2">
               {running ? (
                 <button type="button" onClick={stop} disabled={busy}
@@ -331,7 +331,7 @@ export default function LiveStudio() {
               {status.error && <p className="mt-1 text-red-300">{status.error}</p>}
               {streamReady && (
                 <div className="mt-2 flex items-center gap-2">
-                  <code className="min-w-0 flex-1 truncate rounded bg-surface-raised px-2 py-1 text-[0.6875rem]" title={vlcUrl}>{vlcUrl}</code>
+                  <code className="min-w-0 flex-1 truncate rounded bg-surface-raised px-2 py-1 text-2xs" title={vlcUrl}>{vlcUrl}</code>
                   <button type="button" onClick={copyUrl} title="Copy the stream address for VLC"
                     className="rounded-lg border border-border p-1.5 text-content-muted hover:text-content min-h-10 lg:min-h-0">
                     <Copy aria-hidden="true" className="h-3.5 w-3.5" />

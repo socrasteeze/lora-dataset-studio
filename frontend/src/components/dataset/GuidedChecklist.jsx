@@ -19,7 +19,7 @@ export default function GuidedChecklist({ steps, currentId, onJump }) {
             : s.done ? 'text-emerald-400'
             : s.id === currentId ? 'text-content font-semibold'
             : 'text-content-muted';
-          const cls = `flex min-h-11 lg:min-h-0 items-center gap-1.5 w-full px-1.5 py-1 rounded text-[0.8125rem] text-left hover:bg-surface-raised transition-colors lg:text-sm ${tone}`;
+          const cls = `flex min-h-11 lg:min-h-0 items-center gap-1.5 w-full px-1.5 py-1 rounded text-xs text-left hover:bg-surface-raised transition-colors lg:text-sm ${tone}`;
           const body = (
             <>
               <span aria-hidden className="w-4 shrink-0 text-center">{glyph}</span>

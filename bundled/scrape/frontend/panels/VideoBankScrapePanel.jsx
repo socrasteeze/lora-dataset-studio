@@ -85,7 +85,7 @@ export default function VideoBankScrapePanel({ banks, onDone }) {
         className="flex w-full items-center gap-2 px-4 py-3 text-left">
         <span aria-hidden>🕸</span>
         <span className="text-sm font-semibold text-content">Scrape the web into a video bank</span>
-        <span className="hidden text-[0.6875rem] text-content-subtle sm:inline">
+        <span className="hidden text-2xs text-content-subtle sm:inline">
           no folder to prepare — the clips land in a bank ready to cut
         </span>
         <HelpBadge topic="video-bank-scrape" />
@@ -97,7 +97,7 @@ export default function VideoBankScrapePanel({ banks, onDone }) {
           {/* Destination first: it decides whether this scrape starts a pile or
               grows one. Wraps to one column at 400 px. */}
           <div className="flex flex-col gap-2 rounded-lg border border-border bg-white/[0.03] p-3">
-            <span className="text-[0.6875rem] font-semibold uppercase tracking-wide text-content-subtle">
+            <span className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">
               Destination
             </span>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-content">
@@ -122,7 +122,7 @@ export default function VideoBankScrapePanel({ banks, onDone }) {
                 out. Same rule as everywhere else in that commit — what replaces
                 a refusal is a sentence at the moment of choosing. */}
             {!eligible.length && (banks || []).length > 0 && (
-              <p className="text-[0.6875rem] leading-relaxed text-content-subtle">
+              <p className="text-2xs leading-relaxed text-content-subtle">
                 Your existing banks sit on a dataset&rsquo;s own folder, which a scrape
                 can never write into — create a new bank instead.
               </p>
@@ -156,11 +156,11 @@ export default function VideoBankScrapePanel({ banks, onDone }) {
                 `break-all` on the path: a Windows path has no spaces to wrap at
                 and would otherwise push the panel sideways at 400 px. */}
             {folderNotice && (
-              <p className="rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-[0.6875rem] leading-relaxed text-amber-100 break-all">
+              <p className="rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-2xs leading-relaxed text-amber-100 break-all">
                 {folderNotice}
               </p>
             )}
-            <p className="text-[0.6875rem] leading-relaxed text-content-subtle">
+            <p className="text-2xs leading-relaxed text-content-subtle">
               Clips are stored exactly as downloaded, then cut into shots by the bank&rsquo;s
               own passes — length, motion and sharpness stay for you to judge there.
               Whichever bank you pick receives them: the clips are added to the folder

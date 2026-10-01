@@ -119,7 +119,7 @@ export default function VideoPreviewDialog({ datasetId, tree, selected, onSelect
                     <input type="checkbox" checked={selected.includes(c.key)}
                       disabled={!c.eligible}
                       onChange={() => toggle(c.key)} className="mt-0.5 h-4 w-4 shrink-0 accent-primary" />
-                    <span>{c.label}{!c.eligible && <span className="mt-1 block text-[0.6875rem]">{c.reason}</span>}</span>
+                    <span>{c.label}{!c.eligible && <span className="mt-1 block text-2xs">{c.reason}</span>}</span>
                   </label>)}
                 </div>
                 {!!selected.length && <button type="button" onClick={() => onSelection([])} className="mt-2 min-h-10 rounded border border-border px-2 text-xs text-content lg:min-h-0">Clear selection</button>}

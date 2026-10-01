@@ -71,7 +71,7 @@ function EnhanceModelPopover({ model, onPick, onClose }) {
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-content">⚙️ Enhance — which model</h3>
           <button type="button" onClick={onClose} aria-label="Close"
-            className="text-lg leading-none text-content-subtle hover:text-content">×</button>
+            className="text-xl leading-none text-content-subtle hover:text-content">×</button>
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="enhance-model" className="text-sm font-medium text-content">

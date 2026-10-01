@@ -133,7 +133,7 @@ export default function BankBulkDialog({ banks, onClose, onResults }) {
         className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-surface-overlay shadow-2xl">
         <header className="flex items-center gap-3 border-b border-border p-4">
           <div className="min-w-0 grow">
-            <h2 id="bank-bulk-title" className="text-lg font-semibold text-content">Edit Banks</h2>
+            <h2 id="bank-bulk-title" className="text-xl font-semibold text-content">Edit Banks</h2>
             <p className="text-xs text-content-muted">{pending.length} bank(s) remain in this operation.</p>
           </div>
           <button type="button" onClick={requestClose} disabled={busy} aria-label="Close Edit Banks"

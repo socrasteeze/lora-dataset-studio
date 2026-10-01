@@ -347,7 +347,7 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
       <button type="button" ref={closeRef}
         onClick={(e) => { e.stopPropagation(); onClose?.(); }}
         title="Close (Esc)" aria-label="Close image"
-        className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg leading-none text-white hover:bg-white/20">✕</button>
+        className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-xl leading-none text-white hover:bg-white/20">✕</button>
 
       {/* 📱 Put the details away and give the picture the screen.
 
@@ -443,7 +443,7 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
               <span key={f.key} data-testid={`fact-${f.key}`}
                 className="flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-1">
                 <span className="text-2xs uppercase tracking-wide text-white/45">{f.label}</span>
-                <span className="text-[0.8125rem] font-semibold tabular-nums text-white">{f.value}</span>
+                <span className="text-xs font-semibold tabular-nums text-white">{f.value}</span>
                 {f.copy && <CopyButton value={f.copy} label="seed" />}
               </span>
             ))}

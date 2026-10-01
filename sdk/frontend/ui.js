@@ -4,10 +4,10 @@ import { runtime } from './runtime.js'
 
 export const INPUT_CLASS = 'mt-1 w-full rounded-md border border-border-strong bg-surface-raised px-3 py-2 text-sm text-content '
   + 'placeholder:text-content-subtle focus:border-primary focus:outline-none'
-export const TAG_CLASS = 'px-1.5 py-px rounded-full bg-app/60 border border-border text-content-muted text-[0.625rem]'
-export const ROW_CLS = 'min-h-10 lg:min-h-0 flex items-center gap-1.5 rounded-md border px-2 py-1 text-[0.6875rem] font-medium '
+export const TAG_CLASS = 'px-1.5 py-px rounded-full bg-app/60 border border-border text-content-muted text-2xs'
+export const ROW_CLS = 'min-h-10 lg:min-h-0 flex items-center gap-1.5 rounded-md border px-2 py-1 text-2xs font-medium '
   + 'disabled:cursor-not-allowed disabled:opacity-60'
-export const MUTED_CLS = 'rounded-md border border-border bg-app/40 px-2 py-1 text-content-subtle text-[0.625rem]'
+export const MUTED_CLS = 'rounded-md border border-border bg-app/40 px-2 py-1 text-content-subtle text-2xs'
 
 function control(name, props) {
   const host = runtime()

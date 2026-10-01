@@ -69,14 +69,14 @@ export function VideoCheckpointPopover({
       role="dialog" aria-label={`Checkpoint ${a.label} actions`}
       onPointerDown={(e) => e.stopPropagation()}>
       <div className="mb-1.5 flex items-center gap-1.5">
-        <span className="min-w-0 truncate text-content text-[0.6875rem] font-semibold tabular-nums">{a.label}</span>
+        <span className="min-w-0 truncate text-content text-2xs font-semibold tabular-nums">{a.label}</span>
         {a.deployed && (
-          <span className="shrink-0 rounded bg-emerald-500/15 px-1 py-px text-emerald-200 text-[0.5rem] font-semibold uppercase">
+          <span className="shrink-0 rounded bg-emerald-500/15 px-1 py-px text-emerald-200 text-2xs font-semibold uppercase">
             Deployed
           </span>
         )}
         <button type="button" onClick={onClose}
-          className="ml-auto min-h-10 min-w-10 shrink-0 text-content-subtle hover:text-content text-[0.75rem] lg:min-h-0 lg:min-w-0"
+          className="ml-auto min-h-10 min-w-10 shrink-0 text-content-subtle hover:text-content text-xs lg:min-h-0 lg:min-w-0"
           aria-label="Close">✕</button>
       </div>
       <div className="flex flex-col gap-1">
@@ -122,7 +122,7 @@ export function VideoCheckpointPopover({
         {a.del.ok ? (
           <button type="button" disabled={rowBusy} onClick={() => onDelete?.(g, s, node, pill)}
             title={a.del.title}
-            className="mt-1 min-h-10 lg:min-h-0 flex items-center gap-1.5 border-t border-border px-2 pt-1.5 pb-0.5 text-left text-content-subtle text-[0.625rem] hover:text-rose-200 disabled:opacity-60">
+            className="mt-1 min-h-10 lg:min-h-0 flex items-center gap-1.5 border-t border-border px-2 pt-1.5 pb-0.5 text-left text-content-subtle text-2xs hover:text-rose-200 disabled:opacity-60">
             <Trash2 aria-hidden="true" className="h-3.5 w-3.5" /> {a.del.label}
           </button>
         ) : (
@@ -224,14 +224,14 @@ export default function VideoLineageGraph({
 
   return (
     <>
-      <div className="mb-1.5 flex flex-wrap items-center gap-2 text-[0.625rem] text-content-subtle" data-probe-reading data-probe-chrome="video-preview-toolbar">
+      <div className="mb-1.5 flex flex-wrap items-center gap-2 text-2xs text-content-subtle" data-probe-reading data-probe-chrome="video-preview-toolbar">
         {onGenerate && <button type="button" onClick={() => onGenerate()}
           className="min-h-10 rounded-md border border-primary/50 bg-primary/15 px-3 py-1 text-xs font-semibold text-content lg:min-h-0">Generate previews…{selected.length ? ` (${selected.length})` : ''}</button>}
         {onRenderedPreviews && <button type="button" onClick={() => onRenderedPreviews()}
           className="min-h-10 rounded-md border border-border px-2 py-1 text-xs text-content lg:min-h-0">Rendered previews ({renderedCount})</button>}
         <button type="button" onClick={toggleBigPreviews} aria-pressed={bigPreviews}
           title={bigPreviews ? 'Back to compact pills' : 'Enlarge the sample stills to compare steps at a glance'}
-          className={'min-h-10 lg:min-h-0 rounded-md border px-2 py-0.5 text-[0.625rem] font-semibold transition-colors '
+          className={'min-h-10 lg:min-h-0 rounded-md border px-2 py-0.5 text-2xs font-semibold transition-colors '
             + (bigPreviews
               ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-100 '
               : 'border-border bg-app/60 text-content-muted hover:text-content ')}>

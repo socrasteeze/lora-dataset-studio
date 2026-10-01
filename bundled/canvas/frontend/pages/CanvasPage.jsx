@@ -563,9 +563,9 @@ export default function CanvasPage() {
           ⋯ shelf. Desktop, from `lg` up, is untouched. */}
       <h1 className="sr-only lg:hidden">LoRA Canvas</h1>
       <header className="mb-2 hidden sm:mb-3 lg:block">
-        <h1 className="flex items-center gap-2 text-lg font-semibold text-content">
+        <h1 className="flex items-center gap-2 text-xl font-semibold text-content">
           <span aria-hidden>◉</span> LoRA Canvas
-          <span className="px-1.5 py-0.5 rounded border border-amber-400/50 bg-amber-500/10 text-amber-300 text-[0.625rem] font-semibold uppercase tracking-wide">Beta</span>
+          <span className="px-1.5 py-0.5 rounded border border-amber-400/50 bg-amber-500/10 text-amber-300 text-2xs font-semibold uppercase tracking-wide">Beta</span>
           <HelpBadge topic="page-canvas" />
           {/* ⏏ An INSTALL-wide action, so it lives on the page chrome rather
               than on the board: what is deployed in ComfyUI has nothing to do
@@ -573,24 +573,24 @@ export default function CanvasPage() {
               title at every width. */}
           <button type="button" onClick={() => setUndeployOpen(true)}
             title="List every LoRA this app deployed into ComfyUI and remove the ones you tick. Your training saves are kept — each one can be deployed again."
-            className="ml-auto rounded-md border border-border px-2 py-1 text-[0.6875rem] font-medium text-content-muted hover:bg-surface-raised hover:text-content">
+            className="ml-auto rounded-md border border-border px-2 py-1 text-2xs font-medium text-content-muted hover:bg-surface-raised hover:text-content">
             <span aria-hidden>⏏</span> Undeploy…
           </button>
         </h1>
-        <p className="mt-1 hidden text-content-muted text-[0.75rem] lg:block">
+        <p className="mt-1 hidden text-content-muted text-xs lg:block">
           Every training run you have made, on one board: each dataset gets a lane, each run a card,
           and a continuation is joined to the exact checkpoint it resumed from.
         </p>
       </header>
 
       {index.status === 'error' && (
-        <p className="mb-3 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-amber-100 text-[0.75rem]">
+        <p className="mb-3 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-amber-100 text-xs">
           {index.error}
         </p>
       )}
 
       {index.status === 'loading'
-        ? <p className="text-content-subtle text-[0.75rem]">Loading your datasets…</p>
+        ? <p className="text-content-subtle text-xs">Loading your datasets…</p>
         : (
           <LineageCanvas entries={entries} positions={positions}
             /* The filter rides ON the board — see the overlay comment in

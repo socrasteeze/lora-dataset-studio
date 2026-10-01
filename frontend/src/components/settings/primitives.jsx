@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
 import { postJson } from '../../api/fetchClient'
-import { btnShape } from '../common/controls'
+import { btnShape, fieldClass } from '../common/controls'
 
 /* A single-line field stands at the shared control height (common/controls.js):
    40 px to a finger, 32 px on a desktop, so a Test, Show or Refresh button
-   beside it lines up. `:not(textarea)` because plugins reuse this class on
-   multi-line fields, which must keep growing with their rows. */
+   beside it lines up. Plugins reuse this class on multi-line fields, which
+   must keep growing with their rows, so a textarea releases that height. */
 export const INPUT_CLASS =
-  'mt-1 w-full rounded-md border border-border-strong bg-surface-raised px-3 py-2 text-sm text-content ' +
+  `mt-1 w-full ${fieldClass()} border-border-strong bg-surface-raised ` +
   'placeholder:text-content-subtle focus:border-primary focus:outline-none ' +
-  '[&:not(textarea)]:min-h-10 lg:[&:not(textarea)]:min-h-0 lg:[&:not(textarea)]:h-8 lg:[&:not(textarea)]:py-0'
+  '[&:is(textarea)]:h-auto [&:is(textarea)]:min-h-0 [&:is(textarea)]:py-2'
 
 /* The outlined button that sits beside a settings field (Test, Show, Refresh,
    Check folder): the same height as INPUT_CLASS. */

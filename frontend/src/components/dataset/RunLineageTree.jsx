@@ -80,7 +80,7 @@ function LineageNode({ row, onSelect, index }) {
             {famLabel(node.train_type)}{node.variant ? <span className="font-normal text-content-muted"> · {node.variant}</span> : null}
           </span>
           {cur && (
-            <span className="shrink-0 rounded-full bg-indigo-500/25 px-1.5 py-0.5 text-indigo-100 text-[0.5rem] font-bold uppercase tracking-wider">
+            <span className="shrink-0 rounded-full bg-indigo-500/25 px-1.5 py-0.5 text-indigo-100 text-2xs font-bold uppercase tracking-wider">
               this run
             </span>
           )}
@@ -173,7 +173,7 @@ export default function RunLineageTree({ tree, loading, error, onSelect, onConti
           {rows.length} run{rows.length > 1 ? 's' : ''}
         </span>
         <div className="ml-auto flex items-center gap-2">
-          <span className="hidden items-center gap-2 text-content-subtle text-[0.5rem] sm:flex">
+          <span className="hidden items-center gap-2 text-content-subtle text-2xs sm:flex">
             <span className="inline-flex items-center gap-1">
               <span aria-hidden className="h-2 w-2 rounded-full border border-indigo-400/70 bg-indigo-500/20" />current
             </span>

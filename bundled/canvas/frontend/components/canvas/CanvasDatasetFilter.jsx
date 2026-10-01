@@ -118,17 +118,17 @@ export default function CanvasDatasetFilter({
         <input id="canvas-dataset-pick" type="search" value={pick}
           onChange={(e) => setPick(e.target.value)}
           placeholder="Find a dataset…"
-          className="mb-1.5 h-9 w-full rounded-md border border-border bg-app/60 px-2.5 text-content text-[0.75rem] placeholder:text-content-subtle focus:border-primary focus:outline-none" />
+          className="mb-1.5 h-9 w-full rounded-md border border-border bg-app/60 px-2.5 text-content text-xs placeholder:text-content-subtle focus:border-primary focus:outline-none" />
         <div className="mb-1.5 flex items-center gap-1.5">
           <button type="button" onClick={onAll}
-            className="flex h-10 items-center rounded-md border border-border bg-app/60 px-2.5 text-content-muted text-[0.6875rem] hover:text-content lg:h-8">
+            className="flex h-10 items-center rounded-md border border-border bg-app/60 px-2.5 text-content-muted text-2xs hover:text-content lg:h-8">
             Select all
           </button>
           <button type="button" onClick={onNone}
-            className="flex h-10 items-center rounded-md border border-border bg-app/60 px-2.5 text-content-muted text-[0.6875rem] hover:text-content lg:h-8">
+            className="flex h-10 items-center rounded-md border border-border bg-app/60 px-2.5 text-content-muted text-2xs hover:text-content lg:h-8">
             Clear
           </button>
-          <span className="ml-auto text-content-subtle text-[0.625rem] tabular-nums">
+          <span className="ml-auto text-content-subtle text-2xs tabular-nums">
             {sel.size}/{total}
           </span>
         </div>
@@ -140,13 +140,13 @@ export default function CanvasDatasetFilter({
               <label className={row}>
                 <input type="checkbox" checked={sel.has(d.id)}
                   onChange={() => onToggle(d.id)} className={box} />
-                <span className="min-w-0 flex-1 truncate text-content text-[0.75rem]" title={d.name}>
+                <span className="min-w-0 flex-1 truncate text-content text-xs" title={d.name}>
                   {d.name}
                 </span>
                 {/* The per-dataset run count, kept exactly where it was: it is
                     how you tell a lane worth putting on the board from one
                     with a single run. */}
-                <span className="shrink-0 text-content-subtle text-[0.625rem] tabular-nums"
+                <span className="shrink-0 text-content-subtle text-2xs tabular-nums"
                   title={(d.families || []).map(familyLabel).join(', ')}>
                   {d.runs}
                 </span>
@@ -155,12 +155,12 @@ export default function CanvasDatasetFilter({
           ))}
         </ul>
         {total > 0 && shown.length === 0 && (
-          <p className="m-0 px-2 py-1.5 text-content-subtle text-[0.6875rem]">
+          <p className="m-0 px-2 py-1.5 text-content-subtle text-2xs">
             No dataset matches “{pick}”.
           </p>
         )}
         {total === 0 && (
-          <p className="m-0 px-2 py-1.5 text-content-subtle text-[0.6875rem]">
+          <p className="m-0 px-2 py-1.5 text-content-subtle text-2xs">
             No dataset has been trained yet — the canvas draws training runs, so it
             fills up after your first run finishes.
           </p>
@@ -177,7 +177,7 @@ export default function CanvasDatasetFilter({
               <label className={row}>
                 <input type="checkbox" checked={familySel.has(family)}
                   onChange={() => onToggleFamily(family)} className={box} />
-                <span className="min-w-0 flex-1 truncate text-content text-[0.75rem]">
+                <span className="min-w-0 flex-1 truncate text-content text-xs">
                   {familyLabel(family)}
                 </span>
               </label>
@@ -186,16 +186,16 @@ export default function CanvasDatasetFilter({
         </ul>
         <div className="mt-1.5 flex items-center gap-1.5 border-t border-border pt-1.5">
           <button type="button" onClick={onAllFamilies}
-            className="h-8 rounded-md px-2 text-content-muted text-[0.6875rem] hover:text-content">
+            className="h-8 rounded-md px-2 text-content-muted text-2xs hover:text-content">
             All models
           </button>
           <button type="button" onClick={onNoFamilies}
-            className="h-8 rounded-md px-2 text-content-muted text-[0.6875rem] hover:text-content">
+            className="h-8 rounded-md px-2 text-content-muted text-2xs hover:text-content">
             None
           </button>
         </div>
         {familySel.size === 0 && (
-          <p className="m-0 mt-1 text-amber-200/80 text-[0.6875rem]">
+          <p className="m-0 mt-1 text-amber-200/80 text-2xs">
             No model selected — your dataset choices are kept, but the board is empty.
           </p>
         )}
@@ -211,7 +211,7 @@ export default function CanvasDatasetFilter({
                 <label className={row}>
                   <input type="checkbox" checked={selectedStatuses.includes(status)}
                     onChange={() => onToggleStatus(status)} className={box} />
-                  <span className="min-w-0 flex-1 truncate text-content text-[0.75rem]">
+                  <span className="min-w-0 flex-1 truncate text-content text-xs">
                     {statusLabel(status)}
                   </span>
                 </label>
@@ -229,7 +229,7 @@ export default function CanvasDatasetFilter({
         title={showPinned
           ? 'Pinned images are on the board — click to hide them'
           : 'Pinned images are HIDDEN — click to put them back on the board'}
-        className={'flex h-10 items-center gap-1 md:gap-1.5 rounded-md border px-2 md:px-2.5 text-[0.75rem] font-semibold lg:h-9 '
+        className={'flex h-10 items-center gap-1 md:gap-1.5 rounded-md border px-2 md:px-2.5 text-xs font-semibold lg:h-9 '
           + (showPinned
             ? 'border-border bg-app/60 text-content hover:border-indigo-400/50'
             // Hidden is the state worth shouting about: pinned pictures missing
@@ -248,7 +248,7 @@ export default function CanvasDatasetFilter({
         <button type="button" onClick={onUnpinAll} disabled={unpinBusy}
           data-testid="canvas-unpin-all"
           title={`Unpin all ${pinnedCount} images across every dataset, including those hidden by filters. Gallery images are kept.`}
-          className="flex h-10 shrink-0 items-center gap-1 rounded-md border border-border bg-app/60 px-2 text-[0.75rem] font-semibold text-content-muted hover:border-indigo-400/50 hover:text-content disabled:cursor-wait disabled:opacity-50 md:gap-1.5 md:px-2.5 lg:h-9">
+          className="flex h-10 shrink-0 items-center gap-1 rounded-md border border-border bg-app/60 px-2 text-xs font-semibold text-content-muted hover:border-indigo-400/50 hover:text-content disabled:cursor-wait disabled:opacity-50 md:gap-1.5 md:px-2.5 lg:h-9">
           <PinOff aria-hidden="true" className="h-3.5 w-3.5" />
           {unpinBusy ? 'Unpinning…' : `Unpin all (${pinnedCount})`}
         </button>
@@ -281,7 +281,7 @@ export default function CanvasDatasetFilter({
           ? `Search is narrowing the board: “${query}” — tap to edit or clear it`
           : 'Search runs — dataset, ID, model, variant'}
         aria-label="Search runs"
-        className={'flex h-10 items-center gap-1 md:gap-1.5 rounded-md border px-2 md:px-2.5 text-[0.75rem] font-semibold lg:hidden '
+        className={'flex h-10 items-center gap-1 md:gap-1.5 rounded-md border px-2 md:px-2.5 text-xs font-semibold lg:hidden '
           + (queryActive
             ? 'border-indigo-400/60 bg-indigo-500/15 text-indigo-100'
             : 'border-border bg-app/60 text-content hover:border-indigo-400/50')}>
@@ -301,7 +301,7 @@ export default function CanvasDatasetFilter({
            144-px field in an 844-px bar). On a short fold it shares the row
            instead. Nothing changes on any fold a phone is held upright at,
            where the full-width field is the better read. */
-        className={'h-10 min-w-[9rem] flex-1 rounded-md border bg-app/60 px-3 text-content text-[0.75rem] placeholder:text-content-subtle lg:h-9 lg:block lg:basis-48 '
+        className={'h-10 min-w-[9rem] flex-1 rounded-md border bg-app/60 px-3 text-content text-xs placeholder:text-content-subtle lg:h-9 lg:block lg:basis-48 '
           + (searchOpen ? `${tallFold ? 'basis-full' : 'basis-auto'} ` : 'hidden ')
           + (queryActive ? 'border-indigo-400/60' : 'border-border')} />
 
@@ -320,7 +320,7 @@ export default function CanvasDatasetFilter({
         title={anyNarrowing ? 'Put every dataset, model and status back on the board'
           : 'Nothing is filtered out'}
         aria-label="Reset the filters"
-        className={'h-10 items-center rounded-md border border-border px-2 md:px-2.5 text-content-muted text-[0.75rem] hover:text-content disabled:opacity-40 lg:h-9 md:flex '
+        className={'h-10 items-center rounded-md border border-border px-2 md:px-2.5 text-content-muted text-xs hover:text-content disabled:opacity-40 lg:h-9 md:flex '
           + (anyNarrowing ? 'flex' : 'hidden')}>
         {/* ↺ below `sm`, the word from there up. Measured at 412 px: this row
             held five chips on its first line and wrapped for "Reset" and the
@@ -333,7 +333,7 @@ export default function CanvasDatasetFilter({
 
       {/* The readout that makes the whole bar honest: whatever is set, this says
           how much of the library actually reached the board. */}
-      <span className="ml-auto shrink-0 text-content-subtle text-[0.6875rem] tabular-nums">
+      <span className="ml-auto shrink-0 text-content-subtle text-2xs tabular-nums">
         {visibleRuns} run{visibleRuns === 1 ? '' : 's'}
         {/* "shown" is the word that makes it a readout rather than a total, and
             it is also 40 px of a 360-px row. Below `lg` the number carries the
