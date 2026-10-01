@@ -74,7 +74,8 @@ test('both skip panels are dismissed when the user navigates between screens', (
 })
 
 test('a conscious skip counts as a settled step', () => {
-  assert.match(source, /\['ready', 'skipped'\]\.includes\(stepById\[id\]\.status\)/,
+  // 'ignored' (the Ignore ComfyUI setting) is settled too; 'skipped' must stay in the list.
+  assert.match(source, /\['ready', 'skipped'(, '[a-z]+')*\]\.includes\(stepById\[id\]\.status\)/,
     "isReady ignores 'skipped' again — the wizard keeps sending the user back to the step they closed")
 })
 

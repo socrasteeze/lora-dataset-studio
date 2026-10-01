@@ -166,6 +166,7 @@ export const CORE_GUIDE_ANCHORS = {
     "dataset-import",
     "image-size-budget",
     "captioning",
+    "tagging-wd14",
     "watermark-inpainting",
     "face-similarity",
     "image-bank-triage",
