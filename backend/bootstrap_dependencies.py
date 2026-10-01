@@ -13,7 +13,7 @@ version than ``Image.py`` actually is, and the previous metadata-gated check
 (``version < 12 -> assume fine``) returned early and MISSED exactly that case. The
 decision is made from the relationship between ``Image.py`` (read-only ``mode``
 property?) and the plugins (``self.mode =``?) -- independent of the version string.
-Then force-reinstall the PINNED Pillow before the application imports any PIL module.
+The caller reports the mix. This module does not run pip.
 
 ``importlib.metadata`` + plain file reads only: importing PIL here would lock its
 binaries on Windows and recreate the very failure this bootstrap is meant to fix.
@@ -23,8 +23,6 @@ from __future__ import annotations
 from importlib import metadata
 from pathlib import Path
 import re
-import subprocess
-import sys
 
 
 # An old-style plugin writes the image mode directly (`self.mode = ...`). The
@@ -114,33 +112,3 @@ def incompatible_pillow_plugins(distribution=None) -> tuple[str | None, list[Pat
         if _OLD_MODE_ASSIGNMENT.search(source):
             incompatible.append(plugin)
     return version, incompatible
-
-
-def ensure_pillow_consistent(*, distribution=None, runner=None) -> bool:
-    """Force-reinstall a mixed Pillow install, returning whether a repair ran."""
-    version, plugins = incompatible_pillow_plugins(distribution)
-    if not version or not plugins:
-        return False
-
-    # Reinstall the PINNED version (what the app actually needs), falling back to the
-    # on-disk metadata version only when the pin can't be read. Never reinstall the
-    # metadata version blindly: in a mix it can read older than Image.py really is,
-    # so `Pillow=={metadata}` would rebuild the WRONG (old) version.
-    target = _pinned_pillow_version() or version
-    names = ', '.join(path.name for path in plugins)
-    print(f'[LDS] mixed Pillow install detected (metadata {version}; {names}); '
-          f'repairing to Pillow {target}...', flush=True)
-    run = runner or subprocess.run
-    result = run(
-        [sys.executable, '-m', 'pip', 'install', '--force-reinstall', '--no-deps',
-         f'Pillow=={target}'],
-        check=False,
-        timeout=900,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(
-            f'Pillow repair failed with exit code {result.returncode}. '
-            f'Run: {sys.executable} -m pip install --force-reinstall Pillow=={target}'
-        )
-    print(f'[LDS] Pillow {target} repaired successfully.', flush=True)
-    return True

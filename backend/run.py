@@ -59,8 +59,7 @@ from bootstrap_dependencies import _pinned_pillow_version, incompatible_pillow_p
 # Must run before importing ``app`` (which eventually imports PIL). Detects
 # Windows installs left half-upgraded by versions of the in-app updater that ran
 # pip while Pillow files were still loaded and locked by the Flask process.
-# Fork Divergence 12: upstream repairs it here with pip (ensure_pillow_consistent),
-# a download at startup. The fork only says how.
+# Fork Divergence 12: a mixed Pillow is reported here. Boot does not run pip.
 _pil_version, _pil_mixed = incompatible_pillow_plugins()
 if _pil_version and _pil_mixed:
     print('[LDS] mixed Pillow install detected. Repair it with: '

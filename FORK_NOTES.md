@@ -143,10 +143,10 @@ The inventory is the cover there.
 Update-check tests must stub `is_git_checkout`, or `?force=1` runs a
 real `git fetch`.
 
-`create_app` does not call `legacy_cloud_recovery.start`.
-`run.py` does not call `ensure_pillow_consistent`.
-Both functions still exist because upstream tests import them.
-`test_startup_neither_resumes_rentals_nor_runs_pip` fails if boot calls either.
+`create_app` does not resume rented-GPU work.
+`run.py` calls `incompatible_pillow_plugins()` and prints a repair command.
+It does not run pip.
+`test_startup_neither_resumes_rentals_nor_runs_pip` fails if boot does either.
 
 Still allowed, and only after a click: Hugging Face dataset export,
 the scraper, the Civitai browser, model and node-pack downloads,

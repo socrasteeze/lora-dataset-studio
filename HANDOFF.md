@@ -1,16 +1,16 @@
 # HANDOFF
 
-**Updated:** 2026-10-01 · **Branch:** wave/3-store · **Base:** f3815e82e · **Tree:** clean
+**Updated:** 2026-10-01 · **Branch:** wave/4-legacy · **Base:** f3815e82e · **Tree:** clean
 
 ## State
-Wave 3 is on `wave/3-store`, ahead of `origin/wave/2-docker` at `64a572c4d`. `origin/main` is still `f3815e82e`. Gates have not run.
+Wave 4 is on `wave/4-legacy`, ahead of `origin/wave/3-store` at `5fc37579e`. `origin/main` is still `f3815e82e`. Gates have not run.
 
 ## Done this session
-- Wave 2 is pushed at `64a572c4d`.
-- The plugin catalog, purchases tab, and public-store tooling are gone. `GET /api/plugins/` lists installed plugins and reports `can_manage`.
+- Wave 3 is pushed at `5fc37579e`.
+- Unused rental recovery is gone. Boot reports a mixed Pillow through `incompatible_pillow_plugins()` and does not run pip.
 
 ## Open
-1. Wave 4 legacy recovery removal, then Wave 5 isolation. Cut each branch from the previous pushed tip. Scrub and push before the next.
+1. Wave 5 isolation. Cut the branch from this tip. Record before/after times. Scrub and push before Wave 6.
 2. Waves 6 through 10 in that order, then Wave 11, then Wave 12. Wave 12 removes `bundled/civitai_publish` only. Keep the cloud/API shims and all 12 enabled plugins.
 3. Run `scripts/gates.ps1 -Phase Gates` twice on a named host. On two matching green logs, fast-forward `origin/main`, push annotated tag `v2026.10.01`, and delete `fix/config-isolation`, `fix/settings-copy-restore`, `noble/bank-queue-stop`, and `integrate/2026-10-01`.
 4. If that host cannot start, save the launcher error and leave main at `f3815e82e`.
