@@ -929,6 +929,43 @@ def test_joycaption_timeout_returns_empty_and_logs_first_run_hint(app, monkeypat
     assert diagnostics['stderr_tail'] == [stderr_lines[0].rstrip('\n')]
 
 
+def test_joycaption_default_budget_scales_with_image_count(app, monkeypatch, tmp_path):
+    """A flat 1800 s cut big banks off after ~300 images and handed the rest to the
+    fallback engine. The default budget now grows per image; an explicit timeout
+    is still honoured exactly."""
+    import app.services.joycaption as jc
+    img = _prep_joycaption(monkeypatch, jc, tmp_path)
+    paths = [img, img, img]
+    budgets = []
+    monkeypatch.setattr(jc, 'processing_timeout', lambda s: budgets.append(s) or s)
+    monkeypatch.setattr(jc.subprocess, 'Popen',
+                        lambda *a, **k: _FakePopen([], json.dumps({'captions': {img: 'c'}})))
+    with app.app_context():
+        jc.caption_images_joycaption(paths)
+        jc.caption_images_joycaption(paths, timeout=60)
+    # budgets holds (run budget, stall budget) per call.
+    assert budgets[0] == jc.BASE_TIMEOUT_S + jc.PER_IMAGE_TIMEOUT_S * len(paths)
+    assert budgets[2] == 60
+
+
+def test_joycaption_silent_worker_is_stopped_as_stalled(app, monkeypatch, caplog, tmp_path):
+    """A long per-image budget must not let a hung worker run for hours: one that
+    prints nothing for STALL_TIMEOUT_S is killed and reported as timed out."""
+    import app.services.joycaption as jc
+    img = _prep_joycaption(monkeypatch, jc, tmp_path)
+    monkeypatch.setattr(jc, 'STALL_TIMEOUT_S', 0)
+    fake = _FakePopen([], '', wait_raises=subprocess.TimeoutExpired(cmd='joycaption', timeout=1))
+    monkeypatch.setattr(jc.subprocess, 'Popen', lambda *a, **k: fake)
+    diagnostics = {}
+    with app.app_context():
+        with caplog.at_level('ERROR'):
+            out = jc.caption_images_joycaption([img], diagnostics_out=diagnostics)
+    assert out == {}
+    assert fake.killed
+    assert diagnostics['timed_out'] is True
+    assert 'printed nothing' in caplog.text
+
+
 def test_joycaption_video_sdk_reports_worker_failure_without_losing_captions(
         app, monkeypatch, tmp_path):
     """The Video reader calls this exact SDK API with diagnostics_out."""
