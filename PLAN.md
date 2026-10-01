@@ -109,6 +109,10 @@ HANDOFF.md records the gate results (counts, skips, and that Docker was not run)
 
 ## Wave 1 — detach from upstream
 
+**Status (2026-10-01).** Implemented on `wave/1-detach`. Not landed.
+`scripts/gates.ps1 -Phase Gates` has not been run. The tag is not created.
+`origin/main` is still `f3815e82e`.
+
 **Goal.** The repository stops assuming a sync loop, has a working landing
 gate of its own, and is tagged as its own release line.
 
