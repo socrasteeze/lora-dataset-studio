@@ -57,9 +57,8 @@ function kleinMissingRequired(c) {
 // self-annuls the moment a path is entered. We only treat the step as skipped when
 // ComfyUI is ALSO not reachable — a running ComfyUI is worth surfacing (partial/
 // ready) even if the user once clicked skip.
-function comfyuiStep(caps, runtimeReadiness) {
+function comfyuiStep(caps, _runtimeReadiness) {
   const c = caps.comfyui || {}
-  const managed = (runtimeReadiness && runtimeReadiness.comfyui) || {}
   const missingRequired = kleinMissingRequired(c)
   // The BACKEND's verdict on each local engine, plus the one sentence explaining
   // it. Setup renders these; it no longer decides them. See localEngineReadiness.
@@ -106,21 +105,16 @@ function comfyuiStep(caps, runtimeReadiness) {
     : (derivedHasKlein ? [] : ['klein_model'])
   // Skipped is neutral, not a warning — but only when there's genuinely nothing to
   // show (unreachable). It never overrides a reachable ComfyUI's real status.
-  const managedInitializing = managed.mode === 'integrated'
-    && managed.state === 'starting' && !c.reachable
-  const skipped = !!c.skipped && !c.reachable && !managedInitializing
+  const skipped = !!c.skipped && !c.reachable
   // Ignore ComfyUI (Settings): the operator's choice, shown neutral like a skip.
-  const ignored = comfyuiIgnored(c) && !managedInitializing
-  const status = managedInitializing
-    ? 'initializing'
-    : ignored ? 'ignored'
-      : (skipped ? 'skipped' : gateStatus(c.reachable, hasKlein))
+  const ignored = comfyuiIgnored(c)
+  const status = ignored ? 'ignored' : (skipped ? 'skipped' : gateStatus(c.reachable, hasKlein))
   return {
     id: 'comfyui', title: 'ComfyUI — local generation & Test Studio', recommended: true,
     unlocks: ['Klein engine (image generation)', 'Test Studio'],
     status, reachable: !!c.reachable,
-    managedMode: managed.mode || 'external',
-    managedInitializing,
+    managedMode: 'external',
+    managedInitializing: false,
     connectionStatus: c.status || (c.reachable ? 'ok' : 'unreachable'),
     hasKlein, kleinMissing, kleinInvalid, apiUrl: c.api_url || '',
     skipped,
@@ -165,13 +159,6 @@ function comfyuiStep(caps, runtimeReadiness) {
 // affordance discoverable; starting still requires the saved, freshly re-checked
 // configuration because the no-payload POST reads that configuration.
 export function comfyuiLauncherState(step, configPersisted, liveDirValid = false) {
-  // Docker either owns the integrated process or connects to a process on the
-  // host. In neither case can a button inside the app safely launch a Windows
-  // portable executable. Hide it for the whole deployment lifetime, including
-  // the brief window where runtime readiness is ahead of the full caps refresh.
-  if (step && ['integrated', 'external-host'].includes(step.managedMode)) {
-    return { visible: false, enabled: false, reason: '' }
-  }
   // Never offer a second process while the saved probe says one is answering (or
   // still answering slowly). This comes before the live-directory affordance.
   if (!step || step.reachable || step.connectionStatus === 'slow') {
@@ -304,13 +291,6 @@ export function ollamaSkipKept(joycaptionReady) {
 // branch of it, which is what the page's own closures can never offer.
 export function ollamaGateReason(s) {
   if (!s || s.status === 'ready' || s.disabled) return null
-  // Asked BEFORE the lifts below: an unconfigured Docker install is not a capability
-  // question but an unanswered one — nothing starts until a card is picked, and the
-  // 'No Ollama' card is itself one of the answers. Having a captioner elsewhere must
-  // not wave that choice through, or the companion container is never brought up.
-  if (s.unconfigured) {
-    return 'Choose No Ollama, Existing host Ollama or Docker Ollama on this page before continuing.'
-  }
   if (s.skipped || s.joycaptionReady) return null
   // LM Studio answers a different pair of questions: it cannot be started from
   // here, and "ready" means a model is LOADED rather than pulled. Sending someone
@@ -327,13 +307,7 @@ export function ollamaGateReason(s) {
     }
     return 'Finish this step to continue.'
   }
-  if (s.managedInitializing) {
-    return 'The companion Ollama container is still starting. This page will continue automatically when it is ready.'
-  }
   if (!s.reachable) {
-    if (s.deploymentMode === 'host') {
-      return 'Host Ollama is selected but unreachable from Docker. Start it on the host and make port 11434 reachable from Docker, or choose Docker Ollama on this page.'
-    }
     // Installed-but-stopped gets a Start nudge; genuinely absent gets install.
     if (!s.installed) return "Ollama isn't installed — download it and start it (port 11434) to continue."
     return 'Ollama is installed but not running — click ▶ Start Ollama below to continue.'
@@ -495,39 +469,26 @@ function ollamaStep(caps, runtimeReadiness) {
   const lms = caps.lmstudio || {}
   const o = caps.ollama || {}
   const managed = (runtimeReadiness && runtimeReadiness.ollama) || {}
-  const deploymentMode = managed.mode || 'local'
+  const deploymentMode = 'local'
   const deploymentState = managed.state || ''
-  const dockerManaged = ['unconfigured', 'none', 'host', 'docker'].includes(deploymentMode)
-  const deploymentConfigured = deploymentMode !== 'unconfigured'
-  const deploymentUrl = deploymentMode === 'host'
-    ? 'http://host.docker.internal:11434'
-    : deploymentMode === 'docker' ? 'http://ollama:11434' : ''
-  const normalizedCapabilityUrl = String(o.url || '').replace(/\/+$/, '')
-  // Lightweight runtime readiness owns reachability in Docker. The full caps
-  // snapshot may still describe the previous endpoint while its refresh retries;
-  // never transfer a model-ready verdict across that endpoint switch.
-  const capabilityMatchesDeployment = !dockerManaged || !deploymentUrl
-    || normalizedCapabilityUrl === deploymentUrl
-  // Under LM Studio the whole Docker/host/companion machinery is beside the point:
-  // it is one server the user runs themselves, and its readiness question is
-  // "is a model loaded", not "is a model pulled".
-  const reachable = isLmStudio ? !!lms.reachable
-    : dockerManaged ? !!managed.ready : !!o.reachable
+  const deploymentConfigured = true
+  const deploymentUrl = ''
+  // Under LM Studio the readiness question is "is a model loaded", not
+  // "is a model pulled".
+  const reachable = isLmStudio ? !!lms.reachable : !!o.reachable
   const visionModelReady = isLmStudio ? !!lms.model_ready
-    : (reachable && capabilityMatchesDeployment && !!o.vision_model_ready)
-  const disabled = deploymentMode === 'none'
-  const unconfigured = deploymentMode === 'unconfigured'
-  const managedInitializing = deploymentMode === 'docker'
-    && managed.state === 'starting' && !managed.ready
+    : (reachable && !!o.vision_model_ready)
+  const disabled = false
+  const unconfigured = false
+  const managedInitializing = false
   // Conscious "continue without Ollama". The backend derives it (stored flag AND
   // not reachable), so a reachable Ollama can never read as skipped — its real
-  // state, model gap included, always wins. A Docker deployment set to 'none'
-  // reaches the same neutral status by its own route.
+  // state, model gap included, always wins.
   // NOT excluded for LM Studio any more. The backend derives the flag on the ACTIVE
   // provider now, so it means "the user chose to continue without a local LLM" —
   // and excluding LM Studio here made the step impossible to settle: the panel
   // wrote a flag that read back as false, so the wizard asked again at every Next.
-  const skipped = !dockerManaged && !!o.skipped
+  const skipped = !!o.skipped
   // JoyCaption covers captioning on its own — the caption style follows the
   // TRAIN TYPE (prose for Z-Image, booru for SDXL) and the same prompt goes to
   // both engines, so its presence is what turns this step from a gate into a
@@ -549,7 +510,7 @@ function ollamaStep(caps, runtimeReadiness) {
     status, reachable, visionModelReady, skipped, joycaptionReady,
     llmProvider, isLmStudio, lmDetail: lms.detail || '', lmUrl: lms.url || '',
     deploymentMode, deploymentState, deploymentConfigured, deploymentUrl,
-    dockerManaged, disabled, unconfigured, managedInitializing,
+    disabled, unconfigured, managedInitializing,
     url: deploymentUrl || o.url || '', visionModel: o.vision_model || '',
     // Execution-independent install signal (binary on disk) vs `reachable` (server
     // answering): installed && !reachable -> "installed but stopped", offer a Start.

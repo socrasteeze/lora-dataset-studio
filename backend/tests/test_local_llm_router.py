@@ -1,8 +1,8 @@
 """The provider router — and the one property that matters most: nothing moved.
 
 Adding a second local LLM must be invisible to every install that has Ollama.
-That is not a nice-to-have here: LDS is public, people are running it, and three
-docker-compose files exist purely to wire Ollama up. So the first tests below are
+That is not a nice-to-have here: LDS is public and people are running it.
+So the first tests below are
 about the DEFAULT, not about LM Studio.
 
 The two accessors at the bottom exist because an adversarial pass found that

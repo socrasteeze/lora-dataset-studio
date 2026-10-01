@@ -52,5 +52,5 @@ What happens at boot:
 ## Boundaries
 
 - The app's own tests never load your extensions (the suite points the loader at an empty directory).
-- Docker images built from your working tree would include the folder — images are built from clean checkouts in CI and never pushed, but keep it in mind if you build and publish your own.
+- A release built from your working tree would include the folder. Releases are built from clean checkouts and this folder is not part of them. Keep that in mind if you publish your own build.
 - There is no versioned API contract yet: extensions reach into the same internals the app uses, and those internals move. Pin the app version you develop against.

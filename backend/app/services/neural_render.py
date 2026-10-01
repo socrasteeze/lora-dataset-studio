@@ -12,7 +12,7 @@ over a finished clip and writes a new clip.
 WHAT IT NEEDS, AND WHO SUPPLIES WHAT
 * Windows and an NVIDIA GPU with a recent display driver: the model is a D3D12
   PE and its temporal mode uses the driver's Optical Flow engine. There is no
-  Linux or Docker path, and this is the first capability of the app gated by
+  Linux or container path, and this is the first capability of the app gated by
   the operating system — ``status()`` says so in words rather than showing a
   button that cannot work.
 * The BRIDGE: two small MIT-licensed DLLs from the ComfyUI-DLSS5-NR project

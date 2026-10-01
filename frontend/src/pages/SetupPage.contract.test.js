@@ -41,8 +41,8 @@ test('the Ollama step offers a conscious way out, and persists it', () => {
 
 test('a blocked Next opens the panel instead of only refusing', () => {
   // This is the line the whole fix hangs on. Without it, Next toasts and stays.
-  assert.match(source, /if \(reason && s && !s\.dockerManaged\) \{ setOllamaSkipConfirm\(true\); return \}/,
-    'nextWithSave no longer opens the skip panel on a native install')
+  assert.match(source, /if \(reason\) \{ toast\.warning\(reason\); setOllamaSkipConfirm\(true\); return \}/,
+    'nextWithSave no longer opens the skip panel')
   // ...and the refusal is still ANNOUNCED. The toast carries aria-live; a panel that
   // appears far above the focused button announces nothing on its own.
   const branch = source.slice(source.indexOf('const nextWithSave'))
@@ -79,26 +79,14 @@ test('a conscious skip counts as a settled step', () => {
     "isReady ignores 'skipped' again — the wizard keeps sending the user back to the step they closed")
 })
 
-test('the Docker body never describes Ollama using LM Studio’s readiness', () => {
-  // Under LM Studio the native path returns early, but the DOCKER path fell
-  // through to three branches that all key on `reachable` — which now means "LM
-  // Studio answers". They rendered "✓ Ollama is running at http://ollama:11434"
-  // and a ▶ Start Ollama button on installs where Ollama had never run.
-  // Order is the assertion: the provider branch has to come FIRST.
-  // Anchored on the Ollama step's own body: `if (step.reachable) {` also appears
-  // in the ComfyUI step far above, and an unanchored indexOf measured THAT one —
-  // the assertion passed on a fresh tree and would have passed on a broken one.
-  const body = source.slice(source.indexOf('const lmStudioNote'))
+test('the Ollama step describes LM Studio before the Ollama status', () => {
+  const body = source.slice(source.indexOf('const ollamaBody'))
   const guard = body.indexOf('if (step.isLmStudio) {')
   const reachable = body.indexOf('if (step.reachable) {')
-  assert.ok(guard > -1, 'the Docker body no longer branches on the provider')
+  assert.ok(guard > -1, 'the step no longer branches on the provider')
   assert.ok(reachable > -1 && guard < reachable,
     'the Ollama status branches run first again — they describe the wrong server')
-  // ...and the cards stay, because the BAT launcher waits on that choice.
-  const branch = body.slice(guard, reachable)
-  assert.match(branch, /\{deploymentCards\}/,
-    'the deployment cards left the page — a Docker user can no longer answer the launcher')
-  assert.match(branch, /\{lmStudioNote\}/, 'the body no longer says which server is in use')
+  assert.match(body.slice(guard, reachable), /LM Studio is ready/)
 })
 
 test('the welcome scan row names the provider it scanned', () => {

@@ -10,7 +10,7 @@ export default function Administration({ value, onChange, onUnlock, checking, re
         <li>On the computer running LDS, generate a random token of at least 32 characters. With Python, run:
           <pre className="mt-2 overflow-x-auto rounded-md bg-surface p-3 text-xs"><code>{'python -c "import secrets; print(secrets.token_urlsafe(32))"'}</code></pre>
         </li>
-        <li>Set <code>LDS_PLUGIN_ADMIN_TOKEN</code> to that token in the LDS startup environment, or add <code>LDS_PLUGIN_ADMIN_TOKEN=your-token</code> to its <code>.env</code> file. For Docker or a service, set it in the container or service environment.</li>
+        <li>Set <code>LDS_PLUGIN_ADMIN_TOKEN</code> to that token in the LDS startup environment, or add <code>LDS_PLUGIN_ADMIN_TOKEN=your-token</code> to its <code>.env</code> file. For container or a service, set it in the container or service environment.</li>
         <li>Restart LDS when no jobs are running, return to this page and enter the same token below.</li>
       </ol>
       <p className="mt-3 text-content-muted">Installing plugins runs code on the LDS computer. Keep this token private and use a trusted connection. Running LDS with sudo does not unlock this browser.</p>

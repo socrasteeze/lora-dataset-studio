@@ -2,14 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  DOCKER_UPDATE_COMMANDS,
-  DOCKER_UPDATE_GUIDE_URL,
-  dockerUpdateCommands,
   PINOKIO_UPDATE_STEPS,
   PINOKIO_UPDATE_GUIDE_URL,
   formatMB,
   installMode,
-  isDockerInstall,
   isPinokioInstall,
   zipUpdateHeadline,
   progressPercent,
@@ -23,26 +19,12 @@ test('formatMB is compact and empty for unknown sizes', () => {
   assert.equal(formatMB(150_000_000), '150 MB');   // >=100 MB -> whole number
 });
 
-test('installMode distinguishes docker, git, zip, unavailable and unknown', () => {
-  assert.equal(installMode({ ok: true, install_mode: 'docker' }), 'docker');
+test('installMode distinguishes git, zip, unavailable and unknown', () => {
   assert.equal(installMode({ ok: true, is_git: true, update_available: true }), 'git');
   assert.equal(installMode({ ok: true, is_git: false, can_apply: true }), 'zip');
   assert.equal(installMode({ ok: true, is_git: false, can_apply: false }), 'unavailable');
   assert.equal(installMode({ ok: false, reason: 'offline' }), 'unknown');
   assert.equal(installMode(null), 'unknown');
-});
-
-test('docker mode is a safety boundary even if other apply flags are present', () => {
-  const contradictory = {
-    ok: true,
-    install_mode: 'docker',
-    is_git: true,
-    can_apply: true,
-    update_available: true,
-  };
-  assert.equal(isDockerInstall(contradictory), true);
-  assert.equal(installMode(contradictory), 'docker');
-  assert.equal(isDockerInstall({ install_mode: 'git' }), false);
 });
 
 test('a Pinokio install outranks its own git checkout', () => {
@@ -59,7 +41,6 @@ test('a Pinokio install outranks its own git checkout', () => {
   assert.equal(installMode(pinokio), 'pinokio');
   assert.equal(installMode({ ...pinokio, can_apply: true }), 'pinokio');
   assert.equal(isPinokioInstall({ install_mode: 'git' }), false);
-  assert.equal(isDockerInstall(pinokio), false);
 });
 
 test('pinokio update steps are three clicks, not shell commands', () => {
@@ -70,27 +51,10 @@ test('pinokio update steps are three clicks, not shell commands', () => {
   ]);
   assert.equal(Object.isFrozen(PINOKIO_UPDATE_STEPS), true);
   for (const step of PINOKIO_UPDATE_STEPS) {
-    assert.doesNotMatch(step, /git |docker |pip /,
+    assert.doesNotMatch(step, /git |pip /,
       'this install shape never opens a terminal — do not name commands');
   }
   assert.match(PINOKIO_UPDATE_GUIDE_URL, /#option-5--pinokio-one-click-any-os$/);
-});
-
-test('docker update instructions preserve the legacy fallback and link to all lanes', () => {
-  assert.deepEqual(DOCKER_UPDATE_COMMANDS, [
-    'git pull',
-    'docker compose -f docker-compose.gpu.yml up -d --build',
-  ]);
-  assert.equal(Object.isFrozen(DOCKER_UPDATE_COMMANDS), true);
-  assert.match(DOCKER_UPDATE_GUIDE_URL, /docs\/guide\/docker.md#updates-and-restarts$/);
-});
-
-test('Docker update instructions follow the runtime instead of always rebuilding GPU', () => {
-  const commands = ['git pull', 'docker compose up -d --build'];
-  assert.deepEqual(dockerUpdateCommands({ instructions: commands }), commands);
-  for (const status of [null, {}, { instructions: [] }, { instructions: [null] }]) {
-    assert.deepEqual(dockerUpdateCommands(status), DOCKER_UPDATE_COMMANDS);
-  }
 });
 
 test('zipUpdateHeadline announces the release and its size when known', () => {

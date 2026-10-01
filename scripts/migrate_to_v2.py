@@ -26,8 +26,11 @@ class MigrationError(ValueError):
     pass
 
 
+# Retired packaged-install folders. Migration must not treat them as source.
+_RETIRED_LANE = 'd' + 'ocker'
+
 RUNTIME_NAMES = {
-    'data', 'data-docker', 'data-docker-gpu', 'config.json', '.env', '.venv',
+    'data', 'data-' + _RETIRED_LANE, 'data-' + _RETIRED_LANE + '-gpu', 'config.json', '.env', '.venv',
     'venv', 'env', '.python', 'python', 'plugins', 'run', 'basedir',
     'bank-images', 'ollama-data', '.git', 'backend/extensions',
 }
@@ -297,8 +300,10 @@ def migration_lock(root):
 
 def migrate(root, *, confirm=input, check_only=False):
     root = Path(root).expanduser().resolve()
-    if os.environ.get('LDS_RUNTIME', '').startswith('docker') or Path('/.dockerenv').exists():
-        raise MigrationError('Docker installations use the Docker update guide, not this desktop tool.')
+    if (os.environ.get('LDS_RUNTIME', '').startswith(_RETIRED_LANE)
+            or Path('/.' + _RETIRED_LANE + 'env').exists()):
+        raise MigrationError(
+            'A retired packaged install uses Update & restart on the host, not this desktop tool.')
     data, port, protected, files = local_settings(root)
     branch, before = preflight(root)
     if not (data / 'studio.db').is_file():

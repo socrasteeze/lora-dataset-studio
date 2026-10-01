@@ -12,7 +12,7 @@ meaning.
 **README — at every release, not "at milestones".** "Milestone" was never
 defined, so it meant never: seven features shipped in one day while the README
 still described the app as it was that morning, and one line promised a
-capability the Docker image does not have. Two questions, every time:
+capability the app does not have. Two questions, every time:
 
 - does a section now describe something **that is no longer true**? (a changed
   default, a renamed action, a capability that moved) — that is a debt, not a

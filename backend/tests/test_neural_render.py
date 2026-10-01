@@ -98,7 +98,7 @@ def test_status_names_what_is_missing_in_words(tmp_path):
     assert not st['ready']
     assert any('bridge' in m and 'Setup' in m for m in st['missing'])
     assert any(nr.MODEL_FILE in m and str(root) in m for m in st['missing'])
-    # Linux/Docker: the OS line, and nothing that pretends a driver could fix it.
+    # On Linux: the OS line, and nothing that pretends a driver could fix it.
     st = nr.status(root, os_name='posix', driver={'ngx': False, 'nvof': False}, worker_ok=False, ffmpeg_ok=True)
     assert st['missing'][0].startswith('Windows')
     assert not any('driver' in m for m in st['missing'])

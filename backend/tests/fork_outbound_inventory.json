@@ -520,10 +520,6 @@
    "calls": 1,
    "hosts": []
   },
-  "packaging/docker/healthcheck.py": {
-   "calls": 1,
-   "hosts": []
-  },
   "packaging/launcher.py": {
    "calls": 1,
    "hosts": []

@@ -17,7 +17,7 @@ export const NEURAL_RENDER_TOPICS = [
      'originals kept', 'backup', 'undo neural render', 'video enhance', 'enhance video',
      'enhance a clip', 'improve a clip', 'flat art', 'anime keep tones', 'greys the whites',
      'washed out', 'nvngx_dlssnr.dll', 'model not found', 'windows only', 'nvidia only',
-     'not available in docker', 'render as a new clip', 'compare', 'compare with original',
+     'not available in container', 'render as a new clip', 'compare', 'compare with original',
      'side by side', 'before after', 'before and after', 'original vs render', 'swap sides',
      'in step', 'synchronised playback', 'synchronized playback', 'export', 'export comparison',
      'export the comparison', 'save the comparison', 'download comparison', 'side by side file',
@@ -33,7 +33,7 @@ export const NEURAL_RENDER_TOPICS = [
      'nvngx_dlssnr.dll', 'where to put the model', 'model folder', 'runtime folder',
      'dlss5nr', 'bridge missing', 'model missing', 'forwarder', '165 mb', 'sha256',
      'pinned release', 'ComfyUI-DLSS5-NR', 'nvidia driver', 'ngx', 'optical flow',
-     'nvofapi64', 'windows only', 'no linux', 'no docker', 'rtx 50', 'rtx 40']),
+     'nvofapi64', 'windows only', 'no linux', 'no container', 'rtx 50', 'rtx 40']),
 ];
 
 for (const topic of NEURAL_RENDER_TOPICS) {

@@ -118,7 +118,7 @@ def _discard_incomplete_pack(models_root):
     later call skips the download for and then fails on
     ``assert 'detection' in self.models``. Nothing repairs it.
 
-    That used to cure itself in Docker, where the folder lived in the writable
+    That used to cure itself in container, where the folder lived in the writable
     layer and died with the container. Now that the pack sits on the mounted
     volume it would last forever, so the carcass is cleared here instead.
 

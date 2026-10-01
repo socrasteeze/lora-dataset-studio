@@ -66,4 +66,4 @@ all recovery identities were populated and unique. The isolated test server was 
 ## Preserved work
 
 Pre-existing untracked `upscale-tests.md` remains untouched. Earlier V2 migration,
-physical-device and Docker qualification gates are not closed by this work.
+Physical-device qualification is not closed by this work.

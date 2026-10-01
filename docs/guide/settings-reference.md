@@ -18,7 +18,7 @@ A few things hold true everywhere:
 
 ### Advanced: environment overrides
 
-For containerized or scripted setups, a handful of environment variables override paths and binds before `config.json` is even read. You rarely need these — the UI covers the normal cases.
+For scripted setups, a handful of environment variables override paths and binds before `config.json` is even read. You rarely need these — the UI covers the normal cases.
 
 | Variable | Overrides |
 |---|---|
@@ -32,7 +32,7 @@ For containerized or scripted setups, a handful of environment variables overrid
 | `LDS_DB_TRACE` | Overrides `diagnostics.db_trace_seconds` for this process. Seconds a database write may be held before it is reported to the log; unset or `0` = off. Set it to `2` when the app goes unresponsive while a pass runs — the log then names the thread holding the database and the statement that opened the write. |
 | `LDS_SQLITE_BUSY_TIMEOUT_MS` | How long a click waits for the database before giving up (default `15000`). Only worth changing while hunting a stall: at `500` a misbehaving background pass surfaces in seconds instead of being absorbed by the wait. Leaving it low makes ordinary clicks fail during normal batch saves. |
 | `LDS_PUBLIC` | Set to `1` when the app is served on a URL the public internet can reach (a rented GPU box's proxy hostname, a tunnel). Forces the access-token gate on whatever `server.require_token` says, and makes the launcher generate a token if none exists. Only affects non-loopback binds. |
-| `LDS_ALLOW_UNAUTHENTICATED` | Set to `1` to deliberately opt out of the token gate — for setups that already authenticate the connection themselves (a VPN, a reverse proxy that requires its own login, a trusted Docker network). Overrides `LDS_PUBLIC`: with this set, a public bind is served with no token check at all. |
+| `LDS_ALLOW_UNAUTHENTICATED` | Set to `1` to deliberately opt out of the token gate — for setups that already authenticate the connection themselves (a VPN, a reverse proxy that requires its own login, a private network you already trust). Overrides `LDS_PUBLIC`: with this set, a public bind is served with no token check at all. |
 | `LDS_EXTENSIONS` | Set to `0` to disable the local extension loader entirely — no package under the extensions directory is imported. See the [Extensions guide](extensions.md). |
 | `LDS_EXTENSIONS_DIR` | Directory the extension loader scans (default `backend/extensions/`, which is gitignored and never ships). Mostly for tests and unusual layouts. |
 | `FLASK_DEBUG` | `1` enables Flask debug mode. |
@@ -509,9 +509,9 @@ model LDS did not load. Pointing LDS at a *second* Ollama instance on another
 port (or another machine) removes the contention entirely. A **remote** URL is
 never probed or unloaded — it isn't sharing this machine's GPU.
 
-In Docker, choose the deployment only from **Setup → Ollama**: `none` disables it, `host` uses the existing host service at the authoritative `http://host.docker.internal:11434`, and `docker` uses the isolated companion at the authoritative `http://ollama:11434`. The managed URL is read-only. Neither launcher downloads a model: use the explicit **Pull** button in LDS to see progress and cancel or resume the transfer.
+Use the explicit **Pull** button in LDS to see progress and cancel or resume the transfer.
 
-- **Docker deployment mode** → `ollama.deployment_mode`: `none`, `host`, or `docker`. This setting is selected by Setup and applies only to Docker; native installs keep their normal URL-based behavior.
+- **Ollama mode** → `ollama.deployment_mode`: `none` or `host`. A retired value reads as `host`. The URL stays `ollama.url`.
 - **Ollama vision model** → `ollama.vision_model`. Select from the installed models reported by Ollama. Choose a vision-capable model for auto-captioning, framing auto-classify, head-crop and watermark detection; the list can also contain text-only models. Default **`huihui_ai/qwen3-vl-abliterated:8b-instruct`** — the **abliterated** (uncensored) build, so it captions adult datasets instead of refusing them. **Trap:** keep the **`-instruct`** tag. The plain `:8b` tag is the *Thinking* variant, which reasons out loud instead of captioning and produces garbage here.
 
 - **Images analysed at once** → `ollama.vision_concurrency`. How many images a bank pass sends to Ollama at the same time. Default **4**. The passes that read every image in a bank — watermark scan, framing, captions — spend most of each request waiting on the round-trip rather than on the GPU, so overlapping them roughly **halves** a long pass (measured 2.0× at 4). Going higher gains little: 6 and 8 buy single-digit percentages unless your Ollama is configured for more parallel requests (`OLLAMA_NUM_PARALLEL`), and they make **Stop** take a few seconds longer because it waits for the calls already in flight. Set it to **1** to get the old strictly-one-at-a-time behaviour back. Any value the app can't read falls back to 4, and anything above 16 is clamped — a bad value costs you speed, never the pass.
@@ -1438,7 +1438,7 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `comfyui.object_info_timeout_s` | Seconds ComfyUI may take to enumerate its nodes and model files (default `45`, clamped to 5-300). Raise it on an install with many custom nodes; a ComfyUI that is simply stopped is still detected in ~3 s regardless. Editable in Settings → Local tools. |
 | `comfyui.loras_dir` | Explicit override for ComfyUI's LoRA folder — where trained LoRAs are installed. Wins over `extra_model_paths.yaml`; left empty, the deploy folder follows the yaml's `is_default` LoRA root, else `<install>/models/loras`. Editable in Settings → Local tools. |
 | `ollama.url` | Base URL of your Ollama instance (default `http://127.0.0.1:11434`). |
-| `ollama.deployment_mode` | Docker-only deployment selected in LDS Setup: `none`, `host`, or `docker`. Host and companion modes force `http://host.docker.internal:11434` and `http://ollama:11434` respectively; their URL is not user-editable. |
+| `ollama.deployment_mode` | `none` or `host`. A retired value reads as `host`. The URL stays `ollama.url`. |
 | `ollama.vision_model` | Ollama vision model used for auto-classify and auto head-crop (default `huihui_ai/qwen3-vl-abliterated:8b-instruct`, the uncensored **abliterated** build — use the Instruct, not Thinking, variant). |
 | `ollama.vision_concurrency` | How many images a bank vision pass (watermark / framing / captions) sends to Ollama at once (default `4`, clamped to 1-16). Higher overlaps more waiting; `1` restores the old one-at-a-time behaviour. |
 | `ollama.vision_keep_warm_seconds` | How long a one-off vision job (auto head-crop, Describe) may leave the model loaded when nothing else wants the GPU (default `120`, `0` = always unload, capped at 600). The lease is revoked as soon as a generation or a training starts. |
@@ -1477,7 +1477,7 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `cloud.verified_only` | Restrict to vast.ai verified hosts (default `true`). |
 | `cloud.secure_cloud_only` | Restrict to vast.ai's Secure Cloud (datacenter) tier (default `false`; narrows the market, raises price). |
 | `face_scoring.python` | Python interpreter used to run the InsightFace subprocess (empty = current interpreter). |
-| `face_scoring.models_root` | Directory where InsightFace model weights are stored/downloaded. Empty resolves to `data/models/insightface`, so a Docker install keeps them on its mounted volume instead of re-downloading them whenever the container is recreated (~350 MB downloaded, ~750 MB on disk — InsightFace keeps the zip next to what it extracted). |
+| `face_scoring.models_root` | Directory where InsightFace model weights are stored/downloaded. Empty resolves to `data/models/insightface` (~350 MB downloaded, ~750 MB on disk — InsightFace keeps the zip next to what it extracted). |
 | `face_scoring.green` | Similarity score threshold (0–1) above which an image is flagged "green" (strong match). |
 | `face_scoring.orange` | Similarity score threshold (0–1) above which an image is flagged "orange" (borderline match). |
 | `masks.python` | Python interpreter used to run the rembg subprocess (empty = current interpreter). |

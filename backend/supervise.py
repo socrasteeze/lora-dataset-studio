@@ -11,11 +11,6 @@ child, so the supervisor itself has almost no surface to crash on.
 WHICH LAUNCH PATHS USE IT — the three differ, and the difference is deliberate:
 
   · start.bat (the Windows double-click) runs this. `LDS_SUPERVISE=0` opts out.
-  · Docker already supervises itself and must NOT get a second one:
-    packaging/docker/studio_launch.sh wraps the backend in a `while true` loop
-    that honours the same exit 75, because ComfyUI is the foreground process
-    there and nothing else would restart the studio. Compose adds
-    `restart: unless-stopped` above that.
   · packaging/launcher.py (the portable bundle) does NOT, and this is the one
     real gap. Pointing it here would be a one-line change and a worse bug: its
     Quit button calls `proc.terminate()` on whatever it spawned, so it would
@@ -26,9 +21,9 @@ WHICH LAUNCH PATHS USE IT — the three differ, and the difference is deliberate
     below would go nowhere), not inserting this process underneath it.
 
 The restart contract is NOT invented here: `LDS_RESTART_MODE=supervisor` already
-exists in updater.py and is what Docker uses, so an in-app "Update & restart"
-ends in exit 75 rather than spawning its own detached helper. Two relaunchers on
-one port is the failure that contract exists to prevent.
+exists in updater.py, so an in-app "Update & restart" ends in exit 75 rather
+than spawning its own detached helper. Two relaunchers on one port is the
+failure that contract exists to prevent.
 """
 import os
 import subprocess
@@ -36,7 +31,7 @@ import sys
 import time
 
 CLEAN_EXIT = 0
-RESTART_EXIT = 75          # the launcher's "relaunch me" signal (Docker contract)
+RESTART_EXIT = 75          # the launcher's "relaunch me" signal
 CONTROL_C_EXIT = 3221225786   # 0xC000013A, Windows STATUS_CONTROL_C_EXIT
 RELAUNCH_DELAY = 2.0       # let the port free before binding it again
 HEALTHY_UPTIME = 60.0      # served this long => the next death is a fresh one

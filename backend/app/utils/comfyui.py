@@ -1701,7 +1701,7 @@ def _recently_refused(api_addr) -> bool:
         return False
 
 
-# Private ranges that Docker, WSL2 and Hyper-V hand to guests running ON this
+# Private ranges that container, WSL2 and Hyper-V hand to guests running ON this
 # machine. A ComfyUI addressed there can share this GPU, so it is never treated
 # as another machine.
 _LOCAL_GUEST_NETWORKS = (ipaddress.ip_network('172.16.0.0/12'),)

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { apiFetch, postJson } from '../../api/fetchClient'
 import DiagnosticReport from '../common/DiagnosticReport'
 import GlobalStopPanel from './GlobalStopPanel'
-import DockerUpdateInstructions from '../common/DockerUpdateInstructions'
 import PinokioUpdateInstructions from '../common/PinokioUpdateInstructions'
 import { Card } from './primitives'
 import { installMode, zipUpdateHeadline, progressLabel, progressPercent } from './updateStatus'
@@ -72,10 +71,7 @@ function UpdatesCard() {
   }
 
   const apply = async () => {
-    // Defense in depth: Docker owns /app as image content. The button is not
-    // rendered in this mode, and a stale callback must not POST an apply anyway.
-    if (mode === 'docker') return
-    // Same guard for Pinokio: the pull would succeed and the restart would
+    // Pinokio owns the process: the pull would succeed and the restart would
     // detach the server from the launcher that owns it.
     if (mode === 'pinokio') return
     setApplying(true); setPhase('pulling'); setProgress(null)
@@ -100,13 +96,10 @@ function UpdatesCard() {
   const s = status
   // In-app update is possible for a git clone (pull) or a packaged install whose
   // latest release ships a ZIP asset (download + swap). Otherwise: link out.
-  const dockerMode = mode === 'docker'
   const pinokioMode = mode === 'pinokio'
   const canPull = s && s.update_available && (mode === 'git' || mode === 'zip')
   return (
-    <Card title="Updates" help={dockerMode
-      ? 'Docker installs are updated by pulling the host checkout and rebuilding the image.'
-      : pinokioMode
+    <Card title="Updates" help={pinokioMode
         ? 'Pinokio starts and stops this app, so it also owns the update: Stop, Update, Start.'
         : 'Pull the latest version from GitHub and restart — without leaving the app.'}>
       <div className="flex flex-wrap items-center gap-3">
@@ -165,15 +158,7 @@ function UpdatesCard() {
 
       {!applying && s && (
         <div className="text-sm">
-          {dockerMode && s.update_available ? (
-            <div className="space-y-2">
-              <p className="text-content">
-                <span aria-hidden>⬆</span>{' '}
-                Update available{s.latest ? ` — v${s.latest}` : ''}. The running container cannot replace its own image.
-              </p>
-              <DockerUpdateInstructions status={s} />
-            </div>
-          ) : pinokioMode && s.update_available ? (
+          {pinokioMode && s.update_available ? (
             <div className="space-y-2">
               <p className="text-content">
                 <span aria-hidden>⬆</span>{' '}

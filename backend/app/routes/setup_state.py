@@ -45,11 +45,6 @@ def complete():
             if (address and address.scheme in ('http', 'https')
                     and address.hostname in ('localhost', '127.0.0.1', '::1')):
                 config.save_config({'comfyui': {'setup_skipped': True}})
-        if (capabilities.setup_is_docker_runtime()
-                and not config.get('ollama.deployment_mode', '')):
-            # Opening the core is also an explicit choice to defer optional
-            # Ollama. Let the Docker launcher finish without starting a service.
-            config.save_config({'ollama': {'deployment_mode': 'none'}})
         state = setup_state.complete_core()
     except OSError:
         return jsonify({'error': 'LDS could not save its workspace. Check that '

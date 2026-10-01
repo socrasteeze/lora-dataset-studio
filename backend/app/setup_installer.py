@@ -819,7 +819,7 @@ def _venv_root(python: str) -> str:
     resolving the BINARY (os.path.samefile) answers "same base Python?", never
     "same environment?". Every venv on the machine then collapses into one —
     which is how the Flask-venv guard mistook the app-managed bank-scoring env
-    for the app's own venv inside the GPU Docker image and refused installs that
+    for the app's own venv and refused installs that
     were the whole point of the button. The DIRECTORY is still resolved (a data
     dir reached through a mount symlink must match itself); only the binary is
     taken at face value. Conda envs carry no pyvenv.cfg and return '', keeping
@@ -1599,9 +1599,9 @@ def _install_cpu_torch_pair(action, python, *, constraints=None) -> int:
     torchvision, and left to pip that torchvision resolves from PyPI — where the
     Linux wheel is built against a DIFFERENT torch than the CPU-index one already
     present. The mismatch imports into `RuntimeError: operator torchvision::nms
-    does not exist` and the whole env is unusable (reported from the GPU Docker
-    image, whose rebuilt bank-scoring env failed exactly this way; Dockerfile.gpu
-    names the same trap for the image venv and pairs them for the same reason).
+    does not exist` and the whole env is unusable (reported from a GPU image
+    whose rebuilt bank-scoring env failed exactly this way). The install pairs
+    them for the same reason.
     Windows never surfaced it because PyPI's Windows torchvision wheels are CPU
     builds. One index, both names: pip resolves a matched pair, and the call is a
     no-op when a matched pair is already there."""

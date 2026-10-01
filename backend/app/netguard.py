@@ -24,7 +24,7 @@ Token sources, in order:
     subsequent fetches just work.
 
 Escape hatch for setups with their own network isolation (VPN, reverse proxy
-with auth, trusted Docker network): `LDS_ALLOW_UNAUTHENTICATED=1`.
+with auth, a private network you already trust): `LDS_ALLOW_UNAUTHENTICATED=1`.
 """
 from __future__ import annotations
 import ipaddress

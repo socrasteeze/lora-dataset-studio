@@ -311,7 +311,7 @@ def destroy_instance(instance_id) -> bool:
 
 
 def derive_base_url(instance: dict, container_port: int):
-    """Public URL of the pod's UI from the docker-style port mapping.
+    """Public URL of the pod's UI from its published port mapping.
     Returns None while the mapping isn't published yet (instance booting)."""
     if not instance:
         return None

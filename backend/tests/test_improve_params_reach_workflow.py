@@ -130,7 +130,7 @@ def test_a_raised_strength_with_no_lora_file_is_an_ERROR_not_a_silent_skip(captu
 
 
 @pytest.mark.parametrize('sep,expected', [
-    ('/',  'klein/realistic.safetensors'),      # a Linux install (Docker)
+    ('/',  'klein/realistic.safetensors'),      # a Linux install (container)
     ('\\', 'klein\\realistic.safetensors'),     # a Windows install
 ])
 def test_a_workflow_name_is_respelled_for_the_host_that_opens_it(sep, expected):

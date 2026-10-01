@@ -17,7 +17,7 @@ test('every real credit form of the 28/07 wave is picked up', () => {
   const entries = [
     entry('a', 'A', 'The budget is in Settings. Thanks to j_o_e_l. (Discord) for the report.'),
     entry('b', 'B', 'Others were silent in the same way. Reported by 1Tomber (GitHub #23).'),
-    entry('c', 'C', 'Works in WSL or Docker. Found and diagnosed by 1Tomber (GitHub #21).'),
+    entry('c', 'C', 'Works in WSL or container. Found and diagnosed by 1Tomber (GitHub #21).'),
     entry('d', 'D', 'Found, measured (~15 s on his install) and fixed by j_o_e_l. (Discord).'),
     entry('e', 'E', 'A clear win. Suggested by nofaceman (Reddit).'),
   ];

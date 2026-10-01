@@ -637,37 +637,11 @@ def test_update_check_detects_newer_release(client, monkeypatch, _reset_update_c
     assert d['url'].endswith('v9999.12.31')
 
 
-def test_update_check_docker_reports_manual_rebuild_even_with_zip(
-        client, monkeypatch, _reset_update_cache):
-    import requests
-    from app.services import updater
-    monkeypatch.setenv('LDS_RUNTIME', 'docker-gpu')
-    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: True)
-    monkeypatch.setattr(
-        updater, 'git_update_status',
-        lambda root=None: (_ for _ in ()).throw(
-            AssertionError('Docker checks must not fetch through the git updater')),
-    )
-    monkeypatch.setattr(requests, 'get', lambda *a, **k: _FakeResp(200, {
-        'tag_name': 'v9999.12.31',
-        'assets': [{'name': 'LoRA-Dataset-Studio-windows.zip',
-                    'browser_download_url': 'https://x/win'}],
-    }))
-
-    d = client.get('/api/update/check?force=1').get_json()
-
-    assert d['update_available'] is True
-    assert d['install_mode'] == 'docker' and d['can_apply'] is False
-    assert d['manual'] is True
-    assert d['instructions'] == [
-        'git pull',
-        'docker compose -f docker-compose.gpu.yml up -d --build',
-    ]
 
 
 def test_update_check_pinokio_keeps_the_git_answer_but_drops_the_button(
         client, monkeypatch, _reset_update_cache):
-    """Unlike Docker, a Pinokio install IS a git checkout worth measuring: its
+    """A Pinokio install IS a git checkout worth measuring: its
     Update tab pulls exactly those commits, so "3 commits behind" stays true and
     useful. Only the in-app apply goes away."""
     from app.services import updater
@@ -853,29 +827,6 @@ def test_settings_restart_pins_saved_host_port_to_env(client, monkeypatch):
     assert seen['block_during_update'] is True
 
 
-def test_settings_restart_preserves_supervisor_managed_bind(client, monkeypatch):
-    """Inside Docker the container bind is fixed by its environment.  Saving a
-    desktop host/port must not turn the restarted backend into a loopback-only
-    process that the published port cannot reach."""
-    import os
-    from app.services import updater
-    monkeypatch.setenv('LDS_BIND_MANAGED', '1')
-    monkeypatch.setenv('LDS_HOST', '0.0.0.0')
-    monkeypatch.setenv('LDS_PORT', '5050')
-    seen = {}
-    monkeypatch.setattr(updater, 'schedule_restart',
-                        lambda *a, **k: seen.update(k) or True)
-    client.put('/api/settings', json={'config': {'server': {
-        'host': '127.0.0.1', 'port': 5999,
-    }}})
-
-    response = client.post('/api/settings/restart')
-
-    assert response.status_code == 200
-    assert os.environ['LDS_HOST'] == '0.0.0.0'
-    assert os.environ['LDS_PORT'] == '5050'
-    assert seen['block_during_update'] is True
-    assert seen['environment_updates'] is None
 
 
 def test_put_settings_saves_server_lan_and_port(client):
@@ -980,25 +931,6 @@ def test_update_apply_defers_changed_requirements_to_restart(client, monkeypatch
     assert calls == [((), {'install_requirements': True})]
 
 
-def test_update_apply_docker_refuses_before_any_pull_or_download(client, monkeypatch):
-    from app.services import updater
-    monkeypatch.setenv('LDS_RUNTIME', 'docker-gpu')
-    forbidden = lambda *a, **k: (_ for _ in ()).throw(
-        AssertionError('Docker apply must refuse before an updater is selected'))
-    monkeypatch.setattr(updater, 'is_git_checkout', forbidden)
-    monkeypatch.setattr(updater, 'apply_update', forbidden)
-    monkeypatch.setattr(updater, 'start_zip_update', forbidden)
-
-    response = client.post('/api/update/apply')
-    body = response.get_json()
-
-    assert response.status_code == 200
-    assert body['ok'] is False and body['manual'] is True
-    assert body['install_mode'] == 'docker' and body['can_apply'] is False
-    assert body['instructions'] == [
-        'git pull',
-        'docker compose -f docker-compose.gpu.yml up -d --build',
-    ]
 
 
 def test_settings_restart_is_refused_during_active_update(client, monkeypatch):

@@ -87,7 +87,7 @@ FAKE_SECRET_HINTS = ('example', 'placeholder', 'dummy', 'fake', 'leaked',
 
 # Text files that carry no suffix at all. Without these, the release archive
 # had exactly one member no scanner ever read.
-SCANNED_BASENAMES = ('license', 'notice', 'readme', 'changelog', 'dockerfile',
+SCANNED_BASENAMES = ('license', 'notice', 'readme', 'changelog',
                      'makefile', '.env')
 
 

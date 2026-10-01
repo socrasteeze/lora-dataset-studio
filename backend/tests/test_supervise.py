@@ -12,7 +12,7 @@ between the three ways the backend can end, because they need opposite answers:
 
   * exit 0   -> the user asked it to stop. Stay stopped.
   * exit 75  -> "Update & restart" asked for a relaunch (`LDS_RESTART_MODE=
-                supervisor`, already the Docker contract). Relaunch.
+                supervisor`, already the container contract). Relaunch.
   * anything else -> it died. Relaunch, but not forever: a backend that crashes
                 at boot must not become an infinite respawn loop.
 """
@@ -242,15 +242,6 @@ def test_the_windows_double_click_runs_the_supervisor_and_can_opt_out():
     bat = _repo_file('start.bat')
     assert 'backend\supervise.py' in bat
     assert 'LDS_SUPERVISE' in bat, 'there must be a way to run the backend directly'
-
-
-def test_docker_is_not_given_a_second_supervisor():
-    """It already loops on its own, honouring the same exit 75. A second one
-    would be two relaunchers on one port — the exact failure LDS_RESTART_MODE
-    exists to prevent."""
-    launch = _repo_file('packaging/docker/studio_launch.sh')
-    assert 'while true' in launch and '-eq 75' in launch
-    assert 'supervise.py' not in launch
 
 
 def test_the_portable_bundle_stays_out_until_its_quit_button_can_cope():

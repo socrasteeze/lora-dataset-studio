@@ -1,5 +1,5 @@
 /* JSX wiring contract for the Pinokio install mode — the sibling of
- * dockerModeUi.test.js. The pure mode/steps data lives in updateStatus.test.js;
+ * The pure mode/steps data lives in updateStatus.test.js;
  * this file guards the two places where a refactor could put back an
  * "Update & restart" button that would relaunch the server detached from the
  * launcher that is supposed to stop and start it. */

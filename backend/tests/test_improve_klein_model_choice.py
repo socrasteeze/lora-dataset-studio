@@ -221,7 +221,7 @@ def test_a_path_separator_cannot_be_smuggled_into_the_choice(app):
     BOTH separators must be refused on BOTH hosts. The guard used to be written
     with `os.path.basename`, which reads a backslash as an ordinary filename
     character on Linux — so `sub\\model.safetensors` was refused on Windows and
-    accepted on every Linux/Docker install (reported by socrasteeze, GitHub #20).
+    accepted on every Linux install (reported by socrasteeze, GitHub #20).
     That is why these cases are asserted unconditionally rather than per-OS.
     """
     from app.config import LOCAL_USER

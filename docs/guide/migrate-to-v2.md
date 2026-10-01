@@ -69,14 +69,12 @@ The check fetches the public `v2` reference, but leaves the current branch and
 application files unchanged. The second command shows the plan and asks you to
 type **V2** before making a backup and switching.
 
-## ZIP and Docker installations
+## ZIP installations
 
 - **Installed from a release ZIP, without Git:** there is no branch to switch.
   Use **Update & restart** in your existing LDS installation to get the current
   release. Do not delete its folder or copy your data into a fresh installation.
   The helper detects this case and leaves it unchanged.
-- **Docker:** use the [Docker update guide](docker.md). This desktop tool does
-  not migrate running containers or manage their volumes.
 
 Tool source: [Python helper](../../scripts/migrate_to_v2.py),
 [Windows launcher](../../scripts/migrate-to-v2.bat).

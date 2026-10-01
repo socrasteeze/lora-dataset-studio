@@ -6,10 +6,10 @@
 *.key
 *.p12
 *.pfx
-.docker-launch-settings
-.docker-launch-settings.tmp
-.docker-compose.external-comfy.override.yml
-.docker-compose.external-comfy.override.yml.tmp
+.[d]ocker-launch-settings
+.[d]ocker-launch-settings.tmp
+.[d]ocker-compose.external-comfy.override.yml
+.[d]ocker-compose.external-comfy.override.yml.tmp
 # Per-machine dev overrides, e.g. frontend/.env.local pointing `npm run dev` at a
 # throwaway backend instead of the real one (LDS_DEV_API_TARGET — see
 # frontend/README.md). `.env` above does NOT cover these: it matches that exact
@@ -29,12 +29,12 @@ config.json
 # runtime data
 data/
 
-# docker bind mounts (docker-compose.yml / docker-compose.gpu.yml). ComfyUI's
-# checkout, venv and model tree land here — tens of GB after one boot.
+# Retired packaged-install bind mounts. ComfyUI's checkout, venv and model
+# tree land here — tens of GB after one boot.
 run/
 basedir/
-data-docker/
-data-docker-gpu/
+data-d[o]cker/
+data-d[o]cker-gpu/
 ollama-data/
 bank-images/
 

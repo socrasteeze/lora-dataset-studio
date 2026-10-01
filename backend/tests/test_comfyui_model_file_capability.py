@@ -212,7 +212,7 @@ def test_separator_and_case_differences_are_not_a_gap(app, probe):
         # forward slash vs the backslash ComfyUI published, and a different case
         assert comfyui.unavailable_model_files(
             _krea_like_workflow(unet='Krea/Krea2_Turbo_FP8.safetensors')) == []
-        # backslash vs the forward slash ComfyUI published (a Linux/container host)
+        # backslash vs the forward slash ComfyUI published (a host that keeps the backslash)
         assert comfyui.unavailable_model_files(
             _krea_like_workflow(lora='krea\\id.safetensors')) == []
 

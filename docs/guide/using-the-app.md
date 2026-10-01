@@ -3917,7 +3917,7 @@ driver estimates; it needs a clip **at least 704 px wide** (measured: 700 fails,
 back to *Still* otherwise, and says so. A scene cut resets the history.
 
 **What it needs.** Windows and an NVIDIA GPU with a recent driver — the model is a
-Direct3D 12 library, so there is no Linux or Docker path. Setup installs the
+Direct3D 12 library, so there is no Linux path. Setup installs the
 small open-source **bridge**; the **model file** (`nvngx_dlssnr.dll`) is NVIDIA's
 and yours to place in the folder Setup names — the app does not download it and
 offers no link. NVIDIA ships it for the RTX 50 series; the model itself decides
@@ -4246,7 +4246,7 @@ temperature: amber from 70°, red from 85°, the band where a GPU starts
 throttling); **▾** folds the readout away and stops the polling with it, and
 the choice is remembered. It is a glance, not a monitor: there is no history,
 no graph and no per-process breakdown. On a machine with no NVIDIA card (or
-with `nvidia-smi` unavailable, as in some containers) the GPU, VRAM and
+with `nvidia-smi` unavailable) the GPU, VRAM and
 temperature numbers are simply absent rather than shown as zeros. On a phone
 the readout rides in the board's **⋯** shelf rather than the toolbar.
 

@@ -12,10 +12,8 @@ request the access-token gate would have refused (before_request hooks run
 in registration order). ``test_the_network_guard_outranks_extension_hooks``
 pins that ordering.
 
-Docker builds copy the whole ``backend`` directory into the image, so a
-developer's local ``backend/extensions/`` would enter an image built that
-way too. This is accepted because images are built from clean checkouts in
-CI and are never pushed to a registry.
+A release checkout does not ship ``backend/extensions/``. A developer folder
+there stays on that machine. Do not copy it into a build you publish.
 """
 import importlib
 import logging

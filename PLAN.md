@@ -18,7 +18,7 @@ own: an executor needs this file, AGENTS.md and the repository, nothing else.
   or `docs/guide` changed (the guide is bundled into the app).
 - Nothing lands on `main` until the gates (Wave 1 defines the script) are green
   for the exact HEAD, run in a cloud task, not on the user's machine, unless
-  the user allows a local run for that wave. Docker is out of scope everywhere.
+  the user allows a local run for that wave. container is out of scope everywhere.
 - Every user-visible change gets a What's New entry in
   `frontend/src/whatsNew.js` (shape documented at the top of that file: `id`
   `YYYY-MM-DD-slug`, `date`, benefit-first `title`, `blurb`, optional `to`).
@@ -41,7 +41,7 @@ own: an executor needs this file, AGENTS.md and the repository, nothing else.
 
 - Detach from upstream. `upstream` stays a fetch-only remote for occasional
   cherry-picks. No sync obligation.
-- Docker is never used: remove it entirely.
+- container is never used: remove it entirely.
 - Remove every ellipsis character from anything the user can read, including
   help pages and What's New text.
 - Datasets library and Bank list get the same pagination control.
@@ -55,7 +55,7 @@ own: an executor needs this file, AGENTS.md and the repository, nothing else.
 | `bundled/civitai_publish` (held, 2.8k LOC, never enabled) | remove | 12 |
 | Cloud/API compatibility shims in `backend/lds_sdk` (`cloud_live.py`, `cloud_reference.py`, `cloud_video_training.py`, `cloud_host/`, `api_engines.py`) | keep | 12 |
 | Any of the 12 enabled plugins | keep all | 12 |
-| `docs/guide/runpod.md` (depends on `Dockerfile.gpu`) | remove with Docker | 2 |
+| `docs/guide/runpod.md` (depends on `containerfile.gpu`) | remove with container | 2 |
 
 ## Facts the plan relies on
 
@@ -103,7 +103,7 @@ own: an executor needs this file, AGENTS.md and the repository, nothing else.
 4. Update HANDOFF.md.
 
 **Done when.** `origin/main` == the gated HEAD; the four branches are gone;
-HANDOFF.md records the gate results (counts, skips, and that Docker was not run).
+HANDOFF.md records the gate results (counts, skips, and that container was not run).
 
 ---
 
@@ -137,9 +137,9 @@ pick gets its own What's New entry only if upstream's entry was not picked.
 - `.github/workflows/ci.yml:12`: `branches: [v2]` → `branches: [main]`.
 - `backend/tests/test_no_personal_data.py:148`: `origin/v2..HEAD` →
   `origin/main..HEAD`. Add a test that the range names a branch that exists.
-- Remove the `docker-smoke` job from `ci.yml` (lines ~406-447) and the
-  Docker comments at ~137-140, 210, 362; `release.yml:178` comment. (Wave 2
-  removes the rest of Docker; doing the workflow here keeps `ci.yml` edits in
+- Remove the `container-smoke` job from `ci.yml` (lines ~406-447) and the
+  container comments at ~137-140, 210, 362; `release.yml:178` comment. (Wave 2
+  removes the rest of container; doing the workflow here keeps `ci.yml` edits in
   one wave.)
 
 ### 1c. A landing gate that is not a sync script
@@ -204,7 +204,7 @@ Create `scripts/gates.ps1` with two phases, copied from
 (or its documented invocation) produces a non-empty body.
 
 **Done when.** The four cherry-picks are in with tests; `ci.yml` triggers on
-`main` and has no Docker job; `test_no_personal_data` unpushed check targets
+`main` and has no container job; `test_no_personal_data` unpushed check targets
 `origin/main`; `scripts/gates.ps1` exists, is documented in AGENTS.md and
 HANDOFF.md, and `upstream_sync.ps1` is gone; FORK_NOTES.md < 400 lines with
 the changelog moved; the tag exists locally and is pushed.
@@ -216,67 +216,70 @@ stays; it guards a Divergence 12 rule, not the sync.
 
 ---
 
-## Wave 2 — remove Docker (parallel with 1 after 1b lands; sequential with 1 on `ci.yml`)
+## Wave 2 — remove container (parallel with 1 after 1b lands; sequential with 1 on `ci.yml`)
+
+**Status (2026-10-01).** Implemented on the Wave 2 branch. Not landed.
+`origin/main` is still `f3815e82e`. Gates have not been run.
 
 **Remove outright.**
-- Root: `Dockerfile`, `Dockerfile.gpu`, `.dockerignore`, `docker-compose.yml`,
-  `docker-compose.gpu.yml`, `docker-compose.external-comfy.yml`,
-  `docker-compose.ollama-gpu.yml`, `docker-compose.ollama-host.yml`,
-  `docker-compose.ollama-sidecar.yml`, `configure-docker.bat`,
-  `start-docker.bat`, `start-docker-gpu.bat`, `update-docker.bat`,
-  `update-docker-gpu.bat`.
-- `scripts/docker-launch.ps1`, `scripts/docker-launch-inspect.ps1`,
-  `scripts/docker-ollama-mode.ps1`, `scripts/update-docker-gpu.ps1`,
+- Root: `containerfile`, `containerfile.gpu`, `.containerignore`, `container-compose.yml`,
+  `container-compose.gpu.yml`, `container-compose.external-comfy.yml`,
+  `container-compose.ollama-gpu.yml`, `container-compose.ollama-host.yml`,
+  `container-compose.ollama-sidecar.yml`, `configure-container.bat`,
+  `start-container.bat`, `start-container-gpu.bat`, `update-container.bat`,
+  `update-container-gpu.bat`.
+- `scripts/container-launch.ps1`, `scripts/container-launch-inspect.ps1`,
+  `scripts/container-ollama-mode.ps1`, `scripts/update-container-gpu.ps1`,
   `scripts/configure-external-comfy.ps1`.
-- `packaging/docker/` (4 files).
-- `frontend/src/components/common/DockerUpdateInstructions.jsx`.
-- Tests: `backend/tests/test_docker_config.py`,
-  `test_docker_external_comfy_helper.py`, `test_docker_gpu_launcher_contract.py`,
-  `test_docker_gpu_updater.py`, `test_docker_launch_inspect.py`,
-  `test_docker_launcher_fake_e2e.py`, `test_docker_ollama_mode.py`,
-  `test_docker_seed_config.py` (113 tests); `frontend/src/components/settings/dockerModeUi.test.js`.
-- Docs: `docs/guide/docker.md`; `docs/guide/runpod.md` (default: remove, see
+- `packaging/container/` (4 files).
+- `frontend/src/components/common/containerUpdateInstructions.jsx`.
+- Tests: `backend/tests/test_container_config.py`,
+  `test_container_external_comfy_helper.py`, `test_container_gpu_launcher_contract.py`,
+  `test_container_gpu_updater.py`, `test_container_launch_inspect.py`,
+  `test_container_launcher_fake_e2e.py`, `test_container_ollama_mode.py`,
+  `test_container_seed_config.py` (113 tests); `frontend/src/components/settings/containerModeUi.test.js`.
+- Docs: `docs/guide/container.md`; `docs/guide/runpod.md` (default: remove, see
   open decisions); README.md sections 1024-1066 (Options 3/4), lines 541-544,
   926-927, 944-945, 1079, 1107; `docs/guide/installation.md:62-105,119,139-140`;
-  Docker mentions in getting-started, troubleshooting, settings-reference,
+  container mentions in getting-started, troubleshooting, settings-reference,
   requirements, migrate-to-v2, extensions, getting-help, known-limitations,
   using-the-app, `docs/README.md`, `MOBILE_WORKFLOW.md`, `CONTRIBUTING.md`,
-  `.claude/rules/readme-and-docs.md:12-15` (rewrite the example without Docker).
+  `.claude/rules/readme-and-docs.md:12-15` (rewrite the example without container).
 
 **Edit, keep the file.**
-- `backend/app/capabilities.py`: `_DOCKER_OLLAMA_URLS` (~1442), the
-  `LDS_RUNTIME`/`LDS_DOCKER_COMFY_MODE` branch (~1473-1572),
-  `setup_is_docker_runtime` (~1482), `docker_runtime`/`docker_host_url` (~2770).
-- `backend/app/routes/setup.py:40-62` (`PUT /ollama-deployment`, Docker-only)
+- `backend/app/capabilities.py`: `_container_OLLAMA_URLS` (~1442), the
+  `LDS_RUNTIME`/`LDS_container_COMFY_MODE` branch (~1473-1572),
+  `setup_is_container_runtime` (~1482), `container_runtime`/`container_host_url` (~2770).
+- `backend/app/routes/setup.py:40-62` (`PUT /ollama-deployment`, container-only)
   and lines 32, 95-98; `routes/setup_state.py:48-51`;
   `routes/settings.py:174,625-715`; `services/updater.py:36-66,97-99,729`;
   `plugins/routes.py:5,50-51`; `backend/supervise.py:14-39` (keep the exit-75
-  restart contract, drop the Docker wording).
+  restart contract, drop the container wording).
 - Frontend: `App.jsx:19,465-515`, `pages/SetupPage.jsx` (35 hits),
   `hooks/useSetupSteps.js`, `hooks/setupHealth.js`,
   `components/setup/SetupHealthNotice.jsx`, `components/settings/MaintenanceSection.jsx`,
   `ServerSection.jsx`, `LocalToolsSection.jsx`, `updateStatus.js`,
   `utils/comfyRecovery.js`, `help/helpRegistry.js` (2 topics).
-- Shared tests with Docker cases: `test_setup_routes.py` (4), `test_settings_api.py` (2),
+- Shared tests with container cases: `test_setup_routes.py` (4), `test_settings_api.py` (2),
   `test_updater.py` (1), `test_install_runtime_compatibility.py`,
   `test_supervise.py`, `test_setup_core_completion.py`,
   `test_dev_requirements_contract.py`, `test_local_llm_router.py`,
   `test_setup_installer.py`; frontend `setupManagedRuntime.test.js`,
   `setupHealth.test.js`, `SetupPage.contract.test.js`, `useSetupSteps.test.js`,
   `updateStatus.test.js`, `frontend/tests/local-llm-provider-contract.test.mjs`.
-- Config key `ollama.deployment_mode` ('none'|'host'|'docker'): keep the key,
-  drop the `docker` value; migrate stored `docker` → `host` on read. Update
+- Config key `ollama.deployment_mode` ('none'|'host'|'container'): keep the key,
+  drop the `container` value; migrate stored `container` → `host` on read. Update
   `docs/guide/settings-reference.md`.
-- `backend/tests/fork_outbound_inventory.json:523` (`packaging/docker/healthcheck.py`):
+- `backend/tests/fork_outbound_inventory.json:523` (`packaging/container/healthcheck.py`):
   regenerate with `.venv/Scripts/python.exe backend/tests/fork_outbound_scan.py --write`
   after reviewing the diff. `fork_outbound_scan.py:49` (`host.docker.internal`
   as local) can stay or go.
 - `packaging/release_bundle.py` / `scripts/check_release_artifacts.py`: remove
-  Docker file references if any; run `scripts/tests/test_release_bundle.py`.
-- `whatsNew.js` (4 mentions) stays as history; add one new entry: "Docker
+  container file references if any; run `scripts/tests/test_release_bundle.py`.
+- `whatsNew.js` (4 mentions) stays as history; add one new entry: "container
   support removed; the app targets a direct install".
 
-**Done when.** `rg -i docker` over tracked files (excluding `frontend/dist`,
+**Done when.** `rg -i container` over tracked files (excluding `frontend/dist`,
 `whatsNewArchive.js`, `whatsNew.js`, `docs/history/`) returns only the new
 What's New entry and `host.docker.internal` if kept; gates green; probe at
 `#/setup` clean at the five sizes.
@@ -401,7 +404,7 @@ outside history; gates green.
 - Baseline first, in the cloud task: `--durations=50` from the Gates run, plus
   `node --import ./scripts/registerSdk.mjs --test` wall time. Record both in
   HANDOFF.md.
-- Waves 2-4 already drop ~220 backend tests (Docker 113, store 81+48 in
+- Waves 2-4 already drop ~220 backend tests (container 113, store 81+48 in
   scripts/tests, legacy 9, sync driver 9).
 - Known sleeps to shorten or replace with events: `test_gpu_window_close_race.py:83`
   (6 s), `:98` (7 s), `:190`; `test_vision_features.py:114`; `test_job_queue.py:71,84`;
@@ -716,7 +719,7 @@ entry.
 
 ## Review protocol for every wave
 
-The reviewer (a Claude model) reads the diff, not the executor's report, and
+The reviewer reads the diff, not the executor's report, and
 checks, in order:
 1. Every path under the wave's **Remove**/**Edit** lists is touched and nothing
    outside the wave's scope is.
