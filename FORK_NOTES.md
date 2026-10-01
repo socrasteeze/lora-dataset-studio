@@ -1876,18 +1876,26 @@ paths and patches `config.ENV_PATH` and `config._cache`. Without it, a plain
 pytest run lets any test that takes no `app` fixture read and write the
 checkout's real `config.json`, `data/` and `.env`.
 
-**How it was lost.** The V2 merge `891d61e33` resolved `conftest.py` to
-upstream's version. Upstream's `_isolate_plugin_runtime` resets globals but
-redirects none of those paths. The guard test came through from the fork side
-unchanged, so it was left with nothing to pin. CI run `36831243173` failed its
-four cases on 2026-10-01; `4af9136c7` restored the fixture.
+**How it was lost.** The V2 merge `891d61e33` resolved one `conftest.py`
+hunk, fork lines 242-330 holding `_isolate_user_state` and the old `app`
+fixture, to upstream's side (`_isolate_plugin_runtime`, `plugin_app_factory`
+and the new `app`). It also took upstream's body of
+`_no_hugging_face_gate_call` and kept the fork's other lines, such as
+`pytest_runtest_makereport`. Upstream's `_isolate_plugin_runtime` resets
+globals but redirects none of those paths. The guard test came through from
+the fork side unchanged, so it was left with nothing to pin. A dispatched CI
+run, `36831243173`, failed its four cases on 2026-10-01. Branch
+`fix/config-isolation` restored the fixture body verbatim from `891d61e33^1`.
 
 **Why local Gates cannot see a loss.** `scripts/upstream_sync.ps1`
 (`Invoke-IsolatedValidation`) sets the three variables to one shared scratch
 for the whole run, so every test resolves scratch, never the repo. `f32e6acb1`
 also relaxed `assert not path.exists()` in the guard to a parents check, which
-passes against that shared scratch file. Only CI, which calls pytest directly,
-reports the loss.
+passes against that shared scratch file. CI calls pytest directly and does
+report the loss, but only when a run starts. The same merge took upstream's
+`ci.yml` push trigger, `branches: [v2]`, and this fork has no `v2` branch. No
+push to `main` has started CI since then; CI runs only when dispatched or on a
+pull request.
 
 **After every sync that touches `conftest.py`:**
 
