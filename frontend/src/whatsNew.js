@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-01-zzzzzz-bank-rail',
+    date: '2026-10-01',
+    title: 'The bank rail stays on the controls',
+    blurb: 'The filter rail no longer prints the explanations under the chips. Chip counts, medium limits, and the shared threshold scope stay in Help. The controls on that rail share one height.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-01-zzzzz-bank-pages',
     date: '2026-10-01',
     title: 'Page through the bank list',

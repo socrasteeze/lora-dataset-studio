@@ -31,6 +31,7 @@ import { Ban, Palette, Search, SlidersHorizontal, SlidersVertical, UserX } from 
 import DescribeFilterBar from './DescribeFilterBar.jsx'
 import SelectionTagsPanel from './SelectionTagsPanel.jsx'
 import SubfolderPersonPanel from './SubfolderPersonPanel'
+import { Button, Input, Select, btnClass, controlHeight } from '../common/Controls.jsx'
 import { Chip, FilterGroup, GroupLabel } from './BankAtoms.jsx'
 import { FLAG_HINT, FLAG_LABEL, ORIGIN_BUCKETS } from './bankFacets.js'
 import { foldedCount } from './bankLayout.js'
@@ -44,7 +45,7 @@ export default function BankFilterRail({
   subfolders, folderPersonInfo, folderPersons, folderPersonBusy,
   assertFolderPerson, revokeFolderPerson, checkFolderPerson, scanFolderPersons,
   tagRow, tagPicked, toggleTag, clearTags,
-  chipsFiltered, flags, statusCounts, availableScoreFlags, payload,
+  flags, statusCounts, availableScoreFlags, payload,
   shownResBuckets, resBuckets, originMeasured, originCounts,
   shownFramings, framingCounts, shownMediums, mediumCounts, mediumNote,
   shownAngles, angleCounts, angleState,
@@ -95,17 +96,15 @@ export default function BankFilterRail({
           {filterSummary.text}
         </span>
         {filterSummary.count > 0 && (
-          <button type="button" onClick={clearAllFilters}
-            title="Clear every filter and show the whole bank again. The grid ORDER is a separate, remembered preference and is left alone."
-            className="min-h-10 lg:min-h-0 lg:h-7 shrink-0 whitespace-nowrap rounded-md border border-border px-2 text-xs text-content-muted hover:text-content">
+          <Button size="sm" noShrink onClick={clearAllFilters}
+            title="Clear every filter and show the whole bank again. The grid ORDER is a separate, remembered preference and is left alone.">
             ✕ Clear all
-          </button>
+          </Button>
         )}
         {isDrawer && (
-          <button type="button" onClick={onClose} aria-label="Close the filters"
-            className="min-h-10 lg:min-h-0 shrink-0 rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:text-content">
+          <Button size="sm" noShrink onClick={onClose} aria-label="Close the filters">
             ✕
-          </button>
+          </Button>
         )}
       </div>
 
@@ -136,7 +135,7 @@ export default function BankFilterRail({
               /* One line, one height: label left, count right. Allowed to wrap,
                  "✕ Rejected 116" broke onto two lines beside a one-line
                  "All 135" and the four tiles stopped being a grid. */
-              className={`flex min-h-10 lg:min-h-0 lg:h-9 min-w-0 items-center justify-between gap-2 whitespace-nowrap rounded-md border px-2.5 text-sm font-semibold transition-colors ${active
+              className={`${controlHeight('md')} flex min-w-0 items-center justify-between gap-2 whitespace-nowrap rounded-md border px-2.5 text-sm font-semibold transition-colors ${active
                 ? s.on
                 : 'border-border bg-surface-raised text-content-muted hover:text-content hover:bg-surface'}`}>
               <span className="truncate">{s.label}</span>
@@ -177,13 +176,13 @@ export default function BankFilterRail({
 
       <div className="relative">
         <Search aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-content-subtle" />
-        <input type="search" value={searchText} onChange={(e) => setSearchText(e.target.value)}
+        <Input type="search" size="md" value={searchText} onChange={(e) => setSearchText(e.target.value)}
           placeholder="Search captions and file names (e.g. red dress)"
           aria-label="Search the bank by caption or file name"
-          className="w-full rounded-md border border-border bg-surface py-1.5 pl-8 pr-8 text-sm text-content placeholder:text-content-subtle" />
+          className="w-full !pl-8 !pr-8" />
         {searchText && (
           <button type="button" onClick={() => setSearchText('')} aria-label="Clear search"
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-content-subtle hover:text-content">✕</button>
+            className={`${controlHeight('sm')} absolute right-1 top-1/2 -translate-y-1/2 px-2 text-content-subtle hover:text-content`}>✕</button>
         )}
       </div>
       {/* 🚫 Exclude — the search bar read backwards. Captioning a big bank
@@ -195,14 +194,14 @@ export default function BankFilterRail({
           normal case. */}
       <div className="relative">
         <Ban aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-content-subtle" />
-        <input type="search" value={excludeText} onChange={(e) => setExcludeText(e.target.value)}
+        <Input type="search" size="md" value={excludeText} onChange={(e) => setExcludeText(e.target.value)}
           placeholder="Exclude words (e.g. logo, watermark)"
           aria-label="Hide images whose caption or file name contains these words"
           title="Hides every image whose caption or file name contains one of these words (comma-separated). Matches anywhere in the text, so 'car' also hides 'scarf'. Images with no caption are never hidden."
-          className="w-full rounded-md border border-border bg-surface py-1.5 pl-8 pr-8 text-sm text-content placeholder:text-content-subtle" />
+          className="w-full !pl-8 !pr-8" />
         {excludeText && (
           <button type="button" onClick={() => setExcludeText('')} aria-label="Clear the exclude filter"
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-content-subtle hover:text-content">✕</button>
+            className={`${controlHeight('sm')} absolute right-1 top-1/2 -translate-y-1/2 px-2 text-content-subtle hover:text-content`}>✕</button>
         )}
       </div>
 
@@ -213,9 +212,10 @@ export default function BankFilterRail({
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-1.5">
             <GroupLabel>Subfolder</GroupLabel>
-            <select value={filter.subfolder ?? '__all__'}
+            <Select size="md" value={filter.subfolder ?? '__all__'}
               onChange={(e) => setF({ subfolder: e.target.value === '__all__' ? null : e.target.value })}
-              className="min-w-0 flex-1 rounded-md border border-border bg-surface px-2 py-1 text-xs text-content">
+              aria-label="Subfolder"
+              className="min-w-0 flex-1">
               <option value="__all__">All subfolders</option>
               {subfolders.map((s) => (
                 <option key={s.name || '__root__'} value={s.name}>
@@ -226,7 +226,7 @@ export default function BankFilterRail({
                   {folderMarker(folderPersonInfo?.suggestions, s.name)}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           <SubfolderPersonPanel
             subfolder={filter.subfolder}
@@ -315,14 +315,6 @@ export default function BankFilterRail({
       {/* While anything is filtered the numbers describe the FILTERED bank, and
           the row says so: a count that silently changed meaning would be worse
           than the bank-wide one it replaces. */}
-      {chipsFiltered && (
-        <p className="m-0 text-2xs leading-snug text-content-subtle">
-          Counts below follow the active filters. Each chip is counted with the
-          others applied and its own value lifted, so you can always switch to
-          a neighbour.
-        </p>
-      )}
-
       <div className="flex flex-col gap-3 border-t border-border pt-2">
         <div className="flex flex-col gap-1.5">
           <FilterGroup label="Quality">
@@ -355,7 +347,7 @@ export default function BankFilterRail({
                   inline-flex keeps it in the text flow while giving min-height
                   something to apply to (a plain inline box ignores it). */}
               <button type="button" onClick={() => setPassOpen('scan')}
-                className="min-h-10 lg:min-h-0 inline-flex items-center underline underline-offset-2 hover:text-amber-200">
+                className={`${controlHeight('sm')} inline-flex items-center underline underline-offset-2 hover:text-amber-200`}>
                 <Search aria-hidden="true" className="mr-1 inline h-3 w-3 align-[-1px]" />Scan the rest
               </button>
             </p>
@@ -392,23 +384,21 @@ export default function BankFilterRail({
           <div className="flex items-center gap-2">
             <GroupLabel>🔖 Tags</GroupLabel>
             {wd14Tags.length > 0 && (
-              <button type="button" onClick={clearWd14Tags}
-                className="min-h-10 lg:min-h-0 lg:h-7 ml-auto rounded-md border border-border px-2 text-xs text-content-muted hover:text-content">
+              <Button size="sm" noShrink className="ml-auto" onClick={clearWd14Tags}>
                 Clear ({wd14Tags.length})
-              </button>
+              </Button>
             )}
           </div>
           <div className="mt-1.5 grid grid-cols-2 gap-1.5">
             {tagGroups.facets.map((facet) => (
-              <select key={facet.id} value={facetValue(facet)} aria-label={facet.label}
+              <Select key={facet.id} size="md" value={facetValue(facet)} aria-label={facet.label}
                 onChange={(e) => setFacetTag(facet, e.target.value)}
-                className={`min-h-10 lg:min-h-0 lg:h-8 w-full min-w-0 truncate rounded-md border bg-surface px-2 text-xs ${facetValue(facet)
-                  ? 'border-indigo-400/60 text-indigo-200' : 'border-border text-content'}`}>
+                className={`w-full min-w-0 truncate ${facetValue(facet) ? 'border-indigo-400/60 text-indigo-200' : ''}`}>
                 <option value="">{facet.label}</option>
                 {facet.options.map((o) => (
                   <option key={o.name} value={o.name}>{o.label} ({o.count})</option>
                 ))}
-              </select>
+              </Select>
             ))}
           </div>
           {/* Every tag the facets above do NOT claim — the curated groups are
@@ -439,7 +429,7 @@ export default function BankFilterRail({
         <div className="border-t border-border pt-2">
           <button type="button" onClick={() => setMoreOpen((v) => !v)}
             aria-expanded={moreOpen} aria-controls="bank-rail-more"
-            className="min-h-10 lg:min-h-0 flex w-full items-center gap-1.5 text-left text-xs text-content-muted hover:text-content">
+            className={`${controlHeight('md')} flex w-full items-center gap-1.5 px-2 text-left text-sm text-content-muted hover:text-content`}>
             <SlidersHorizontal aria-hidden="true" className="h-3.5 w-3.5" />
             <span className="font-medium">More filters</span>
             <span className="text-content-subtle">({hiddenAxes})</span>
@@ -491,14 +481,13 @@ export default function BankFilterRail({
                     {shownMediums.map((b) => (
                       <Chip key={b.id} active={filter.medium === b.id}
                         onClick={() => setF({ medium: filter.medium === b.id ? null : b.id })}
-                        title={mediumTitle(b.id)}>
+                        title={b.id === 'unsure'
+                          ? [mediumTitle(b.id), mediumNote].filter(Boolean).join(' ')
+                          : mediumTitle(b.id)}>
                         {b.label} {mediumCounts[b.id] ?? 0}
                       </Chip>
                     ))}
                   </FilterGroup>
-                  {mediumNote && (
-                    <p className="m-0 pl-1 text-2xs leading-snug text-content-subtle">{mediumNote}</p>
-                  )}
                 </div>
               )}
 
@@ -512,21 +501,18 @@ export default function BankFilterRail({
                     {shownAngles.map((b) => (
                       <Chip key={b.id} active={filter.angle === b.id}
                         onClick={() => setF({ angle: filter.angle === b.id ? null : b.id })}
-                        title={angleTitle(b.id)}>
+                        title={[angleTitle(b.id), angleState.note].filter(Boolean).join(' ')}>
                         {b.label} {angleCounts[b.id] ?? 0}
                       </Chip>
                     ))}
                   </FilterGroup>
-                  {angleState.note && (
-                    <p className="m-0 pl-1 text-2xs leading-snug text-content-subtle">{angleState.note}</p>
-                  )}
                   {angleState.offer && (
                     /* The why is the button's tooltip; printed beside it too, it
                        said the same thing twice. */
-                    <p className="m-0 flex flex-wrap items-center gap-2 pl-1 text-2xs leading-snug text-content-subtle">
+                    <p className="m-0 flex flex-wrap items-center gap-2 pl-1">
                       <button type="button" onClick={() => setPassOpen('angles')} disabled={!!live}
                         title={angleState.offer.why}
-                        className="min-h-10 lg:min-h-0 rounded-md border border-border bg-surface-raised px-2 py-0.5 text-2xs text-content transition-colors hover:bg-surface disabled:opacity-50">
+                        className={btnClass({ size: 'sm' })}>
                         ⤢ {angleState.offer.label}
                       </button>
                     </p>
@@ -581,7 +567,7 @@ export default function BankFilterRail({
       <div className="border-t border-border pt-2">
         <button type="button" onClick={() => setThresholdsOpen((v) => !v)}
           aria-expanded={thresholdsOpen} aria-controls="bank-thresholds-panel"
-          className="min-h-10 lg:min-h-0 flex w-full items-center gap-1.5 text-left text-xs text-content-muted hover:text-content">
+          className={`${controlHeight('md')} flex w-full items-center gap-1.5 px-2 text-left text-sm text-content-muted hover:text-content`}>
           <SlidersVertical aria-hidden="true" className="h-3.5 w-3.5" />
           {/* No subtitle: in the rail it wrapped the row to three lines beside
               one-line neighbours. What it opens is said in the tooltip. */}
@@ -626,10 +612,10 @@ export default function BankFilterRail({
               "Select all in filter" and ▶ Review walk the same order — and it
               is remembered per bank, so a dump you review by sharpness opens
               that way tomorrow. */}
-          <select value={filter.sort} onChange={(e) => setSort(e.target.value)}
+          <Select size="sm" value={filter.sort} onChange={(e) => setSort(e.target.value)}
             title="Order the grid by anything the passes measured — resolution, size, aesthetic, NSFW, sharpness, noise, contrast, detail, bars, JPEG quality, face confidence. Images a pass never reached sink to the end. Remembered for this bank."
             aria-label="Sort the grid"
-            className="min-h-10 lg:min-h-0 lg:h-7 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-xs text-content">
+            className="min-w-0 flex-1">
             {sortGroups.map((g) => (g.group ? (
               <optgroup key={g.group} label={g.group}>
                 {g.options.map((o) => (
@@ -643,12 +629,11 @@ export default function BankFilterRail({
                 {o.label}
               </option>
             ))))}
-          </select>
+          </Select>
         </label>
-        <button type="button" onClick={() => setTileSize((s) => (s === 'M' ? 'S' : 'M'))}
-          className="min-h-10 lg:min-h-0 lg:h-7 whitespace-nowrap rounded-md border border-border px-2 text-xs text-content-muted hover:text-content">
+        <Button size="sm" noShrink onClick={() => setTileSize((s) => (s === 'M' ? 'S' : 'M'))}>
           {tileSize === 'M' ? 'Small tiles' : 'Medium tiles'}
-        </button>
+        </Button>
       </div>
 
       {/* 🏷️ The selection's caption tags — ONE mount now. The old screen carried

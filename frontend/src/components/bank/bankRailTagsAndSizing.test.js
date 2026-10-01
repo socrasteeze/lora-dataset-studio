@@ -29,6 +29,6 @@ test('the workspace hands the rail its tag state and handlers', () => {
 /* Uneven controls: a label allowed to wrap doubles its button's height beside
    one-line neighbours. Buttons in the rail keep one line and one height. */
 test('status tiles and chips keep one line and a fixed desktop height', () => {
-  assert.match(rail, /lg:h-9 min-w-0 items-center justify-between gap-2 whitespace-nowrap/)
+  assert.match(rail, /controlHeight\('md'\)\} flex min-w-0 items-center justify-between gap-2 whitespace-nowrap/)
   assert.match(atoms, /inline-flex min-h-10 lg:min-h-0 lg:h-7 items-center whitespace-nowrap rounded-full/)
 })

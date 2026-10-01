@@ -7,9 +7,10 @@
    Everything here is the same setting — the SAME `config.bank.<key>`, written
    through the SAME PUT /api/settings that Settings uses. There is no second
    copy and nothing to keep in sync: the two screens are one value seen twice.
-   Editing here therefore changes it for EVERY bank, which the header says in
-   plain words, above the fold, before anything is unfolded — that is the one
-   real hazard of a shared setting and the only defence is to state it.
+   Editing here therefore changes it for EVERY bank. That sentence lives in
+   the guide, not as a paragraph above the knobs. Each field still says which
+   way catches more, in the line under the input. The longer hint and when the
+   change lands sit on that line's title.
 
    Three things this panel does that a bare list of numbers cannot:
 
@@ -40,6 +41,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { apiFetch, postJson, putJson } from '../../api/fetchClient'
 import { useToast } from '../common/Toast'
+import { btnClass, controlHeight, fieldClass } from '../common/Controls.jsx'
 import ResetToDefault from '../settings/ResetToDefault.jsx'
 import {
   APPLIES, BANK_SECTION, THRESHOLD_GROUPS,
@@ -56,11 +58,9 @@ import {
 // request instead of three, short enough to still feel attached to the keystroke.
 const PREVIEW_DEBOUNCE_MS = 350
 
-const INPUT = 'mt-1 w-full rounded-md border border-border bg-surface px-2 py-1 ' +
-  'text-sm text-content tabular-nums focus:border-indigo-400 focus:outline-none'
+const INPUT = `${fieldClass({ size: 'md' })} mt-1 w-full tabular-nums focus:border-indigo-400 focus:outline-none`
 
-const SMALL_BTN = 'rounded-md border border-border px-2 py-1 text-xs text-content-muted ' +
-  'hover:bg-surface-raised hover:text-content disabled:opacity-50'
+const SMALL_BTN = btnClass({ size: 'sm' })
 
 /** One collapsible group of thresholds. A folded group still advertises how
     many of its fields you have moved off the default — otherwise folding it
@@ -70,7 +70,7 @@ function Group({ group, open, onToggle, customised, children }) {
   return (
     <section className="rounded-lg border border-border bg-surface">
       <button type="button" onClick={onToggle} aria-expanded={open} aria-controls={panelId}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left">
+        className={`${controlHeight('md')} flex w-full items-center gap-2 px-3 text-left`}>
         <span aria-hidden className="text-sm">{group.emoji}</span>
         <span className="text-sm font-medium text-content">{group.label}</span>
         {customised > 0 && (
@@ -336,20 +336,12 @@ export default function BankThresholdsPanel({
 
   return (
     <div className="space-y-3">
-      {/* Scope, in words, before any group is unfolded. */}
-      <div className="flex flex-wrap items-start gap-x-3 gap-y-2 rounded-lg border border-border bg-surface-raised px-3 py-2">
-        <p className="min-w-[12rem] flex-1 text-xs text-content-muted">
-          These apply to <strong className="text-content">every bank</strong> — they are the same
-          values as Settings ▸ Captioning &amp; quality. Most re-sort this bank the moment you
-          save, with no rescan.
-        </p>
-        {canResetAll && (
-          <button type="button" onClick={() => setEdits(resetAll)}
-            className="rounded-md border border-border-strong px-2 py-1 text-xs font-medium text-content hover:bg-surface">
-            <span aria-hidden>↺ </span>Reset all to defaults
-          </button>
-        )}
-      </div>
+      {canResetAll && (
+        <button type="button" onClick={() => setEdits(resetAll)}
+          className={btnClass({ size: 'md' })}>
+          <span aria-hidden>↺ </span>Reset all to defaults
+        </button>
+      )}
 
       {THRESHOLD_GROUPS.map((g) => (
         <Group key={g.id} group={g} open={!!open[g.id]}
@@ -381,19 +373,17 @@ export default function BankThresholdsPanel({
                   onChange={(e) => setField(BANK_SECTION, t.field, coerceValue(t, e.target.value))}
                   className={`${INPUT} ${invalid ? 'border-rose-400' : ''}`}
                 />
-                <div id={`bank-th-${t.field}-hint`} className="mt-1 space-y-0.5 text-xs">
-                  {/* Direction FIRST and visible — the one fact that keeps the
-                      knob from being set backwards. */}
-                  <span className="block font-medium text-content-muted">{directionHint(t)}</span>
-                  <span className="block text-content-subtle">{t.hint}</span>
-                  <span className="block text-content-subtle">{APPLIES[t.applies]}</span>
+                <p id={`bank-th-${t.field}-hint`}
+                  className="mt-1 text-xs font-medium text-content-muted"
+                  title={`${t.hint} ${APPLIES[t.applies]}`}>
+                  {directionHint(t)}
                   {invalid && (
-                    <span className="block text-rose-300">
+                    <span className="mt-0.5 block font-normal text-rose-300">
                       Enter a number{t.min !== undefined && t.max !== undefined
                         ? ` between ${t.min} and ${t.max}` : ''}.
                     </span>
                   )}
-                </div>
+                </p>
                 {/* The effect readout. Visually a live number; for assistive tech
                     it is a stable sentence reachable from the input, so nudging a
                     value does not fire an announcement per keystroke. */}
@@ -428,12 +418,12 @@ export default function BankThresholdsPanel({
 
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={save} disabled={busy || dirty.length === 0}
-          className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-gray-950 hover:bg-indigo-500 disabled:opacity-50">
+          className={btnClass({ size: 'lg', variant: 'primary' })}>
           {busy ? 'Saving' : `Save${dirty.length ? ` (${dirty.length})` : ''}`}
         </button>
         {dirty.length > 0 && (
           <button type="button" onClick={() => { setEdits({}); setPreviewFlags(null) }}
-            className="rounded-md border border-border px-3 py-1.5 text-sm text-content-muted hover:text-content">
+            className={btnClass({ size: 'lg' })}>
             Discard changes
           </button>
         )}

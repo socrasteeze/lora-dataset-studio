@@ -17,6 +17,7 @@ import { holdsLocalGpu } from '../../utils/activityLanes.js';
 import { IMPROVE_DERIVATION } from './improveCandidates.js';
 import { faceAnalysisState, faceAnalysisLabel } from './faceScoringGate.js';
 import DatasetGrid from './DatasetGrid';
+import { Chip, Select } from '../common/Controls.jsx';
 import { datasetBusyReason } from './datasetBusyReason.js';
 import KleinModelSetting from '../shared/KleinModelSetting';
 import KleinCleanOptions from '../shared/KleinCleanOptions';
@@ -161,13 +162,10 @@ function GridStatusFilter({ value, counts, onChange }) {
       {GRID_STATUS_FILTERS.map((f) => {
         const on = f.id === value;
         return (
-          <button key={f.id} type="button" onClick={() => onChange(f.id)}
-            aria-pressed={on} title={f.title}
-            className={`min-h-10 lg:min-h-0 px-2 py-0.5 rounded-full border text-2xs font-semibold tabular-nums ${
-              on ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-100'
-                : 'border-border bg-surface text-content-muted hover:text-content'}`}>
+          <Chip key={f.id} size="sm" pressed={on} title={f.title}
+            onClick={() => onChange(f.id)} className="tabular-nums">
             {f.label} ({counts[f.id] ?? 0})
-          </button>
+          </Chip>
         );
       })}
       <HelpBadge topic="action-grid-status-filter" />
@@ -192,16 +190,16 @@ function GridSortSelect({ value, images, onChange }) {
   return (
     <label className="flex shrink-0 items-center gap-1 text-xs text-content-subtle">
       Sort
-      <select value={value} onChange={(e) => onChange(e.target.value)}
+      <Select size="sm" value={value} onChange={(e) => onChange(e.target.value)}
         aria-label="Sort the grid"
         title="Order the images by face similarity to your reference, or group them by shot type. Images the pass never reached sink to the end."
-        className="max-w-[13rem] rounded-md border border-border bg-surface px-2 py-0.5 text-2xs text-content">
+        className="max-w-[13rem]">
         {datasetSortOptions(images).map((o) => (
           <option key={o.id} value={o.id} disabled={o.disabled} title={o.title}>
             {o.label}
           </option>
         ))}
-      </select>
+      </Select>
       <HelpBadge topic="action-grid-sort" />
     </label>
   );
