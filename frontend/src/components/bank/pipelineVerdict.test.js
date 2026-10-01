@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { pipelineBadge, pipelineReportVerdict, queueOutcomeLine } from './pipelineVerdict.js'
+import {
+  captionStepNote, pipelineBadge, pipelineReportVerdict, queueOutcomeLine,
+} from './pipelineVerdict.js'
 
 const step = (name, status = 'done', reason = null) => ({ step: name, status, reason })
 const report = (steps, over = {}) => ({ steps, ...over })
@@ -140,4 +142,88 @@ test('the backend flag wins over the prose, in both directions', () => {
   ]))
   assert.equal(declined.state, 'ok')
   assert.equal(declined.blocked, 0)
+})
+
+/* A caption step that RAN can still owe a look. Overnight, five banks had 5–83 %
+ * of their captions written by the fallback engine after JoyCaption ran out of
+ * time, and some images were left uncaptioned while another client held the
+ * model — every one of them showed a clean "done". */
+
+const caption = (counts, detail = 'done — some captions') => (
+  { step: 'caption', status: 'done', reason: null, detail, counts })
+
+test('a caption step that left images uncaptioned needs attention', () => {
+  const v = pipelineReportVerdict(report([
+    step('scan'),
+    caption({ captioned: 40, joycaption: 40, ollama: 0, skipped: 2, failed: 1,
+      first_choice: 'joycaption' }, 'done — 40 captioned, 2 not captioned (model busy)'),
+  ]))
+  assert.equal(v.state, 'attention')
+  assert.equal(v.attention, 1)
+  assert.equal(v.note, '3 not captioned')
+  const badge = pipelineBadge(v)
+  assert.equal(badge.tone, 'warn')
+  assert.equal(badge.label, '⚠ 3 not captioned')
+  assert.match(badge.title, /^caption: done — 40 captioned/)
+})
+
+test('captions split across two engines name the fallback share', () => {
+  const v = pipelineReportVerdict(report([
+    caption({ captioned: 1000, joycaption: 138, ollama: 862, skipped: 3, failed: 0,
+      first_choice: 'joycaption' }),
+  ]))
+  assert.equal(v.state, 'attention')
+  assert.equal(pipelineBadge(v).label, '⚠ 3 not captioned · 862 by fallback')
+})
+
+test('a mixed run alone, nothing missed, still needs attention', () => {
+  const note = captionStepNote(caption({ joycaption: 950, ollama: 50, skipped: 0,
+    failed: 0, first_choice: 'joycaption' }))
+  assert.deepEqual(note, { missed: 0, mixed: true, fallback: 50, text: '50 by fallback' })
+})
+
+test('when the first choice is unknown the local engine is named, not "fallback"', () => {
+  // A peer ran the step; this machine does not know which engine it tried first.
+  const note = captionStepNote(caption({ joycaption: 10, ollama: 862 }))
+  assert.equal(note.text, '862 by Local LLM')
+})
+
+test('one engine, nothing missed, is a clean caption step', () => {
+  assert.equal(captionStepNote(caption({ joycaption: 0, ollama: 500, skipped: 0,
+    failed: 0, first_choice: 'joycaption' })), null)
+  const v = pipelineReportVerdict(report([caption({ joycaption: 500, skipped: 0,
+    failed: 0, first_choice: 'joycaption' })]))
+  assert.equal(v.state, 'ok')
+  assert.equal(pipelineBadge(v), null)
+})
+
+test('a report written before the counts existed gets no invented note', () => {
+  const v = pipelineReportVerdict(report([
+    caption({ captioned: 12, total_captioned: 40 }),
+  ]))
+  assert.equal(v.state, 'ok')
+  assert.equal(v.attention, 0)
+})
+
+test('only a caption step that RAN is read for counts', () => {
+  assert.equal(captionStepNote({ step: 'caption', status: 'skipped',
+    counts: { skipped: 4 } }), null)
+  assert.equal(captionStepNote({ step: 'score', status: 'done',
+    counts: { skipped: 4 } }), null)
+  assert.equal(captionStepNote(null), null)
+})
+
+test('a blocked or failed step outranks a caption that needs attention', () => {
+  const v = pipelineReportVerdict(report([
+    step('score', 'skipped', 'GPU busy — x'),
+    caption({ joycaption: 1, ollama: 1, first_choice: 'joycaption' }),
+  ]))
+  assert.equal(v.state, 'partial')
+  assert.equal(v.attention, 1, 'still counted')
+  assert.match(pipelineBadge(v).label, /1 pass skipped/)
+})
+
+test('the queue line counts a bank that needs attention as a problem', () => {
+  assert.match(queueOutcomeLine([{ state: 'ok' }, { state: 'attention' }]),
+    /1 finished, 1 with problems/)
 })

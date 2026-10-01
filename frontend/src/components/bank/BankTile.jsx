@@ -6,20 +6,20 @@
  * incidental detail of a four-zone stack and became the thing the page is for.
  *
  * Nothing about its behaviour changed — same three hit targets (select, ▶
- * review, ⛶ open), same badge cluster, same tooltip.
+ * review, ⛶ open), same badge cluster, same tooltip. Since then the badge
+ * cluster is capped at three plus "+n" (bankTileBadges.js), the actions are
+ * finger-sized on touch, and the caption author shows as a chip.
  */
-import { FLAG_LABEL, STATUS_RING } from './bankFacets.js'
+import { STATUS_RING } from './bankFacets.js'
 import SelectionMark from '../shared/SelectionMark';
 import { Tag } from 'lucide-react';
 import { editBadge, imageVersionQuery } from './bankEdits.js'
-import { angleBadge } from './bankMedium.js'
 import { detailSummary } from './bankProvenance.js'
 import { captionChips } from './bankTags.js'
-import { captionOriginTooltipLine } from '../../utils/captionOrigin.js'
+import { capTileBadges, tileBadges } from './bankTileBadges.js'
+import { captionIsAsserted, captionOriginInfo, captionOriginTooltipLine } from '../../utils/captionOrigin.js'
 
 export default function Tile({ img, bankId, selected, onToggle, onReview, onTags }) {
-  // `key` matters only for the flags list below (the one mapped array) — it was
-  // missing and logged a React warning on every bank grid render.
   // The chips this image would actually offer. Computed HERE rather than asked of
   // the caption's mere existence: a caption of nothing but stop words ("a photo of
   // her") yields zero chips, and `img.caption && …` would have offered the button
@@ -28,9 +28,17 @@ export default function Tile({ img, bankId, selected, onToggle, onReview, onTags
   // ✂/✨ made in the Bank itself. A state, like ✓ ✕ ⬆ and the flags — it belongs
   // in the readout cluster, not among the actions.
   const edited = editBadge(img)
-  const badge = (txt, cls, key) => (
-    <span key={key} className={`rounded px-1 py-px text-2xs font-semibold leading-none ${cls}`}>{txt}</span>
+  // At most three badges and a "+n" (bankTileBadges.js): on a phone the full
+  // stack covered most of the picture.
+  const { shown, more } = capTileBadges(tileBadges(img, edited))
+  const badge = (b) => (
+    <span key={b.key} title={b.title} aria-label={b.label}
+      className={`rounded px-1 py-px text-2xs font-semibold leading-none ${b.cls}`}>{b.text}</span>
   )
+  // Who wrote the caption, said on the tile the way the Dataset tile says it —
+  // not only in the hover tooltip, which a phone never shows. Same helper, same
+  // silence when the author was never recorded.
+  const origin = (img.caption || '').trim() ? captionOriginInfo(img.caption_origin) : null
   return (
     <li className={`relative overflow-hidden rounded-lg border border-border bg-surface ${STATUS_RING[img.status] || ''}`}>
       <button type="button" onClick={onToggle}
@@ -78,40 +86,16 @@ export default function Tile({ img, bankId, selected, onToggle, onReview, onTags
         </>
       )}
       <span className="absolute left-1 top-1 flex flex-wrap gap-0.5 max-w-[85%]">
-        {img.status === 'keep' && badge('✓', 'bg-emerald-500/80 text-white')}
-        {img.status === 'reject' && badge(`✕ ${img.reject_reason || ''}`.trim(), 'bg-rose-500/80 text-white')}
-        {/* ⬆ = this image left for somewhere: a dataset, another bank, or both.
-            One badge for both destinations — the tile says THAT it went, the
-            tooltip and the review lightbox say where. */}
-        {(img.promoted_dataset_id != null || img.promoted_bank_id != null)
-          && badge('⬆', 'bg-indigo-500/80 text-white')}
-        {/* ✂/✨ = these pixels were edited HERE. Without it an edited image looks
-            like any other, and the grid cannot answer either "did my crop land?"
-            or "what does ↩ Revert still have to take back?". The tooltip carries
-            the promise the whole feature rests on: your own file was not touched. */}
-        {edited && (
-          <span title={edited.title} aria-label={edited.label}
-            className="rounded bg-sky-500/80 px-1 py-px text-2xs font-semibold leading-none text-white">
-            {edited.text}
-          </span>
-        )}
-        {img.flags.map((f) => badge(FLAG_LABEL[f]?.slice(0, 2) || f, 'bg-black/60 text-amber-200', f))}
-        {img.face_cluster != null && badge(`person ${img.face_cluster}`, 'bg-black/60 text-sky-200')}
-        {img.framing && badge(`${img.framing}`, 'bg-black/60 text-teal-200')}
-        {/* A medium badge is stamped only when the classifier actually COMMITTED
-            to one — 'unsure' is a real verdict but it is not a label to write on
-            a thumbnail, and NULL means the pass never reached this image. */}
-        {img.medium && img.medium !== 'unsure'
-          && badge(`${img.medium}`, 'bg-black/60 text-lime-200')}
-        {angleBadge(img) && badge(angleBadge(img).text, 'bg-black/60 text-cyan-200')}
-        {/* Only the PROVEN states get a badge. Stamping ❔ on the 80% of files
-            whose metadata was stripped would be noise, not information. */}
-        {img.origin === 'ai' && badge('AI', 'bg-black/60 text-violet-200')}
-        {img.origin === 'camera' && badge('photo', 'bg-black/60 text-emerald-200')}
-        {img.style_cluster != null && badge(`style ${img.style_cluster}`, 'bg-black/60 text-fuchsia-200')}
-        {img.dup_group != null && badge(`≈${img.dup_group}`, 'bg-black/60 text-fuchsia-200')}
-        {img.semantic_dup_group != null && badge(`✂${img.semantic_dup_group}`, 'bg-black/60 text-orange-200')}
+        {shown.map(badge)}
+        {more && badge(more)}
       </span>
+      {origin?.known && (
+        <span title={origin.title} aria-label={origin.short}
+          className={`bank-tile__origin truncate rounded bg-black/60 px-1 py-px text-2xs leading-none ${
+            captionIsAsserted(img.caption_origin) ? 'text-emerald-300' : 'text-white/80'}`}>
+          {origin.chip}
+        </span>
+      )}
       {/* ▶ starts the fast-triage lightbox AT this image. It's a separate hit
           target on purpose: the tile's own click still (de)selects for the bulk
           ✓/✕/⬆ bar, so neither use loses its gesture. */}
@@ -132,36 +116,51 @@ export default function Tile({ img, bankId, selected, onToggle, onReview, onTags
           not there, exactly the way a semantic action names its missing index
           on the pass row — a shipped feature that says nothing is indistinguishable
           from one that does not exist. */}
-      {tagChips.length > 0 ? (
-        <button type="button" onClick={onTags}
-          title={`Filter the bank by this image's tags — ${img.caption}`}
-          aria-label={`Use the tags of ${img.name} as a filter`}
-          className="absolute bottom-1 right-11 rounded bg-black/60 px-1 text-2xs text-emerald-200 hover:bg-black/80"><Tag aria-hidden="true" className="h-3 w-3" /></button>
-      ) : (
-        <span
-          title={img.caption
-            ? 'Tags — this caption has no word worth filtering on (the chips are the caption\'s own words)'
-            : 'Tags (needs a caption) — run Caption on this bank and the chips appear here'}
-          aria-label={img.caption
-            ? 'Tags unavailable: this caption has no word worth filtering on'
-            : 'Tags unavailable: this image has no caption yet'}
-          className="absolute bottom-1 right-11 rounded bg-black/40 px-1 text-2xs text-white/35"><Tag aria-hidden="true" className="h-3 w-3" /></span>
-      )}
-      <button type="button" onClick={onReview}
-        title="Review from this image — full size, one at a time, with Keep/Reject/Skip"
-        aria-label={`Review from ${img.name}`}
-        className="absolute bottom-1 right-6 rounded bg-black/60 px-1 text-2xs text-white hover:bg-black/80">▶</button>
-      {/* ⛶ serves what the bank RESOLVES for this image, and on an edited row that
-          is the crop/upscale — so the tooltip stops calling it "the original file",
-          which a ✂ crop makes visibly false, and the version key travels with it
-          (this route is cached too). Renamed rather than made conditional: a
-          computed title is invisible to the surface-inventory guard, and this
-          button is worth keeping under it. */}
-      <a href={`/api/bank/${bankId}/file/${img.id}${imageVersionQuery(img)}`}
-        target="_blank" rel="noreferrer"
-        title="Open this image full size, as the Bank shows it — your own file on disk is never modified"
-        aria-label={`Open ${img.name} full size`}
-        className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-2xs text-white no-underline hover:bg-black/80">⛶</a>
+      {/* FINGER-SIZED, SAME AS THE DATASET TILE. Each action is a transparent
+          hit area around the small pill a desktop shows. Below lg or on a
+          coarse pointer the three share one 40 px strip across the tile foot
+          (index.css, .bank-tile__actions); a desktop mouse keeps the corner
+          cluster. */}
+      <div className="bank-tile__actions">
+        {tagChips.length > 0 ? (
+          <button type="button" onClick={onTags}
+            title={`Filter the bank by this image's tags — ${img.caption}`}
+            aria-label={`Use the tags of ${img.name} as a filter`}
+            className="bank-tile__action group/act">
+            <span className="inline-flex rounded bg-black/60 px-1 py-px text-2xs text-emerald-200 group-hover/act:bg-black/80"><Tag aria-hidden="true" className="h-3 w-3" /></span>
+          </button>
+        ) : (
+          <span
+            title={img.caption
+              ? 'Tags — this caption has no word worth filtering on (the chips are the caption\'s own words)'
+              : 'Tags (needs a caption) — run Caption on this bank and the chips appear here'}
+            aria-label={img.caption
+              ? 'Tags unavailable: this caption has no word worth filtering on'
+              : 'Tags unavailable: this image has no caption yet'}
+            className="bank-tile__action">
+            <span className="inline-flex rounded bg-black/40 px-1 py-px text-2xs text-white/35"><Tag aria-hidden="true" className="h-3 w-3" /></span>
+          </span>
+        )}
+        <button type="button" onClick={onReview}
+          title="Review from this image — full size, one at a time, with Keep/Reject/Skip"
+          aria-label={`Review from ${img.name}`}
+          className="bank-tile__action group/act">
+          <span className="rounded bg-black/60 px-1 text-2xs text-white group-hover/act:bg-black/80">▶</span>
+        </button>
+        {/* ⛶ serves what the bank RESOLVES for this image, and on an edited row that
+            is the crop/upscale — so the tooltip stops calling it "the original file",
+            which a ✂ crop makes visibly false, and the version key travels with it
+            (this route is cached too). Renamed rather than made conditional: a
+            computed title is invisible to the surface-inventory guard, and this
+            button is worth keeping under it. */}
+        <a href={`/api/bank/${bankId}/file/${img.id}${imageVersionQuery(img)}`}
+          target="_blank" rel="noreferrer"
+          title="Open this image full size, as the Bank shows it — your own file on disk is never modified"
+          aria-label={`Open ${img.name} full size`}
+          className="bank-tile__action group/act no-underline">
+          <span className="rounded bg-black/60 px-1 text-2xs text-white group-hover/act:bg-black/80">⛶</span>
+        </a>
+      </div>
     </li>
   )
 }

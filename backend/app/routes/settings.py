@@ -333,6 +333,9 @@ def put_settings():
     if 'comfyui' in config_partial:
         from ..utils import comfyui
         comfyui.clear_model_caches()
+        # A new address (or the same one, saved after starting ComfyUI) must be
+        # asked again before the next vision pass, not answered from memory.
+        comfyui.forget_comfyui_refused()
     payload = _settings_payload()
     if hf_cloud_check is not None:
         payload['secret_checks'] = {'HF_CLOUD_TOKEN': hf_cloud_check}

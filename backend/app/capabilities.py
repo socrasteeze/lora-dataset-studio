@@ -43,6 +43,16 @@ _cache_generation = 0
 _PROBE_WORKERS = 17
 
 _IMPORT_TTL = 600
+# How long a POSITIVE verdict is kept for the import probes named below. A pass
+# such as the Bank caption step asks JoyCaption's readiness about three times per
+# bank, so with 600 s a queue of banks re-spawned the ai-toolkit venv's import of
+# transformers + bitsandbytes + accelerate once per bank. A working venv does not
+# stop working by itself, and the two ways it changes are already handled: a
+# different interpreter is a different cache key (the path is part of it), and an
+# install action or "↻ Check again" empties the cache (clear_import_cache). A
+# NEGATIVE verdict keeps the short TTL, so an install by hand is still seen soon.
+_POSITIVE_IMPORT_TTL = 24 * 3600
+_LONG_POSITIVE_IMPORT_KEYS = frozenset(('joycaption',))
 # How long an UNKNOWN verdict (the probe never answered) is remembered. Short,
 # because it must re-try soon against a warm import — but not zero: the Bank
 # panel polls its readiness every ~2 s, and an uncached unknown meant a fresh
@@ -206,7 +216,12 @@ def _cached_import_state(key: str, python: str, module_expr: str):
     def fresh_cached():
         cached = _import_cache.get(cache_key)
         if cached is not None:
-            ttl = _IMPORT_TTL if cached[1] is not None else _UNKNOWN_TTL
+            if cached[1] is None:
+                ttl = _UNKNOWN_TTL
+            elif cached[1] is True and key in _LONG_POSITIVE_IMPORT_KEYS:
+                ttl = _POSITIVE_IMPORT_TTL
+            else:
+                ttl = _IMPORT_TTL
             if time.time() - cached[0] < ttl:
                 return cached
         return None

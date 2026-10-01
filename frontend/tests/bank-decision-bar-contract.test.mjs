@@ -66,15 +66,19 @@ test('the selection actions exist in exactly one place — the bar, not inline',
   assert.doesNotMatch(workspace, />✓ Keep<\/button>/, 'no inline ✓ Keep button should remain in BankWorkspace.jsx')
 })
 
-test('Keep and Reject share one even row, Skip and CLR the next', () => {
+test('Keep and Reject share one even row, Undecide and Clear selection the next', () => {
   const grids = [...bar.matchAll(/className="grid grid-cols-2 gap-1\.5"/g)]
-  assert.equal(grids.length, 2, 'two even two-column rows: Keep/Reject, then Skip/CLR')
+  assert.equal(grids.length, 2, 'two even two-column rows: Keep/Reject, then Undecide/Clear selection')
   assert.match(bar, />\s*✓ Keep\s*</)
   assert.match(bar, />\s*✕ Reject\s*</)
-  assert.match(bar, />\s*Skip\s*</)
-  assert.match(bar, />\s*CLR\s*</)
-  assert.doesNotMatch(bar, />\s*↺ Undecided\s*</)
-  assert.doesNotMatch(bar, />\s*Undecided\s*</)
+  // The Dataset bulk bar's word for the same action (DatasetGrid.jsx). "Skip"
+  // belongs to the review lightbox, where it really skips; "CLR" said nothing.
+  assert.match(bar, />\s*↺ Undecide\s*</)
+  assert.match(bar, />\s*Clear selection\s*</)
+  assert.doesNotMatch(bar, />\s*Skip\s*</)
+  assert.doesNotMatch(bar, />\s*CLR\s*</)
+  assert.match(read('src/components/dataset/DatasetGrid.jsx'), />↺ Undecide</,
+    'Bank and Dataset name the undecide action the same way')
   assert.match(bar, /aria-label="Clear selection"/)
   assert.match(bar, /title="Set these images back to undecided"/)
 })

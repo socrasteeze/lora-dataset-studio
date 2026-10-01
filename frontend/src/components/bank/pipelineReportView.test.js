@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-import { isSuperseded, reportHeadline, stepView } from './pipelineReportView.js';
+import { isSuperseded, reportHeadline, STATUS_STYLE, stepView } from './pipelineReportView.js';
 
 const cancelled = (step, extra = {}) => ({
   step, status: 'cancelled', reason: 'cancelled before it ran', ...extra,
@@ -83,4 +83,49 @@ test('PipelineReport renders through the shared view logic', () => {
   assert.match(src, /reportHeadline\(/);
   assert.doesNotMatch(src, /const STATUS_STYLE = \{/,
     'the styles moved to the view module — two copies would drift');
+});
+
+// A step that RAN but finished short or mixed must not wear the same ✅ as a
+// clean one, and the headline says how many need a look.
+const shortCaption = {
+  step: 'caption', status: 'done', reason: null,
+  detail: 'done — 997 captioned (135 by JoyCaption, 862 by the local LLM vision model)',
+  counts: { joycaption: 135, ollama: 862, skipped: 3, failed: 0, first_choice: 'joycaption' },
+};
+
+test('a caption step that needs attention does not show a ✅', () => {
+  const view = stepView(shortCaption);
+  assert.notEqual(view.icon, '✅');
+  assert.equal(view.icon, STATUS_STYLE.attention.icon);
+  assert.equal(view.cls, STATUS_STYLE.attention.cls);
+  assert.equal(view.attention, true);
+  assert.match(view.note, /862 by the local LLM/, 'the step keeps its own detail line');
+});
+
+test('a clean caption step keeps its ✅', () => {
+  const view = stepView({ step: 'caption', status: 'done', detail: 'done — 5 captioned',
+    counts: { joycaption: 5, ollama: 0, skipped: 0, failed: 0, first_choice: 'joycaption' } });
+  assert.equal(view.icon, '✅');
+  assert.equal(view.attention, false);
+});
+
+test('the headline reads "8/8 ran · 1 needs attention"', () => {
+  const done = (step) => ({ step, status: 'done', detail: 'ok' });
+  const report = { steps: [
+    done('scan'), done('auto_reject'), done('score'), done('semantic_dedup'),
+    done('watermark'), done('faces'), done('framing'), shortCaption,
+  ] };
+  const head = reportHeadline(report);
+  assert.equal(head.covered, 8);
+  assert.equal(head.total, 8);
+  assert.equal(head.attention, 1);
+  assert.equal(head.attentionLabel, '1 needs attention');
+  assert.equal(reportHeadline({ steps: [done('scan')] }).attentionLabel, '');
+  assert.equal(reportHeadline({ steps: [shortCaption, shortCaption] }).attentionLabel,
+    '2 need attention');
+});
+
+test('PipelineReport shows the attention count in its headline', () => {
+  const src = fs.readFileSync(new URL('./PipelineReport.jsx', import.meta.url), 'utf8');
+  assert.match(src, /attentionLabel/);
 });

@@ -708,7 +708,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Skip",
+    "↺ Undecide",
     1
   ],
   [

@@ -145,9 +145,12 @@ def _no_live_comfyui_vram_release(monkeypatch):
 
     Tests that are ABOUT this call (test_vision_features) monkeypatch it
     themselves; a later setattr wins over this one, so they are unaffected."""
-    from app.utils.comfyui import ComfyVramFreeVerdict
+    from app.utils.comfyui import ComfyVramFreeVerdict, forget_comfyui_refused
     monkeypatch.setattr('app.utils.comfyui.free_comfyui_vram',
                         lambda *a, **k: ComfyVramFreeVerdict.FREED)
+    # A refusal a previous test provoked for real must not answer this test's
+    # vision window from the 30 s memory (utils.comfyui._refused_at).
+    forget_comfyui_refused()
 
 
 @pytest.fixture(autouse=True)

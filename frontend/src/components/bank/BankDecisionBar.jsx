@@ -34,14 +34,17 @@ import { UNDO_HINT, undoBannerText } from './bankUndo.js'
  * With neither, it renders nothing and costs no space.
  *
  * EVEN WEIGHT, TWO ROWS — Keep and Reject used to size to their labels, so
- * Keep sat wider than Reject and the rest (Skip, the two rotate glyphs, CLR)
- * wrapped into a second ragged row. Both decision pairs now share a two-column
+ * Keep sat wider than Reject and the rest (Undecide, the two rotate glyphs,
+ * Clear selection) wrapped into a second ragged row. Both decision pairs now share a two-column
  * grid the same way the header's Promote / Delete rejected row does; the
  * rotate pair sits next to the count as equal icon buttons so they cannot
  * look like a third reset.
  *
- * Skip here is "set these back to undecided", not the review-lightbox ⏭ Skip
- * (leave pending and go to the next photo). The tooltip spells that out.
+ * ↺ Undecide sets these back to undecided — the Dataset bulk bar's own word
+ * for the same action. It was labelled "Skip", which is what the review
+ * lightbox's ⏭ Skip does (leave pending, go to the next photo), so one word
+ * meant two things. "CLR" became "Clear selection" for the same reason: say
+ * what it does.
  */
 const DECIDE = 'inline-flex h-full w-full min-w-0 items-center justify-center '
   + 'rounded-lg px-2 py-1.5 text-sm font-semibold'
@@ -95,13 +98,13 @@ export default function BankDecisionBar({
               title="Set these images back to undecided"
               aria-label="Set the selected images back to undecided"
               className={`${DECIDE} border border-border text-content-muted hover:bg-surface-raised hover:text-content`}>
-              Skip
+              ↺ Undecide
             </button>
             <button type="button" onClick={onClear}
               title="Clear selection"
               aria-label="Clear selection"
               className={`${DECIDE} border border-border text-content-muted hover:bg-surface-raised hover:text-content`}>
-              CLR
+              Clear selection
             </button>
           </div>
         </div>

@@ -11,7 +11,14 @@
  * as designed — nagging about it would train people to ignore the badge. Every
  * GPU pass skipped because the GPU was busy means the night was wasted. So the
  * verdict separates a step that declined itself from one the machine refused.
+ *
+ * A step can also RUN and still owe a look. The caption step used to store only
+ * {captioned, total_captioned}, so a bank where JoyCaption ran out of time and
+ * the local LLM wrote most of the captions, or where another client held the
+ * model and images were left uncaptioned, read as a clean "done". The step now
+ * stores who wrote what and what it left; captionStepNote reads it.
  */
+import { CAPTION_WRITERS } from '../../utils/captionEngines.js'
 
 /** Reasons that mean "this pass could not run because something else had the
  *  machine" — the ones worth waking someone for.
@@ -41,13 +48,56 @@ function wasBlocked(step) {
   return BLOCKED_RE.test(String(step?.reason || ''))
 }
 
-/** {state, errors, skipped, blocked, first_reason} for a stored pipeline_report.
+const count = (v) => {
+  const n = Number(v)
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
+
+/** What a caption step that RAN still owes the reader, or null when nothing.
+ *
+ *  {missed, mixed, fallback, text}: `missed` is skipped + failed (images the
+ *  step left without a caption); `mixed` is true when more than one engine wrote
+ *  captions in this run; `fallback` is how many the engine that was NOT the
+ *  first choice wrote. `text` is the short badge sentence, e.g.
+ *  "3 not captioned · 862 by fallback". When the first choice is unknown (a peer
+ *  ran the step) the local LLM's share is named instead of "fallback".
+ *
+ *  Reads the counts the backend stores on the step; a report written before
+ *  those counts existed has none and gets no note — never an invented one. */
+export function captionStepNote(step) {
+  if (!step || step.step !== 'caption' || step.status !== 'done') return null
+  const c = step.counts || {}
+  const missed = count(c.skipped) + count(c.failed)
+  const writers = CAPTION_WRITERS.filter((w) => count(c[w.key]) > 0)
+  const mixed = writers.length > 1
+  if (!missed && !mixed) return null
+  const parts = []
+  if (missed) parts.push(`${missed} not captioned`)
+  let fallback = 0
+  if (mixed) {
+    const first = writers.find((w) => w.key === c.first_choice)
+    if (first) {
+      fallback = writers.filter((w) => w !== first).reduce((n, w) => n + count(c[w.key]), 0)
+      parts.push(`${fallback} by fallback`)
+    } else {
+      const local = CAPTION_WRITERS.find((w) => w.key === 'ollama')
+      fallback = count(c[local.key])
+      parts.push(`${fallback} by ${local.short}`)
+    }
+  }
+  return { missed, mixed, fallback, text: parts.join(' · ') }
+}
+
+/** {state, errors, skipped, blocked, attention, note, first_reason} for a stored
+ *  pipeline_report.
  *
  *  state:
- *    'error'   at least one step threw
- *    'partial' at least one step was blocked by the machine (GPU busy / never
- *              reached) — the night did less than it looked like
- *    'ok'      everything ran, or only declined itself for a stated prerequisite
+ *    'error'     at least one step threw
+ *    'partial'   at least one step was blocked by the machine (GPU busy / never
+ *                reached) — the night did less than it looked like
+ *    'attention' every step ran, but one finished short or mixed: images left
+ *                uncaptioned, or a fallback engine wrote part of the captions
+ *    'ok'        everything ran, or only declined itself for a stated prerequisite
  *
  *  null when there is no report at all: a bank that never ran a pipeline has no
  *  verdict, and inventing 'ok' for it would put a green tick on nothing. */
@@ -57,15 +107,22 @@ export function pipelineReportVerdict(report) {
   const errored = steps.filter((s) => s?.status === 'error')
   const skipped = steps.filter((s) => s?.status === 'skipped' || s?.status === 'cancelled')
   const blocked = skipped.filter(wasBlocked)
+  const noted = steps.map((s) => [s, captionStepNote(s)]).filter(([, n]) => n)
   const worst = errored[0] || blocked[0] || null
+  // A step that ran has no `reason`; its own detail line is the explanation.
+  const why = worst ? worst.reason : noted.length ? noted[0][0].detail : null
+  const which = worst || (noted.length ? noted[0][0] : null)
   return {
-    state: errored.length ? 'error' : blocked.length ? 'partial' : 'ok',
+    state: errored.length ? 'error' : blocked.length ? 'partial'
+      : noted.length ? 'attention' : 'ok',
     errors: errored.length,
     skipped: skipped.length,
     blocked: blocked.length,
+    attention: noted.length,
+    note: noted.length ? noted[0][1].text : null,
     cancelled: Boolean(report?.cancelled),
-    first_reason: worst ? String(worst.reason || '') : null,
-    first_step: worst ? String(worst.step || '') : null,
+    first_reason: which ? String(why || '') : null,
+    first_step: which ? String(which.step || '') : null,
   }
 }
 
@@ -81,6 +138,15 @@ export function pipelineBadge(verdict) {
       title: verdict.first_reason
         ? `${verdict.first_step}: ${verdict.first_reason}`
         : 'The last Launch-all had a step fail. Open the bank for the report.',
+    }
+  }
+  if (verdict.state === 'attention') {
+    return {
+      tone: 'warn',
+      label: `⚠ ${verdict.note}`,
+      title: verdict.first_reason
+        ? `${verdict.first_step}: ${verdict.first_reason}`
+        : 'The last Launch-all left some captions unwritten or written by another engine. Open the bank for the report.',
     }
   }
   return {

@@ -228,9 +228,16 @@ def compare(caps: dict, state: dict | None = None) -> list:
     stored = (state or read())['checks']
     live = snapshot(caps)
     labels = _labels()
+    # A local engine renders through ComfyUI, so its readiness follows ComfyUI
+    # being reachable. While ComfyUI is down or ignored, a failing local engine
+    # is "ComfyUI is not running", not a regression.
+    comfy = (caps or {}).get('comfyui') or {}
+    comfy_down = comfy.get('reachable') is False or comfy.get('ignored') is True
+    skip = ({f'engines.{s.id}' for s in _engines.all_specs() if s.kind == 'local'}
+            if comfy_down else set())
     return [{'key': k, 'label': labels[k]}
             for k in tracked_keys()
-            if stored.get(k) and k in live and not live[k]]
+            if k not in skip and stored.get(k) and k in live and not live[k]]
 
 
 def dismiss(keys) -> dict:

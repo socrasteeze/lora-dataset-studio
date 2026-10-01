@@ -106,6 +106,22 @@ def test_comfyui_or_ollama_merely_stopped_is_not_a_regression(app):
     assert setup_state.compare(down) == []
 
 
+def test_tracked_local_engine_is_not_a_regression_while_comfyui_is_down(app, monkeypatch):
+    """A tracked local engine (Dataset Forge) is ready only while ComfyUI answers.
+    ComfyUI being stopped or ignored must not report it as stopped working; a
+    real failure with ComfyUI up still does."""
+    from types import SimpleNamespace
+    from app.engines import registry
+    spec = SimpleNamespace(id='forge', kind='local', tracked_capability='Forge')
+    monkeypatch.setattr(registry, 'all_specs', lambda: (spec,))
+    monkeypatch.setattr(registry, 'tracked', lambda: (('engines.forge', 'Forge'),))
+    setup_state.observe(_caps(engines={'forge': True}))
+    for comfy in ({'reachable': False}, {'reachable': True, 'ignored': True}):
+        assert setup_state.compare(_caps(engines={'forge': False}, comfyui=comfy)) == []
+    keys = [r['key'] for r in setup_state.compare(_caps(engines={'forge': False}))]
+    assert keys == ['engines.forge']
+
+
 def test_never_installed_capability_is_not_a_regression(app):
     """"Not everything is installed" is the normal state of nearly every
     install; only losing something you HAD is worth an interruption."""

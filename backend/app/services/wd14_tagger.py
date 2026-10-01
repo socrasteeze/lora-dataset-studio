@@ -151,13 +151,37 @@ def is_available() -> bool:
     return probe_wd14()['ok']
 
 
+DEVICES = ('auto', 'cuda', 'cpu')
+
+
+def device() -> str:
+    """`wd14.device`: auto | cuda | cpu. Unknown values read as auto."""
+    d = str(cfg.get('wd14.device') or 'auto').strip().lower()
+    return d if d in DEVICES else 'auto'
+
+
 def uses_gpu() -> bool:
     """Whether a run would take the CUDA execution provider. The CALLER needs this
     before starting: a CUDA run must hold the GPU-exclusive window (unloading
     ComfyUI, blocking a training start) and a CPU run must never hold one. False
     is the common, healthy answer — see capabilities.wd14_gpu_available."""
+    if device() == 'cpu':
+        return False
     from ..capabilities import wd14_gpu_available
     return bool(wd14_gpu_available())
+
+
+def gpu_refusal() -> str | None:
+    """Why a tag run must not start, when the operator requires the GPU and the
+    tagger's interpreter cannot provide CUDA. None otherwise."""
+    if device() != 'cuda':
+        return None
+    from ..capabilities import wd14_gpu_available
+    if wd14_gpu_available():
+        return None
+    return ('GPU tagging is selected, but the tagger\'s Python has no CUDA '
+            'onnxruntime. Point the WD14 interpreter at an environment with '
+            'onnxruntime-gpu, or set Tagging device to Auto (Settings ▸ Captioning)')
 
 
 def default_timeout(n_images: int) -> int:
@@ -192,6 +216,7 @@ def tag_images(image_paths, threshold_value=None, timeout=None,
         'images': images,
         'threshold': thr,
         'models_dir': models_dir(),
+        'device': device(),
         # The child does the fetching, so it is handed the whole spec rather than
         # a hardcoded copy of it: one place defines which model this is.
         'model_files': {name: {'url': url, 'min_bytes': min_bytes}
@@ -200,6 +225,9 @@ def tag_images(image_paths, threshold_value=None, timeout=None,
     budget = int(timeout) if timeout else default_timeout(len(images))
 
     def _on_line(line):
+        if line.startswith('[wd14] provider='):
+            # Which device actually ran: CPU tagging used to be invisible in app.log.
+            logger.info('wd14: %s', line[len('[wd14] '):].strip())
         rec = parse_progress_line(line)
         if rec and on_progress:
             on_progress(rec)

@@ -23,6 +23,23 @@ export const FLAG_LABEL = {
   low_aesthetic: 'Low aesthetic', nsfw: 'NSFW', watermark: 'Watermark',
 }
 
+/* The tile badge's short word for each flag. The badge used to take the first
+   two letters of FLAG_LABEL, so Blurry and Black bars both read "Bl" (and Soft
+   detail "So", Low aesthetic "Lo"). Each flag gets its own word here; the full
+   label stays on the badge's title and aria-label. A flag missing from this map
+   falls back to the old two letters (flagShortLabel). */
+export const FLAG_SHORT = {
+  blur: 'Blur', noise: 'Noise', uniform: 'Flat', small: 'Small',
+  unreadable: 'Unread', soft_detail: 'Soft', bars: 'Bars',
+  low_aesthetic: 'Lo-aes', nsfw: 'NSFW', watermark: 'WM',
+}
+
+/** Short tile-badge text for a flag: FLAG_SHORT, else the first two letters of
+ *  its label, else the raw id. */
+export function flagShortLabel(flag) {
+  return FLAG_SHORT[flag] || FLAG_LABEL[flag]?.slice(0, 2) || flag
+}
+
 export const FLAG_HINT = {
   soft_detail: 'The picture stops before the pixels do — usually an enlargement. '
     + 'A soft or out-of-focus shot reads the same, so check before mass-rejecting.',

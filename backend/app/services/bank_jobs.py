@@ -26,6 +26,36 @@ _jobs: dict = {}          # bank_id -> job dict (see start())
 _FINISHED_TTL = 5 * 60    # finished snapshot lifetime
 _STALE_TTL = 60 * 60      # running job with no progress for this long = dead
 
+# Bumped and broadcast whenever a job ends (finished, or a reservation dropped),
+# so the Launch-all queue starts the next bank AT ONCE instead of on its next
+# 2 s poll. A counter rather than an Event: several queue lanes wait at the same
+# time, and an Event one of them clears would swallow the wake-up of the others.
+_ended = threading.Condition()
+_ended_count = 0
+
+
+def _announce_ended():
+    global _ended_count
+    with _ended:
+        _ended_count += 1
+        _ended.notify_all()
+
+
+def ended_count() -> int:
+    """How many jobs have ended so far. Read it BEFORE checking ``running`` and
+    hand it to ``wait_for_end``, so an end in between is never missed."""
+    with _ended:
+        return _ended_count
+
+
+def wait_for_end(seen, timeout) -> bool:
+    """Block until a job ends after ``seen`` = ended_count(), or ``timeout``
+    seconds pass. True when one ended. The timeout stays the fallback for what
+    this does not announce (a GPU flag clearing, a stale entry purged)."""
+    with _ended:
+        return _ended.wait_for(lambda: _ended_count != seen,
+                               timeout=max(0.0, float(timeout)))
+
 # Called after a pass function returns CLEANLY (no exception, no job error, not
 # cancelled) with (bank_id, kind, detail), inside a fresh app context. Installed
 # by image_bank_service at import to journal the run (note_pass_run); kept as a
@@ -225,6 +255,7 @@ def abort(job):
         return
     with _lock:
         _drop_job_locked(job)
+    _announce_ended()
 
 
 def launched(job) -> bool:
@@ -335,6 +366,9 @@ def start(app, bank_id, kind, fn, total=0, reserve_ids=None,
                         hook(bank_id, kind, job.get('detail'))
                 except Exception:  # noqa: BLE001 — bookkeeping never sinks a pass
                     pass
+            # Last, after the journal: whoever waits (the Launch-all queue)
+            # sees the pass as completely done.
+            _announce_ended()
 
     # Under TESTING the job runs INLINE: the test suite uses a per-connection
     # sqlite:///:memory: DB, so a real worker thread would open a fresh, EMPTY

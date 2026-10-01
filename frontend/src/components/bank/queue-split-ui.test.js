@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const dialog = fs.readFileSync(new URL('./LaunchAllDialog.jsx', import.meta.url), 'utf8');
 const page = fs.readFileSync(new URL('../../pages/BankPage.jsx', import.meta.url), 'utf8');
+const panel = fs.readFileSync(new URL('./BankQueuePanel.jsx', import.meta.url), 'utf8');
 
 // --- Launch-all dialog: the new "Add to queue" action ------------------------
 test('the launch dialog exposes an onQueue action alongside Run now', () => {
@@ -24,7 +25,7 @@ test('the banks page enqueues, polls, cancels and clears the queue', () => {
   assert.match(page, /postJson\(`\/api\/bank\/\$\{id\}\/queue`/);          // add
   assert.match(page, /apiFetch\('\/api\/bank-queue'\)/);                    // poll snapshot
   assert.match(page, /del\(`\/api\/bank-queue\/\$\{id\}`\)/);               // cancel one
-  assert.match(page, /postJson\('\/api\/bank-queue\/clear'/);              // clear all
+  assert.match(page, /postJson\('\/api\/bank-queue\/clear', \{ pending_only: true \}\)/); // clear waiting
   // The queue is polled on an interval while on the list page.
   assert.match(page, /setInterval\(refreshQueue, 2000\)/);
 });
@@ -127,7 +128,50 @@ test('the queue panel says WHERE each bank runs and why it is waiting', () => {
   // dropped both: twelve banks queued to a peer looked byte-identical to twelve
   // local ones, and a queue stalled on a stuck GPU flag looked simply dead.
   // With a lane per machine, two "running" rows are otherwise indistinguishable.
-  assert.match(page, /it\.device_label && \(/);
-  assert.match(page, /on \{it\.device_label\}/);
-  assert.match(page, /it\.state !== 'running' && it\.waiting_for/);
+  // The panel moved out of BankPage.jsx into BankQueuePanel.jsx.
+  assert.match(panel, /it\.device_label && \(/);
+  assert.match(panel, /on \{it\.device_label\}/);
+  assert.match(panel, /it\.state !== 'running' && it\.waiting_for/);
+  assert.match(page, /<BankQueuePanel queue=\{queue\}/);
+});
+
+// --- Queue panel: Clear waiting / Stop running ------------------------------
+test('the queue panel splits Clear all into Clear waiting and Stop running', () => {
+  // One "Clear all" also cancelled the running pipeline, so tidying the line
+  // stopped the bank mid-run. Each action now does one thing.
+  assert.doesNotMatch(panel, />\s*Clear all\s*</);
+  assert.match(panel, /\{waiting > 0 && \([\s\S]*?Clear waiting/);
+  assert.match(panel, /\{running > 0 && \([\s\S]*?Stop running/);
+  assert.match(page, /onClearWaiting=\{clearWaiting\} onStopRunning=\{stopRunning\}/);
+});
+
+test('both destructive queue actions, and the running row ✕, ask first', () => {
+  // window.confirm is the app's confirm pattern (queue-all, remove bank).
+  assert.match(page, /const ask = clearWaitingConfirm\(queue\)\s*if \(!ask \|\| !window\.confirm\(ask\)\) return/);
+  assert.match(page, /const ask = stopRunningConfirm\(queue, nameOf\)\s*if \(!ask \|\| !window\.confirm\(ask\)\) return/);
+  // The ✕: null (no question) for a waiting row, the stop question when running.
+  assert.match(page, /const ask = removeQueuedConfirm\(queue, nameOf, id\)\s*if \(ask && !window\.confirm\(ask\)\) return/);
+  // Stop running uses the per-entry cancel, one per running entry (one per machine).
+  assert.match(page, /for \(const it of runningItems\(queue\)\)[\s\S]{0,80}del\(`\/api\/bank-queue\/\$\{it\.bank_id\}`\)/);
+});
+
+test('hovering, focusing or pressing a queue row tints the WHOLE row', () => {
+  // The ✕ sits at the far end of the row; the tint ties it to its bank.
+  const row = panel.match(/const ROW = ([^\n]*\n[^\n]*\n[^\n]*)/);
+  assert.ok(row, 'the row class constant was not found');
+  for (const cls of ['group', 'hover:bg-surface-raised', 'focus-within:bg-surface-raised',
+    'active:bg-surface-raised', 'has-[:active]:bg-surface-raised']) {
+    assert.ok(row[1].includes(cls), `the row is missing ${cls}`);
+  }
+  assert.match(panel, /<li key=\{it\.bank_id\} className=\{ROW\}>/);
+  assert.match(panel, /group-hover:text-content/);
+});
+
+test('queue buttons are finger-sized below lg and the ✕ names its bank', () => {
+  assert.match(panel, /const ACTION = 'min-h-10 lg:min-h-0 /);
+  assert.match(panel, /inline-flex min-h-10 min-w-10 lg:min-h-0 lg:min-w-0 shrink-0/);
+  assert.match(panel, /`Remove \$\{nameOf\(it\.bank_id\)\} from queue`/);
+  assert.match(panel, /`Stop \$\{nameOf\(it\.bank_id\)\} and remove it from queue`/);
+  // 360 px: the name and its chips wrap inside the row instead of pushing the ✕ off.
+  assert.match(panel, /flex min-w-0 grow flex-wrap items-center/);
 });

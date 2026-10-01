@@ -26,6 +26,7 @@ from ..timeout_settings import network_timeout
 
 import errno
 import glob
+import ipaddress
 import logging
 import math
 import os
@@ -36,7 +37,7 @@ import threading
 import time
 from dataclasses import dataclass
 from enum import Enum
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urlencode, urljoin, urlsplit
 
 import requests
 from flask import current_app
@@ -51,11 +52,16 @@ class ComfyVramFreeVerdict(Enum):
 
     FREED = 'freed'
     COMFYUI_OFFLINE = 'comfyui_offline'
+    # The configured ComfyUI is provably on ANOTHER machine, so it cannot hold
+    # this machine's GPU. Nothing was asked and nothing is claimed about that
+    # ComfyUI's own memory — only that local GPU work need not wait for it.
+    # Returned by release_comfyui_for_local_gpu alone, never by free_comfyui_vram.
+    COMFYUI_NOT_LOCAL = 'comfyui_not_local'
     UNKNOWN = 'unknown'
 
     @property
     def permits_ollama(self):
-        return self in (self.FREED, self.COMFYUI_OFFLINE)
+        return self in (self.FREED, self.COMFYUI_OFFLINE, self.COMFYUI_NOT_LOCAL)
 
 
 class ComfyHistoryHealth(Enum):
@@ -587,6 +593,9 @@ def queue_prompt_to_comfyui(prompt_workflow, client_id, worker_url=None):
         status = getattr(response, 'status_code', None)
         if type(status) is not int or not 200 <= status < 300:
             return None, f'ComfyUI /prompt returned unsafe HTTP status {status!r}'
+        if is_local:
+            # It answered, so a remembered refusal is out of date.
+            forget_comfyui_refused()
         return response.json(), None
     except requests.exceptions.RequestException as e:
         logger.error(f"Error queuing prompt to {api_addr}: {e}")
@@ -1616,6 +1625,7 @@ def free_comfyui_vram(worker_url=None, timeout=10) -> ComfyVramFreeVerdict:
     said it is not part of this setup, so it must not hold up a vision pass."""
     if _ignored_target(worker_url):
         return ComfyVramFreeVerdict.COMFYUI_OFFLINE
+    api_addr = ''
     try:
         api_addr = (worker_url or api_address()).rstrip('/')
         if not api_addr:
@@ -1632,6 +1642,8 @@ def free_comfyui_vram(worker_url=None, timeout=10) -> ComfyVramFreeVerdict:
         verdict = (ComfyVramFreeVerdict.COMFYUI_OFFLINE
                    if _is_explicit_connection_refused(exc)
                    else ComfyVramFreeVerdict.UNKNOWN)
+        if verdict is ComfyVramFreeVerdict.COMFYUI_OFFLINE:
+            _note_comfyui_refused(api_addr)
         logger.warning('ComfyUI /free did not complete: %s (%s)', exc, verdict.value)
         return verdict
     except Exception as exc:
@@ -1641,9 +1653,125 @@ def free_comfyui_vram(worker_url=None, timeout=10) -> ComfyVramFreeVerdict:
     status = getattr(response, 'status_code', None)
     if type(status) is int and 200 <= status < 300:
         logger.info('ComfyUI VRAM freed successfully')
+        forget_comfyui_refused()
         return ComfyVramFreeVerdict.FREED
     logger.warning('ComfyUI /free returned malformed/non-2xx status %r', status)
     return ComfyVramFreeVerdict.UNKNOWN
+
+
+# --- /free before a pass takes THIS machine's GPU ---------------------------
+#
+# Every vision window asks ComfyUI to unload, and a Launch-all queue opens one
+# per GPU step of every bank. With ComfyUI stopped, Windows answers a refused
+# local connection only after about 2 s, so a queue paid that per step; with
+# ComfyUI on another machine the request could not free this GPU at all.
+#
+# A refused connection is remembered for a short time per address. Only a REAL
+# refusal is remembered (free_comfyui_vram records it), never a timeout or an
+# unknown answer, and it is forgotten on a /free that succeeds, on a /prompt
+# that succeeds, on a settings save of the comfyui section and when the app
+# starts ComfyUI. Within the window a ComfyUI started by hand elsewhere can be
+# missed for at most this long; LDS's own queue is still covered by the window's
+# has_comfyui_work() check.
+_REFUSED_TTL_S = 30.0
+_refused_at: dict = {}
+_refused_lock = threading.Lock()
+
+
+def _note_comfyui_refused(api_addr) -> None:
+    if api_addr:
+        with _refused_lock:
+            _refused_at[str(api_addr).rstrip('/')] = time.monotonic()
+
+
+def forget_comfyui_refused() -> None:
+    """Drop every remembered refusal, so the next /free asks again."""
+    with _refused_lock:
+        _refused_at.clear()
+
+
+def _recently_refused(api_addr) -> bool:
+    with _refused_lock:
+        at = _refused_at.get(api_addr)
+        if at is None:
+            return False
+        if time.monotonic() - at < _REFUSED_TTL_S:
+            return True
+        _refused_at.pop(api_addr, None)
+        return False
+
+
+# Private ranges that Docker, WSL2 and Hyper-V hand to guests running ON this
+# machine. A ComfyUI addressed there can share this GPU, so it is never treated
+# as another machine.
+_LOCAL_GUEST_NETWORKS = (ipaddress.ip_network('172.16.0.0/12'),)
+
+
+def _this_machine_addresses():
+    """Every address on this machine's own interfaces, or None when they cannot
+    be listed. Read from the OS, with no lookup and no traffic."""
+    try:
+        import psutil
+        found = set()
+        for addrs in psutil.net_if_addrs().values():
+            for a in addrs:
+                if a.family not in (socket.AF_INET, socket.AF_INET6):
+                    continue
+                try:
+                    found.add(ipaddress.ip_address(str(a.address).split('%', 1)[0]))
+                except ValueError:
+                    continue
+        return found or None
+    except Exception:      # noqa: BLE001 — unknown means "maybe local"
+        return None
+
+
+def comfyui_is_on_another_machine(api_addr) -> bool:
+    """True only when ``api_addr`` provably names another machine.
+
+    Starts from the Ollama fence's local/remote rule (ollama_gpu_fence.
+    _endpoint_scope), which calls anything that is not loopback 'remote'. That
+    errs safely for the fence, which must never unload a stranger's model, but
+    the wrong way here: skipping /free for a ComfyUI that IS on this machine
+    would let a vision pass load next to its models. So 'remote' must also be an
+    IP literal (a name can resolve to this machine, and resolving it would be a
+    lookup), not unspecified, not one of this machine's own addresses, and not in
+    a range a local container or VM uses. Anything uncertain answers False and
+    the caller asks ComfyUI as before."""
+    from ..services.ollama_gpu_fence import _endpoint_scope
+    scope, _endpoint = _endpoint_scope(api_addr)
+    if scope != 'remote':
+        return False
+    try:
+        host = (urlsplit(str(api_addr)).hostname or '').rstrip('.')
+        ip = ipaddress.ip_address(host.split('%', 1)[0])
+    except ValueError:
+        return False
+    if ip.version == 6 and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    if (ip.is_loopback or ip.is_unspecified or ip.is_link_local
+            or any(ip in net for net in _LOCAL_GUEST_NETWORKS)):
+        return False
+    own = _this_machine_addresses()
+    return own is not None and ip not in own
+
+
+def release_comfyui_for_local_gpu() -> ComfyVramFreeVerdict:
+    """/free for a pass about to use THIS machine's GPU (the vision window).
+
+    COMFYUI_NOT_LOCAL, with no request, when the configured ComfyUI is on
+    another machine; COMFYUI_OFFLINE, with no request, when the same address
+    refused a connection within _REFUSED_TTL_S; otherwise free_comfyui_vram's
+    own verdict. Explicit actions (Free memory, Stop everything) keep calling
+    free_comfyui_vram directly and always ask."""
+    if _ignored_target(None):
+        return ComfyVramFreeVerdict.COMFYUI_OFFLINE
+    api_addr = str(api_address() or '').rstrip('/')
+    if api_addr and comfyui_is_on_another_machine(api_addr):
+        return ComfyVramFreeVerdict.COMFYUI_NOT_LOCAL
+    if api_addr and _recently_refused(api_addr):
+        return ComfyVramFreeVerdict.COMFYUI_OFFLINE
+    return free_comfyui_vram()
 
 
 # --- Trained-LoRA parser (SINGLE source shared by labels + grouping) -------

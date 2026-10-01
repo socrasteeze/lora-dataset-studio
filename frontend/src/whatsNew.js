@@ -84,6 +84,18 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-01-zz-honest-caption-verdict', date: '2026-10-01',
+    title: 'See When a Launch-all Left Captions Short',
+    blurb: 'A bank whose Launch-all captions were partly written by the fallback engine, or that left images uncaptioned because another app held the model, no longer shows a clean finish. Its card says how many, for example "⚠ 3 not captioned · 862 by fallback", and the report marks the Caption step instead of ticking it. Queued banks also start one after another without the pause between them.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-01-z-bank-queue-and-tiles', date: '2026-10-01',
+    title: 'Tidy the Bank Queue Without Stopping the Running Bank',
+    blurb: 'The Launch-all queue now has Clear waiting, which empties the line and leaves the running bank going, and a separate Stop running. Both ask first, and the whole row lights up so you can see which bank an ✕ removes. Bank tiles now say why an image was rejected in words, give every flag its own short label, show at most three badges plus "+n", show who wrote the caption, and have finger-sized buttons on a phone. ↺ Undecide and Clear selection replace Skip and CLR, matching the dataset grid.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-01-ignore-comfyui', date: '2026-10-01',
     title: 'Leave an Offline ComfyUI Alone',
     blurb: 'If your ComfyUI lives on a machine that is often off, turn on Ignore ComfyUI in Settings ▸ Local tools. LDS stops contacting it and keeps the address for later, so captioning no longer waits on it and the logs stay quiet. Turn it off again to generate.',

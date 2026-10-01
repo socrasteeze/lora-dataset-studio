@@ -77,7 +77,17 @@ _LOCAL_LANE = 'local'
 
 # How often the worker re-checks whether the next bank can start (GPU free /
 # bank idle). Module-level so tests can drop it to 0 for a synchronous drain.
+# Since bank_jobs announces every job that ends, this is only the FALLBACK for
+# what it does not announce (a GPU flag clearing, a training run ending): the
+# common wait, one bank's pipeline ending before the next starts, wakes at once.
 _POLL_SECONDS = 2.0
+
+
+def _wait_for_a_job_to_end(seen) -> None:
+    """Sleep until a bank job ends after ``seen`` (bank_jobs.ended_count(),
+    read BEFORE the check that made us wait), at most _POLL_SECONDS."""
+    from . import bank_jobs
+    bank_jobs.wait_for_end(seen, _POLL_SECONDS)
 
 
 # ── the durable half ─────────────────────────────────────────────────────────
@@ -482,6 +492,7 @@ def _process_next(app) -> bool:
     from . import bank_jobs
     from . import image_bank_service as banks
     lane = getattr(_current, 'lane', None)
+    seen = bank_jobs.ended_count()
     entry = _claim_next(lane)
     if entry is None:
         # A lane can have work it cannot start YET — another lane is holding
@@ -489,7 +500,7 @@ def _process_next(app) -> bool:
         # worker, and nothing would restart it when the group frees up. Only a
         # lane with nothing pending at all is actually done.
         if lane is not None and _lane_has_pending(lane):
-            time.sleep(_POLL_SECONDS)
+            _wait_for_a_job_to_end(seen)
             return True
         return False
     bank_id = entry['bank_id']
@@ -504,6 +515,7 @@ def _process_next(app) -> bool:
     # like "it just doesn't queue". Say it once, and publish it.
     said = None
     while True:
+        seen = bank_jobs.ended_count()
         with _lock:
             if _find(bank_id) is not entry:
                 entry['waiting_for'] = None
@@ -525,7 +537,7 @@ def _process_next(app) -> bool:
             with _lock:
                 entry['waiting_for'] = why
             logger.info('bank_queue: bank %s is waiting — %s', bank_id, why)
-        time.sleep(_POLL_SECONDS)
+        _wait_for_a_job_to_end(seen)
     if said is not None:
         logger.info('bank_queue: bank %s stopped waiting, starting now', bank_id)
     with _lock:
@@ -546,11 +558,12 @@ def _process_next(app) -> bool:
         # A manual launch grabbed the slot between our check and here — back to
         # pending, claim RELEASED so the lane can pick it up again, and let the
         # next loop wait for it to clear.
+        seen = bank_jobs.ended_count()
         with _lock:
             if _find(bank_id) is entry:
                 entry['state'] = 'pending'
                 entry['claimed'] = False
-        time.sleep(_POLL_SECONDS)
+        _wait_for_a_job_to_end(seen)
         return True
     except (ValueError, RuntimeError) as e:
         # Bank gone / prerequisite failed at launch: drop it and move on.
@@ -558,9 +571,13 @@ def _process_next(app) -> bool:
         _remove(bank_id)
         return True
 
-    # Wait for the pipeline to finish before starting the next bank.
-    while bank_jobs.running(bank_id):
-        time.sleep(_POLL_SECONDS)
+    # Wait for the pipeline to finish before starting the next bank: woken by
+    # bank_jobs the moment it ends, with the poll as the fallback.
+    while True:
+        seen = bank_jobs.ended_count()
+        if not bank_jobs.running(bank_id):
+            break
+        _wait_for_a_job_to_end(seen)
     _log(bank_id, 'pipeline done, dequeued', 'ok')
     _remove(bank_id)
     return True
@@ -598,20 +615,28 @@ def cancel(bank_id) -> bool:
     return True
 
 
-def clear() -> int:
+def clear(pending_only=False) -> int:
     """Drop every pending entry and cancel the running one. Returns how many
-    entries were removed."""
+    entries were removed.
+
+    ``pending_only`` keeps every running entry and its live pipeline, and drops
+    only the banks still waiting their turn: the panel's "Clear waiting". A
+    claimed entry that is still waiting is pending, so it goes too; its wait
+    loop sees the entry gone and stops (see _process_next)."""
     from . import bank_jobs
     with _lock:
-        running_ids = [e['bank_id'] for e in _queue if e['state'] == 'running']
-        all_ids = [e['bank_id'] for e in _queue]
-        n = len(_queue)
-        _queue.clear()
+        kept = [e for e in _queue if pending_only and e['state'] == 'running']
+        removed = [e for e in _queue if not any(e is k for k in kept)]
+        running_ids = [e['bank_id'] for e in removed if e['state'] == 'running']
+        all_ids = [e['bank_id'] for e in removed]
+        n = len(removed)
+        _queue[:] = kept
     _safely('forget the cleared queue', _persist_remove, all_ids)
     for bid in running_ids:
         bank_jobs.cancel(bid)
     if n:
-        _log(None, 'queue cleared', 'warn', detail=f'{n} entr{"y" if n == 1 else "ies"}')
+        _log(None, 'waiting banks cleared' if pending_only else 'queue cleared', 'warn',
+             detail=f'{n} entr{"y" if n == 1 else "ies"}')
     return n
 
 

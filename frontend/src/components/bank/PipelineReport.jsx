@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { captionStepNote } from './pipelineVerdict.js'
 import { reportHeadline, stepView } from './pipelineReportView.js'
 
 /** The morning-after summary of the last "Launch all" run — one row per
@@ -29,15 +30,17 @@ function fmtWhen(ts) {
 }
 
 export default function PipelineReport({ report, onDismiss }) {
-  // One line by default; opened only when the run needs a look (a pass errored
-  // or the run was stopped). Open, it was ~300 px above the grid on every visit.
+  // One line by default; opened only when the run needs a look (a pass errored,
+  // the run was stopped, or a pass ran short). Open, it was ~300 px above the
+  // grid on every visit.
   const [open, setOpen] = useState(() => !!report?.cancelled
-    || (Array.isArray(report?.steps) && report.steps.some((s) => s.status === 'error')))
+    || (Array.isArray(report?.steps) && report.steps.some((s) => s.status === 'error'
+      || captionStepNote(s))))
   if (!report || !Array.isArray(report.steps)) return null
   // A pass re-run since counts as covered, and drops the 🛑 with it: this banner
   // used to keep announcing "cancelled before it ran" over a standalone run that
   // had just done the work. See pipelineReportView.js.
-  const { covered, total, stopped, icon, redone } = reportHeadline(report)
+  const { covered, total, stopped, icon, redone, attentionLabel } = reportHeadline(report)
   const c = report.counts || {}
 
   return (
@@ -52,6 +55,7 @@ export default function PipelineReport({ report, onDismiss }) {
             <span className="text-content-subtle">({redone} re-run since)</span>
           )}
           {stopped && <span className="text-content-subtle">(stopped)</span>}
+          {attentionLabel && <span className="text-amber-300">· {attentionLabel}</span>}
           <span aria-hidden className="text-content-subtle">{open ? '▾' : '▸'}</span>
         </button>
         <span className="ml-auto text-xs text-content-subtle">{fmtWhen(report.finished_at)}</span>

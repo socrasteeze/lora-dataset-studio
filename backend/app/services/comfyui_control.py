@@ -325,6 +325,16 @@ def _busy() -> dict:
 
 
 
+def _forget_refused() -> None:
+    """A start click, and a ComfyUI that answered, both outdate the vision
+    window's remembered refusal (utils.comfyui.release_comfyui_for_local_gpu)."""
+    try:
+        from ..utils.comfyui import forget_comfyui_refused
+        forget_comfyui_refused()
+    except Exception:  # noqa: BLE001 - bookkeeping never blocks a start
+        logger.debug('could not forget the ComfyUI refusal', exc_info=True)
+
+
 def start_comfyui(*, wait_timeout: float = _READY_TIMEOUT,
                   poll_interval: float = _POLL_INTERVAL) -> dict:
     """Start the configured portable ComfyUI, or report a safe idempotent outcome.
@@ -337,6 +347,7 @@ def start_comfyui(*, wait_timeout: float = _READY_TIMEOUT,
     layout = _validated_portable_layout()
     if layout is None:
         return _failure()
+    _forget_refused()
 
     # A manually started, valid local ComfyUI remains fully independent: do not
     # replace it or claim its PID; simply report that the endpoint is ready.
@@ -379,6 +390,7 @@ def start_comfyui(*, wait_timeout: float = _READY_TIMEOUT,
         history = _history_state()
         if history == _HISTORY_READY:
             logger.info('ComfyUI portable readiness succeeded')
+            _forget_refused()
             return {'ok': True, 'reachable': True}
         try:
             returncode = process.poll()
@@ -398,6 +410,7 @@ def start_comfyui(*, wait_timeout: float = _READY_TIMEOUT,
     history = _history_state()
     if history == _HISTORY_READY:
         logger.info('ComfyUI portable readiness succeeded')
+        _forget_refused()
         return {'ok': True, 'reachable': True}
     if history == _HISTORY_OCCUPIED:
         logger.warning('ComfyUI portable readiness timed out while the endpoint was occupied')
