@@ -9,9 +9,10 @@ is exercised separately with the worker stubbed out so entries stay put.
 """
 import os
 
+import pytest
 from PIL import Image
 
-from app.services import bank_queue
+from app.services import bank_jobs, bank_queue
 
 
 def _save(path):
@@ -194,3 +195,65 @@ def test_clear_route_honours_pending_only(app, client, monkeypatch):
     r = client.post('/api/bank-queue/clear', json={'pending_only': 'yes'})
     assert r.get_json() == {'ok': True, 'removed': 1}
     assert cancelled == [1]
+
+
+@pytest.mark.parametrize('state, kind, should_cancel', [
+    ('running', 'pipeline', True),
+    ('pending', 'score', False),
+])
+def test_queue_stop_is_reachable_while_bank_has_a_live_job(
+        app, client, monkeypatch, state, kind, should_cancel):
+    """Stop a queued pipeline without unlocking edits or stopping another pass."""
+    bank_queue.reset()
+    _freeze_worker(monkeypatch)
+    bank_queue.enqueue(app, 'local', 1, steps=['scan'])
+    bank_queue.enqueue(app, 'local', 2, steps=['scan'])
+    with bank_queue._lock:
+        bank_queue._find(1)['state'] = state
+    job = bank_jobs.reserve(1, kind)
+    stopped = []
+    bank_jobs.set_cancel_hook(job, lambda: stopped.append(1))
+    try:
+        blocked = client.delete('/api/bank/1')
+        assert blocked.status_code == 409
+        assert blocked.get_json()['busy_kind'] == kind
+
+        response = client.delete('/api/bank-queue/1')
+        assert response.status_code == 200, response.get_json()
+        assert response.get_json() == {'ok': True}
+        assert job['cancelled'] is should_cancel
+        assert stopped == ([1] if should_cancel else [])
+        assert bank_queue.state_for(1) is None
+        assert [(item['bank_id'], item['position'])
+                for item in bank_queue.snapshot()['items']] == [(2, 1)]
+        # A stop request does not release the job's ownership before it exits.
+        assert bank_jobs.running(1)
+        assert client.delete('/api/bank/1').status_code == 409
+    finally:
+        bank_jobs.abort(job)
+        bank_queue.reset()
+
+
+def test_queue_stop_missing_entry_does_not_cancel_live_job(client):
+    bank_queue.reset()
+    job = bank_jobs.reserve(1, 'pipeline')
+    try:
+        response = client.delete('/api/bank-queue/1')
+        assert response.status_code == 404
+        assert response.get_json() == {'error': 'not queued'}
+        assert job['cancelled'] is False
+    finally:
+        bank_jobs.abort(job)
+
+
+def test_queue_remove_pending_entry_without_a_live_job(app, client, monkeypatch):
+    bank_queue.reset()
+    _freeze_worker(monkeypatch)
+    bank_queue.enqueue(app, 'local', 1, steps=['scan'])
+    try:
+        response = client.delete('/api/bank-queue/1')
+        assert response.status_code == 200
+        assert response.get_json() == {'ok': True}
+        assert bank_queue.snapshot()['items'] == []
+    finally:
+        bank_queue.reset()
