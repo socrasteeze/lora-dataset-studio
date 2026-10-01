@@ -3052,17 +3052,27 @@ def list_banks(user_id, dataset_id=None) -> list:
 
 
 def _report_steps(bank) -> dict | None:
-    """The step outcomes of the last pipeline, for the bank list — {steps,
-    cancelled} and nothing else. The full report (counts, timings, flags) stays
-    a workspace payload: the list needs a verdict, not a transcript."""
+    """The step outcomes of the last pipeline, for the bank list.
+
+    The card reads three fields the transcript used to drop: ``counts`` (a
+    caption step that finished short), ``blocked`` (the machine refused the
+    pass — prose is only the fallback), and ``superseded_at`` (a later run
+    replaced this step, so the old shortfall is not still news). Timings and
+    the bank-wide count block stay in the workspace payload."""
     report = _load_pipeline_report(bank)
     steps = (report or {}).get('steps')
     if not steps:
         return None
     return {
         'cancelled': bool(report.get('cancelled')),
-        'steps': [{'step': e.get('step'), 'status': e.get('status'),
-                   'reason': e.get('reason')} for e in steps],
+        'steps': [{
+            'step': e.get('step'),
+            'status': e.get('status'),
+            'reason': e.get('reason'),
+            'counts': e.get('counts') if isinstance(e.get('counts'), dict) else {},
+            'blocked': e.get('blocked') if isinstance(e.get('blocked'), bool) else None,
+            'superseded_at': e.get('superseded_at'),
+        } for e in steps],
     }
 
 

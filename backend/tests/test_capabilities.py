@@ -768,6 +768,49 @@ def test_unanswered_cuda_probe_is_not_re_spawned_on_every_poll(app, monkeypatch)
         assert len(calls) == 1
 
 
+def test_joycaption_positive_cache_follows_the_receipt_and_lasts_one_hour(
+        app, monkeypatch):
+    """A ready JoyCaption verdict dies when the install receipt changes, and
+    within an hour even when the receipt cannot be told apart."""
+    from app import capabilities
+    calls = []
+    receipts = {'stamp': 'transformers:1'}
+    monkeypatch.setattr(capabilities, '_import_ok',
+                        lambda *a, **k: calls.append(1) or True)
+    monkeypatch.setattr(capabilities, '_joycaption_install_receipt',
+                        lambda python: receipts['stamp'])
+    with app.app_context():
+        capabilities._import_cache.clear()
+        assert capabilities._cached_import(
+            'joycaption', 'synthetic-python', 'import transformers') is True
+        assert len(calls) == 1
+        # Inside the hour, the same interpreter and the same receipt stay cached.
+        key = next(k for k in capabilities._import_cache if k.startswith('joycaption:'))
+        ts, ok = capabilities._import_cache[key]
+        capabilities._import_cache[key] = (ts - 660, ok)
+        assert capabilities._cached_import(
+            'joycaption', 'synthetic-python', 'import transformers') is True
+        assert len(calls) == 1
+        # A new install receipt is a new question, even inside that hour.
+        receipts['stamp'] = 'transformers:2'
+        assert capabilities._cached_import(
+            'joycaption', 'synthetic-python', 'import transformers') is True
+        assert len(calls) == 2
+        # A different interpreter is a different question.
+        assert capabilities._cached_import(
+            'joycaption', 'other-python', 'import transformers') is True
+        assert len(calls) == 3
+        # One hour is the backstop for the same path and the same receipt.
+        key = next(k for k in capabilities._import_cache
+                   if k.startswith('joycaption:synthetic-python|receipt=transformers:2'))
+        ts, ok = capabilities._import_cache[key]
+        capabilities._import_cache[key] = (ts - capabilities._POSITIVE_IMPORT_TTL - 1, ok)
+        assert capabilities._cached_import(
+            'joycaption', 'synthetic-python', 'import transformers') is True
+        assert len(calls) == 4
+    assert capabilities._POSITIVE_IMPORT_TTL == 3600
+
+
 def test_import_probe_cache_key_includes_interpreter_path(app, monkeypatch):
     """Changing interpreter path should invalidate the import cache."""
     with app.app_context():

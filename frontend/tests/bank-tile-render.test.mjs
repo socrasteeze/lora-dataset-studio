@@ -68,4 +68,5 @@ test('index.css gives Bank tile actions the Dataset tile\'s coarse-pointer rule'
   const block = css.match(/@media \(max-width: 1023px\), \(pointer: coarse\) \{\s*\.bank-tile__actions[\s\S]*?\n\}/)
   assert.ok(block, 'the coarse-pointer block for .bank-tile__actions is missing')
   assert.match(block[0], /\.bank-tile__action \{[^}]*min-height: 40px/)
+  assert.match(block[0], /\.bank-tile__actions \{[^}]*left:\s*2\.5rem/)
 })

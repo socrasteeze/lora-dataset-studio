@@ -224,6 +224,20 @@ test('a blocked or failed step outranks a caption that needs attention', () => {
   assert.match(pipelineBadge(v).label, /1 pass skipped/)
 })
 
+test('a list step carries the caption note and the blocked flag together', () => {
+  // The bank list used to send step, status and reason only. The card then
+  // invented "blocked" from the sentence and had no caption counts to read.
+  const v = pipelineReportVerdict(report([
+    { step: 'score', status: 'skipped', reason: 'training is running on the GPU',
+      blocked: true, counts: {}, superseded_at: null },
+    caption({ skipped: 2, failed: 1, joycaption: 40, first_choice: 'joycaption' }),
+  ]))
+  assert.equal(v.state, 'partial')
+  assert.equal(v.blocked, 1)
+  assert.equal(v.note, '3 not captioned')
+  assert.equal(v.attention, 1)
+})
+
 test('the queue line counts a bank that needs attention as a problem', () => {
   assert.match(queueOutcomeLine([{ state: 'ok' }, { state: 'attention' }]),
     /1 finished, 1 with problems/)

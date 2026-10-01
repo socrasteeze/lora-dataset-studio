@@ -47,12 +47,15 @@ _IMPORT_TTL = 600
 # such as the Bank caption step asks JoyCaption's readiness about three times per
 # bank, so with 600 s a queue of banks re-spawned the ai-toolkit venv's import of
 # transformers + bitsandbytes + accelerate once per bank. A working venv does not
-# stop working by itself, and the two ways it changes are already handled: a
-# different interpreter is a different cache key (the path is part of it), and an
-# install action or "↻ Check again" empties the cache (clear_import_cache). A
-# NEGATIVE verdict keeps the short TTL, so an install by hand is still seen soon.
-_POSITIVE_IMPORT_TTL = 24 * 3600
+# stop working by itself. Two changes drop the verdict immediately: a different
+# interpreter (the path is part of the cache key) and a changed install receipt
+# (the dist-info mtimes of the packages that probe imports, also part of the key).
+# An install action or "Check again" still empties the cache (clear_import_cache).
+# One hour is the backstop when a receipt cannot be read. A NEGATIVE verdict keeps
+# the short TTL, so an install by hand is still seen soon.
+_POSITIVE_IMPORT_TTL = 3600
 _LONG_POSITIVE_IMPORT_KEYS = frozenset(('joycaption',))
+_JOYCAPTION_RECEIPT_PACKAGES = ('transformers', 'bitsandbytes', 'accelerate')
 # How long an UNKNOWN verdict (the probe never answered) is remembered. Short,
 # because it must re-try soon against a warm import — but not zero: the Bank
 # panel polls its readiness every ~2 s, and an uncached unknown meant a fresh
@@ -199,6 +202,41 @@ def _import_ok(python, module_expr: str, timeout=_IMPORT_TIMEOUT):
         return False
 
 
+def _joycaption_install_receipt(python: str) -> str:
+    """Stamp of the packages a JoyCaption probe imports, or ``absent``.
+
+    The interpreter path is already a cache key. A pip install into that same
+    venv does not move the path, so a positive verdict would keep saying ready
+    after the packages changed. The dist-info mtimes are the install receipt.
+    A path that is not a real interpreter has no receipt; that stamp is stable
+    so a test double is not a new question on every call."""
+    exe = Path(str(python))
+    try:
+        if not exe.is_file():
+            return 'absent'
+    except OSError:
+        return 'absent'
+    root = exe.parent.parent if exe.parent.name.lower() in ('scripts', 'bin') else exe.parent
+    sites = [root / 'Lib' / 'site-packages']
+    lib = root / 'lib'
+    if lib.is_dir():
+        sites.extend(lib.glob('python*/site-packages'))
+    stamps = []
+    for site in sites:
+        if not site.is_dir():
+            continue
+        for name in _JOYCAPTION_RECEIPT_PACKAGES:
+            infos = sorted(site.glob(f'{name}-*.dist-info'))
+            if not infos:
+                stamps.append(f'{name}:absent')
+                continue
+            try:
+                stamps.append(f'{name}:{int(infos[-1].stat().st_mtime)}')
+            except OSError:
+                stamps.append(f'{name}:unread')
+    return '|'.join(stamps) if stamps else 'absent'
+
+
 def _cached_import_state(key: str, python: str, module_expr: str):
     """Three-valued, cached import probe: True / False / None.
 
@@ -211,6 +249,8 @@ def _cached_import_state(key: str, python: str, module_expr: str):
     for _IMPORT_TTL (a venv does not change between two probes), an unknown for
     _UNKNOWN_TTL so it re-tries soon against a now-warm import WITHOUT spawning
     a fresh 90 s subprocess on every 2 s poll of the Bank panel."""
+    if key in _LONG_POSITIVE_IMPORT_KEYS:
+        python = f'{python}|receipt={_joycaption_install_receipt(python)}'
     cache_key = f'{key}:{python}:{module_expr}'
 
     def fresh_cached():

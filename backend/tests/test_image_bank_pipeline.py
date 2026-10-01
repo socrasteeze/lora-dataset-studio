@@ -188,6 +188,43 @@ def test_pipeline_skips_step_with_reason_when_prereq_absent(client, tmp_path, mo
     assert 'caption' in [n for n, _ in log]
 
 
+def test_the_bank_list_keeps_counts_blocked_and_superseded(client, app, tmp_path):
+    """The list card reads the same three fields the workspace report stores.
+    Dropping them made a short caption look clean and made "blocked" a guess
+    from the reason sentence."""
+    import json
+    from app.extensions import db
+    from app.models import ImageBank
+
+    bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': _photo()})
+    stored = {
+        'cancelled': False,
+        'steps': [
+            {'step': 'caption', 'status': 'done', 'reason': None,
+             'counts': {'skipped': 2, 'failed': 1, 'joycaption': 40,
+                        'first_choice': 'joycaption'},
+             'blocked': False, 'superseded_at': None},
+            {'step': 'score', 'status': 'skipped',
+             'reason': 'training is running on the GPU',
+             'counts': {}, 'blocked': True, 'superseded_at': 99},
+        ],
+    }
+    with app.app_context():
+        bank = db.session.get(ImageBank, bank_id)
+        bank.pipeline_report = json.dumps(stored)
+        db.session.commit()
+    rows = client.get('/api/banks').get_json()['banks']
+    report = next(row['pipeline_report'] for row in rows if row['id'] == bank_id)
+    steps = {step['step']: step for step in report['steps']}
+    assert steps['caption']['counts']['skipped'] == 2
+    assert steps['caption']['counts']['failed'] == 1
+    assert steps['caption']['blocked'] is False
+    assert steps['caption']['superseded_at'] is None
+    assert steps['score']['blocked'] is True
+    assert steps['score']['superseded_at'] == 99
+    assert steps['score']['counts'] == {}
+
+
 def test_pipeline_skips_gpu_step_when_gpu_busy(client, tmp_path, monkeypatch):
     from app.services import image_bank_service as svc
     log = []
