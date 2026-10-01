@@ -268,8 +268,9 @@ def _reset_inmemory_registries():
     clip_text_encoder.forget_memory_cache()
     clip_text_encoder.release()
 
-# Fork-carried: upstream V2 dropped this fixture together with
-# test_config_isolation.py. Keep it through syncs; that test pins it.
+# Fork-only: upstream never had this fixture or test_config_isolation.py.
+# Merge 891d61e33 dropped it by taking upstream's conftest. Keep it through
+# syncs; test_config_isolation.py pins it (FORK_NOTES.md Divergence 5).
 @pytest.fixture(autouse=True)
 def _isolate_user_state(tmp_path, monkeypatch):
     """Point EVERY test at throwaway user state — never the real one on this
