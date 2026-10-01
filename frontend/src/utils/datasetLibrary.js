@@ -32,13 +32,16 @@ export function normalizePageSize(value) {
   return LIBRARY_PAGE_SIZES.includes(n) ? n : LIBRARY_PAGE_SIZES[0];
 }
 
-/** Page 1 when the search, kind chip, or tile size changed. Otherwise the
- *  page the caller already has. */
+/** Page 1 when the search, kind chip, tile size, sort, or filter changed.
+ *  Otherwise the page the caller already has. A key the caller does not pass
+ *  is undefined on both sides and does not reset the page. */
 export function libraryPageFor(page, next, prev) {
   if (!prev
     || next.query !== prev.query
     || next.kindFilter !== prev.kindFilter
-    || next.tileSize !== prev.tileSize) {
+    || next.tileSize !== prev.tileSize
+    || next.sort !== prev.sort
+    || next.filter !== prev.filter) {
     return 1;
   }
   const n = Number(page);

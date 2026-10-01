@@ -191,33 +191,55 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
 
 /** A path text field with a Browse button. The field stays editable (pasting a
  * path still works); Browse opens the in-app folder browser on the machine
- * running the app. Reused by the Image bank, the video bank, and Move folder. */
+ * running the app. Reused by the Image bank, the video bank, and Move folder.
+ * `inline` puts the field and Browse on the parent's row instead of a nested box. */
 export default function FolderPickerField({
-  id, label, value, onChange, placeholder, required, hint,
+  id, label, value, onChange, placeholder, required, hint, size = 'md', inline = false,
 }) {
   const [browsing, setBrowsing] = useState(false)
-
+  const field = (
+    <Input id={id} size={size} value={value} onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder} required={required}
+      className="w-full min-w-0 grow font-mono" />
+  )
+  const browse = (
+    <Button size={size} noShrink onClick={() => setBrowsing(true)}>
+      <FolderOpen aria-hidden="true" className="h-4 w-4" /> Browse</Button>
+  )
+  const modal = browsing && (
+    /* This host only writes the path into the field above — nothing can
+       refuse it — but it says {ok:true} out loud rather than returning
+       nothing: the browser treats silence as "no answer", on purpose. */
+    <FolderBrowserModal initial={value || null}
+      onPick={(p) => { onChange(p); return { ok: true } }}
+      onClose={() => setBrowsing(false)} />
+  )
+  if (inline) {
+    return (
+      <>
+        <div className="min-w-64 grow-[3]">
+          {label && (
+            <label htmlFor={id} className="mb-1 block text-sm font-medium text-content">{label}</label>
+          )}
+          {field}
+        </div>
+        {browse}
+        {hint && <p className="mt-1 basis-full text-xs text-content-muted">{hint}</p>}
+        {modal}
+      </>
+    )
+  }
   return (
     <div>
       {label && (
         <label htmlFor={id} className="block text-sm font-medium text-content">{label}</label>
       )}
       <div className="mt-1 flex items-stretch gap-2">
-        <Input id={id} value={value} onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder} required={required}
-          className="w-full min-w-0 grow font-mono" />
-        <Button noShrink onClick={() => setBrowsing(true)}>
-          <FolderOpen aria-hidden="true" className="h-4 w-4" /> Browse</Button>
+        {field}
+        {browse}
       </div>
       {hint && <p className="mt-1 text-xs text-content-muted">{hint}</p>}
-      {browsing && (
-        /* This host only writes the path into the field above — nothing can
-           refuse it — but it says {ok:true} out loud rather than returning
-           nothing: the browser treats silence as "no answer", on purpose. */
-        <FolderBrowserModal initial={value || null}
-          onPick={(p) => { onChange(p); return { ok: true } }}
-          onClose={() => setBrowsing(false)} />
-      )}
+      {modal}
     </div>
   )
 }

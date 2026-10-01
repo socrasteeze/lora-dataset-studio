@@ -38,7 +38,11 @@ test('the list renders group rows instead of a flat bank list', () => {
   // Group first and a filtered-down pair would keep rendering as a group whose
   // member list no longer matches what is on screen.
   assert.match(page, /const visibleBanks = sortBanks\(banks \|\| \[\], sort\)\.filter\(/)
-  assert.match(page, /groupRows\(visibleBanks\)/)
+  assert.match(page, /paginate\(visibleBanks/)
+  assert.match(page, /groupRows\(paged\.items\)/)
+  assert.match(page, /selectVisibleBanks\(prev, paged\.items\)/)
+  assert.match(page, /selectVisibleBanks\(prev, visibleBanks\)/)
+  assert.match(page, /bankListPageSize/)
   assert.match(page, /row\.kind === 'group'/)
   assert.match(page, /<BankGroupCard/)
 })

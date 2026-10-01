@@ -69,7 +69,9 @@ test('an unknown size or variant fails loudly instead of rendering "undefined"',
   assert.throws(() => controlHeight('xl'), /unknown size "xl"/)
   assert.throws(() => btnClass({ variant: 'primray' }), /unknown variant "primray"/)
   assert.throws(() => btnShape({ size: 'xs' }), /unknown size/)
-  assert.throws(() => fieldClass({ size: 'lg' }), /unknown field size "lg"/)
+  assert.throws(() => fieldClass({ size: 'xl' }), /unknown field size "xl"/)
+  has(fieldClass({ size: 'lg' }), 'lg:h-9')
+  has(fieldClass({ size: 'lg' }), 'text-sm')
 })
 
 test('no output contains a stray "undefined" or doubled space', () => {
@@ -79,7 +81,9 @@ test('no output contains a stray "undefined" or doubled space', () => {
       assert.doesNotMatch(s, /undefined|\s{2}/)
     }
   }
-  assert.doesNotMatch(fieldClass({ size: 'sm' }), /undefined|\s{2}/)
+  for (const size of ['sm', 'md', 'lg']) {
+    assert.doesNotMatch(fieldClass({ size }), /undefined|\s{2}/)
+  }
 })
 
 test('Button, Input, Select and Chip render the shared classes', async () => {

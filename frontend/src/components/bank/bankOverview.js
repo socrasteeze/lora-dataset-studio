@@ -58,6 +58,19 @@ export function bankListOverview(bank) {
   }
 }
 
+/** One card line: Kept, Undecided, Rejected, and Quality as scanned/total. */
+export function bankListSummaryLine(bank) {
+  const summary = bankListOverview(bank)
+  if (!(summary.total > 0)) {
+    return summary.total === 0 ? 'No images.' : 'Curation totals unavailable.'
+  }
+  const quality = summary.scanned != null
+    ? `${summary.scanned}/${summary.total}`
+    : summary.scanText
+  const counts = summary.status.map((row) => `${row.label} ${row.value ?? '—'}`).join(' · ')
+  return `${counts} · Quality ${quality}`
+}
+
 export function widthPercent(value, total) {
   if (!(total > 0) || value == null) return null
   return Math.max(0, Math.min(100, (100 * value) / total))

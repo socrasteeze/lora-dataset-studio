@@ -381,6 +381,7 @@ const TOPICS = [
     '/bank', 'using-the-app', 'the-image-bank-triage-a-big-folder'),
   action('bank-bulk-manage', 'Manage Banks Together',
     ['bulk edit', 'bulk delete', 'mass edit', 'mass delete', 'select banks',
+      'select visible', 'select all matching', 'bank page', 'banks per page',
       'rename banks', 'prefix', 'suffix', 'find replace', 'keep separate'],
     '/bank', 'using-the-app', 'manage-several-banks'),
   action('bank-launch-queue', 'Launch-all queue',

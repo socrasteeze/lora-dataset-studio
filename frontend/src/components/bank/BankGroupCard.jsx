@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { btnShape } from '../common/Controls.jsx'
+import { bankListSummaryLine } from './bankOverview.js'
 import { groupLabel, groupOverlapNote } from './bankGroups'
 import { pipelineBadge, pipelineReportVerdict } from './pipelineVerdict'
 
@@ -35,11 +37,7 @@ export default function BankGroupCard({
         )}
       </div>
       <p className="text-xs text-content-subtle">{groupLabel(row.members.length - 1)}</p>
-      <p className="text-xs text-content-muted">
-        {row.total} image(s) · {row.scanned} scanned ·{' '}
-        <span className="text-emerald-300">{row.keep} kept</span> ·{' '}
-        <span className="text-rose-300">{row.reject} rejected</span>
-      </p>
+      <p className="text-2xs text-content-muted">{bankListSummaryLine(row)}</p>
       {/* Counters are summed from the member rows, so overlapping folders make
           them add the same image twice. Said out loud rather than hidden: a
           number that is quietly wrong is worse than one that is explained. */}
@@ -48,17 +46,17 @@ export default function BankGroupCard({
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => onQueue?.(row)}
           title="Queue every bank in this group — one entry each, and only ever one of them running at a time"
-          className="rounded-md border border-indigo-400/50 px-3 py-1 text-xs font-semibold text-indigo-200 hover:bg-indigo-500/10">
+          className={`${btnShape({ size: 'sm' })} border border-indigo-400/50 font-semibold text-indigo-200 hover:bg-indigo-500/10`}>
           ⏳ Queue the group
         </button>
         <button type="button" onClick={() => onPromote?.(row)} disabled={row.keep === 0}
           title="Promote every kept image in this group into one dataset"
-          className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-content-muted hover:text-content hover:bg-surface-raised disabled:opacity-50">
+          className={`${btnShape({ size: 'sm' })} border border-border font-semibold text-content-muted hover:text-content hover:bg-surface-raised`}>
           ⬆ Promote the group
         </button>
         <button type="button" onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="ml-auto rounded-md border border-border px-2 py-1 text-xs text-content-muted hover:text-content hover:bg-surface-raised">
+          className={`${btnShape({ size: 'sm' })} ml-auto border border-border text-content-muted hover:text-content hover:bg-surface-raised`}>
           {open ? '▾' : '▸'} {row.members.length} banks
         </button>
       </div>
@@ -96,7 +94,7 @@ export default function BankGroupCard({
                 )}
                 <div className="flex flex-wrap items-center gap-2">
                   <button type="button" onClick={() => onOpen?.(m.id)}
-                    className="rounded border border-border px-2 py-0.5 text-2xs font-semibold text-content hover:bg-surface-raised">
+                    className={`${btnShape({ size: 'sm' })} border border-border font-semibold text-content hover:bg-surface-raised`}>
                     Open →
                   </button>
                   <label className="flex items-center gap-1 text-2xs text-content-muted">

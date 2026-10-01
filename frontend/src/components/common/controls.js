@@ -39,6 +39,7 @@ const BTN_VARIANT = {
 const FIELD_SIZE = {
   sm: 'px-2 py-0 text-xs',
   md: 'px-2 py-0 text-sm',
+  lg: 'px-3 py-0 text-sm',
 }
 
 const FIELD_LOOK = 'rounded-md border border-border bg-surface text-content disabled:opacity-50'
@@ -68,8 +69,10 @@ export function btnClass({ variant = 'secondary', size = 'md', noShrink = false 
   return `${btnShape({ size, noShrink })} ${pick(BTN_VARIANT, variant, 'variant')}`
 }
 
-/** A single-line input or select at a control height: md by default, sm in a
- *  dense row. A button beside it takes the same size. */
+/** A single-line input or select. sm is a dense row, md the default, lg the
+ *  main form row (the same 36 px desktop height as a large button). A button
+ *  beside the field takes the same size. */
 export function fieldClass({ size = 'md' } = {}) {
-  return `${controlHeight(size)} ${pick(FIELD_SIZE, size, 'field size')} ${FIELD_LOOK}`
+  const padding = pick(FIELD_SIZE, size, 'field size')
+  return `${controlHeight(size)} ${padding} ${FIELD_LOOK}`
 }

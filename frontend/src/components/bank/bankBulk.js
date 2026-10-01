@@ -4,6 +4,22 @@ export function bankSelectionKey(bank) {
   return `${Number(bank?.id)}:${String(bank?.instance_id || '')}`
 }
 
+/** One status sentence for the bulk bar. Hidden-by-filter names selected banks
+ *  the current search does not show. When the matching list is longer than the
+ *  batch limit, the same sentence says Select all cannot take the rest. */
+export function bulkSelectionNote({
+  selectedCount = 0,
+  hiddenSelectedCount = 0,
+  matchingCount = 0,
+  limit = BANK_BULK_LIMIT,
+} = {}) {
+  const parts = [`${selectedCount} selected`]
+  if (hiddenSelectedCount > 0) parts.push(`${hiddenSelectedCount} hidden by the filter`)
+  const leftOut = Math.max(0, Number(matchingCount) - limit)
+  if (leftOut > 0) parts.push(`${leftOut} matching not selected (limit ${limit})`)
+  return parts.join(', ')
+}
+
 export function selectVisibleBanks(selected, visibleBanks, limit = BANK_BULK_LIMIT) {
   const next = new Set(selected)
   for (const bank of visibleBanks) {

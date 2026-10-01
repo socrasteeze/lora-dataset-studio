@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  BANK_BULK_LIMIT, bankSelectionKey, buildBulkEditItems, selectVisibleBanks,
-  successfulBulkKeys, transformBankName,
+  BANK_BULK_LIMIT, bankSelectionKey, buildBulkEditItems, bulkSelectionNote,
+  selectVisibleBanks, successfulBulkKeys, transformBankName,
 } from './bankBulk.js'
 
 test('selection uses the bank instance and respects the hard limit', () => {
@@ -16,6 +16,21 @@ test('select visible adds rows without broadening to hidden rows', () => {
   const selected = new Set(['9:old'])
   const next = selectVisibleBanks(selected, [{ id: 1, instance_id: 'one' }])
   assert.deepEqual([...next], ['9:old', '1:one'])
+})
+
+test('select visible stops at the rows it is given', () => {
+  const page = [{ id: 1, instance_id: 'a' }, { id: 2, instance_id: 'b' }]
+  const selected = selectVisibleBanks(new Set(), page)
+  assert.deepEqual([...selected], ['1:a', '2:b'])
+})
+
+test('the selection note names a hidden filter and a limit that leaves matches out', () => {
+  assert.equal(bulkSelectionNote({
+    selectedCount: 500, hiddenSelectedCount: 2, matchingCount: 530,
+  }), '500 selected, 2 hidden by the filter, 30 matching not selected (limit 500)')
+  assert.equal(bulkSelectionNote({
+    selectedCount: 3, hiddenSelectedCount: 0, matchingCount: 10,
+  }), '3 selected')
 })
 
 test('name transformations are literal and ordered', () => {
