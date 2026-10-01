@@ -2,7 +2,7 @@
 
 ## Current: integrate/2026-10-01 (2026-10-01)
 - PLAN.md is the execution plan for what follows (detach, prune, UI consistency). It supersedes PLAN_BRIEF.md, which is deleted. Wave 0 of the plan is landing this branch.
-- Agent-rules audit applied in `ca7364a51`: `.claude/rules/release-mechanics.md` now states the real CI trigger and the warn-only release dist check; AGENTS.md no longer names a Codex cloud task.
+- Agent-rules audit applied in `7e9f69f73`: `.claude/rules/release-mechanics.md` now states the real CI trigger and the warn-only release dist check; AGENTS.md no longer names a Codex cloud task.
 - Branch `integrate/2026-10-01`, pushed to origin. Main is still `f3815e82e`; it was NOT fast-forwarded because the gates failed.
 - Merged (no-ff) onto main `f3815e82e`: `fix/config-isolation` (restored autouse `_isolate_user_state`, FORK_NOTES D5), `noble/bank-queue-stop` (queued Bank runs can be stopped while active), `fix/settings-copy-restore` (Klein pin wording, usage-statistics entry withdrawn, Pick a balanced set opens Curate). Bundle `f3d66ad2c`.
 - Review fix `e14ed5585`: `captionStepNote` returns null for a step with `superseded_at`, so a standalone Caption re-run clears "N not captioned" and "needs attention". Test in `pipelineVerdict.test.js`. Bundle `21db95291`.
