@@ -262,7 +262,9 @@ def _isolate_user_state(tmp_path, monkeypatch):
     """Point EVERY test at throwaway user state — never the real one on this
     machine. Covers the three roots the app resolves from the environment:
     ``LDS_CONFIG`` (config.json), ``LDS_DATA_DIR`` (data/: studio.db, banks,
-    thumbnails, logs, the provisioned envs) and ``LDS_ENV`` (.env secrets).
+    thumbnails, logs, the provisioned envs), ``LDS_ENV`` (.env secrets),
+    ``LDS_PLUGINS_DIR`` and ``LDS_EXTENSIONS_DIR``. It does not set
+    ``LDS_PLUGIN_DISTRIBUTION`` or ``LDS_BUNDLED_DIR``.
 
     The `app` fixture already did all this — but only for tests that take it. A
     test calling a helper directly (a pure wrapper/prompt function, a service
@@ -291,6 +293,8 @@ def _isolate_user_state(tmp_path, monkeypatch):
     monkeypatch.setenv('LDS_CONFIG', str(tmp_path / 'isolated-config.json'))
     monkeypatch.setenv('LDS_DATA_DIR', str(tmp_path / 'isolated-data'))
     monkeypatch.setenv('LDS_ENV', str(tmp_path / 'isolated.env'))
+    monkeypatch.setenv('LDS_PLUGINS_DIR', str(tmp_path / 'isolated-plugins'))
+    monkeypatch.setenv('LDS_EXTENSIONS_DIR', str(tmp_path / 'isolated-extensions'))
     monkeypatch.setattr(_cfg, 'ENV_PATH', tmp_path / 'isolated.env')
     monkeypatch.setattr(_cfg, '_cache', None)
     yield

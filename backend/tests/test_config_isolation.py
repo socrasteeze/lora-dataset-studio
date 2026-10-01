@@ -15,6 +15,7 @@ that contract, so it can't silently regress.
 """
 import json
 import os
+from pathlib import Path
 
 import app.config as cfg
 
@@ -25,8 +26,7 @@ def test_every_test_reads_an_isolated_config(tmp_path):
     path = cfg._config_path()
     assert path != cfg.REPO_ROOT / 'config.json'
     assert str(tmp_path) not in str(cfg.REPO_ROOT)      # sanity: tmp is elsewhere
-    if path.exists():
-        assert cfg.REPO_ROOT not in path.parents
+    assert not path.exists()
 
 
 def test_the_data_dir_is_isolated_and_never_the_repo_one():
@@ -40,6 +40,38 @@ def test_the_data_dir_is_isolated_and_never_the_repo_one():
     created = cfg.data_dir()                            # the side effect itself
     assert created.is_dir()
     assert real not in created.parents
+
+
+def test_the_plugin_dir_is_isolated_and_never_the_repo_one():
+    """Installed plugins must not share one directory across xdist workers."""
+    from app.plugins.loader import external_dir
+    resolved = external_dir()
+    assert resolved == Path(os.environ['LDS_PLUGINS_DIR'])
+    assert cfg.REPO_ROOT not in resolved.parents
+    assert resolved != cfg.REPO_ROOT / 'data' / 'plugins'
+
+
+def test_the_extensions_dir_is_isolated_and_never_the_repo_one():
+    """Legacy extensions must not load from the checkout's backend/extensions."""
+    from app.extension_loader import _extensions_dir
+    from app.plugins.legacy import legacy_dir
+    resolved = legacy_dir()
+    assert resolved == Path(os.environ['LDS_EXTENSIONS_DIR'])
+    assert _extensions_dir() == os.environ['LDS_EXTENSIONS_DIR']
+    assert cfg.REPO_ROOT not in resolved.parents
+    assert resolved != cfg.REPO_ROOT / 'backend' / 'extensions'
+
+
+def test_a_fork_marker_still_loads_the_real_bundled_tree():
+    """Isolation redirects installed plugins and extensions only. A fork build
+    marker still discovers curated plugins from the repository bundled tree.
+    A missing marker fails closed instead of discovering nothing."""
+    assert 'LDS_PLUGIN_DISTRIBUTION' not in os.environ
+    assert 'LDS_BUNDLED_DIR' not in os.environ
+    from app.plugins.fork_profile import distribution
+    from app.plugins.loader import bundled_dir
+    assert distribution() == 'fork'
+    assert bundled_dir() == cfg.REPO_ROOT / 'bundled'
 
 
 def test_the_env_file_is_isolated_and_never_the_repo_one():

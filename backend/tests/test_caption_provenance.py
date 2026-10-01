@@ -384,6 +384,7 @@ def test_the_migration_lands_on_an_existing_database_and_old_rows_stay_null(
     con.commit()
     con.close()
 
+    # Plugin and extension dirs come from the autouse _isolate_user_state fixture.
     from app import create_app
     monkeypatch.setenv('LDS_TESTING', '1')
     application = create_app({

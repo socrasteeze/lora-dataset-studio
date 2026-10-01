@@ -46,6 +46,7 @@ def test_startup_cleans_only_legacy_orphaned_studio_rows(tmp_path, monkeypatch):
     from app import config as cfg
     monkeypatch.setattr(cfg, 'ENV_PATH', tmp_path / '.env')
     monkeypatch.setattr(cfg, '_cache', None)
+    # Plugin and extension dirs come from the autouse _isolate_user_state fixture.
     from app import create_app
     from app.extensions import db
     from app.models import FaceDataset
@@ -95,6 +96,7 @@ def test_startup_cleans_only_legacy_orphaned_studio_rows(tmp_path, monkeypatch):
     finally:
         connection.close()
 
+    # Plugin and extension dirs come from the autouse _isolate_user_state fixture.
     application = create_app({
         'TESTING': True,
         'WTF_CSRF_ENABLED': False,

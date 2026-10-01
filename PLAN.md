@@ -366,6 +366,9 @@ an admin token; gates green; probe at `#/plugins` clean.
 
 ## Wave 5 — test isolation and speed (sequential after 2-4)
 
+**Status (2026-10-01).** Isolation is implemented on `wave/5-isolation`. Not landed.
+Local `-n 8` times are in HANDOFF.md. Full Gates durations are not recorded.
+
 **Isolation.**
 - `backend/tests/conftest.py::_isolate_user_state` (278-315): also set
   `LDS_PLUGINS_DIR=<tmp>/isolated-plugins` and `LDS_EXTENSIONS_DIR=<tmp>/isolated-extensions`.
