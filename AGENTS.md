@@ -29,7 +29,7 @@ an editor does not load them automatically:
 - Frontend changes: [.claude/rules/frontend-contracts.md](.claude/rules/frontend-contracts.md).
 - README and guide changes: [.claude/rules/readme-and-docs.md](.claude/rules/readme-and-docs.md).
 - Release tooling: [.claude/rules/release-mechanics.md](.claude/rules/release-mechanics.md).
-- Upstream synchronization: [docs/UPSTREAM_SYNC.md](docs/UPSTREAM_SYNC.md), then the relevant FORK_NOTES.md sections.
+- Fork rules: [FORK_NOTES.md](FORK_NOTES.md).
 
 CLAUDE.md points here for compatibility. Maintain shared guidance here rather
 than creating a second policy for another agent.
@@ -100,7 +100,7 @@ than creating a second policy for another agent.
 ## Validation
 
 Use the repository's pinned `.venv` and the Node version required by the current
-manifests and sync driver. Historical test counts are not a current baseline.
+manifests and `scripts/gates.ps1`. Historical test counts are not a current baseline.
 
 - Run tests in a separate cloud task by default. Do not start or rerun
   tests, responsive probes, fixture-backed checks, or the test-bearing
@@ -120,7 +120,7 @@ manifests and sync driver. Historical test counts are not a current baseline.
 - Targeted frontend tests: from `frontend`, run `node --import
   ./scripts/registerSdk.mjs --test <file>`. Bare discovery omits the SDK setup.
 - Before committing, run relevant tests, privacy and contract checks, and `npm test`.
-- Before a landing push, run `scripts/upstream_sync.ps1 -Phase Gates`. It includes
+- Before a landing push, run `scripts/gates.ps1 -Phase Gates`. It includes
   the full host/tooling suite, isolated bundled Python tests, frontend tests and
   required checks. The host suite uses eight workers with `--dist loadfile`.
 - Run both linters: `.venv/Scripts/python.exe -m ruff check .` and, from
@@ -146,7 +146,7 @@ manifests and sync driver. Historical test counts are not a current baseline.
   data before committing or pushing a task branch for cloud validation. Run the
   repository gates in a cloud task before landing on main. Never publish main on
   the strength of source inspection alone.
-- `upstream` is read-only. No upstream push or PR is implied by implementation or sync.
+- `upstream` stays a read-only remote for an occasional cherry-pick.
 - Rebuild `frontend/dist` after frontend changes. The app serves it directly.
   When committing, keep source and the consolidated `build(frontend):` bundle
   in separate commits within the same delivery.
@@ -158,13 +158,3 @@ manifests and sync driver. Historical test counts are not a current baseline.
 - Release only validated waves, using the release workflow. Do not tag per repair.
 - Record unfinished work and measured evidence in HANDOFF.md. Do not present an
   external or physical-device gate as completed local verification.
-
-## Explicit upstream contributions
-
-If the user separately requests an upstream contribution, read upstream's
-CONTRIBUTING.md and PR template. Use an isolated checkout based on the intended
-upstream branch and apply the focused change there. Do not copy the fork's full
-files or divergence into that branch. Test against the upstream baseline and
-include the bundle if upstream requires it. Preserve the user's configured
-author identity unless the user explicitly requests another identity. GitHub
-writes and PR creation require authorization covering those actions.
