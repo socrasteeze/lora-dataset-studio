@@ -11,7 +11,7 @@ picks it up automatically (backend/ is copied verbatim into the archive).
 # a bare letter suffix is not a valid version. '+fork' parses, satisfies the
 # same specifiers, and still sorts ABOVE upstream's plain version. The updater's
 # plain string comparison below is unaffected.
-APP_VERSION = '2026.09.26+fork'
+APP_VERSION = '2026.10.01+fork'
 # Release tooling reads this marker from the tagged tree. Adopted from V2:
 # .github/workflows/release.yml greps for it and a missing marker breaks a tag.
 # The VERSION above stays the fork's own -- upstream's release identity
