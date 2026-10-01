@@ -112,7 +112,8 @@ def test_tracked_local_engine_is_not_a_regression_while_comfyui_is_down(app, mon
     real failure with ComfyUI up still does."""
     from types import SimpleNamespace
     from app.engines import registry
-    spec = SimpleNamespace(id='forge', kind='local', tracked_capability='Forge')
+    spec = SimpleNamespace(id='forge', kind='local', tracked_capability='Forge',
+                           counts_as_recommended=False)
     monkeypatch.setattr(registry, 'all_specs', lambda: (spec,))
     monkeypatch.setattr(registry, 'tracked', lambda: (('engines.forge', 'Forge'),))
     setup_state.observe(_caps(engines={'forge': True}))
