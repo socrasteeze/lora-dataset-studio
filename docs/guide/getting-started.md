@@ -139,9 +139,8 @@ later visits return to the application.
 
 Choose an optional goal when you need more: captioning prepares the shared
 vision tools; local generation prepares ComfyUI and its selected models;
-**Plugins** opens one list for browsing and managing plugins, with **All**,
-**Installed** and **Updates** filters. Nothing is downloaded by choosing a goal
-or visiting a plugin page.
+**Plugins** opens the features that ship with this install. Nothing is downloaded
+by choosing a goal or visiting a plugin page.
 
 **Plugins** lists the features that ship with this install. Each card offers
 **Settings**, and **Turn on** or **Turn off**. **More actions** contains

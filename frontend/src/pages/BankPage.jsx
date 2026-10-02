@@ -9,7 +9,7 @@ import LaunchAllDialog from '../components/bank/LaunchAllDialog'
 import FolderPickerField from '../components/common/FolderPicker'
 import { Button, Input, Select, btnClass } from '../components/common/Controls.jsx'
 import Pagination from '../components/common/Pagination.jsx'
-import { libraryPageFor, normalizePageSize, paginate } from '../utils/datasetLibrary.js'
+import { libraryPageFor, normalizePageSize } from '../utils/datasetLibrary.js'
 import GpuBusyNotice from '../components/common/GpuBusyNotice'
 import { hiddenCount, previewSlots } from '../components/bank/bankPreview'
 import { bankListSyncToast } from '../components/bank/bankSync'
@@ -21,7 +21,7 @@ import BankQueuePanel from '../components/bank/BankQueuePanel'
 import { clearWaitingConfirm, removeQueuedConfirm, runningItems, stopRunningConfirm } from '../components/bank/bankQueueActions.js'
 import { coverageBadges, coverageSummary } from '../components/bank/bankPassCoverage'
 import { pipelineBadge, pipelineReportVerdict, queueOutcomeLine } from '../components/bank/pipelineVerdict'
-import { groupRows } from '../components/bank/bankGroups'
+import { composeBankList } from '../components/bank/bankListCompose.js'
 import BankGroupCard from '../components/bank/BankGroupCard'
 import BankGroupPromoteDialog from '../components/bank/BankGroupPromoteDialog'
 import { datasetFolderNotice } from '../utils/pathRelation'
@@ -371,16 +371,21 @@ export default function BankPage() {
   // would be a lie about what pressing it does.
   const queueAllCount = queueAllCandidates(banks, queue).length
 
-  // Sort first, then filter, then group — grouping LAST so a filtered pair
-  // still forms its group, and a group filtered down to one member correctly
-  // dissolves into a loose row (bankGroups needs 2+).
+  // Sort, then filter, then group the full filtered list, then page the display
+  // rows. A page slice before grouping would sum only the banks on that page.
+  // A name the search leaves as one bank stays a loose row. Selection mode
+  // pages the raw filtered banks instead, so Select Visible stays per bank.
   const visibleBanks = sortBanks(banks || [], sort).filter((b) => bankMatches(b, query))
   const viewPage = libraryPageFor(page, { query, sort }, appliedList)
   if (viewPage !== page || appliedList.query !== query || appliedList.sort !== sort) {
     setAppliedList({ query, sort })
     if (viewPage !== page) setPage(viewPage)
   }
-  const paged = paginate(visibleBanks, viewPage, pageSize)
+  const { paged, rows: listRows } = composeBankList(visibleBanks, {
+    selecting: selectingBanks,
+    page: viewPage,
+    pageSize,
+  })
   const selectedBankRows = (banks || []).filter((bank) => selectedBanks.has(bankSelectionKey(bank)))
   const visibleSelectedCount = visibleBanks.filter((bank) => selectedBanks.has(bankSelectionKey(bank))).length
   const hiddenSelectedCount = selectedBankRows.length - visibleSelectedCount
@@ -843,7 +848,7 @@ export default function BankPage() {
               combined counts, one queue action and one promote. A member can opt
               out ("Keep separate"), which is a property of the BANK and survives
               a rename away and back. */}
-          {(selectingBanks ? paged.items.map((bank) => ({ kind: 'bank', key: `select-${bankSelectionKey(bank)}`, bank })) : groupRows(paged.items)).map((row) => {
+          {listRows.map((row) => {
             if (row.kind === 'group') {
               return (
                 <BankGroupCard key={row.key} row={row} queueStateOf={queueStateOf}

@@ -36,6 +36,36 @@ export function PluginAdminLock({ value, onChange, onUnlock, checking, rejected 
   )
 }
 
+export function PluginInstallConsent({ consent, busy = false, onInstall, onCancel }) {
+  const issues = (Array.isArray(consent?.compatibility_issues) ? consent.compatibility_issues : [])
+    .filter(issue => issue && typeof issue.message === 'string' && issue.message.trim())
+  const blocked = consent?.can_install !== true
+  return (
+    <Card title={`Install ${consent?.manifest?.name || 'plugin'}?`} id="plugins-consent">
+      <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[max-content_1fr]">
+        <dt className="text-content-muted">Id</dt><dd>{consent?.manifest?.id} · v{consent?.manifest?.version}</dd>
+        <dt className="text-content-muted">Author</dt><dd>{consent?.manifest?.author || '—'}</dd>
+        <dt className="text-content-muted">Description</dt><dd>{consent?.manifest?.description || '—'}</dd>
+        <dt className="text-content-muted">Installs to</dt><dd className="break-all">{consent?.install_dir}</dd>
+      </dl>
+      {issues.length > 0 && (
+        <ul className="mt-3 space-y-1 text-sm text-amber-500">
+          {issues.map((issue, index) => (
+            <li key={`${issue.code || 'issue'}-${index}`} role="alert">{issue.message}</li>
+          ))}
+        </ul>
+      )}
+      {blocked && issues.length === 0 && (
+        <p role="alert" className="mt-3 text-sm text-amber-500">This plugin cannot be installed in the current app configuration.</p>
+      )}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" className={BTN_PRIMARY} disabled={busy || blocked} onClick={onInstall}>Install</button>
+        <button type="button" className={BTN} disabled={busy} onClick={onCancel}>Cancel</button>
+      </div>
+    </Card>
+  )
+}
+
 export default function PluginsPage() {
   const [searchParams] = useSearchParams()
   const toast = useToast()
@@ -258,19 +288,8 @@ export default function PluginsPage() {
       )}
 
       {consent && (
-        <Card title={`Install ${consent.manifest.name}?`} id="plugins-consent">
-          <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[max-content_1fr]">
-            <dt className="text-content-muted">Id</dt><dd>{consent.manifest.id} · v{consent.manifest.version}</dd>
-            <dt className="text-content-muted">Author</dt><dd>{consent.manifest.author || '—'}</dd>
-            <dt className="text-content-muted">Description</dt><dd>{consent.manifest.description || '—'}</dd>
-            <dt className="text-content-muted">Installs to</dt><dd className="break-all">{consent.install_dir}</dd>
-          </dl>
-          {!consent.can_install && <p role="alert" className="mt-3 text-sm text-amber-500">This plugin cannot be installed in the current app configuration.</p>}
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" className={BTN_PRIMARY} disabled={busy || !consent.can_install} onClick={() => confirmInstall(false)}>Install</button>
-            <button type="button" className={BTN} disabled={busy} onClick={() => setConsent(null)}>Cancel</button>
-          </div>
-        </Card>
+        <PluginInstallConsent consent={consent} busy={busy}
+          onInstall={() => confirmInstall(false)} onCancel={() => setConsent(null)} />
       )}
     </div>
   )
