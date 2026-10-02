@@ -4,6 +4,7 @@ import {
   buildModelOptions, filterModelOptions, emptyScanMessage,
   PINNED_MISSING_BADGE, PINNED_MISSING_TITLE,
 } from '../../utils/modelFileOptions'
+import { fieldClass } from '../common/controls.js'
 
 /**
  * Fetch the model files on disk for ONE picker slot (GET
@@ -121,7 +122,7 @@ export default function ModelFilePicker({
                narrow, and a padding utility that no other component uses is one
                Tailwind may not have emitted — which renders as text running
                UNDER the badge, which is exactly what the 400 px capture caught. */
-            className="min-h-10 lg:min-h-0 mt-0 w-full rounded-md border border-border-strong bg-surface-raised px-3 py-2 pr-16 text-sm text-content placeholder:text-content-subtle focus:border-primary focus:outline-none"
+            className={`${fieldClass({ size: 'lg' })} mt-0 w-full border-border-strong bg-surface-raised pr-16 placeholder:text-content-subtle focus:border-primary focus:outline-none`}
           />
           {pinnedMissing && (
             <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">

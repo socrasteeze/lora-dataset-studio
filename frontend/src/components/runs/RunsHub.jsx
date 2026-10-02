@@ -22,6 +22,7 @@ import { runStagingCleanup } from '../../utils/stagingCleanup.js'
 import { StatusBadge, timeAgo, famLabel, cardAccent, RunThumb, PodKeptNote, FullArtifactStatus, AutoRetryBadges, RecipeWarning, settingsLine, checkpointHref } from './RunHistoryAtoms.jsx'
 import useRunsHubContinue from './useRunsHubContinue.js'
 import { studioRunTarget } from '../../utils/studioRunNavigation.js'
+import { controlHeight } from '../common/controls.js'
 export { StatusBadge, timeAgo, famLabel, FullArtifactStatus, AutoRetryBadges, RecipeWarning, checkpointHref } from './RunHistoryAtoms.jsx'
 
 const POLL_MS = 5000
@@ -417,7 +418,7 @@ const renderRunCard = (run, i) => {
                   : run.source === 'local'
                     ? 'Relaunch this run locally with the same settings'
                     : 'Relaunch this run with the same settings on a fresh pod'}
-                className="px-3 py-1.5 rounded-lg bg-primary/90 hover:bg-primary text-gray-950 text-xs font-semibold disabled:opacity-40">
+                className={`${controlHeight('sm')} rounded-lg bg-primary/90 px-3 py-0 text-xs font-semibold text-gray-950 hover:bg-primary disabled:opacity-40`}>
                 {retrying[runRetryKey(run)] ? '↻ Retrying' : '↻ Retry'}
               </button>
             )}
@@ -438,21 +439,21 @@ const renderRunCard = (run, i) => {
                     ? (denseContinueBlocker(run, hubPresence[run.run_id])
                       || "Resume this full model on a fresh pod — pick how its 26 GB gets there")
                     : "Resume from any of this run's checkpoints for more steps, on a fresh pod"}
-                className="px-3 py-1.5 rounded-lg bg-sky-600/80 hover:bg-sky-600 text-white text-xs font-semibold disabled:opacity-40">
+                className={`${controlHeight('sm')} rounded-lg bg-sky-600/80 px-3 py-0 text-xs font-semibold text-white hover:bg-sky-600 disabled:opacity-40`}>
                 {continuing[run.run_id] ? '▶ Continuing' : '▶ Continue'}
               </button>
             )}
             {!fullModel && run.checkpoint_ready && (
               <a href={checkpointHref(run)}
                 title="Download this run's LoRA checkpoint"
-                className="px-3 py-1.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-600 text-white text-xs font-semibold no-underline">
+                className={`${controlHeight('sm')} inline-flex items-center rounded-lg bg-emerald-600/80 px-3 py-0 text-xs font-semibold text-white no-underline hover:bg-emerald-600`}>
                 ⬇ LoRA
               </a>
             )}
             {!fullModel && run.dataset_id != null && (
               <button type="button" onClick={() => openTestStudio(run.dataset_id, run.train_type)}
                 title="Open Test Studio with this run's dataset selected"
-                className="rounded-lg border border-indigo-400/40 bg-indigo-500/10 px-2 py-1 text-indigo-100 hover:bg-indigo-500/20 text-xs font-semibold">
+                className={`${controlHeight('sm')} rounded-lg border border-indigo-400/40 bg-indigo-500/10 px-2 py-0 text-xs font-semibold text-indigo-100 hover:bg-indigo-500/20`}>
                 <FlaskConical aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Test in Studio
               </button>
             )}
@@ -465,7 +466,7 @@ const renderRunCard = (run, i) => {
                 title={run.lineage
                   ? "Show this run's lineage — the runs it continued from or that branched off it"
                   : "Show this run's checkpoints as a graph — import / generate / download / continue from any of them"}
-                className={'rounded-lg border px-2 py-1 text-xs font-semibold transition-colors '
+                className={`${controlHeight('sm')} rounded-lg border px-2 py-0 text-xs font-semibold transition-colors `
                   + (lineageOpen[run.record_id]
                     ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-100 '
                     : 'border-indigo-400/40 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20 ')}>
@@ -477,8 +478,8 @@ const renderRunCard = (run, i) => {
             {run.share_key && (
               <button type="button" onClick={() => shareConfig(run)}
                 title="Download this run's full settings as a paste-safe text file (recipe / help thread)"
-                className="ml-auto rounded-lg border border-transparent px-2 py-1 text-content-muted hover:border-border hover:text-content text-xs font-medium">
-                ⎘ Share config
+                className={`${controlHeight('sm')} ml-auto rounded-lg border border-transparent px-2 py-0 text-xs font-medium text-content-muted hover:border-border hover:text-content`}>
+                ⎘ Share Config
               </button>
             )}
             {/* Per-run cleanup, so a long history no longer forces the all-or-
@@ -489,7 +490,7 @@ const renderRunCard = (run, i) => {
               <button type="button" onClick={() => purgeRun(run)}
                 disabled={!!purgingRun[run.run_id]}
                 title={cleanup.title}
-                className={`rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-red-200 hover:bg-red-500/20 text-xs font-semibold disabled:opacity-40 ${run.share_key ? '' : 'ml-auto'}`}>
+                className={`${controlHeight('sm')} rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-0 text-xs font-semibold text-red-200 hover:bg-red-500/20 disabled:opacity-40 ${run.share_key ? '' : 'ml-auto'}`}>
                 <Eraser aria-hidden="true" className="mr-1 inline h-3 w-3 align-[-1px]" />{purgingRun[run.run_id] ? 'Cleaning' : `Clean ${cleanup.size}`}
               </button>
             )}
@@ -559,25 +560,25 @@ const renderRunCard = (run, i) => {
                 {canStopLocalRun(data.local_active) && (
                   <button type="button" onClick={stopLocal} disabled={stoppingLocal}
                     title="Stop this local training process; checkpoints already saved are kept"
-                    className="px-3 py-1 rounded-lg bg-red-600/80 text-white text-xs font-semibold disabled:opacity-40">
-                    {stoppingLocal ? 'Stopping' : 'Stop run'}
+                    className={`${controlHeight('sm')} rounded-lg bg-red-600/80 px-3 py-0 text-xs font-semibold text-white disabled:opacity-40`}>
+                    {stoppingLocal ? 'Stopping' : 'Stop Run'}
                   </button>
                 )}
                 {data.local_active.share_key && (
                   <button type="button" onClick={() => shareConfig(data.local_active)}
                     title="Download this run's full settings as a paste-safe text file (recipe / help thread)"
-                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content-muted hover:text-content text-xs font-semibold">
-                    ⎘ Share config
+                    className={`${controlHeight('sm')} rounded-lg border border-border bg-surface px-2 py-0 text-xs font-semibold text-content-muted hover:text-content`}>
+                    ⎘ Share Config
                   </button>
                 )}
                 <button type="button" onClick={() => openDataset(data.local_active.current.dataset_id)}
-                  className="px-2 py-1 rounded-lg text-content-muted hover:text-content text-xs">
-                  Open dataset ↗
+                  className={`${controlHeight('sm')} rounded-lg px-2 py-0 text-xs text-content-muted hover:text-content`}>
+                  Open Dataset ↗
                 </button>
                 {data.local_active.current.dataset_id != null && (
                   <button type="button" onClick={() => openTestStudio(data.local_active.current.dataset_id, data.local_active.current.train_type)}
                     title="Open Test Studio with this run's dataset selected"
-                    className="px-2 py-1 rounded-lg text-indigo-200 hover:bg-indigo-500/10 hover:text-indigo-100 text-xs font-semibold">
+                    className={`${controlHeight('sm')} rounded-lg px-2 py-0 text-xs font-semibold text-indigo-200 hover:bg-indigo-500/10 hover:text-indigo-100`}>
                     <FlaskConical aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Test in Studio
                   </button>
                 )}
@@ -646,13 +647,13 @@ const renderRunCard = (run, i) => {
                       <span className="whitespace-nowrap text-amber-300 text-2xs">⚠ kept pod billing</span>
                     )}
                     <button type="button" onClick={() => openDataset(group.datasetId)}
-                      className="ml-auto whitespace-nowrap rounded-lg px-2 py-0.5 text-content-muted hover:text-content text-2xs">
-                      Open dataset ↗
+                      className={`${controlHeight('sm')} ml-auto whitespace-nowrap rounded-lg px-2 py-0 text-xs text-content-muted hover:text-content`}>
+                      Open Dataset ↗
                     </button>
                     {testRun && group.datasetId != null && (
                       <button type="button" onClick={() => openTestStudio(group.datasetId, testRun.train_type)}
                         title="Open Test Studio with this run's dataset selected"
-                        className="whitespace-nowrap rounded-lg px-2 py-0.5 text-indigo-200 hover:bg-indigo-500/10 hover:text-indigo-100 text-2xs font-semibold">
+                        className={`${controlHeight('sm')} whitespace-nowrap rounded-lg px-2 py-0 text-xs font-semibold text-indigo-200 hover:bg-indigo-500/10 hover:text-indigo-100`}>
                         <FlaskConical aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Test in Studio
                       </button>
                     )}
@@ -669,8 +670,8 @@ const renderRunCard = (run, i) => {
               <button type="button"
                 onClick={() => setHistoryLimit((n) => Math.min(n + 25, 100))}
                 title="The list keeps only the most recent runs to stay light; load older ones on demand."
-                className="self-center mt-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-content-muted hover:text-content text-xs font-semibold">
-                Load older runs
+                className={`${controlHeight('sm')} mt-1 self-center rounded-lg border border-border bg-surface px-3 py-0 text-xs font-semibold text-content-muted hover:text-content`}>
+                Load Older Runs
               </button>
             )}
           </div>

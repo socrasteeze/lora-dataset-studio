@@ -46,8 +46,8 @@ test('the probe knows this page, and every state it opens has something to click
   // Each state's selector must name something this workspace really renders.
   assert.match(probe, /nav\[aria-label="Video dataset sections"\]/)
   assert.match(workspace, /aria-label="Video dataset sections"/)
-  assert.match(probe, /button:has-text\("Filter & sort"\)/)
-  assert.match(workspace, /🔎 Filter & sort/)
+  assert.match(probe, /button:has-text\("Filter & Sort"\)/)
+  assert.match(workspace, /🔎 Filter &amp; Sort/)
 })
 
 test('the clip toolbar folds away on a fold under 500 px, and comes back', () => {

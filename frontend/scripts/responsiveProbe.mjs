@@ -337,7 +337,7 @@ const PAGES = {
       // button. Measuring only the folded state would report a page that had
       // hidden its furniture rather than fitted it — this is where the search,
       // the sort and the three filter chips are really charged for.
-      { name: 'clip-tools', open: ['button:has-text("Filter & sort")'] },
+      { name: 'clip-tools', open: ['button:has-text("Filter & Sort")'] },
       // The two sections the image rail always had: a list of saves with
       // five verbs per row (deploy, undeploy, continue, details, delete) that
       // wraps on a phone, and the Studio launcher.

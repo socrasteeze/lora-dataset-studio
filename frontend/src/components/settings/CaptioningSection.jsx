@@ -214,7 +214,7 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
         help={`Who writes the captions. Auto prefers JoyCaption (via ai-toolkit) and falls back to the ${llmName} vision model.`}
       >
         <div>
-          <label htmlFor="captioning-backend" className="block text-sm font-medium text-content">Captioning backend</label>
+          <label htmlFor="captioning-backend" className="block text-sm font-medium text-content">Captioning Backend</label>
           <select
             id="captioning-backend"
             value={config.captioning.backend}
@@ -232,7 +232,7 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
         help="Where the WD14 tagger runs. GPU refuses to tag on the CPU: a tag pass stops with a reason instead of loading every core."
       >
         <div>
-          <label htmlFor="wd14-device" className="block text-sm font-medium text-content">Tagging device</label>
+          <label htmlFor="wd14-device" className="block text-sm font-medium text-content">Tagging Device</label>
           <select id="wd14-device" value={config.wd14?.device || defaultValueAt(configDefaults, 'wd14', 'device')}
             onChange={(e) => setField('wd14', 'device', e.target.value)} className={INPUT_CLASS}>
             <option value="auto">Auto (GPU when available, otherwise CPU)</option>
@@ -252,7 +252,7 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
         help="Choose where LaMa removes small off-center watermarks. Auto uses CUDA when the configured ML Python supports it and otherwise falls back to CPU."
       >
         <div>
-          <label htmlFor="watermark-device" className="block text-sm font-medium text-content">Processing device</label>
+          <label htmlFor="watermark-device" className="block text-sm font-medium text-content">Processing Device</label>
           <select id="watermark-device" value={config.watermark?.device || defaultValueAt(configDefaults, 'watermark', 'device')}
             onChange={(e) => setField('watermark', 'device', e.target.value)} className={INPUT_CLASS}>
             <option value="auto">Auto (GPU when available, otherwise CPU)</option>
@@ -268,7 +268,7 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
             onChange={(e) => setField('watermark', 'allow_crop', e.target.checked)}
             className="mt-0.5" />
           <span>
-            <span className="font-medium">Allow automatic crop</span>
+            <span className="font-medium">Automatic Crop</span>
             <span className="block text-xs text-content-muted">
               On: a watermark sitting in a border is cropped off (no invented pixels). Off:
               border marks are repainted instead (LaMa/Klein). You can still override this per

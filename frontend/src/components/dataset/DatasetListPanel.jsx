@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { familyBadge } from '../../utils/familyBadges';
-import { AlertTriangle, Camera, Dna, Download, Image as ImageIcon, LayoutGrid, Lightbulb, Palette, PenLine, PersonStanding, Plus, Save, Smile, Sparkles, Trash2, User, X } from 'lucide-react';
+import { AlertTriangle, Download, Image as ImageIcon, LayoutGrid, Lightbulb, Palette, PenLine, PersonStanding, Plus, Save, Smile, Trash2, User, X } from 'lucide-react';
 import { datasetThumbUrl } from '../../utils/datasetThumbUrl';
 import ShotIllustration from './ShotIllustration';
 import TileSizeControl from '../shared/TileSizeControl';
 import FullBackupControls from './FullBackupControls';
-import { Button, Chip, Input } from '../common/Controls.jsx';
+import { Button, Chip, Input, btnClass, btnShape, fieldClass } from '../common/Controls.jsx';
 import Pagination from '../common/Pagination.jsx';
 import { HelpBadge } from '../../help/HelpMode';
 import { canCreateDataset } from './newDataset';
@@ -36,38 +36,7 @@ function gradientFor(name = '') {
   return AVATAR_GRADIENTS[h % AVATAR_GRADIENTS.length];
 }
 
-/** The 3-step pipeline strip — what this page is for, at a glance. Only shown
- *  on an EMPTY library: returning users know the pipeline by heart. */
-function PipelineSteps() {
-  const steps = [
-    { n: 1, icon: Camera, title: 'Add Images', text: 'Import photos, use a Bank, or generate from a reference.' },
-    { n: 2, icon: Sparkles, title: 'Curate & Caption', text: 'Keep useful images and review their captions.' },
-    { n: 3, icon: Dna, title: 'Export or Train', text: 'Download a training ZIP or train on the host.' },
-  ];
-  return (
-    <ol className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-      {steps.map((s, i) => (
-        <li key={s.n} className="relative flex items-start gap-2.5 rounded-lg border border-border bg-app/40 p-2.5">
-          <span className="grid place-items-center w-8 h-8 shrink-0 rounded-full bg-primary/15 border border-primary/40 text-base"
-            aria-hidden="true"><s.icon className="h-4 w-4" /></span>
-          <span className="min-w-0">
-            <span className="block text-content text-xs font-semibold">
-              <span className="text-indigo-300 mr-1">{s.n}.</span>{s.title}
-            </span>
-            <span className="block text-content-subtle text-2xs leading-snug">{s.text}</span>
-          </span>
-          {i < steps.length - 1 && (
-            <span className="hidden sm:block absolute -right-2 top-1/2 -translate-y-1/2 text-content-subtle z-10"
-              aria-hidden="true">→</span>
-          )}
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-/** Empty state = the page's only "hero": what the app does, the 3-step strip,
- *  and a mini contact sheet of shot pictograms. */
+/** Empty state keeps one clear creation path and a compact shot contact sheet. */
 function EmptyState() {
   const shots = [
     { framing: 'face', label: '' },
@@ -78,14 +47,7 @@ function EmptyState() {
     { framing: 'back', label: '' },
   ];
   return (
-    <div className="mx-auto w-full max-w-4xl flex flex-col gap-3">
-      <div className="rounded-xl border border-border bg-gradient-to-br from-surface to-app/60 p-3 flex flex-col gap-2.5">
-        <p className="text-content-subtle text-xs">
-          Build a Character, Concept or Style dataset from existing photos or generated images.
-        </p>
-        <PipelineSteps />
-      </div>
-      <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-app/30 px-4 py-8 text-center">
+    <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-app/30 px-4 py-6 text-center">
         <div className="grid grid-cols-6 gap-1.5" aria-hidden="true">
           {shots.map((s, i) => (
             <ShotIllustration key={i} framing={s.framing} label={s.label}
@@ -93,11 +55,9 @@ function EmptyState() {
           ))}
         </div>
         <p className="text-content-muted text-sm font-medium">No datasets yet</p>
-        <p className="text-content-subtle text-xs max-w-xs">
-          Choose <span className="font-semibold text-content-muted">New Dataset</span>,
-          then import images or generate from a reference.
+        <p className="max-w-xs text-content-subtle text-xs">
+          Create a dataset, then import images or generate from a reference.
         </p>
-      </div>
     </div>
   );
 }
@@ -275,7 +235,7 @@ function NewDatasetForm({ onCreate, onClose }) {
   // it. Same behaviour, now tested.
   const canCreate = canCreateDataset({ name, trigger, kind, conceptDesc });
   return (
-    <div id="new-dataset-form" className="mx-auto w-full max-w-4xl rounded-xl border border-border bg-surface p-3 flex flex-col gap-2.5">
+    <div id="new-dataset-form" className="mx-auto flex w-full max-w-4xl flex-col gap-2 rounded-xl border border-border bg-surface p-3">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-content font-semibold text-sm flex items-center gap-2">
           <Plus aria-hidden="true" className="h-4 w-4" /> New dataset
@@ -292,7 +252,7 @@ function NewDatasetForm({ onCreate, onClose }) {
           }))].map((item) => (
             <button key={item.key} type="button" aria-pressed={media === item.key}
               onClick={() => setMedia(item.key)}
-              className={`min-h-10 flex-1 rounded-lg border px-3 py-1.5 text-sm font-semibold ${media === item.key
+              className={`${btnShape()} flex-1 border font-semibold ${media === item.key
                 ? 'border-primary/60 bg-primary/15 text-content'
                 : 'border-border text-content-muted hover:bg-surface-raised'}`}>
               {item.label}
@@ -314,7 +274,7 @@ function NewDatasetForm({ onCreate, onClose }) {
           ['style', Palette, 'Style', 'An always-on aesthetic: load the LoRA and control its influence with the LoRA weight']].map(
           ([val, KindIcon, label, hint]) => (
             <button key={val} type="button" onClick={() => setKind(val)} title={hint}
-              className={`flex-1 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors inline-flex items-center justify-center gap-1.5 ${
+              className={`${btnShape()} flex-1 border font-semibold ${
                 kind === val
                   ? 'border-primary/60 bg-primary/15 text-content'
                   : 'border-border bg-app/40 text-content-muted hover:bg-surface-raised'}`}>
@@ -323,18 +283,18 @@ function NewDatasetForm({ onCreate, onClose }) {
           ))}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <label className={`flex flex-col gap-1 text-2xs text-content-muted ${style ? 'sm:col-span-2' : ''}`}>
+        <label className={`flex flex-col gap-1 text-xs text-content-muted ${style ? 'sm:col-span-2' : ''}`}>
           {concept ? 'Concept name' : style ? 'Style name' : 'Character name'}
           <input id="new-dataset-name" value={name} onChange={(e) => setName(e.target.value)}
             placeholder={concept ? 'e.g. cim' : style ? 'e.g. ink-wash' : 'e.g. Emma'}
-            className="bg-app/60 border border-border rounded px-2 py-1.5 text-sm text-content" />
+            className={fieldClass()} />
         </label>
         {!style && (
-          <label className="flex flex-col gap-1 text-2xs text-content-muted">
+          <label className="flex flex-col gap-1 text-xs text-content-muted">
             Trigger word
             <input value={trigger} onChange={(e) => setTrigger(e.target.value)}
               placeholder={concept ? 'e.g. cim_act' : 'e.g. zchar_emma'}
-              className="bg-app/60 border border-border rounded px-2 py-1.5 text-sm text-content" />
+              className={fieldClass()} />
             {/* Guard-rail: a plain short word ("emma", "girl") collides with the base
                 model's existing vocabulary — the identity bleeds into that word
                 everywhere. A unique token (prefix/underscore/digits) binds cleanly. */}
@@ -352,10 +312,10 @@ function NewDatasetForm({ onCreate, onClose }) {
        * accepting either; otherwise prose) and the menu section. Editable later in the training
        * panel.
        */}
-      <label className="flex flex-col gap-1 text-2xs text-content-muted">
+      <label className="flex flex-col gap-1 text-xs text-content-muted">
         Target model <span className="text-content-subtle normal-case">— sets the caption style &amp; groups the menu (changeable later)</span>
         <select value={trainType} onChange={(e) => setTrainType(e.target.value)}
-          className="bg-app/60 border border-border rounded px-2 py-1.5 text-sm text-content">
+          className={fieldClass()}>
           <option value="zimage">Z-Image (prose captions)</option>
           <option value="sdxl">SDXL (booru-tag captions)</option>
           <option value="krea">Krea 2 (prose captions)</option>
@@ -377,7 +337,7 @@ function NewDatasetForm({ onCreate, onClose }) {
               ['body', PersonStanding, 'Face + body', 'Total fidelity: body shape, tattoos and marks bind to the trigger too. Prefers full-frame imports and more bust/body shots.']].map(
               ([val, FidIcon, label, hint]) => (
                 <button key={val} type="button" onClick={() => setFidelity(val)} title={hint}
-                  className={`flex-1 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors inline-flex items-center justify-center gap-1.5 ${
+                  className={`${btnShape()} flex-1 border font-semibold ${
                     fidelity === val
                       ? 'border-primary/60 bg-primary/15 text-content'
                       : 'border-border bg-app/40 text-content-muted hover:bg-surface-raised'}`}>
@@ -392,7 +352,7 @@ function NewDatasetForm({ onCreate, onClose }) {
        * caption/refinement/ban-list prompts. Describe the ACTION, not the subject.
        */}
       {concept && (
-        <label className="flex flex-col gap-1 text-2xs text-content-muted">
+        <label className="flex flex-col gap-1 text-xs text-content-muted">
           What is the recurring concept? <span className="text-fuchsia-300">(required — it will be omitted from every caption)</span>
           <textarea value={conceptDesc} onChange={(e) => setConceptDesc(e.target.value)} rows={2}
             placeholder="Describe the recurring act/effect itself, not the people — e.g. “a tongue licking an ice-cream cone”"
@@ -411,7 +371,7 @@ function NewDatasetForm({ onCreate, onClose }) {
           onClick={() => canCreate && onCreate(name.trim(), trigger.trim(), kind, conceptDesc.trim(), trainType,
             (concept || style) ? undefined : fidelity)}
           disabled={!canCreate}
-          className="ml-auto px-4 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
+          className={`ml-auto ${btnClass({ variant: 'primary' })}`}>
           Create
         </button>
       </div>
@@ -425,7 +385,7 @@ function ListStatusNotice({ status, onRetry }) {
   if (status === 'error') {
     return (
       <div role="alert"
-        className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-red-500/40 bg-red-500/5 px-4 py-8 text-center">
+        className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-red-500/40 bg-red-500/5 px-4 py-5 text-center">
         <p className="text-sm text-content-muted">Could not load your datasets.</p>
         {onRetry && (
           <button type="button" onClick={onRetry}
@@ -438,7 +398,7 @@ function ListStatusNotice({ status, onRetry }) {
   }
   return (
     <p role="status"
-      className="rounded-xl border border-dashed border-border bg-app/30 px-4 py-8 text-center text-sm text-content-muted">
+      className="rounded-xl border border-dashed border-border bg-app/30 px-4 py-5 text-center text-sm text-content-muted">
       Loading datasets
     </p>
   );
@@ -516,16 +476,15 @@ export default function DatasetListPanel({
   // hides matches would read as lost datasets. Folding resumes when cleared.
   const filterActive = Boolean(query.trim()) || kindFilter !== 'all';
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {/* Header: the page IS the library. Row 1 = title + primary actions;
           row 2 (below, non-empty library only) = search + filters + size. */}
       <div>
-        <p className="font-mono text-2xs uppercase tracking-[0.18em] text-content-subtle">library</p>
         {/*
          * relative z-30 creates a stacking context; otherwise the Backup menu panel's z-20 would
          * remain trapped below the tiles.
          */}
-        <div className="relative z-30 mt-1 flex flex-wrap items-center gap-2">
+        <div className="relative z-30 flex flex-wrap items-center gap-2">
           <h1 className="text-xl font-semibold text-content flex items-center gap-2">Datasets<HelpBadge topic="page-datasets" /></h1>
           {!empty && <span className="text-sm text-content-subtle">{datasets.length}</span>}
           <Button
@@ -598,7 +557,7 @@ export default function DatasetListPanel({
       ) : empty ? (
         <EmptyState />
       ) : groups.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-border bg-app/30 px-4 py-8 text-center text-sm text-content-muted">
+        <p className="rounded-xl border border-dashed border-border bg-app/30 px-4 py-5 text-center text-sm text-content-muted">
           {query.trim()
             ? <>No dataset matches “{query.trim()}”{kindFilter !== 'all' ? ` in ${KIND_CHIPS[kindFilter]}` : ''}.</>
             : <>No {KIND_CHIPS[kindFilter]} dataset.</>}

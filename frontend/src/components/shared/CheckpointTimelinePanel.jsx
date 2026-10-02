@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch, fetchWithCsrfRetry } from '../../api/fetchClient';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { btnClass, btnShape } from '../common/controls.js';
 import {
   boundedCanvasSize, containRect, nextTimelineIndex, orderTimelineSeries,
   pickWebMMimeType, timelineFrameLabel, timelineGifError, timelineGifUrl, timelineListUrl,
@@ -677,14 +678,14 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
                   <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-3">
                     <div className="flex items-center gap-1" aria-label="Playback controls">
                       <button type="button" onClick={() => move(-1)} aria-label="Previous frame"
-                        className="rounded-md border border-border px-3 py-2 text-content hover:border-indigo-400/60">◀</button>
+                        className={`${btnClass({ size: 'sm' })} hover:border-indigo-400/60`}>◀</button>
                       <button type="button" onClick={() => setPlaying((value) => !value)}
                         aria-label={playing ? 'Pause timeline' : 'Play timeline'} aria-pressed={playing}
-                        className="min-w-20 rounded-md border border-indigo-400/60 bg-indigo-500/15 px-3 py-2 text-xs font-semibold text-indigo-100 hover:bg-indigo-500/25">
+                        className={`${btnShape({ size: 'sm' })} min-w-20 border border-indigo-400/60 bg-indigo-500/15 font-semibold text-indigo-100 hover:bg-indigo-500/25`}>
                         {playing ? '❚❚ Pause' : '▶ Play'}
                       </button>
                       <button type="button" onClick={() => move(1)} aria-label="Next frame"
-                        className="rounded-md border border-border px-3 py-2 text-content hover:border-indigo-400/60">▶</button>
+                        className={`${btnClass({ size: 'sm' })} hover:border-indigo-400/60`}>▶</button>
                     </div>
 
                     <button type="button"
@@ -692,14 +693,14 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
                         ? TIMELINE_PLAYBACK_MODES.PING_PONG : TIMELINE_PLAYBACK_MODES.LOOP); setPlayDirection(1); }}
                       aria-label={`Playback mode: ${playMode === TIMELINE_PLAYBACK_MODES.LOOP ? 'loop' : 'ping-pong'}`}
                       title="Toggle loop or ping-pong playback"
-                      className="rounded-md border border-border px-2.5 py-2 text-2xs text-content-muted hover:border-indigo-400/60 hover:text-content">
+                      className={`${btnClass({ size: 'sm' })} hover:border-indigo-400/60`}>
                       {playMode === TIMELINE_PLAYBACK_MODES.LOOP ? '↻ Loop' : '↔ Ping-pong'}
                     </button>
 
-                    <div role="group" aria-label="Playback speed" className="flex items-center rounded-md border border-border p-0.5">
+                    <div role="group" aria-label="Playback speed" className="flex items-center gap-1">
                       {TIMELINE_SPEEDS.map((rate) => (
                         <button key={rate} type="button" onClick={() => setSpeed(rate)} aria-pressed={speed === rate}
-                          className={`rounded px-2 py-1.5 text-2xs ${speed === rate
+                          className={`${btnShape({ size: 'sm' })} ${speed === rate
                             ? 'bg-indigo-500/30 font-semibold text-indigo-100'
                             : 'text-content-subtle hover:text-content'}`}>
                           {rate}×
@@ -710,7 +711,7 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
                     <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
                       <button type="button" onClick={downloadGif}
                         aria-disabled={gifBusy || exportState.busy}
-                        className="rounded-md border border-border px-3 py-2 text-xs text-content-muted hover:border-indigo-400/60 hover:text-content aria-disabled:cursor-not-allowed aria-disabled:opacity-40"
+                        className={`${btnClass({ size: 'sm' })} hover:border-indigo-400/60 aria-disabled:cursor-not-allowed aria-disabled:opacity-40`}
                         aria-label="Download timeline as GIF">
                         {gifBusy ? 'Rendering GIF' : 'Download GIF'}
                       </button>
@@ -718,7 +719,7 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
                         disabled={!exportSupport}
                         aria-disabled={!exportSupport || exportState.busy || gifBusy}
                         title={exportDisabledReason || 'Render this timeline locally and download a WebM video'}
-                        className="rounded-md border border-border px-3 py-2 text-xs text-content-muted hover:border-indigo-400/60 hover:text-content disabled:cursor-not-allowed disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40">
+                        className={`${btnClass({ size: 'sm' })} hover:border-indigo-400/60 disabled:cursor-not-allowed aria-disabled:cursor-not-allowed aria-disabled:opacity-40`}>
                         {exportState.busy ? `Exporting ${exportState.progress}%` : 'Export WebM'}
                       </button>
                     </div>

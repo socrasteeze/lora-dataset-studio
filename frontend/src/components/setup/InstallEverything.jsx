@@ -250,8 +250,8 @@ export default function InstallEverything({ plan, caps, onDone }) {
       <KreaInstallCard caps={caps} onDone={onDone} />
 
       {/* Path 3 — the one-by-one menu, always visible (install/repair a single component). */}
-      <section className="rounded-xl border border-border bg-surface p-5">
-        <h3 className="text-base font-semibold text-content">Install or repair individually</h3>
+      <section className="rounded-xl border border-border bg-surface p-4">
+        <h3 className="text-base font-semibold text-content">Individual Tools</h3>
         <p className="mt-1 text-sm text-content-muted">
           Prefer to pick and choose? Install any component on its own here. Already installed?
           Use <span className="font-medium text-content">↻ Reinstall</span> to repair or update it —

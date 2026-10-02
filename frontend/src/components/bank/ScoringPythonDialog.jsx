@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { apiFetch, postJson } from '../../api/fetchClient'
+import { Button, Input } from '../common/Controls.jsx'
 import {
   calculationNote, canSelect, DEFAULT_PICKER, detectionFailure, detectionSummary, dialogCopy,
   enteredNote, gpuWindowCost, interpreterPaths, missingLabels, pickerProfile, sortInterpreters, statusBadge,
@@ -280,15 +281,14 @@ export default function ScoringPythonDialog({ onClose, onChanged,
             Not listed? Enter the path to a Python interpreter or its folder
           </label>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <input id={picker.inputId} type="text" value={typed} spellCheck={false}
+            <Input size="md" id={picker.inputId} type="text" value={typed} spellCheck={false}
               onChange={(e) => setTyped(e.target.value)}
               placeholder="/envs/myenv  or  /envs/myenv/Scripts/python.exe"
-              className="min-w-0 flex-1 rounded-md border border-border bg-surface px-2 py-1 font-mono text-xs text-content" />
-            <button type="button" disabled={!typed.trim() || actionBusy}
-              onClick={() => load({ force: true, path: typed.trim() })}
-              className="min-h-10 lg:min-h-0 rounded-md border border-border px-2.5 py-1 text-xs text-content hover:bg-surface-raised disabled:opacity-40">
-              Check it
-            </button>
+              className="min-w-0 flex-1 font-mono" />
+            <Button size="md" noShrink disabled={!typed.trim() || actionBusy}
+              onClick={() => load({ force: true, path: typed.trim() })}>
+              Check It
+            </Button>
           </div>
           {entered ? (
             <p className={`text-2xs ${entered.tone === 'warn'

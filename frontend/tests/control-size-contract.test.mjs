@@ -8,6 +8,8 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { controlHeight } from '../src/components/common/controls.js'
+import { INPUT_CLASS as SDK_INPUT_CLASS } from '../../sdk/frontend/ui.js'
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8')
 
@@ -64,4 +66,15 @@ test('settings INPUT_CLASS is fieldClass, and the file has no raw control class'
   assert.match(src, /\[&:is\(textarea\)\]:h-auto/)
   assert.match(src, /btnShape\(\)/)
   assert.deepEqual(rawControl(src), [])
+})
+
+test('standalone plugin fields match host controls and release textarea height', () => {
+  const classes = SDK_INPUT_CLASS.split(/\s+/)
+  for (const token of controlHeight('md').split(/\s+/)) {
+    assert.ok(classes.includes(token), `plugin fields lost host height ${token}`)
+  }
+  for (const token of ['text-sm', 'py-0', '[&:is(textarea)]:h-auto',
+    '[&:is(textarea)]:min-h-0', '[&:is(textarea)]:py-2']) {
+    assert.ok(classes.includes(token), `plugin fields lost ${token}`)
+  }
 })

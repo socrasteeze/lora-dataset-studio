@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { apiFetch, postJson } from '@lds/plugin-sdk';
-import { useFocusTrap } from '@lds/plugin-sdk/ui';
+import { controlHeight, useFocusTrap } from '@lds/plugin-sdk/ui';
 import { HelpBadge } from '@lds/plugin-sdk';
 import VideoOptionsPanel from '../studio/video/VideoOptionsPanel'
 import VideoSourcePicker from '../studio/video/VideoSourcePicker'
@@ -97,11 +97,11 @@ export default function VideoPreviewDialog({ datasetId, tree, selected, onSelect
         <h2 className="text-sm font-semibold text-content">Checkpoint previews</h2>
         <HelpBadge topic="video-checkpoint-previews" />
         <button type="button" onClick={onClose} disabled={busy} aria-label="Close previews"
-          className="ml-auto min-h-10 rounded border border-border px-3 text-xs text-content disabled:opacity-50 lg:min-h-0">Close</button>
+          className={`${controlHeight('sm')} ml-auto rounded border border-border px-3 text-xs text-content disabled:opacity-50`}>Close</button>
         <div className="flex w-full flex-wrap gap-2">
-          <button type="button" onClick={() => setTab('render')} aria-pressed={tab === 'render'} className="min-h-10 rounded border border-border px-3 text-xs text-content aria-pressed:border-primary lg:min-h-0">New previews{selected.length ? ` (${selected.length})` : ''}</button>
-          <button type="button" onClick={() => setTab('history')} aria-pressed={tab === 'history'} className="min-h-10 rounded border border-border px-3 text-xs text-content aria-pressed:border-primary lg:min-h-0">History ({previews.length})</button>
-          <button type="button" onClick={() => { onRefresh(); setHistoryRefresh((v) => v + 1) }} className="ml-auto min-h-10 rounded border border-border px-2 text-xs text-content-muted lg:min-h-0">Refresh</button>
+          <button type="button" onClick={() => setTab('render')} aria-pressed={tab === 'render'} className={`${controlHeight('sm')} rounded border border-border px-3 text-xs text-content aria-pressed:border-primary`}>New Previews{selected.length ? ` (${selected.length})` : ''}</button>
+          <button type="button" onClick={() => setTab('history')} aria-pressed={tab === 'history'} className={`${controlHeight('sm')} rounded border border-border px-3 text-xs text-content aria-pressed:border-primary`}>History ({previews.length})</button>
+          <button type="button" onClick={() => { onRefresh(); setHistoryRefresh((v) => v + 1) }} className={`${controlHeight('sm')} ml-auto rounded border border-border px-2 text-xs text-content-muted`}>Refresh</button>
         </div>
       </header>
       <div className="min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-4">
@@ -147,7 +147,7 @@ export default function VideoPreviewDialog({ datasetId, tree, selected, onSelect
       {tab === 'render' && <footer className="flex shrink-0 flex-wrap items-center gap-2 border-t border-border bg-surface-overlay p-3">
         <p className="min-w-0 flex-1 text-xs text-content-muted">{selected.length} clip{selected.length === 1 ? '' : 's'} · one shared seed{opts.seed === '' ? ' (chosen at launch)' : `: ${opts.seed}`}</p>
         <button type="button" disabled={busy || !options || !selected.length} onClick={submit}
-          className="min-h-10 rounded-md border border-primary bg-primary px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Queueing' : 'Generate previews'}</button>
+          className={`${controlHeight()} rounded-md border border-primary bg-primary px-3 py-0 text-sm font-semibold text-white disabled:opacity-50`}>{busy ? 'Queueing' : 'Generate Previews'}</button>
       </footer>}
     </div>
   </div>, document.body)

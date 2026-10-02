@@ -3,6 +3,7 @@ import IdentityPromptModal from './IdentityPromptModal';
 // Engine names come from the derived edit list — spelling them out here is how
 // this tooltip ended up naming two engines while a third could already edit.
 import { editEngineNames, pendingEditNote } from './referenceEdit';
+import { btnClass } from '../common/controls';
 
 // Same limit as backend MAX_EXTRA_REFS in face_dataset_service.
 const MAX_EXTRA_REFS = 3;
@@ -51,17 +52,17 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
           <span className="text-content-subtle text-2xs">source of Klein variations — crop with ✂ after upload</span>
           <div className="flex gap-1.5 items-center flex-wrap">
             <button type="button" onClick={() => inp.current?.click()} disabled={importBusy}
-              className="px-2.5 py-1 rounded-lg bg-surface-raised text-content text-xs disabled:opacity-40">
+              className={btnClass({ size: 'sm' })}>
               {refFilename ? 'Change' : 'Set'} reference
             </button>
             {refFilename && (
               <button type="button" onClick={onCropRef} disabled={busy}
-                className="px-2.5 py-1 rounded-lg bg-surface-raised text-content text-xs disabled:opacity-40">✂ Crop</button>
+                className={btnClass({ size: 'sm' })}>✂ Crop</button>
             )}
             {refFilename && onEditRef && (
               <button type="button" onClick={onEditRef} disabled={busy}
                 title={`Edit the reference with a prompt (${editEngineNames()}) — compare before/after, then Keep or Discard`}
-                className="px-2.5 py-1 rounded-lg bg-surface-raised text-content text-xs disabled:opacity-40">✦ Edit</button>
+                className={btnClass({ size: 'sm' })}>✦ Edit</button>
             )}
             <label className="flex items-center gap-1 text-2xs text-content-muted cursor-pointer"
               title={visionBusy ? 'Auto head-crop is unavailable during local generation; the reference imports with a centered crop.' : 'ON: a vision pass finds the head and crops around it (slower, pauses ComfyUI). OFF (default): instant centered square — adjust with ✂ Crop, usually faster.'}>

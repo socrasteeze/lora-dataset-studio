@@ -66,6 +66,6 @@ export function allExcludedWarning(plan, { loose = 0, includeLoose = true } = {}
       + 'bank — nothing from the excluded folders is imported.'
   }
   return 'Every subfolder is excluded and there is nothing left to import. '
-    + 'Untick one, or turn off "One bank per subfolder" to make a single bank '
+    + 'Untick one, or turn off "Subfolders" to make a single bank '
     + 'from the whole folder.'
 }

@@ -9,7 +9,7 @@ export default function CameraSettings({ config, setField }) {
       help="ComfyUI diffusion model filename. The Camera angles picker edits this same preference." />
     <details className="rounded-lg border border-border p-3">
       <summary className="min-h-10 cursor-pointer text-sm font-medium text-content">Advanced model overrides</summary>
-      <div className="mt-3 space-y-4">
+      <div className="mt-3 space-y-3">
         <TextField id="camera-text-encoder" label="Text encoder" value={camera.text_encoder}
           onChange={(value) => setField('camera', 'text_encoder', value)} placeholder="Automatic" />
         <TextField id="camera-vae" label="VAE" value={camera.vae}

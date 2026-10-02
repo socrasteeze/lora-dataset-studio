@@ -69,7 +69,7 @@ export function SettingsGroup({ sectionId, group, defaultOpen = false, children 
         localStorage, sectionId, group.id, e.currentTarget.open)}
       className="group scroll-mt-24 rounded-xl border border-border bg-surface">
       <summary
-        className="flex min-h-10 lg:min-h-0 cursor-pointer list-none items-baseline gap-2 rounded-xl px-4 py-3 hover:bg-surface-raised [&::-webkit-details-marker]:hidden">
+        className="flex min-h-10 lg:min-h-0 cursor-pointer list-none items-baseline gap-2 rounded-xl px-3 py-2.5 hover:bg-surface-raised [&::-webkit-details-marker]:hidden">
         <span aria-hidden
           className="shrink-0 text-xs text-content-subtle transition-transform group-open:rotate-90">▸</span>
         <group.icon aria-hidden="true" className="h-4 w-4 shrink-0" />
@@ -80,7 +80,7 @@ export function SettingsGroup({ sectionId, group, defaultOpen = false, children 
           <span className="block text-xs text-content-muted group-open:hidden">{group.blurb}</span>
         </span>
       </summary>
-      <div className="space-y-6 px-2 pb-2 sm:px-3 sm:pb-3">
+      <div className="space-y-4 px-2 pb-2 sm:px-3 sm:pb-3">
         {children}
       </div>
     </details>

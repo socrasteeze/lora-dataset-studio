@@ -155,7 +155,7 @@ test('stored cloud history stays readable with no launch, cleanup or continue ca
   assert.match(html, /Fixture cloud run/)
   assert.match(html, /run-cloud-5/)
   assert.doesNotMatch(html, /↻ Retry|▶ Continue|Clean finished|fresh pod/)
-  assert.match(html, /Share config/)
+  assert.match(html, /Share Config/)
 })
 
 test('cloud controls appear only from the supplied execution capability', () => {

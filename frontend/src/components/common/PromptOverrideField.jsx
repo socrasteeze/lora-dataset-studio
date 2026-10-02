@@ -9,9 +9,9 @@
    merely looked at the default from silently persisting a frozen copy of it and
    never receiving a future improvement — see promptOverride.js. */
 import { normalizePromptOverride, promptBoxText } from './promptOverride.js';
+import { btnClass } from './controls.js';
 
-const RESET_BTN = 'rounded-md border border-border-strong px-2 py-1 text-xs font-medium ' +
-  'text-content hover:bg-surface-raised disabled:opacity-50';
+const RESET_BTN = btnClass({ size: 'sm', noShrink: true });
 
 const BOX_CLASS =
   'mt-1 w-full rounded-md border border-border-strong bg-surface-raised px-3 py-2 text-sm text-content ' +
@@ -57,15 +57,15 @@ export default function PromptOverrideField({
         placeholder={defaultText || 'Leave empty to use the built-in default.'}
         className={`${BOX_CLASS} font-mono leading-relaxed disabled:opacity-50`}
       />
-      <div className="mt-1 flex items-center justify-between gap-2">
+      <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs text-content-subtle">
           {custom
-            ? 'Custom override — this exact text is used instead of the built-in default.'
-            : 'Following the built-in default — improvements to it reach you automatically.'}
+            ? 'Custom override'
+            : 'Following the built-in default'}
         </span>
         {custom && !disabled && (
           <button type="button" onClick={() => onChange('')} className={RESET_BTN}>
-            Reset to default
+            Reset to Default
           </button>
         )}
       </div>

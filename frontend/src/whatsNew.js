@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-02-compact-workspaces',
+    date: '2026-10-02',
+    title: 'More workspace, less repeated text',
+    blurb: 'Creation forms, toolbars and settings use less nesting and spacing. Related controls share heights and type sizes. Bank creation keeps Browse, Subfolders and Create together, with equal-width Images and Video choices.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-01-zzzzzzzzzzzz-whole-bank-groups',
     date: '2026-10-01',
     title: 'A bank group stays whole across pages',

@@ -5,14 +5,14 @@ export default function QwenSettings({ config, configDefaults, setField, caps })
   const values = config.plugins?.qwen_dataset || {}
   const defaults = configDefaults?.plugins?.qwen_dataset || {}
   const set = (key, value) => setField('plugins', 'qwen_dataset', { ...values, [key]: value })
-  return <div className="space-y-4">
+  return <div className="space-y-3">
     <Card title="Dataset generation" help="Choose Qwen-Image 2.1 in your dataset’s Generate variations panel. It uses the same shot selection, reference photos, output size and curation grid.">
       <p className="text-xs text-content-subtle">
         The starting recipe is 25 steps, CFG 3, res_multistep / simple. Add useful side or profile views
         to the dataset references to guide angles the main photo does not show. Up to 10 references
         are supported, including the primary photo.
       </p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label htmlFor="qwen-dataset-steps" className="text-sm font-medium text-content">
             Sampling steps <HelpBadge topic="qwen-dataset-steps" />

@@ -60,8 +60,8 @@ export default function Dlss5Page() {
     finally { setOpeningFolder(false) }
   }
   const clip = clips.find(item => item.id === selected) || clips[0]
-  return <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
-    <header className="flex flex-wrap items-start justify-between gap-4">
+  return <main className="mx-auto max-w-6xl space-y-4 p-4 sm:p-5">
+    <header className="flex flex-wrap items-start justify-between gap-3">
       <div><h1 className="text-2xl font-semibold text-content">DLSS 5 Neural Rendering</h1>
         <p className="mt-2 max-w-2xl text-sm text-content-muted">Improve a finished video, compare the detail and keep the original. This studio works independently of Video lane.</p></div>
       <Link to="/plugins/dlss5/settings" className={button}>Preparation &amp; settings</Link>
@@ -72,14 +72,14 @@ export default function Dlss5Page() {
       <p>Complete DLSS preparation before rendering.</p><ul className="mt-2 list-inside list-disc">{status.missing?.map(text => <li key={text}>{text}</li>)}</ul>
       <Link to="/plugins/dlss5/settings" className="mt-3 inline-block text-primary">Prepare DLSS 5 →</Link>
     </div>}
-    <section className="rounded-xl border border-border bg-surface p-5">
-      <label className="block text-sm font-semibold text-content">Import a finished video
+    <section className="rounded-xl border border-border bg-surface p-4">
+      <label className="block text-sm font-semibold text-content">Import Video
         <input aria-label="Import a finished video" type="file" accept="video/mp4,video/quicktime,video/x-matroska,video/webm,video/x-msvideo,.m4v"
           disabled={busy} onChange={upload} className="mt-3 block max-w-full text-sm" />
       </label>
       <p className="mt-2 text-xs text-content-muted">MP4, MOV, MKV, WebM, AVI or M4V · Up to 512 MB. The original stays untouched; each render starts from it.</p>
     </section>
-    {clip ? <section className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
+    {clip ? <section className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <div className="min-w-0 rounded-xl border border-border bg-surface p-4">
         <h2 className="break-words text-base font-semibold text-content">{clip.name}</h2>
         <video key={`${clip.id}:${clip.has_result}:${clip.state}`} controls preload="metadata"
@@ -88,17 +88,17 @@ export default function Dlss5Page() {
           {active(clip) && clip.progress?.frame != null ? ` · Frame ${clip.progress.frame}${clip.progress.total ? ` / ${clip.progress.total}` : ''}` : ''}</p>
         {clip.error && <p className="mt-2 text-sm text-red-400">{clip.error}</p>}
         <div className="mt-4 flex flex-wrap gap-2">
-          {active(clip) ? <button type="button" onClick={() => cancel(clip)} className={button}>Cancel render</button>
+          {active(clip) ? <button type="button" onClick={() => cancel(clip)} className={button}>Cancel Render</button>
             : <button type="button" disabled={busy || running || !status?.ready} onClick={() => setDialog(clip)}
-              className={`${button} bg-primary text-black`}>Render with DLSS 5</button>}
-          {clip.has_result && <><button type="button" onClick={() => setCompare(clip)} className={button}>Compare original &amp; result</button>
-            <a href={`${base}/${clip.id}/media/result?download=1`} className={button}>Download result</a></>}
+              className={`${button} bg-primary text-black`}>Render</button>}
+          {clip.has_result && <><button type="button" onClick={() => setCompare(clip)} className={button}>Compare</button>
+            <a href={`${base}/${clip.id}/media/result?download=1`} className={button}>Download Result</a></>}
           <button type="button" disabled={openingFolder} onClick={() => openFolder(clip)} className={button}
             title="Open this clip's folder on the computer running LDS, containing the original and any rendered result.">
             {openingFolder ? 'Opening folder' : 'Open folder'}</button>
         </div>
       </div>
-      <aside className="min-w-0"><h2 className="mb-3 font-semibold text-content">Your clips</h2>
+      <aside className="min-w-0"><h2 className="mb-2 font-semibold text-content">Clips</h2>
         <div className="space-y-2">{clips.map(item => <button key={item.id} type="button" onClick={() => setSelected(item.id)} aria-pressed={item.id === clip.id}
           className={`w-full rounded-lg border p-3 text-left ${item.id === clip.id ? 'border-primary bg-surface-raised' : 'border-border bg-surface'}`}>
           <span className="block truncate text-sm text-content">{item.name}</span><span className="text-xs text-content-muted">{item.state}</span></button>)}</div>

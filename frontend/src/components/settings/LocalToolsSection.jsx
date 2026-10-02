@@ -420,7 +420,7 @@ export default function LocalToolsSection(props) {
             config={config} configDefaults={configDefaults} setField={setField} />
         </div>
         <div>
-          <label htmlFor="comfyui-local-queue-limit" className="block text-sm font-medium text-content">Local generation queue limit</label>
+          <label htmlFor="comfyui-local-queue-limit" className="block text-sm font-medium text-content">Queue Limit</label>
           <input id="comfyui-local-queue-limit" type="number" min="1" max="10000" step="1"
             value={config.comfyui.local_queue_limit ?? comfyDefault('local_queue_limit')}
             onChange={(e) => setField('comfyui', 'local_queue_limit', Number(e.target.value))}
@@ -430,7 +430,7 @@ export default function LocalToolsSection(props) {
             config={config} configDefaults={configDefaults} setField={setField} />
         </div>
         <div>
-          <label htmlFor="comfyui-generation-timeout" className="block text-sm font-medium text-content">Generation time limit (minutes)</label>
+          <label htmlFor="comfyui-generation-timeout" className="block text-sm font-medium text-content">Time Limit</label>
           <input id="comfyui-generation-timeout" type="number" min="0" max="1440" step="1"
             value={config.comfyui.generation_timeout_minutes ?? comfyDefault('generation_timeout_minutes')}
             onChange={(e) => setField('comfyui', 'generation_timeout_minutes', Number(e.target.value))}

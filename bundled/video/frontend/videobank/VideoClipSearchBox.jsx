@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiFetch } from '@lds/plugin-sdk';
 import { HelpBadge } from '@lds/plugin-sdk';
+import { controlHeight } from '@lds/plugin-sdk/ui';
 import { videoSearchUrl } from './videoBankApi'
 import {
   searchUnavailableReason, summarize, readinessHint, pendingLabel,
@@ -103,14 +104,14 @@ export default function VideoClipSearchBox({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="a woman walking on a beach"
               aria-label="Describe the scene to look for"
-              className="min-w-[12rem] flex-1 rounded-md border border-border bg-app px-2.5 py-1.5 text-sm text-content placeholder:text-content-subtle" />
+              className={`${controlHeight()} min-w-[12rem] flex-1 rounded-md border border-border bg-app px-2.5 py-0 text-sm text-content placeholder:text-content-subtle`} />
             <button type="submit" disabled={searching || !query.trim()}
-              className="min-h-10 lg:min-h-0 rounded-md bg-gradient-primary px-3 py-1.5 text-xs font-semibold text-gray-950 disabled:opacity-40">
+              className={`${controlHeight()} rounded-md bg-gradient-primary px-3 py-0 text-sm font-semibold text-gray-950 disabled:opacity-40`}>
               {searching ? pendingLabel(status) : 'Search'}
             </button>
             {result && (
               <button type="button" onClick={clear}
-                className="min-h-10 lg:min-h-0 rounded-md border border-border bg-surface-raised px-2.5 py-1.5 text-xs font-semibold text-content hover:bg-surface">
+                className={`${controlHeight()} rounded-md border border-border bg-surface-raised px-2.5 py-0 text-sm font-semibold text-content hover:bg-surface`}>
                 Clear
               </button>
             )}

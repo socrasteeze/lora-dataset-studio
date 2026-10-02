@@ -88,7 +88,7 @@ export default function Dlss5InstallCard({ caps, onDone }) {
   )
 
   return (
-    <section className="rounded-xl border border-border bg-surface p-4 sm:p-5">
+    <section className="rounded-xl border border-border bg-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
         <h3 className="text-base font-semibold text-content">
           2. Prepare the DLSS bridge and model

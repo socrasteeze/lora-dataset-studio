@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { apiFetch, postJson, putJson } from '../../api/fetchClient';
 import { activeLocalLlm, localLlmLabel } from '../../utils/localLlm.js';
 import { pullCopy, visionModelSetting } from '../../utils/watermarkEngine.js';
+import { Button, Input, Select } from '../common/Controls.jsx';
 
 /* The vision route's model, IN the scan window — the three things the
  * maintainer asked for in one breath: the model that will actually run, named
@@ -104,39 +105,36 @@ export default function VisionModelPicker({ caps = {}, disabled = false, onModel
   // user's choice on the floor is worse than offering an unconfirmed name.
   const choices = model && !models.includes(model) ? [model, ...models] : models;
   return (
-    <div className="mt-2 space-y-1.5 rounded border border-border bg-app/40 p-2">
-      <div>
-        <span className="font-medium text-content">Vision model</span>
-        {' — this scan runs '}
-        <span className="font-mono text-content">{model || 'the loaded model'}</span>
-        {` via ${server}. Stored: the other surface and Settings ▸ Local tools read the same value.`}
+    <div className="mt-2 space-y-2 text-xs">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-medium text-content">Vision Model</span>
+        <span className="text-content-muted">{server}</span>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <select value={model} disabled={disabled || saving || loading}
+        <Select size="sm" value={model} disabled={disabled || saving || loading}
           aria-label="Watermark vision model"
           onChange={(e) => save(e.target.value)}
-          className="max-w-full rounded border border-border bg-app px-1.5 py-0.5 text-content">
+          className="w-full min-w-0">
           {choices.length === 0 && (
             <option value="">{loading ? 'Loading models' : 'No model installed yet'}</option>
           )}
           {choices.map((m) => <option key={m} value={m}>{m}</option>)}
-        </select>
+        </Select>
         {!reachable && !loading && (
-          <span className="text-amber-300">{server} is not answering — the list fills once it does.</span>
+          <span className="text-amber-300">{server} is offline. Reconnect to load models.</span>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <input
+        <Input size="sm"
           type="text" value={name} onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); start(); } }}
           placeholder={copy.placeholder} aria-label={copy.inputLabel}
           disabled={disabled || running}
-          className="w-full min-w-[10rem] flex-1 rounded border border-border bg-app px-2 py-1 text-content"
+          className="min-w-0 flex-1"
         />
-        <button type="button" onClick={start} disabled={disabled || busy || running || !name.trim()}
-          className="min-h-10 rounded border border-border px-2.5 py-1 font-semibold text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-50 lg:min-h-0">
+        <Button size="sm" noShrink onClick={start} disabled={disabled || busy || running || !name.trim()}>
           {running ? `${copy.busy}` : copy.button}
-        </button>
+        </Button>
       </div>
       {running && (
         <p role="status" aria-live="polite" className="text-content-muted">

@@ -14,6 +14,7 @@ import { useFocusTrap } from '../../../hooks/useFocusTrap';
 import { HelpBadge } from '../../../help/HelpMode';
 import { datasetThumbUrl } from '../../../utils/datasetThumbUrl';
 import { filterSavedPrompts, normalizeSavedPrompt } from './savedPrompts';
+import { btnShape, fieldClass } from '../../common/controls';
 
 // Request 384-pixel thumbnails for 144x192 CSS tiles. Rows load lazily, roughly four are visible
 // at once, and inspecting the image is this dialog's purpose.
@@ -86,7 +87,7 @@ export function SavedPromptsPanel({
           <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
             aria-label="Search saved prompts"
             placeholder="Search your prompts (e.g. bathroom mirror)"
-            className="min-h-10 min-w-0 flex-1 rounded-lg border border-border bg-app/60 px-2.5 py-1.5 text-content text-xs lg:min-h-0" />
+            className={`${fieldClass()} min-w-0 flex-1`} />
           <span className="text-content-subtle text-2xs tabular-nums" role="status">
             {query.trim() ? `${shown.length} of ${total}` : `${total} prompts`}
           </span>
@@ -96,7 +97,7 @@ export function SavedPromptsPanel({
                 {picked.length} selected
               </span>
               <button type="button" onClick={onClearBatch}
-                className="inline-flex min-h-10 items-center px-1 text-content-subtle text-2xs underline decoration-dotted hover:text-content lg:min-h-0 lg:px-0">
+                className={`${btnShape()} px-1 text-content-subtle underline decoration-dotted hover:text-content`}>
                 Clear
               </button>
             </span>
@@ -161,7 +162,7 @@ export function SavedPromptsPanel({
                       <button type="button" role="checkbox" aria-checked={inBatch}
                         onClick={() => onToggleBatch(p.prompt)}
                         title={inBatch ? 'Remove this prompt from the batch' : 'Add this prompt to the batch'}
-                        className={`px-2 py-1 min-h-10 lg:min-h-0 rounded border text-2xs ${
+                        className={`${btnShape({ size: 'sm' })} border ${
                           inBatch
                             ? 'border-purple-400 bg-purple-500/25 text-purple-200'
                             : 'border-border bg-app text-content-muted hover:text-content'}`}>
@@ -170,7 +171,7 @@ export function SavedPromptsPanel({
                     )}
                     <button type="button" onClick={() => copyPrompt(p.prompt)}
                       title="Copy this prompt"
-                      className="px-2 py-1 min-h-10 lg:min-h-0 rounded border border-border bg-app text-content-muted text-2xs hover:text-content">
+                      className={`${btnShape({ size: 'sm' })} border border-border bg-app text-content-muted hover:text-content`}>
                       📋 Copy
                     </button>
                     {onDelete && (
@@ -181,13 +182,13 @@ export function SavedPromptsPanel({
                         }}
                         title="Delete this saved prompt (and its test images)"
                         aria-label="Delete this saved prompt"
-                        className="px-2 py-1 min-h-10 lg:min-h-0 rounded border border-border bg-app text-red-300/70 text-2xs hover:text-red-300 hover:bg-red-500/15">
+                        className={`${btnShape({ size: 'sm' })} border border-border bg-app text-red-300/70 hover:text-red-300 hover:bg-red-500/15`}>
                         🗑 Delete
                       </button>
                     )}
                     <button type="button" onClick={() => use(p.prompt)}
                       title="Load this prompt into the prompt field"
-                      className="ml-auto px-2.5 py-1 min-h-10 lg:min-h-0 rounded-lg bg-gradient-primary text-gray-950 text-2xs font-semibold">
+                      className={`ml-auto ${btnShape({ size: 'sm' })} bg-gradient-primary font-semibold text-gray-950`}>
                       ⤵ Use prompt
                     </button>
                   </div>

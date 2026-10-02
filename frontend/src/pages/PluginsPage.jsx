@@ -224,7 +224,7 @@ export default function PluginsPage() {
   const locked = data?.can_manage === false
 
   return (
-    <div className="mx-auto w-full space-y-6" data-probe-panel="plugins" data-probe-content="plugins">
+    <div className="mx-auto w-full space-y-4" data-probe-panel="plugins" data-probe-content="plugins">
       <div className="space-y-2">
         <SectionHeader eyebrow="Workspace" title="Plugins"
           description="The plugins installed with this app, and any ZIP you add yourself." />
@@ -264,7 +264,7 @@ export default function PluginsPage() {
                 <p className="mt-1 text-content-muted">{applying ? 'Waiting for the new server. This page will reload when it is ready.' : 'Your choices are saved. The current features stay available until LDS restarts.'}</p>
               </div>
             </div>
-            {restart.can_apply && <button type="button" className={BTN_PRIMARY + ' shrink-0'} disabled={busy} onClick={apply}>Apply and restart</button>}
+            {restart.can_apply && <button type="button" className={BTN_PRIMARY + ' shrink-0'} disabled={busy} onClick={apply}>Apply &amp; Restart</button>}
           </div>
           {!restart.can_apply && <p className="text-content-muted">{restart.how}</p>}
           {applyWarning && <p role="status" className="text-amber-500">{applyWarning}</p>}
@@ -276,7 +276,7 @@ export default function PluginsPage() {
         onToggle={toggle} onRemove={remove} onInstalled={() => { load(); refreshCaps(true) }} />
 
       {data?.transactions?.length > 0 && (
-        <details className="rounded-lg border border-border p-4 text-sm" open={data.transactions[0].phase === 'rolled_back'}>
+        <details className="rounded-lg border border-border p-3 text-sm" open={data.transactions[0].phase === 'rolled_back'}>
           <summary className="min-h-10 cursor-pointer py-2 font-medium">Installation history</summary>
           <ul className="divide-y divide-border">{data.transactions.map(item => <li key={item.id} className="py-3">
             <p className="font-medium">{item.plugins.map(plugin => `${plugin.id}${plugin.version ? ` ${plugin.version}` : ''}`).join(', ')}</p>

@@ -57,10 +57,23 @@ test('split mode previews and creates one bank per subfolder', () => {
   // per checkbox and a race between what is ticked and what is drawn. They ride
   // the create call only.
   assert.match(page, /postJson\('\/api\/bank\/split',\s*\n?\s*\{ folder, include_loose: includeLoose, exclude: normalizeExcluded\(excluded\) \}\)/);
-  // The toggle and the loose-files option exist and default to including loose.
-  assert.match(page, /One bank per subfolder/);
+  // The pressed button and the loose-files option exist and default to including loose.
+  assert.match(page, /aria-pressed=\{splitMode\}/);
+  assert.match(page, /aria-label="One bank per subfolder"/);
+  assert.match(page, />\s*Subfolders\s*</);
+  assert.match(page, /Enabled: create one bank for each top-level subfolder\. Select to disable\./);
   assert.match(page, /useState\(true\)/);            // includeLoose defaults on
-  assert.match(page, /Also make a bank from loose root images/);
+  assert.match(page, /Include Loose Images/);
+  const picker = page.indexOf('<FolderPickerField inline')
+  const toggle = page.indexOf('aria-pressed={splitMode}')
+  const create = page.indexOf('<Button type="submit"', toggle)
+  assert.ok(picker >= 0 && picker < toggle && toggle < create,
+    'Subfolders stays between Browse and Create in the creation row');
+});
+
+test('the bank list sort keeps its accessible name without a visible prefix', () => {
+  assert.match(page, /<Select size="md" value=\{sort\}[\s\S]{0,120}aria-label="Sort the banks"/);
+  assert.doesNotMatch(page, />\s*Sort\s*<Select/);
 });
 
 test('the split preview lists every folder, striking out the excluded ones', () => {
@@ -91,7 +104,8 @@ test('queue-all posts the queue route, never one pipeline per bank', () => {
   // entry per bank, drained one at a time by the untouched worker gate.
   assert.match(page, /postJson\('\/api\/bank-queue\/all', config\)/);
   assert.match(page, /⏳ Queue all \{queueAllCount\} bank\(s\)/);
-  assert.match(page, /One at a time on this machine — a bank sent to another one runs alongside it/);
+  assert.match(page, /Banks run one at a time per machine; another machine runs its own queue alongside this one/);
+  assert.doesNotMatch(page, /<span[^>]*>\s*One at a time on this machine/);
 });
 
 test('queue-all confirms first, and the toast comes from the SERVER counts', () => {

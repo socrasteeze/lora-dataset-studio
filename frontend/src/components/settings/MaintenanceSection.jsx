@@ -230,7 +230,7 @@ function LogViewer() {
     if (!res.ok) { setCopyFailed(true); setTimeout(() => setCopyFailed(false), 2500) }
   }
   return (
-    <section className="rounded-xl border border-border bg-surface p-5">
+    <section className="rounded-xl border border-border bg-surface p-4">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
         className="flex w-full items-center gap-2 text-left">
         <h2 className="text-base font-semibold text-content">🪵 Server log</h2>
@@ -267,7 +267,7 @@ function LogViewer() {
    answered together instead of one card per screen. */
 export default function MaintenanceSection() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <UpdatesCard />
       <GlobalStopPanel />
       <DiagnosticReport />

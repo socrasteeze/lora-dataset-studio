@@ -21,6 +21,7 @@ test('each size is one fixed desktop height and a 40-px target below lg', () => 
   for (const [size, h] of Object.entries(heights)) {
     const s = controlHeight(size)
     has(s, 'min-h-10')
+    has(s, 'h-10')
     has(s, 'lg:min-h-0')
     has(s, h)
   }

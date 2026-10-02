@@ -45,6 +45,7 @@ import {
 import { openerLabel } from './scoringPython.js'
 import { localEngineUnavailableReason } from '../../utils/localEngineReason'
 import { activeLocalLlm } from '../../utils/localLlm'
+import { Button, btnShape, controlHeight } from '../common/Controls.jsx'
 
 // How many cleaned images the before/after strip offers. A sample is enough to
 // judge a pass; the grid holds the full set.
@@ -295,10 +296,10 @@ export default function BankWatermarkPanel({
         <span className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">
           Level 3 engine
         </span>
-        <div className="flex items-center gap-1 rounded-lg border border-border bg-app/60 p-0.5 text-xs">
+        <div className={`${controlHeight('md')} flex items-center gap-1 rounded-lg border border-border bg-app/60 text-sm`}>
           <button type="button" aria-pressed={method !== 'klein'} onClick={() => setMethod('auto')}
             title="LaMa: fast, non-generative repaint of small off-centre marks. Marks on the subject stay flagged."
-            className={`rounded-md px-2.5 py-1 font-semibold ${method !== 'klein'
+            className={`h-full rounded-md px-2.5 font-semibold ${method !== 'klein'
               ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
             LaMa <span className="font-normal opacity-70">fast</span>
           </button>
@@ -309,7 +310,7 @@ export default function BankWatermarkPanel({
               : deviceId !== 'local'
                 ? 'Klein renders on the selected machine — its own ComfyUI checks the models when the job runs.'
                 : (kleinReason || 'Klein inpainting needs ComfyUI running + the Klein models (Setup ▸ ComfyUI).')}
-            className={`rounded-md px-2.5 py-1 font-semibold disabled:opacity-40 ${method === 'klein'
+            className={`h-full rounded-md px-2.5 font-semibold disabled:opacity-40 ${method === 'klein'
               ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
             Klein <span className="font-normal opacity-70">quality</span>
           </button>
@@ -317,8 +318,7 @@ export default function BankWatermarkPanel({
         {/* Which machine renders the Klein jobs. Self-hides when this install
             has no peers/backends; LaMa ignores it (it never travels), which the
             state helper says whenever the pick actually changes behaviour. */}
-        <DevicePicker value={deviceId} onChange={setDeviceId} kind="comfy"
-          className="text-2xs" />
+        <DevicePicker value={deviceId} onChange={setDeviceId} kind="comfy" size="md" />
         {/* WHICH Klein model is about to repaint these images. A bank has no
             dataset to inherit a choice from, so there is nothing to pick here —
             but "no choice" was never a reason to stay silent about the model.
@@ -328,16 +328,16 @@ export default function BankWatermarkPanel({
           <>
           <div className="w-full flex flex-wrap items-center gap-x-3 gap-y-1">
             <KleinModelSetting className="min-w-0 flex-1" />
-            <button type="button"
+            <Button type="button" size="md" noShrink
               onClick={async () => {
                 const d = await apiFetch('/api/klein-model').catch(() => null)
                 setKleinCompare({ choices: d?.choices || [], stored: d?.stored || null })
                 setKleinCompareOpen(true)
               }}
               title="Run each ticked Klein model on one flagged image (same zones, same seed) and pick the winner for THIS run — a bank stores no Klein choice."
-              className="min-h-10 lg:min-h-0 px-2.5 py-1 rounded-lg border border-border text-xs font-semibold text-content-subtle hover:text-content hover:bg-surface-raised">
+              className="font-semibold text-content-subtle">
               ⚖ Compare models
-            </button>
+            </Button>
             {kleinRunModel && (
               <span className="text-2xs text-amber-200">
                 Next Klein clean runs on <span className="font-mono break-all">{kleinRunModel}</span>{' '}
@@ -365,22 +365,22 @@ export default function BankWatermarkPanel({
               What to clean
             </span>
             <div role="group" aria-label="What to clean"
-              className="flex items-center gap-1 rounded-lg border border-border bg-app/60 p-0.5 text-xs">
+              className={`${controlHeight('md')} flex items-center gap-1 rounded-lg border border-border bg-app/60 text-sm`}>
               <button type="button" aria-pressed={target === 'all'} onClick={() => setTarget('all')}
                 title="Repaint every flagged page — text and watermarks alike."
-                className={`rounded-md px-2.5 py-1 font-semibold ${target === 'all'
+                className={`h-full rounded-md px-2.5 font-semibold ${target === 'all'
                   ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
                 Both
               </button>
               <button type="button" aria-pressed={target === 'text'} onClick={() => setTarget('text')}
                 title="Only pages 🔤 Find text flagged. A page carrying both a watermark and text counts here — one page is never split between two runs."
-                className={`rounded-md px-2.5 py-1 font-semibold ${target === 'text'
+                className={`h-full rounded-md px-2.5 font-semibold ${target === 'text'
                   ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
                 🔤 Text
               </button>
               <button type="button" aria-pressed={target === 'watermark'} onClick={() => setTarget('watermark')}
                 title="Only pages 🚩 flagged with no text flag on them."
-                className={`rounded-md px-2.5 py-1 font-semibold ${target === 'watermark'
+                className={`h-full rounded-md px-2.5 font-semibold ${target === 'watermark'
                   ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
                 🚩 Marks
               </button>
@@ -393,13 +393,13 @@ export default function BankWatermarkPanel({
               onClick={() => run(`/api/bank/${bankId}/watermark/undo`, {},
                 'Cleaned versions removed — your originals are back.')}
               title="Throw away every cleaned version and flag those images again. Your original files were never modified, so nothing is lost."
-              className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-content disabled:opacity-40">
+              className={`${btnShape({ size: 'md', noShrink: true })} border border-border bg-surface text-content`}>
               ↩ Undo cleaning
             </button>
             <button type="button" onClick={() => setComparing((v) => !v)}
               aria-expanded={comparing}
               title="Show a sample of the cleaned images so you can flip between the cleaned version and your original."
-              className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-content">
+              className={`${btnShape({ size: 'md', noShrink: true })} border border-border bg-surface text-content`}>
               {comparing ? '✕ Hide before/after' : '👁 Before / after'}
             </button>
           </>

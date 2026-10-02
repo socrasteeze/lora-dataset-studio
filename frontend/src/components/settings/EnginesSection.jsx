@@ -825,7 +825,7 @@ function IdentityPromptsCard({ config, setField, promptDefaults, promptDefaultsB
       {/* flex-wrap: five chips fit one row on a laptop and wrap to two or three
           on a phone — never a row that overflows the card. */}
       <div>
-        <span className="block text-sm font-medium text-content">Subject type</span>
+        <span className="block text-sm font-medium text-content">Subject Type</span>
         <p className="mt-1 mb-2 text-xs text-content-muted">
           Which datasets these three prompts apply to. Each subject type keeps its own texts —
           editing the Animal ones leaves your Human datasets untouched. A dot marks a type you
@@ -980,7 +980,7 @@ export default function EnginesSection(props) {
       <SettingsGroup {...groupProps(group1)}>
       <Card title="Engines" help="Which engines appear in the generate panel, and which one is preselected. An engine a plugin brings is listed while that plugin is on.">
         <div>
-          <label htmlFor="engine-default" className="block text-sm font-medium text-content">Default engine</label>
+          <label htmlFor="engine-default" className="block text-sm font-medium text-content">Default Engine</label>
           <select
             id="engine-default"
             value={config.engines.default}
@@ -1014,7 +1014,7 @@ export default function EnginesSection(props) {
               releases, so that knowledge goes stale. Order is not compared: a
               re-ticked selection is the same selection. */}
           <button type="button" className="min-h-10 text-xs text-primary underline"
-            onClick={() => setField('engines', 'enabled', resetEngineSelection(config.engines.enabled, configDefaults.engines?.enabled, [...coreEngineIds]))}>Reset local engines</button>
+            onClick={() => setField('engines', 'enabled', resetEngineSelection(config.engines.enabled, configDefaults.engines?.enabled, [...coreEngineIds]))}>Reset Engines</button>
         </fieldset>
       </Card>
       </SettingsGroup>

@@ -22,6 +22,7 @@
    `node --test` can cover them without a JSX parser. */
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch, postJson } from '../../api/fetchClient';
+import { Select } from '../common/Controls.jsx';
 import {
   canChooseModel, legacyNotice, modelEndpoint, modelLine, readLegacyPick, selectValue,
 } from './kleinModelChoice';
@@ -77,21 +78,19 @@ export default function KleinModelSetting({ datasetId = null, className = '', on
       {canChoose && (
         // flex-wrap + min-w-0: label and select stack rather than overflow at 400 px.
         <label className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-          <span className="text-content-muted">Klein model</span>
-          <select
+          <span className="text-xs text-content-muted">Klein Model</span>
+          <Select size="sm"
             aria-label="Klein model for this dataset"
             disabled={saving}
             value={selectValue(state)}
             onChange={(e) => save(e.target.value)}
-            className="min-w-0 max-w-full flex-1 bg-white/[0.03] border border-white/10 rounded-md
-                       px-2 py-1 text-2xs text-content focus:outline-none
-                       focus:border-primary/60 disabled:opacity-50"
+            className="min-w-0 max-w-full flex-1 focus:outline-none focus:border-primary/60"
           >
             <option value="" className="bg-surface-overlay">Auto (detected)</option>
             {state.choices.map((m) => (
               <option key={m} value={m} className="bg-surface-overlay">{m}</option>
             ))}
-          </select>
+          </Select>
         </label>
       )}
       {notice && (

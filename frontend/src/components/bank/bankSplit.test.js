@@ -62,7 +62,7 @@ test('the all-excluded warning names WHICH outcome, never a guess', () => {
   assert.match(withLoose, /Only the loose root images/)
   const nothing = allExcludedWarning(plan, { loose: 6, includeLoose: false })
   assert.match(nothing, /nothing left to import/)
-  assert.match(nothing, /One bank per subfolder/, 'the way out is named')
+  assert.match(nothing, /Subfolders/, 'the way out is named')
   assert.equal(allExcludedWarning(splitPlan({ preview: preview([['a', 1]]) })), null)
 })
 

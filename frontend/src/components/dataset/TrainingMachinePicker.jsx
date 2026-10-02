@@ -13,6 +13,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { HelpBadge } from '../../help/HelpMode';
+import { fieldClass } from '../common/controls';
 import {
   LOCAL_MACHINE, machineNote, machineOption, reconcileMachine, remoteMachines,
 } from './trainingMachines.js';
@@ -67,7 +68,7 @@ export default function TrainingMachinePicker({ value, onChange, onConfigured,
 
   return (
     <label className={`inline-flex items-center gap-2 text-xs ${className}`}>
-      <span className="text-content-muted whitespace-nowrap">Train on</span>
+      <span className="text-content-muted whitespace-nowrap">Train On</span>
       <select
         value={current}
         disabled={disabled || offered.length === 0}
@@ -76,7 +77,7 @@ export default function TrainingMachinePicker({ value, onChange, onConfigured,
         title={'A run sent to another machine starts fresh there — this app does not '
           + 'send previous checkpoints. Its log, samples and checkpoints are mirrored '
           + 'back here as it goes.'}
-        className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs max-w-[14rem] disabled:opacity-50">
+        className={`${fieldClass({ size: 'md' })} max-w-[14rem]`}>
         <option value={LOCAL_MACHINE}>This machine</option>
         {offered.map((m) => {
           const opt = machineOption(m);

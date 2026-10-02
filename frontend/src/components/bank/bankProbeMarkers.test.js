@@ -41,9 +41,10 @@ test('the passes panel is a READING surface: asked for, one tap away, used again
   // …and below lg it folds everything that is not a pass button: measured at
   // 360 px, the unfolded panel was ~1 500 px tall.
   assert.match(passes, /function Fold\(\{ compact, title, children \}\)/);
-  for (const title of ['Semantic engine', 'Watermarks', 'Edits', 'Bank overview']) {
+  for (const title of ['Semantic engine', 'Watermarks', 'Edits']) {
     assert.ok(passes.includes(`<Fold compact={compact} title="${title}">`), `${title} is no longer folded below lg`);
   }
+  assert.match(passes, /<BankOverview payload=\{payload\} compact=\{compact\} \/>/);
   assert.match(workspace, /compact=\{!railIsColumnNow\}/);
 });
 
@@ -110,7 +111,8 @@ test('the header gives the fold back on a phone', () => {
   assert.match(workspace, /className="hidden items-baseline gap-x-4 gap-y-1 border-t border-border pt-2 text-sm sm:flex sm:flex-wrap \[@media\(max-height:500px\)\]:!hidden"/);
   assert.match(workspace, /data-probe-reading>\s*\{counts && \(\s*<div className="mb-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm sm:hidden">\s*\{counterStats\}/);
   assert.match(workspace, /flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto border-t border-border pt-2 sm:flex-wrap sm:overflow-visible/);
-  assert.equal((workspace.match(/min-h-10 lg:min-h-0 shrink-0 whitespace-nowrap rounded-md/g) || []).length, 5);
+  const actions = workspace.slice(workspace.indexOf('{/* The decisive actions.'), workspace.indexOf('</header>'));
+  assert.equal((actions.match(/<Button type="button" size="md" noShrink/g) || []).length, 5);
   assert.match(workspace, /\[@media\(max-height:500px\)\]:flex \[@media\(max-height:500px\)\]:flex-nowrap/);
 });
 

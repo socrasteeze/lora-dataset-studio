@@ -16,6 +16,7 @@ import {
 } from '../../utils/improveEngines';
 import { useCapabilities } from '../../context/CapabilitiesContext';
 import { useToast } from '../common/Toast';
+import { btnClass, btnShape } from '../common/controls';
 import { autoTriageAvailable, autoTriageEmptyReason } from './faceScoringGate.js';
 import { bulkActionMessage, createBulkActionGate } from './bulkActionGate.js';
 import { READS_STAY_OPEN, datasetBusyReason } from './datasetBusyReason.js';
@@ -28,14 +29,7 @@ import {
 } from './autoTriageApply.js';
 
 const DEFAULT_GREEN = 0.50;
-
-// 3-4 line plain-language explanation for the 🎯 panel's "?" button.
-const AUTO_TRIAGE_HELP = [
-  'Marks the UNDECIDED, face-scored images: keep when the face similarity is ≥ the threshold, reject below it.',
-  'It never deletes anything and never touches your manual ✓/✕ — those are left as-is and drop out of a Re-apply.',
-  'Images with no score (face too small / no face detected) are skipped — judge those by eye.',
-  'After an Apply, move the slider and Re-apply to re-sort everything it triaged this session at the new threshold.',
-];
+const AUTO_TRIAGE_HELP = 'Uses face scores to mark undecided images. Manual decisions stay unchanged.';
 
 // Thumbnail size (S/M/L): three steps avoid a fiddly slider with no useful extra granularity.
 // Persist as a GLOBAL preference, not per dataset, like datasetGenerator: this controls display,
@@ -174,24 +168,20 @@ function AutoTriageBar({ images, allImages, datasetId, faceThresholds, onBatch, 
   };
 
   return (
-    <div className="relative flex items-center gap-3 flex-wrap rounded-lg border border-border bg-surface px-3 py-2">
+    <div className="relative flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2">
       <span className="inline-flex items-center gap-1.5 text-content text-sm font-semibold shrink-0"><Target aria-hidden="true" className="h-4 w-4" /> Auto-triage</span>
       <button type="button" onClick={() => setShowHelp((v) => !v)}
-        aria-expanded={showHelp} aria-label="What does auto-triage do?"
-        title="What does auto-triage do?"
-        className="shrink-0 w-5 h-5 -ml-1 rounded-full border border-border bg-surface-raised text-content-muted text-xs font-bold leading-none hover:text-content hover:bg-surface">
+        aria-expanded={showHelp} aria-label="About Auto-triage"
+        title="About Auto-triage"
+        className={`${btnShape({ size: 'sm' })} min-w-10 border border-border bg-surface-raised px-0 text-xs font-bold text-content-muted hover:bg-surface hover:text-content`}>
         ?
       </button>
       {showHelp && (
         <>
-          {/* Transparent backdrop: an outside click dismisses the popover. */}
           <div className="fixed inset-0 z-40" onClick={() => setShowHelp(false)} aria-hidden />
-          <div role="tooltip"
-            className="absolute z-50 top-full left-2 mt-1 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-surface-overlay p-3 shadow-xl flex flex-col gap-1.5">
-            {AUTO_TRIAGE_HELP.map((line) => (
-              <p key={line} className="text-2xs leading-snug text-content-muted">{line}</p>
-            ))}
-          </div>
+          <p role="tooltip" className="absolute left-2 top-full z-50 mt-1 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-surface-overlay p-3 text-2xs leading-snug text-content-muted shadow-xl">
+            {AUTO_TRIAGE_HELP}
+          </p>
         </>
       )}
       <label className="flex items-center gap-2 text-xs text-content-muted">
@@ -209,7 +199,7 @@ function AutoTriageBar({ images, allImages, datasetId, faceThresholds, onBatch, 
       </span>
       <button type="button" onClick={apply} disabled={busy || applying || nothingToDo}
         title="Marks only scored images — your manual ✓/✕ choices are never changed"
-        className="ml-auto px-3 py-1 rounded-lg bg-surface-raised border border-border text-content text-xs font-semibold disabled:opacity-40 hover:bg-surface">
+        className={btnClass({ size: 'sm' })}>
         {applying ? 'Applying' : isReplay ? 'Re-apply' : 'Apply'}
       </button>
       <span role="status" aria-live="polite" aria-atomic="true"

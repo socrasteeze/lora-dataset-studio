@@ -23,9 +23,10 @@ import InstallRunner from '../components/setup/InstallRunner'
 import InstallEverything from '../components/setup/InstallEverything'
 import { HelpBadge } from '../help/HelpMode'
 import { kleinAssetBlocks } from '../utils/kleinAssets.js'
+import { btnClass, btnShape, fieldClass } from '../components/common/controls.js'
 
 const INPUT_CLASS =
-  'mt-1 w-full rounded-md border border-border-strong bg-surface-raised px-3 py-2 text-sm text-content ' +
+  `mt-1 w-full ${fieldClass()} border-border-strong bg-surface-raised ` +
   'placeholder:text-content-subtle focus:border-primary focus:outline-none'
 
 // Credentials belong to their plugin. This legacy wizard step is only a
@@ -1374,8 +1375,8 @@ export default function SetupPage() {
     // the guard effect hasn't run yet (e.g. this Link navigates before that effect
     // re-fires with fresh caps).
     <button type="button" onClick={openWorkspace} disabled={busy}
-      className="inline-flex min-h-10 items-center text-xs text-content-subtle underline hover:text-content">
-      Back to my workspace
+      className={`${btnShape()} text-content-subtle underline hover:text-content`}>
+      Open Workspace
     </button>
   )
 
@@ -1453,7 +1454,7 @@ export default function SetupPage() {
     // Optional + not-ready → don't alarm: neutral glyph/color and an "optional" tone.
     const NEUTRAL = { glyph: '○', cls: 'text-content-subtle' }
     return (
-      <div className="mx-auto max-w-2xl space-y-6" data-probe-content="setup" data-probe-setup={detecting ? 'checking' : 'ready'}>
+      <div className="mx-auto max-w-2xl space-y-4 [&_button]:min-h-10 lg:[&_button]:min-h-0" data-probe-content="setup" data-probe-setup={detecting ? 'checking' : 'ready'}>
         <div className="text-center">
           <Dna aria-hidden="true" className="mx-auto h-8 w-8 text-primary" />
           <h1 className="mt-2 text-2xl font-bold text-content">Optional tools</h1>
@@ -1463,7 +1464,7 @@ export default function SetupPage() {
           </p>
         </div>
 
-        <section className="rounded-xl border border-border bg-surface p-5">
+        <section className="rounded-xl border border-border bg-surface p-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-content">
               {detecting ? 'Scanning your machine' : 'Machine scan'}
@@ -1534,7 +1535,7 @@ export default function SetupPage() {
               on a configured ComfyUI/Ollama. */}
           <button type="button" onClick={() => setScreen(INSTALL)}
             className="min-h-10 rounded-lg border border-border-strong px-5 py-2 text-sm font-semibold text-content">
-            Downloads & repair
+            Downloads &amp; Repair
           </button>
         </div>
       </div>
@@ -1544,14 +1545,14 @@ export default function SetupPage() {
   // --- Done / summary ----------------------------------------------------------
   if (kind === 'done') {
     return (
-      <div className="mx-auto max-w-2xl space-y-6" data-probe-content="setup" data-probe-setup="ready">
+      <div className="mx-auto max-w-2xl space-y-4 [&_button]:min-h-10 lg:[&_button]:min-h-0" data-probe-content="setup" data-probe-setup="ready">
         <div className="text-center">
           <PartyPopper aria-hidden="true" className="mx-auto h-8 w-8 text-primary" />
-          <h1 className="mt-2 text-2xl font-bold text-content">Optional tools overview</h1>
+          <h1 className="mt-2 text-2xl font-bold text-content">Tools Overview</h1>
           <p className="mt-1 text-sm text-content-muted">{readyCount} of {summary.length} capabilities ready.</p>
         </div>
-        <section className="rounded-xl border border-border bg-surface p-5">
-          <h2 className="text-base font-semibold text-content">What's unlocked</h2>
+        <section className="rounded-xl border border-border bg-surface p-4">
+          <h2 className="text-base font-semibold text-content">Available Features</h2>
           <ul className="mt-3 grid gap-1 sm:grid-cols-2">
             {summary.map((s) => {
               // A product names the setup screen it owns without extending a
@@ -1609,11 +1610,11 @@ export default function SetupPage() {
           </ul>
         </section>
         <div className="flex items-center justify-between">
-          <button type="button" onClick={goBack} className="text-xs text-content-subtle underline hover:text-content">
+          <button type="button" onClick={goBack} className={`${btnShape()} text-content-subtle underline hover:text-content`}>
             ← Back
           </button>
-          <button type="button" onClick={openWorkspace} disabled={busy} className="min-h-10 rounded-lg bg-gradient-primary px-5 py-2 text-sm font-semibold text-gray-950">
-            Build your first dataset →
+          <button type="button" onClick={openWorkspace} disabled={busy} className={btnClass({ variant: 'primary' })}>
+            Build Dataset →
           </button>
         </div>
       </div>
@@ -1627,7 +1628,7 @@ export default function SetupPage() {
         className="mx-auto max-w-2xl space-y-5 [&_button]:min-h-10 [&_summary]:min-h-10 lg:[&_button]:min-h-0 lg:[&_summary]:min-h-0">
         <div className="text-center">
           <div className="text-2xl" aria-hidden="true">⬇</div>
-          <h1 className="mt-2 text-2xl font-bold text-content">Optional downloads & repair</h1>
+          <h1 className="mt-2 text-2xl font-bold text-content">Downloads &amp; Repair</h1>
           <p className="mt-2 text-sm text-content-muted">
             Install only the tools you want to use. Each action lists what it adds;
             local model downloads require a configured ComfyUI first.
@@ -1636,14 +1637,14 @@ export default function SetupPage() {
         </div>
         <InstallEverything plan={installPlan} caps={caps} onDone={() => refresh(true)} />
         <div className="flex items-center justify-between">
-          <button type="button" onClick={goBack} className="text-xs text-content-subtle underline hover:text-content">
+          <button type="button" onClick={goBack} className={`${btnShape()} text-content-subtle underline hover:text-content`}>
             ← Back
           </button>
           <div className="flex items-center gap-4">
             {skipLink}
             <button type="button" onClick={goNext}
-              className="rounded-lg bg-gradient-primary px-5 py-2 text-sm font-semibold text-gray-950">
-              Back to optional tools
+              className={btnClass({ variant: 'primary' })}>
+              Back to Tools
             </button>
           </div>
         </div>
@@ -1664,7 +1665,7 @@ export default function SetupPage() {
         <button type="button" onClick={goBack} className="text-sm text-content-muted hover:text-content">{journey ? '← My setup plan' : '← Optional tools'}</button>
       </div>
 
-      <section className="rounded-xl border border-border bg-surface p-5">
+      <section className="rounded-xl border border-border bg-surface p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold text-content">
@@ -1687,14 +1688,14 @@ export default function SetupPage() {
         </p>
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button type="button" onClick={goBack} className="text-xs text-content-subtle underline hover:text-content">
+        <button type="button" onClick={goBack} className={`${btnShape()} text-content-subtle underline hover:text-content`}>
           ← Back
         </button>
         <div className="flex flex-wrap items-center gap-3">
           {skipLink}
           <button type="button" onClick={nextWithSave} disabled={advancing}
             title={reason || ''}
-            className="rounded-lg bg-gradient-primary px-5 py-2 text-sm font-semibold text-gray-950 disabled:cursor-not-allowed disabled:opacity-40">
+            className={`${btnClass({ variant: 'primary' })} disabled:cursor-not-allowed`}>
             {nextLabel}
           </button>
         </div>

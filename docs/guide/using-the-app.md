@@ -494,7 +494,7 @@ The funnel itself:
    inventories every image in place (subfolders included). Nothing is copied,
    nothing is modified; rejecting an image is a reversible status, never a file
    deletion. If your folder is really a *folder of folders* (a Telegram export
-   with one subfolder per chat, say), tick **One bank per subfolder** and each
+   with one subfolder per chat, say), enable **Subfolders** between Browse and Create. Each
    top-level subfolder becomes its own bank — so you can curate, queue and
    promote each one separately. A preview shows exactly which banks will be made
    and how many images each holds; loose images sitting directly in the parent
@@ -513,7 +513,7 @@ The funnel itself:
    and captions are never touched. The bank LIST does not re-check the folders by
    itself any more: on a big library that was a full inventory of every image on
    disk each time you walked past the page. It tells you how fresh its counts
-   are, and **🔄 Rescan folders** checks them all on demand ("42 new image(s)
+   are, and **🔄 Rescan Folders** checks them all on demand ("42 new image(s)
    found in the folder"). Opening one bank still walks that bank's own folder, so
    its own count is always current the moment you look at it. A folder that went
    missing (unplugged drive, renamed folder) is still flagged from the list
@@ -523,8 +523,8 @@ The funnel itself:
    many as fit and tells you how many it left out, so nothing you already
    triaged stops working. That ceiling counts what is in the folder now — files
    you deleted from it don't count against it.
-1bis. **🕸 Scrape the web into a bank** — you don't need a folder you prepared
-   by hand. Unfold **🕸 Scrape the web into a bank** on the bank list, choose a
+1bis. **Scrape Images** — you don't need a folder you prepared
+   by hand. Unfold **Scrape Images** on the bank list, choose a
    destination (a **new bank**, or **add to an existing one**), then scan a
    gallery URL and pick images exactly as you would for a dataset. They are
    downloaded into that bank's own folder and inventoried on the spot.
@@ -2999,8 +2999,8 @@ can judge; the three hundred shots inside it are.
    Nothing is copied, and **no pass ever modifies your files** — scanning,
    cutting and building all write elsewhere. The one thing that adds to that
    folder is a scrape you send to this bank yourself (next step).
-1bis. **🕸 Scrape the web into a video bank** — you don't need a folder of rushes
-   you assembled by hand. Unfold **🕸 Scrape the web into a video bank** on the
+1bis. **Scrape Video** — you don't need a folder of rushes
+   you assembled by hand. Unfold **Scrape Video** on the
    video bank list, choose a destination, then scan a URL and pick clips exactly
    as you would pick images. The scanner has always listed videos — RedGifs,
    Erome, Picazor, TikTok, X, Civitai and the gallery sources all return them —

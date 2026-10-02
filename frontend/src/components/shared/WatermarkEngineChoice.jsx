@@ -5,6 +5,7 @@ import {
   WATERMARK_ENGINES, normalizeEngine, watermarkEngineStatus, withVisionModel,
 } from '../../utils/watermarkEngine.js';
 import VisionModelPicker from './VisionModelPicker.jsx';
+import { Select } from '../common/Controls.jsx';
 
 /* Which engine 🚩 Find watermarks runs — ONE control, mounted in BOTH scan
  * windows (dataset dialog and bank panel), write-through persisted exactly like
@@ -41,18 +42,20 @@ export default function WatermarkEngineChoice({ caps = {}, disabled = false, onC
   };
 
   return (
-    <label className="block text-2xs text-content-subtle">
-      <span className="font-medium text-content">Detection engine</span>
-      {' — stored: the other surface reads the same value.'}
+    <div className="text-xs text-content-subtle">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-medium text-content">Detection Engine</span>
+        <span title="Saved to Settings for Bank and Dataset">Shared Setting</span>
+      </div>
       <span className="mt-1 flex flex-wrap items-center gap-2">
-        <select value={value} disabled={disabled || saving}
+        <Select size="sm" value={value} disabled={disabled || saving}
           aria-label="Watermark detection engine"
           onChange={(e) => save(e.target.value)}
-          className="rounded border border-border bg-app px-1.5 py-0.5 text-content">
+          className="min-w-0 max-w-full">
           {WATERMARK_ENGINES.map((e) => (
             <option key={e.id} value={e.id}>{e.label}</option>
           ))}
-        </select>
+        </Select>
       </span>
       <span className={`mt-1 block leading-snug ${status.warn ? 'text-amber-300' : 'text-content-subtle'}`}>
         {status.line}
@@ -60,6 +63,6 @@ export default function WatermarkEngineChoice({ caps = {}, disabled = false, onC
       {status.runs === 'vision' && (
         <VisionModelPicker caps={capsView} disabled={disabled} onModel={setVisionModel} />
       )}
-    </label>
+    </div>
   );
 }

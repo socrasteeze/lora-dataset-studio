@@ -295,7 +295,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Check it",
+    "Check It",
     1
   ],
   [

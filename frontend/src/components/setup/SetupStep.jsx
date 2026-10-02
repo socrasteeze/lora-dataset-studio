@@ -9,7 +9,7 @@ export default function SetupStep({ step, index, effectiveStatus, onSkip, onUnsk
   const meta = STATUS_META[effectiveStatus] || STATUS_META.available
   const collapsed = effectiveStatus === 'ready' || effectiveStatus === 'skipped'
   return (
-    <section className="rounded-xl border border-border bg-surface p-5">
+    <section className="rounded-xl border border-border bg-surface p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-content">
@@ -30,8 +30,8 @@ export default function SetupStep({ step, index, effectiveStatus, onSkip, onUnsk
       {!step.recommended && effectiveStatus !== 'ready' && (
         <div className="mt-3 text-right">
           {effectiveStatus === 'skipped'
-            ? <button type="button" onClick={onUnskip} className="text-xs text-primary underline">Set this up</button>
-            : <button type="button" onClick={onSkip} className="text-xs text-content-subtle underline">Skip for now</button>}
+            ? <button type="button" onClick={onUnskip} className="text-xs text-primary underline">Set Up</button>
+            : <button type="button" onClick={onSkip} className="text-xs text-content-subtle underline">Skip</button>}
         </div>
       )}
     </section>

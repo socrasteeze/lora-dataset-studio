@@ -11,7 +11,7 @@ import PluginSlot from '../plugins/PluginSlot.jsx';
 export default function DatasetPage() {
   const ds = useDataset();
   return (
-    <div className="mx-auto w-full p-4 lg:p-0">
+    <div className="mx-auto w-full">
       {ds.currentId ? (
         <DatasetWorkspace ds={ds} onBack={() => ds.setCurrentId(null)} />
       ) : (

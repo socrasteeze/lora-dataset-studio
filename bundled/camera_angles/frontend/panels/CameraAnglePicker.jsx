@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, X } from 'lucide-react';
+import { controlHeight } from '@lds/plugin-sdk/ui';
 import { apiFetch } from '@lds/plugin-sdk';
 import { requestHelpTip } from '@lds/plugin-sdk';
 import { GlobalModelPicker } from '@lds/plugin-sdk';
@@ -200,7 +201,7 @@ export default function CameraAnglePicker({ onShoot, onClose, modelResident = fa
           </button>}
         </header>
 
-        <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto p-4 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]">
+        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-3 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]">
           <section data-probe-panel="camera-dial" className="min-w-0">
             <h3 className="mb-2 font-mono text-2xs uppercase tracking-[0.14em] text-gray-400">
               Around the subject
@@ -209,17 +210,17 @@ export default function CameraAnglePicker({ onShoot, onClose, modelResident = fa
             <div className="mt-2 flex gap-2">
               <button type="button"
                 onClick={() => setAzimuths(AZIMUTHS.map((a) => a.id))}
-                className="min-h-10 lg:min-h-0 flex-1 rounded-lg border border-white/10 px-2 py-1.5 text-xs text-gray-300 hover:border-white/25">
+                className={`${controlHeight('sm')} flex-1 rounded-lg border border-white/10 px-2 py-0 text-xs text-gray-300 hover:border-white/25`}>
                 All sides
               </button>
               <button type="button" onClick={() => setAzimuths([])}
-                className="min-h-10 lg:min-h-0 flex-1 rounded-lg border border-white/10 px-2 py-1.5 text-xs text-gray-300 hover:border-white/25">
+                className={`${controlHeight('sm')} flex-1 rounded-lg border border-white/10 px-2 py-0 text-xs text-gray-300 hover:border-white/25`}>
                 Clear
               </button>
             </div>
           </section>
 
-          <section data-probe-panel="camera-axes" className="min-w-0 space-y-4">
+          <section data-probe-panel="camera-axes" className="min-w-0 space-y-3">
             <div>
               <h3 className="mb-2 font-mono text-2xs uppercase tracking-[0.14em] text-gray-400">
                 Camera height
@@ -309,12 +310,12 @@ export default function CameraAnglePicker({ onShoot, onClose, modelResident = fa
             )}
           </p>
           {!inline && <button type="button" onClick={onClose}
-            className="min-h-10 lg:min-h-0 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-gray-300 hover:border-white/25">
+            className={`${controlHeight('sm')} rounded-lg border border-white/10 px-3 py-0 text-xs text-gray-300 hover:border-white/25`}>
             Cancel
           </button>}
           <button type="button" onClick={run} disabled={!!refusal || active || disabled}
             aria-busy={active}
-            className="min-h-10 lg:min-h-0 rounded-lg bg-gradient-primary px-4 py-1.5 text-xs font-semibold text-gray-950 disabled:cursor-not-allowed disabled:opacity-40">
+            className={`${controlHeight('sm')} rounded-lg bg-gradient-primary px-4 py-0 text-xs font-semibold text-gray-950 disabled:cursor-not-allowed disabled:opacity-40`}>
             {active ? 'Queueing' : `Shoot ${poses.length || ''} view${poses.length === 1 ? '' : 's'}`.trim()}
           </button>
         </footer>

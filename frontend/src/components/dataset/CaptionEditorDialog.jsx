@@ -8,6 +8,7 @@ import CaptionLab from './CaptionLab';
 import { captionOriginInfo } from '../../utils/captionOrigin.js';
 import { useCaptionDraft } from '../../hooks/useCaptionDraft.js';
 import { useFocusTrap } from '../../hooks/useFocusTrap.js';
+import { btnShape } from '../common/controls';
 
 /** The authorship line for a text box, or null.
  *
@@ -158,21 +159,19 @@ export default function CaptionEditorDialog({
             </div>
             {labAvailable && (
               <div className="ml-1 flex rounded-lg border border-border bg-app p-0.5" role="tablist" aria-label="Caption editor mode">
-                {/* min-h-10 lg:min-h-0 with inline-flex: the two tabs measured 24 px
-                    on a phone, and an inline box ignores min-height on its own. */}
                 <button type="button" role="tab" aria-selected={mode === 'edit'} onClick={() => setMode('edit')}
-                  className={`inline-flex min-h-10 items-center rounded-md px-2.5 py-1 text-xs font-semibold lg:min-h-0 ${mode === 'edit' ? 'bg-surface text-content shadow-sm' : 'text-content-muted hover:text-content'}`}>
+                  className={`${btnShape()} rounded-md font-semibold ${mode === 'edit' ? 'bg-surface text-content shadow-sm' : 'text-content-muted hover:text-content'}`}>
                   Edit
                 </button>
                 <button type="button" role="tab" aria-selected={mode === 'lab'} disabled={!!recovery.conflict || busy} onClick={() => setMode('lab')}
-                  className={`inline-flex min-h-10 items-center rounded-md px-2.5 py-1 text-xs font-semibold lg:min-h-0 ${mode === 'lab' ? 'bg-surface text-content shadow-sm' : 'text-content-muted hover:text-content'}`}>
+                  className={`${btnShape()} rounded-md font-semibold ${mode === 'lab' ? 'bg-surface text-content shadow-sm' : 'text-content-muted hover:text-content'}`}>
                   🧪 Caption Lab
                 </button>
               </div>
             )}
           </div>
           <button type="button" onClick={dismiss} disabled={busy} aria-label="Close expanded caption editor"
-            className="inline-flex min-h-10 items-center rounded-lg border border-border bg-app px-2.5 py-1.5 text-sm text-content-muted hover:text-content disabled:opacity-40 lg:min-h-0">
+            className={`${btnShape()} border border-border bg-app text-content-muted hover:text-content`}>
             ✕
           </button>
         </header>

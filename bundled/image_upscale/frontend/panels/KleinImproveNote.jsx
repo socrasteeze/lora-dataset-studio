@@ -38,7 +38,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { readImproveSettings, saveImproveSettings } from '../lib/settings.js';
 export { readImproveSettings, saveImproveSettings } from '../lib/settings.js';
-import { SettingsLink } from '@lds/plugin-sdk/ui';
+import { SettingsLink, controlHeight } from '@lds/plugin-sdk/ui';
 import { PromptOverrideField } from '@lds/plugin-sdk/ui';
 import { KleinModelSetting } from '@lds/plugin-sdk/ui';
 import { improveInstructionLine, improveAnimeCaution } from '../lib/kleinImproveHint.js';
@@ -292,17 +292,16 @@ export default function KleinImproveNote({
           backend already resolves it fail-closed to "none"). Klein only:
           SeedVR2 is a restoration and chains nothing. */}
       {(server.loraPresets.length > 0 || loraPreset) && (
-        <label className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-          <span className="text-content-muted">LoRA preset (app-wide, Klein only)</span>
+        <label className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 text-xs">
+          <span className="text-content-muted">LoRA Preset</span>
           <select
             data-testid="klein-improve-lora-preset"
             aria-label="Generation-LoRA preset chained by every Klein improve"
             disabled={saving || !server.loaded}
             value={loraPreset}
             onChange={(e) => setLoraPreset(e.target.value)}
-            className="min-w-0 max-w-full flex-1 bg-white/[0.03] border border-white/10 rounded-md
-                       px-2 py-1 text-2xs text-content focus:outline-none
-                       focus:border-primary/60 disabled:opacity-50"
+            title="Saved for every Klein improvement"
+            className={`${controlHeight('sm')} min-w-0 max-w-full flex-1 bg-white/[0.03] border border-white/10 rounded-md px-2 py-0 text-xs text-content focus:outline-none focus:border-primary/60 disabled:opacity-50`}
           >
             <option value="" className="bg-surface-overlay">None</option>
             {server.loraPresets.map((name) => (
@@ -407,8 +406,8 @@ export default function KleinImproveNote({
           comes back at, and the knob people left this panel for (reported the
           day the rest of the improve controls arrived here). Same single truth
           as the Settings card: same key, same 0.5–8 bounds, said app-wide. */}
-      <label className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-        <span className="text-content-muted">Output size, MP (app-wide)</span>
+      <label className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 text-xs">
+        <span className="text-content-muted">Output MP</span>
         <input
           type="number"
           data-testid="klein-improve-megapixels"
@@ -418,9 +417,7 @@ export default function KleinImproveNote({
           disabled={saving || !server.loaded}
           value={megapixels}
           onChange={(e) => setMegapixels(e.target.value)}
-          className="w-20 bg-white/[0.03] border border-white/10 rounded-md
-                     px-2 py-1 text-2xs text-content focus:outline-none
-                     focus:border-primary/60 disabled:opacity-50"
+          className={`${controlHeight('sm')} w-20 bg-white/[0.03] border border-white/10 rounded-md px-2 py-0 text-xs text-content focus:outline-none focus:border-primary/60 disabled:opacity-50`}
         />
       </label>
       {/* Two targets because they are two different problems: the WORDS

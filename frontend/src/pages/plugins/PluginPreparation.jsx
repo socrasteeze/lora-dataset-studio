@@ -49,7 +49,7 @@ export default function PluginPreparation({ pluginId, items, onPrepared }) {
   }
   const busy = phase === 'running' || phase === 'starting'
   return <section aria-label="Prepare selected components" className="space-y-3 rounded-lg border border-border p-4">
-    <h3 className="text-sm font-semibold">Prepare selected components</h3>
+    <h3 className="text-sm font-semibold">Prepare Components</h3>
     <p className="text-sm text-content-muted">Choose the downloads and tools for this plugin. LDS checks the whole selection before starting. Existing files stay available for repair.</p>
     <div className="space-y-2">{items.map(item => <label key={item.action} className="flex min-h-10 items-start gap-2 text-sm">
       <input type="checkbox" className="mt-1" checked={selected.includes(item.action)} disabled={busy || !item.available}
@@ -64,7 +64,7 @@ export default function PluginPreparation({ pluginId, items, onPrepared }) {
     {phase === 'error' && <p role="alert" className="text-sm text-danger">Some components need attention. Select them to retry, or repair them individually below.</p>}
     {error && <p role="alert" className="text-sm text-danger">{error}</p>}
     {phase === 'status-error' ? <button type="button" className="min-h-10 rounded-md border border-border px-3 text-sm"
-      onClick={() => { setError(''); setAttempt(value => value + 1); setPhase('running') }}>Retry status</button>
+      onClick={() => { setError(''); setAttempt(value => value + 1); setPhase('running') }}>Retry Status</button>
       : <button type="button" onClick={start} disabled={busy || !selected.length}
         className="min-h-10 rounded-md bg-primary px-3 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Preparing' : `Prepare selection (${selected.length})`}</button>}
   </section>

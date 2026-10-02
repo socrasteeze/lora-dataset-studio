@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { apiFetch, postJson } from '../../api/fetchClient.js'
-import { Card, INPUT_CLASS } from '../settings/primitives.jsx'
+import { Card } from '../settings/primitives.jsx'
 import ResetToDefault from '../settings/ResetToDefault.jsx'
 import { moveLabel, movePercent, relocationChoices } from '../settings/storageLocations.js'
 import { waitForStorageMove } from './storageMoveCompletion.js'
+import { Button, Input } from '../common/Controls.jsx'
 
 export function LocationEditor({
   id, storageKey, label, help, section, field, current, sizeBytes,
@@ -79,22 +80,20 @@ export function LocationEditor({
   return (
     <Card title={label} help={help}>
       <p className="break-all text-xs text-content-subtle">
-        <span className="text-content-muted">In use now:</span> {current || '—'}
+        <span className="text-content-muted">Current:</span> {current || '—'}
       </p>
       <div>
         <label htmlFor={id} className="block text-sm font-medium text-content">
-          Folder (leave empty for the default)
+          Folder
         </label>
-        {/* Column on a phone: a path field and two buttons never share 400 px. */}
-        <div className="mt-1 flex flex-col gap-2 sm:flex-row">
-          <input id={id} type="text" value={draft} disabled={busy}
+        <div className="mt-1 flex items-center gap-2">
+          <Input id={id} type="text" value={draft} disabled={busy}
             onChange={(e) => { setDraft(e.target.value); setCheck(null) }}
-            placeholder="Defaults to the app’s data folder"
-            className={`${INPUT_CLASS} sm:flex-1`} />
-          <button type="button" onClick={validate} disabled={checking || busy}
-            className="shrink-0 rounded-md border border-border-strong px-3 py-1.5 text-sm font-medium text-content hover:bg-surface-raised disabled:opacity-50">
-            {checking ? 'Checking' : 'Check folder'}
-          </button>
+            placeholder="Empty uses the default folder"
+            className="min-w-0 flex-1 border-border-strong bg-surface-raised" />
+          <Button noShrink onClick={validate} disabled={checking || busy}>
+            {checking ? 'Checking' : 'Check'}
+          </Button>
         </div>
         <div className="mt-1">
           <ResetToDefault label={label} section={section} field={field}
@@ -109,7 +108,7 @@ export function LocationEditor({
       )}
 
       {choices.length > 0 && !busy && (
-        <div className="space-y-2 rounded-lg border border-border bg-surface-raised p-3">
+        <div className="space-y-2 border-t border-border pt-2">
           <p className="text-xs text-content-muted">
             {check.default
               ? 'This goes back to the folder inside the app’s data directory.'

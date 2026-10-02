@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { captionStepNote } from './pipelineVerdict.js'
 import { reportHeadline, stepView } from './pipelineReportView.js'
+import { Button, IconButton } from '../common/Controls.jsx'
 
 /** The morning-after summary of the last "Launch all" run — one row per
  * requested pass (done / skipped-with-reason / error / cancelled) plus the
@@ -46,9 +47,9 @@ export default function PipelineReport({ report, onDismiss }) {
   return (
     <div className="rounded-lg border border-border bg-surface-raised">
       <div className="flex items-center gap-2 px-3 py-2">
-        <button type="button" onClick={() => setOpen((v) => !v)}
+        <Button type="button" size="md" variant="ghost" onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex items-center gap-2 text-sm font-semibold text-content">
+          className="min-w-0 justify-start font-semibold text-content">
           <span aria-hidden>{icon}</span>
           Last Launch-all run — {covered}/{total} passes ran
           {redone > 0 && (
@@ -57,11 +58,10 @@ export default function PipelineReport({ report, onDismiss }) {
           {stopped && <span className="text-content-subtle">(stopped)</span>}
           {attentionLabel && <span className="text-amber-300">· {attentionLabel}</span>}
           <span aria-hidden className="text-content-subtle">{open ? '▾' : '▸'}</span>
-        </button>
+        </Button>
         <span className="ml-auto text-xs text-content-subtle">{fmtWhen(report.finished_at)}</span>
         {onDismiss && (
-          <button type="button" onClick={onDismiss} aria-label="Dismiss the report"
-            className="rounded border border-border px-1.5 text-xs text-content-subtle hover:text-content">✕</button>
+          <IconButton size="md" label="Dismiss the report" onClick={onDismiss}>✕</IconButton>
         )}
       </div>
       {open && (

@@ -10,7 +10,7 @@ const CIVITAI_SECRET = {
 
 export default function ScrapingSection(props) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card id="scrape-credentials" title="Source Credentials"
         help="Saved keys remain private. The field stays blank after saving.">
         <SecretField field={CIVITAI_SECRET} {...props} />

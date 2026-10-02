@@ -74,16 +74,15 @@ function BankTitle({ bank, onOpen, onRename }) {
   if (editing) {
     return (
       <form onSubmit={submit} className="flex min-w-0 grow items-center gap-1">
-        <input value={draft} onChange={(e) => setDraft(e.target.value)}
+        <Input size="sm" value={draft} onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Escape') cancel() }}
           aria-label={`New name for ${bank.name}`} maxLength={BANK_NAME_MAX} autoFocus
-          className="min-w-0 grow rounded-md border border-border bg-surface-raised px-2 py-1 text-sm text-content" />
-        <button type="submit" disabled={saving}
-          className="rounded-md border border-border px-2 py-1 text-xs font-semibold text-emerald-300 disabled:opacity-50">
+          className="min-w-0 grow bg-surface-raised" />
+        <Button type="submit" size="sm" noShrink disabled={saving}
+          className="font-semibold text-emerald-300">
           {saving ? '' : 'Save'}
-        </button>
-        <button type="button" onClick={cancel}
-          className="px-1 text-xs text-content-subtle hover:text-content">Cancel</button>
+        </Button>
+        <Button type="button" size="sm" noShrink variant="ghost" onClick={cancel}>Cancel</Button>
       </form>
     )
   }
@@ -645,11 +644,11 @@ export default function BankPage() {
         {/* The kind of bank you are making, said WHERE you make one. Until now a
             .mp4 dropped in this folder was skipped in silence — this is the only
             place someone with a folder of rushes would ever have looked. */}
-        <BankLaneTabs className="w-full sm:ml-auto sm:w-auto" />
+        <BankLaneTabs className="w-full sm:ml-auto sm:w-72" />
       </header>
 
       <form onSubmit={create}
-        className="space-y-3 rounded-lg border border-border bg-surface p-4">
+        className="space-y-3">
         <div className="flex flex-wrap items-end gap-2">
           <div className="min-w-40 grow">
             <label htmlFor="bank-name" className="mb-1 block text-sm font-medium text-content">Name</label>
@@ -661,6 +660,16 @@ export default function BankPage() {
           <FolderPickerField inline size="lg" id="bank-folder" label="Folder"
             value={folder} onChange={setFolder} required
             placeholder="C:\path\to\unsorted-images (subfolders included)" />
+          <Button type="button" size="lg" aria-pressed={splitMode}
+            aria-label="One bank per subfolder"
+            onClick={() => setSplitMode((value) => !value)}
+            title={splitMode
+              ? 'Enabled: create one bank for each top-level subfolder. Select to disable.'
+              : 'Disabled: create one bank for this folder. Select to create one bank for each top-level subfolder.'}
+            className={splitMode ? 'border-primary/60 bg-primary/15 text-content' : ''}>
+            Subfolders
+          </Button>
+          <HelpBadge topic="bank-split-subfolders" />
           <Button type="submit" size="lg" variant="primary" disabled={creating || !!folderNotice}
             title={folderNotice ? 'That folder belongs to a dataset' : undefined}>
             {creating ? 'Inventorying' : (
@@ -669,21 +678,13 @@ export default function BankPage() {
             )}
           </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <label className="flex items-center gap-1.5 text-sm text-content">
-            <input type="checkbox" checked={splitMode}
-              onChange={(e) => setSplitMode(e.target.checked)} />
-            One bank per subfolder
-            <HelpBadge topic="bank-split-subfolders" />
+        {splitMode && (
+          <label className="flex items-center gap-1.5 text-sm text-content-muted">
+            <input type="checkbox" checked={includeLoose}
+              onChange={(e) => setIncludeLoose(e.target.checked)} />
+            Include Loose Images
           </label>
-          {splitMode && (
-            <label className="flex items-center gap-1.5 text-sm text-content-muted">
-              <input type="checkbox" checked={includeLoose}
-                onChange={(e) => setIncludeLoose(e.target.checked)} />
-              Also make a bank from loose root images
-            </label>
-          )}
-        </div>
+        )}
         {splitMode && preview && (
           <div className="rounded-md border border-border bg-surface-raised p-3 text-sm">
             {preview.subfolders.length === 0 ? (
@@ -742,15 +743,12 @@ export default function BankPage() {
           bank, drained one at a time per machine behind an idle GPU — and the confirm says
           so, because "run all" on twelve banks is the thing to be afraid of. */}
       {queueAllCount > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center">
           <button type="button" onClick={() => setDialogScope({ kind: 'all' })}
-            title="Line every bank that still has undecided images up to run, one after another on each machine"
+            title="Queue every bank with undecided images. Banks run one at a time per machine; another machine runs its own queue alongside this one."
             className={`${btnClass({ size: 'md' })} border-indigo-400/50 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20`}>
             ⏳ Queue all {queueAllCount} bank(s)
           </button>
-          <span className="text-xs text-content-subtle">
-            One at a time on this machine — a bank sent to another one runs alongside it.
-          </span>
         </div>
       )}
 
@@ -788,13 +786,10 @@ export default function BankPage() {
             aria-label="Find a bank"
             className="min-w-[9rem] flex-1"
           />
-          <label className="flex items-center gap-2 text-sm text-content-muted">
-            Sort
-            <Select size="md" value={sort} onChange={(e) => changeSort(e.target.value)}
-              aria-label="Sort the banks">
-              {BANK_SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </Select>
-          </label>
+          <Select size="md" value={sort} onChange={(e) => changeSort(e.target.value)}
+            aria-label="Sort the banks">
+            {BANK_SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </Select>
           <Button size="md" type="button" onClick={() => {
             setSelectingBanks((value) => !value)
             if (selectingBanks) setSelectedBanks(new Set())

@@ -132,6 +132,7 @@ import { chipCounts, facetDataKey, isFacetFiltered } from './bankFacetCounts.js'
 // address at all. Read-only; it selects, it never un-rejects.
 import { reasonBuckets, reasonHint } from './bankRejectReasons.js'
 import { activeLocalLlm, localLlmLabel } from '../../utils/localLlm'
+import { Button, Select } from '../common/Controls.jsx'
 import WatermarkEngineChoice from '../shared/WatermarkEngineChoice'
 import { watermarkEngineStatus } from '../../utils/watermarkEngine.js'
 
@@ -1310,8 +1311,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
      and overflow on their own); the rest are max-w-full with a 16rem ceiling from
      sm up, because capping them by symmetry truncated them into nonsense
      ("Standard — the prompt as⌄"). */
-  const captionSelectClass = 'mt-0.5 w-full rounded-lg border border-border bg-app/60 '
-    + 'px-2 py-1 text-xs text-content disabled:opacity-40'
+  const captionSelectClass = 'mt-0.5 w-full bg-app/60'
   /* Rendered UNDER the engine picker, because it is about the engine and the picker
      is the lever it names. It re-computes as the engine changes, so ticking
      JoyCaption turns the warning into its own confirmation instead of leaving an
@@ -1359,10 +1359,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     ? { limit: Math.max(1, Math.min(10000, Math.round(Number(wmSampleSize) || 20))) }
     : {})
   const watermarkScanControls = (
-    <div className="space-y-2 rounded-md border border-border bg-surface-raised p-2">
-      <p className="m-0 text-2xs font-semibold uppercase tracking-wide text-content-muted">
-        Options for this run
-      </p>
+    <div className="space-y-2 border-t border-border pt-2">
       <label className="flex items-start gap-2 text-2xs text-content-subtle">
         <input type="checkbox" className="mt-0.5" checked={wmSampleOn}
           onChange={(e) => setWmSampleOn(e.target.checked)} disabled={live} />
@@ -1412,10 +1409,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     </div>
   )
   const textScanControls = (
-    <div className="space-y-2 rounded-md border border-border bg-surface-raised p-2">
-      <p className="m-0 text-2xs font-semibold uppercase tracking-wide text-content-muted">
-        Options for this run
-      </p>
+    <div className="space-y-2 border-t border-border pt-2">
       <label className="flex items-start gap-2 text-2xs text-content-subtle">
         <input type="checkbox" className="mt-0.5" checked={textSampleOn}
           onChange={(e) => setTextSampleOn(e.target.checked)} disabled={live} />
@@ -1489,11 +1483,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     setCaptionLength(config.length || '')
   }, [setCaptionEngine, setCaptionModel, setCaptionVocab, setCaptionLength])
   const captionRunControls = (
-    <div className="space-y-2 rounded-md border border-border bg-surface-raised p-2">
-      <p className="m-0 text-2xs font-semibold uppercase tracking-wide text-content-muted">
-        Options for this run
-      </p>
-      <p className="m-0 text-2xs leading-snug text-content-subtle">
+    <div className="space-y-2 border-t border-border pt-2">
+      <p className="m-0 text-xs leading-snug text-content-subtle">
         These override your Settings for this run only — the global values are never
         written from here.
       </p>
@@ -1503,7 +1494,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           test_bank_caption_lab.py); what it offers to bench and what "use this config"
           means are this surface's own. */}
       <div className="flex flex-wrap items-center gap-2 border-b border-border pb-2">
-        <button type="button" onClick={() => setLabPickerOpen(true)}
+        <Button type="button" size="md" onClick={() => setLabPickerOpen(true)}
           disabled={live || labPile.length === 0}
           aria-label="Open the Caption Lab"
           title={labPile.length === 0
@@ -1511,35 +1502,31 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             : 'Try up to four caption configs (engine, vision model, register, length) on '
               + 'one image and read them side by side. Nothing is written until you keep a '
               + 'result, and the winning config can be loaded into the dials above.'}
-          className="inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-content disabled:opacity-40 lg:min-h-0">
+          className="font-semibold">
           🧪 Caption Lab
-        </button>
-        <span className="text-2xs leading-snug text-content-subtle">
-          Compare engines, models and registers on ONE image before paying for a pass
-          over the pile.
-        </span>
+        </Button>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
-        <label className="block text-2xs text-content-subtle">
+        <label className="block text-xs text-content-subtle">
           Engine
-          <select value={captionEngine} onChange={(e) => setCaptionEngine(e.target.value)}
+          <Select size="md" value={captionEngine} onChange={(e) => setCaptionEngine(e.target.value)}
             disabled={live} aria-label="Caption engine"
             title="Which engine writes this run's captions, without changing your Settings. Auto is a CHAIN, not a choice between two: JoyCaption drafts, then Ollama covers whatever it missed."
             className={`${captionSelectClass} sm:max-w-[16rem]`}>
             {/* 'none' is dropped on purpose: "caption with nothing" is not a pass. */}
             {ENGINE_OPTIONS.filter((o) => o.id !== 'none')
               .map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-          </select>
+          </Select>
         </label>
-        <label className="block text-2xs text-content-subtle">
+        <label className="block text-xs text-content-subtle">
           Vision model
-          <select value={captionModel} onChange={(e) => setCaptionModel(e.target.value)}
+          <Select size="md" value={captionModel} onChange={(e) => setCaptionModel(e.target.value)}
             disabled={live || !ollamaPicksApply} aria-label="Caption vision model"
             title={ollamaPicksApply ? llmPicker.perRunHint : llmPicker.inertHint}
             className={`${captionSelectClass} sm:max-w-[11rem]`}>
             <option value="">Configured model</option>
             {captionModelChoices.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
+          </Select>
           {!ollamaPicksApply && (
             <span className="mt-0.5 block text-2xs leading-snug text-amber-300/90">
               The engine you picked does not reach {llmPicker.label}, so this choice would
@@ -1547,23 +1534,23 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             </span>
           )}
         </label>
-        <label className="block text-2xs text-content-subtle">
+        <label className="block text-xs text-content-subtle">
           Register
-          <select value={captionVocab} onChange={(e) => setCaptionVocab(e.target.value)}
+          <Select size="md" value={captionVocab} onChange={(e) => setCaptionVocab(e.target.value)}
             disabled={live} aria-label="Caption vocabulary register"
             title={llmPicker.registerHint}
             className={`${captionSelectClass} sm:max-w-[16rem]`}>
             {VOCABULARY_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-          </select>
+          </Select>
         </label>
-        <label className="block text-2xs text-content-subtle">
+        <label className="block text-xs text-content-subtle">
           Length
-          <select value={captionLength} onChange={(e) => setCaptionLength(e.target.value)}
+          <Select size="md" value={captionLength} onChange={(e) => setCaptionLength(e.target.value)}
             disabled={live} aria-label="Caption length"
             title="How much the captioner writes. Concise aims for one short sentence, Detailed for several - a target the model follows loosely, not a hard cap. Standard leaves the prompt untouched. Longer captions give the search more to match on."
             className={`${captionSelectClass} sm:max-w-[16rem]`}>
             {CAPTION_LENGTH_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-          </select>
+          </Select>
         </label>
       </div>
       {captionNsfw && (
@@ -1601,12 +1588,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         <button type="button" onClick={startRecaption} disabled={!!recaptionInert}
           aria-label="Re-caption"
           title={recaptionInert || recaptionNote}
-          className="rounded-md border border-amber-400/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200 disabled:opacity-40">
+          className="min-h-10 rounded-md border border-amber-400/40 bg-amber-500/10 px-3 py-1.5 text-sm font-semibold text-amber-200 disabled:opacity-40 lg:min-h-0">
           {captionRecaptionLabel(counts, captionScope, recaptionInert,
                                  captionIncludeAsserted)}
         </button>
         {includeAssertedLabel && (
-          <label className="flex items-center gap-1 text-2xs text-amber-400/90">
+          <label className="flex items-center gap-1 text-xs text-amber-400/90">
             <input type="checkbox" checked={captionIncludeAsserted} disabled={live}
               onChange={(e) => setCaptionIncludeAsserted(e.target.checked)}
               aria-label="Also re-caption the captions I wrote by hand"
@@ -1736,12 +1723,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       {/* A phone held sideways has ~390 px of fold: the card drops its path and
           counter rows and most of its padding, and becomes a one-line toolbar. */}
       <header data-probe-chrome="header"
-        className="space-y-2 rounded-xl border border-border bg-surface px-4 py-3 [@media(max-height:500px)]:flex [@media(max-height:500px)]:flex-nowrap [@media(max-height:500px)]:items-center [@media(max-height:500px)]:gap-3 [@media(max-height:500px)]:space-y-0 [@media(max-height:500px)]:py-1">
+        className="space-y-2 pb-2 [@media(max-height:500px)]:flex [@media(max-height:500px)]:flex-nowrap [@media(max-height:500px)]:items-center [@media(max-height:500px)]:gap-3 [@media(max-height:500px)]:space-y-0 [@media(max-height:500px)]:pb-1">
         <div className="flex flex-wrap items-center gap-2 [@media(max-height:500px)]:min-w-0 [@media(max-height:500px)]:shrink">
-          <button type="button" onClick={onBack}
-            className="min-h-10 lg:min-h-0 rounded-md border border-border px-2 py-1 text-xs text-content-muted hover:text-content hover:bg-surface-raised">
+          <Button type="button" size="md" onClick={onBack}>
             ← Banks
-          </button>
+          </Button>
           <h1 className="flex items-center gap-2 text-xl font-semibold text-content"><Archive aria-hidden="true" className="h-4 w-4" /> {payload?.name || `Bank #${bankId}`}</h1>
           {payload?.source_path && (
             /* hidden below sm: opening or moving the folder is a gesture on the
@@ -1752,21 +1738,20 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 title={payload.source_path}>
                 {payload.source_path}
               </p>
-              <button type="button" onClick={openSourceFolder}
+              <Button type="button" size="md" noShrink onClick={openSourceFolder}
                 disabled={openingSourceFolder} aria-busy={openingSourceFolder}
                 title="Open this Bank's source folder in the system file explorer."
-                className="min-h-10 lg:min-h-0 shrink-0 rounded border border-border px-2 py-0.5 text-xs text-content-muted hover:bg-surface-raised hover:text-content disabled:cursor-wait disabled:opacity-60">
+                className="disabled:cursor-wait">
                 <FolderOpen aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{openingSourceFolder ? 'Opening' : 'Open folder'}
-              </button>
+              </Button>
               {/* Cold path. The folder-sync note below offers this too, but only once
                   the folder is already gone — and the real move is PLANNED: you look
                   for the option before you drag 30 000 files to another drive, not
                   after breaking the bank to discover it could have been repaired. */}
-              <button type="button" onClick={() => setRelocating(true)}
-                title="Moving this folder to another disk? Point the bank at its new location."
-                className="min-h-10 lg:min-h-0 shrink-0 rounded border border-border px-2 py-0.5 text-xs text-content-muted hover:bg-surface-raised hover:text-content">
+              <Button type="button" size="md" noShrink onClick={() => setRelocating(true)}
+                title="Moving this folder to another disk? Point the bank at its new location.">
                 <FolderInput aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Move folder
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -1792,47 +1777,45 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           {!railIsColumnNow && (
             /* The closed drawer hides the rail's summary line, so the button
                keeps the count and the full list rides in its tooltip. */
-            <button type="button" onClick={openRail}
+            <Button type="button" size="md" noShrink onClick={openRail}
               aria-expanded={railOpen} aria-controls="bank-filter-rail"
-              title={filterSummary.count ? filterSummary.title : undefined}
-              className="min-h-10 lg:min-h-0 shrink-0 whitespace-nowrap rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content hover:bg-surface">
+              title={filterSummary.count ? filterSummary.title : undefined}>
               ☰ Filters{filterSummary.count > 0 && (
                 <span className="ml-1.5 tabular-nums text-indigo-300">{filterSummary.count}</span>
               )}
-            </button>
+            </Button>
           )}
-          <button type="button" onClick={togglePasses}
+          <Button type="button" size="md" noShrink onClick={togglePasses}
             aria-expanded={passesOpen} aria-controls="bank-passes-panel"
-            title="Open the analysis passes — scan, score, group by person, framing, medium, crops, watermarks and captions."
-            className="min-h-10 lg:min-h-0 shrink-0 whitespace-nowrap rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content hover:bg-surface">
+            title="Open the analysis passes — scan, score, group by person, framing, medium, crops, watermarks and captions.">
             {passesButtonLabel(live)}
-          </button>
-          <button type="button" onClick={() => setLaunchOpen(true)} disabled={live || !(counts?.total > 0)}
+          </Button>
+          <Button type="button" size="md" noShrink variant="primary" onClick={() => setLaunchOpen(true)} disabled={live || !(counts?.total > 0)}
             title={`Run the whole triage in one go — scan, auto-reject, Score${semanticState.engine === 'siglip2' ? ', SigLIP 2 semantic index' : ''}, crops/variants, watermarks, group by person and (optionally) caption. Start it and walk away. If the person pass is in, it checks your folders first and asks once, before the run.`}
-            className="min-h-10 lg:min-h-0 shrink-0 whitespace-nowrap rounded-md bg-gradient-primary px-4 py-2 text-sm font-bold text-gray-950 shadow disabled:opacity-50">
+            className="font-bold shadow">
             <Rocket aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Launch all
-          </button>
+          </Button>
           <span className="ml-auto" />
-          <button type="button" onClick={() => setPromoteOpen(true)} disabled={live || !canPromote}
+          <Button type="button" size="md" noShrink variant="primary" onClick={() => setPromoteOpen(true)} disabled={live || !canPromote}
             title={canPromote
               ? 'Copy the kept selection into a dataset — or into a brand-new bank, to keep working on a shortlist apart'
               : 'Keep some images first'}
-            className="min-h-10 lg:min-h-0 shrink-0 whitespace-nowrap rounded-md bg-gradient-primary px-3 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-50">
+            >
             ⬆ Promote
-          </button>
+          </Button>
           {/* Disabled outright when this bank's folder belongs to a dataset: the
               banner below says it is, and a button that still opened a dialog only
               to be refused there would make that sentence a lie. */}
-          <button type="button" onClick={() => setDeleteRejectedOpen(true)}
+          <Button type="button" size="md" noShrink onClick={() => setDeleteRejectedOpen(true)}
             disabled={live || !(counts?.reject > 0) || !!payload?.dataset_conflict}
             title={payload?.dataset_conflict
               ? 'This bank sits on a dataset’s image folder — deleting these files would delete the dataset’s images.'
               : (counts?.reject > 0)
                 ? 'Delete the rejected images from your disk (OS trash when available). Irreversible — asks you to type DELETE first. Kept images are untouched.'
                 : 'No rejected images to delete'}
-            className="min-h-10 lg:min-h-0 shrink-0 whitespace-nowrap rounded-md border border-rose-500/50 px-3 py-1.5 text-sm text-rose-300 disabled:opacity-40 hover:bg-rose-500/10">
+            className="border-rose-500/50 text-rose-300 hover:bg-rose-500/10">
             <Trash2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Delete rejected from disk{(counts?.reject > 0) ? ` (${counts.reject})` : ''}
-          </button>
+          </Button>
         </div>
       </header>
 

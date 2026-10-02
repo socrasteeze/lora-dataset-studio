@@ -73,7 +73,7 @@ test('the box holds the SHIPPED text when nothing is overridden', () => {
   assert.equal(textareaValue(html), SHIPPED,
     'an empty box would be indistinguishable from "no instruction"')
   // Following the default is not an override, so there is nothing to reset TO.
-  assert.doesNotMatch(text(html), /Reset to default/,
+  assert.doesNotMatch(text(html), /Reset to Default/,
     'the reset button is itself the "you changed this" marker')
   assert.match(text(html), /Following the built-in default/)
 })
@@ -82,7 +82,7 @@ test('the box holds the OVERRIDE when there is one, and offers the way back', ()
   const html = render({ klein_improve: 'keep it a flat drawing, no skin texture' },
     { defaultEditorOpen: true })
   assert.equal(textareaValue(html), 'keep it a flat drawing, no skin texture')
-  assert.match(text(html), /Reset to default/)
+  assert.match(text(html), /Reset to Default/)
   assert.match(text(html), /Custom override/)
 })
 
@@ -295,7 +295,7 @@ test('a failed save is reported with the editor CLOSED, where the sliders are', 
   // From the chain block to the dial that follows it — the error line has to
   // live INSIDE that span, not in the instruction editor that starts closed.
   const chain = src.split('data-testid="klein-improve-lora-chain"')[1]
-    .split('Output size, MP')[0]
+    .split('Output MP')[0]
   assert.match(chain, /error &&/,
     'a slider sitting on a value the server never stored must not stay silent')
 })

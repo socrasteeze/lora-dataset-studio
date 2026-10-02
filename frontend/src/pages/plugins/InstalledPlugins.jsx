@@ -74,7 +74,7 @@ export default function InstalledPlugins({ plugins = [], busy, caps, capsKnown =
               {loadProblem && (
                 <div role="alert" data-plugin-load-problem={plugin.id} className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
                   <p>{loadProblem.reason || 'This plugin’s interface did not load.'}</p>
-                  <button type="button" className={BTN} onClick={reloadPage}>Reload page</button>
+                  <button type="button" className={BTN} onClick={reloadPage}>Reload Page</button>
                 </div>
               )}
               {pending && <p className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-content" data-plugin-pending>{pending}</p>}

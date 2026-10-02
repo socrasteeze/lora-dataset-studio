@@ -2,8 +2,8 @@
  *
  * A desktop (`lg` and up) gets a fixed height per size: sm 28 px (rails,
  * toolbars, chips), md 32 px (the default), lg 36 px (a page's main action).
- * Below `lg` every control keeps the repository's 40-px finger target
- * (`min-h-10`), which `lg:min-h-0` releases on a desktop.
+ * Below `lg` every control has the same 40-px height and finger target
+ * (`h-10 min-h-10`); desktop sizes override the height and release the minimum.
  *
  * Buttons are `inline-flex`: Tailwind's preflight makes an <svg> a block, so an
  * icon in a plain button sits ABOVE its label and doubles the height (the Train
@@ -16,9 +16,9 @@
  */
 
 const HEIGHT = {
-  sm: 'min-h-10 lg:min-h-0 lg:h-7',
-  md: 'min-h-10 lg:min-h-0 lg:h-8',
-  lg: 'min-h-10 lg:min-h-0 lg:h-9',
+  sm: 'h-10 min-h-10 lg:min-h-0 lg:h-7',
+  md: 'h-10 min-h-10 lg:min-h-0 lg:h-8',
+  lg: 'h-10 min-h-10 lg:min-h-0 lg:h-9',
 }
 
 const BTN_LAYOUT = 'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md transition-colors disabled:opacity-40'

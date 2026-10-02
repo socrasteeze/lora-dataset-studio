@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from 'react';
 import { putJson } from '../../api/fetchClient';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import DatasetZonesPreview from './DatasetZonesPreview.jsx';
+import { btnClass, btnShape } from '../common/controls';
 
 export default function TextScanDialog({
   onClose, onLaunch, toRead = 0, rereadable = 0, sensitivity = 0.5, live = false,
@@ -160,13 +161,13 @@ export default function TextScanDialog({
         )}
         <div className="flex items-center justify-end gap-2 pt-1">
           <button type="button" onClick={onClose} disabled={busy}
-            className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-content disabled:opacity-40">
+            className={btnClass()}>
             {ran ? 'Close' : 'Cancel'}
           </button>
           <button type="button" onClick={launch}
             disabled={busy || live || willRead === 0}
             title={willRead === 0 ? 'Nothing left to read in this scope.' : undefined}
-            className="rounded-lg bg-amber-500/90 px-3 py-1.5 text-sm font-bold text-black disabled:opacity-40">
+            className={`${btnShape()} bg-amber-500/90 font-bold text-black`}>
             {busy ? 'Scanning' : `Scan ${willRead} image${willRead === 1 ? '' : 's'}`}
           </button>
         </div>

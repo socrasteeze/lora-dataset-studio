@@ -95,7 +95,7 @@ export default function CameraStudio() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-7xl space-y-4 p-4 sm:p-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-100"><Camera className="size-5 text-indigo-300" />Camera angles</h1>
@@ -105,7 +105,7 @@ export default function CameraStudio() {
       </header>
       {error && <p role="alert" className="rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
       {notice && <p role="status" className="rounded-lg border border-indigo-400/30 bg-indigo-500/10 p-3 text-sm text-indigo-100">{notice}</p>}
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <section aria-label="Source image" className="min-w-0 space-y-3">
           <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only"
             aria-label="Import image" disabled={loading || uploading || sending}
@@ -126,7 +126,7 @@ export default function CameraStudio() {
               <p className="break-words text-sm font-medium text-gray-200">{selected.name}</p>
               <p className="text-xs text-gray-500">Original · {selected.width} × {selected.height} · kept unchanged</p>
             </div>
-          </div> : <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6 text-sm leading-relaxed text-gray-400">
+          </div> : <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm leading-relaxed text-gray-400">
             Your source image appears here. Choose the camera positions on the right, then shoot your views.
           </div>}
           {images.length > 1 && <div>

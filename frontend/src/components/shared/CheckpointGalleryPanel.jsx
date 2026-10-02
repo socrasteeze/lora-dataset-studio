@@ -21,6 +21,7 @@ import { configRows } from '../dataset/lineageDetail.js';
 import RunDeleteSection from './RunDeleteSection';
 import GeneratedImageLightbox from './GeneratedImageLightbox';
 import CheckpointTimelinePanel from './CheckpointTimelinePanel';
+import { btnClass, btnShape } from '../common/controls.js';
 
 /* 🖼 Everything one checkpoint — or one whole RUN — ever produced.
 
@@ -528,7 +529,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
               aria-pressed={bar.togglePressed}
               aria-label={picking ? 'Leave selection mode' : 'Select images to delete'}
               title={picking ? 'Leave selection mode' : 'Select images to delete'}
-              className={`shrink-0 rounded-md border px-3 py-1.5 text-xs font-semibold ${picking
+              className={`${btnShape({ size: 'sm', noShrink: true })} border font-semibold ${picking
                 ? 'border-indigo-300 bg-indigo-500/40 text-white'
                 : 'border-indigo-400/70 bg-indigo-500/15 text-indigo-200 hover:bg-indigo-500/25'}`}>
               {bar.toggleLabel}
@@ -541,7 +542,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
             {zipBtn.shown && (
               <button type="button" data-testid="gallery-download-zip"
                 onClick={runZip} disabled={zipBtn.disabled} title={zipBtn.title}
-                className="shrink-0 rounded-md border border-border px-2.5 py-1.5 text-content-muted text-xs hover:border-indigo-400/50 hover:text-content disabled:opacity-40">
+                className={`${btnClass({ size: 'sm', noShrink: true })} hover:border-indigo-400/50`}>
                 {zipBtn.label}
               </button>
             )}
@@ -557,8 +558,8 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
                     .catch((e) => setNotice({ kind: 'error', text: e?.message || 'Could not open the folder' }));
                 }}
                 title="Open the folder these images are saved in (the dataset's folder, on the machine running the app)"
-                className="shrink-0 rounded-md border border-border px-2.5 py-1.5 text-content-muted text-xs hover:border-indigo-400/50 hover:text-content">
-                <FolderOpen aria-hidden="true" className="h-3.5 w-3.5" /> Open folder
+                className={`${btnClass({ size: 'sm', noShrink: true })} hover:border-indigo-400/50`}>
+                <FolderOpen aria-hidden="true" className="h-3.5 w-3.5" /> Open Folder
               </button>
             )}
             {bar.showsDelete && (
@@ -569,7 +570,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
                 <button type="button"
                   onClick={() => setSelected(selected.size === images.length
                     ? new Set() : allGalleryImageIds(images))}
-                  className="rounded-md border border-border px-2 py-1.5 text-content-muted text-2xs hover:text-content">
+                  className={btnClass({ size: 'sm' })}>
                   {bar.selectAllLabel}
                 </button>
                 {/* Last, and pushed to the far edge: the gate that opens this mode
@@ -579,7 +580,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
                 <button type="button" data-testid="gallery-delete"
                   disabled={bar.deleteDisabled}
                   onClick={() => setConfirming(true)}
-                  className="ml-auto rounded-md border border-rose-500/50 px-3 py-1.5 text-xs text-rose-300 disabled:opacity-40 hover:bg-rose-500/10">
+                  className={`${btnShape({ size: 'sm' })} ml-auto border border-rose-500/50 text-rose-300 hover:bg-rose-500/10`}>
                   🗑 Delete{selected.size ? ` (${selected.size})` : ''}
                 </button>
               </>
@@ -606,12 +607,12 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
             )}
             <div className="flex flex-wrap justify-end gap-2">
               <button type="button" autoFocus onClick={() => setConfirming(false)}
-                className="rounded-md border border-border px-3 py-2 text-content-muted text-xs hover:text-content">
+                className={btnClass({ size: 'sm' })}>
                 Cancel
               </button>
               <button type="button" data-testid="gallery-confirm-delete"
                 disabled={busy} onClick={runDelete}
-                className="rounded-md border border-rose-500/60 bg-rose-500/15 px-3 py-2 text-xs text-rose-100 disabled:opacity-40 hover:bg-rose-500/25">
+                className={`${btnShape({ size: 'sm' })} border border-rose-500/60 bg-rose-500/15 text-rose-100 hover:bg-rose-500/25`}>
                 {busy ? 'Deleting' : `Delete ${selected.size}`}
               </button>
             </div>

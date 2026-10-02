@@ -13,7 +13,7 @@ export default function SetupJourneyChoices({ plan, journey, products, catalog, 
       <span className="block text-sm font-semibold text-content">{engine.label}</span>
       <span className="mt-1 block text-xs text-content-muted">{engine.kind === 'local' ? 'Local · your GPU' : 'Online · account or API key'}</span>
     </button>)}</div>
-    <button type="button" onClick={() => onChoose({ goal: 'plugins' })} className="min-h-10 text-sm text-primary underline">Find more engines in the plugin Store</button>
+    <button type="button" onClick={() => onChoose({ goal: 'plugins' })} className="min-h-10 text-sm text-primary underline">Find Engines</button>
   </section>
   if (plan.chooseCapability) return <section className="space-y-4" aria-label="Choose a plugin function">
     <h2 className="text-xl font-semibold text-content">What would you like to use first?</h2>
@@ -45,6 +45,6 @@ export default function SetupJourneyChoices({ plan, journey, products, catalog, 
       {!product.installed && product.issues?.length > 0 && <span className="mt-2 block text-xs text-amber-300">{product.issues[0].message}</span>}
     </button>)}</div>
     {!matches.length && <p className="text-sm text-content-muted">{search ? 'No plugin matches this search.' : 'No plugin is available here yet. Open the Store to check its connection or install a plugin archive.'}</p>}
-    <button type="button" onClick={onBrowse} className="min-h-10 text-sm text-primary underline">Open the plugin Store</button>
+    <button type="button" onClick={onBrowse} className="min-h-10 text-sm text-primary underline">Open Store</button>
   </section>
 }

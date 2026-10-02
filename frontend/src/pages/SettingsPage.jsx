@@ -391,7 +391,7 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
   }
 
   if (loadError) {
-    return <div role="alert" className="space-y-3"><p>{loadError}</p><button type="button" onClick={load}>Retry loading settings</button></div>
+    return <div role="alert" className="space-y-3"><p>{loadError}</p><button type="button" onClick={load}>Retry</button></div>
   }
   if (loading || !config || pluginTarget) {
     return <p className="text-content-muted">Loading settings</p>
@@ -480,18 +480,18 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
   }
 
   return (
-    <SettingsScopeContext value={plugin?.id || null}><div>
+    <SettingsScopeContext value={plugin?.id || null}><div className="[&_button]:min-h-10 lg:[&_button]:min-h-0">
       {missingFocus === `${location.key}|${focusId}` && <p role="status" className="mb-4 rounded-lg border border-border p-3 text-sm">
         This setting is not available on this page. If it belongs to a plugin, open its settings from{' '}
         <Link to="/plugins?tab=installed" className="text-primary underline">Plugins</Link>.
       </p>}
-      {plugin ? <div ref={panelRef} className="space-y-6" data-plugin-settings={plugin.id}>
+      {plugin ? <div ref={panelRef} className="space-y-4" data-plugin-settings={plugin.id}>
         <Link to="/plugins?tab=installed" className="inline-flex min-h-10 items-center text-sm text-primary hover:underline">← Plugins</Link>
         <SectionHeader eyebrow="Plugin settings" title={plugin.name || plugin.id}
           description="Changes are saved with this plugin. Your existing values are kept across updates and reinstallation." />
         <PluginSettingsGroups pluginId={plugin.id} groups={groups} {...sectionProps} />
       </div> : <>
-      <div className="lg:grid lg:grid-cols-[230px_minmax(0,1fr)] lg:items-start lg:gap-8">
+      <div className="lg:grid lg:grid-cols-[230px_minmax(0,1fr)] lg:items-start lg:gap-6">
         {/* lg:self-stretch: see the Guide — the grid is items-start, so without it
             the aside is only as tall as its nav and the sticky rail cannot move. */}
         <aside className="lg:self-stretch">
@@ -548,7 +548,7 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
           </nav>
         </aside>
 
-        <div ref={panelRef} className="mt-2 space-y-6 lg:mt-0">
+        <div ref={panelRef} className="mt-2 space-y-4 lg:mt-0">
           <SectionHeader eyebrow={active.eyebrow} title={active.title}
             badge={<HelpBadge topic={`settings-${activeId}`} />} />
           <ActiveSection {...sectionProps} />

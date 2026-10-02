@@ -31,7 +31,7 @@ test('only the model select is width-capped, and the other four are not truncate
     const i = ws.indexOf(`aria-label="${label}"`);
     assert.ok(i > 0, `${label} select is missing`);
     // The className sits within the same element; look at the tag around it.
-    const tagStart = ws.lastIndexOf('<select', i);
+    const tagStart = ws.lastIndexOf('<Select', i);
     const tagEnd = ws.indexOf('>', ws.indexOf('className=', i));
     const tag = ws.slice(tagStart, tagEnd);
     if (capped[label]) {

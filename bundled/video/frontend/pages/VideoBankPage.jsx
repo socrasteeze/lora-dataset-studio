@@ -3,7 +3,7 @@ import { Clapperboard } from 'lucide-react';
 import { apiFetch, del, postJson } from '@lds/plugin-sdk';
 import { useToast } from '@lds/plugin-sdk';
 import { HelpBadge } from '@lds/plugin-sdk';
-import { FolderPickerField } from '@lds/plugin-sdk/ui';
+import { controlHeight, FolderPickerField } from '@lds/plugin-sdk/ui';
 import { BankLaneTabs } from '@lds/plugin-sdk/bank';
 import { PluginSlot } from '@lds/plugin-sdk/ui';
 import VideoBankWorkspace from '../videobank/VideoBankWorkspace'
@@ -107,7 +107,7 @@ export default function VideoBankPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <header className="flex flex-wrap items-center gap-2">
         <h1 className="flex items-center gap-2 text-xl font-bold text-content">
           <Clapperboard aria-hidden="true" className="mr-2 inline h-5 w-5 align-[-3px]" />Video bank
@@ -116,29 +116,27 @@ export default function VideoBankPage() {
           </span>
         </h1>
         <HelpBadge topic="page-video-bank" />
-        <BankLaneTabs surface="videoBank" className="w-full sm:ml-auto sm:w-auto" />
+        <BankLaneTabs surface="videoBank" className="w-full sm:ml-auto sm:w-72" />
       </header>
 
       <VideoCapabilityStrip capability={capability} />
 
-      <form onSubmit={create}
-        className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-surface p-4">
-        <div className="grow min-w-40">
-          <label htmlFor="video-bank-name" className="block text-sm font-medium text-content">Name</label>
+      <form onSubmit={create} className="flex flex-wrap items-end gap-2">
+        <div className="min-w-40 grow">
+          <label htmlFor="video-bank-name" className="mb-1 block text-sm font-medium text-content">Name</label>
           <input id="video-bank-name" value={name} onChange={(e) => setName(e.target.value)}
             placeholder="City rushes 08/2026" required
-            className="mt-1 w-full rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content" />
+            className={`${controlHeight('lg')} w-full rounded-md border border-border bg-surface px-3 py-0 text-sm text-content`} />
         </div>
-        <div className="grow-[3] min-w-64">
-          <FolderPickerField id="video-bank-folder" label="Folder"
+        <FolderPickerField inline size="lg" id="video-bank-folder" label="Folder"
             value={folder} onChange={setFolder} required
             placeholder="path\to\rushes (subfolders included)"
-            hint=".mp4, .mov, .mkv, .webm, .avi" />
-        </div>
+            />
         <button type="submit" disabled={creating}
-          className="rounded-md bg-gradient-primary px-4 py-2 text-sm font-semibold text-gray-950 disabled:opacity-50">
-          {creating ? 'Inventorying' : '➕ Create video bank'}
+          className={`${controlHeight('lg')} inline-flex items-center justify-center whitespace-nowrap rounded-md bg-gradient-primary px-4 text-sm font-semibold text-gray-950 disabled:opacity-50`}>
+          {creating ? 'Inventorying' : '➕ Create Bank'}
         </button>
+        <p className="basis-full text-xs text-content-muted">MP4, MOV, MKV, WebM or AVI</p>
       </form>
 
       {/* Second way in: the scraper's own destination. A video bank no longer

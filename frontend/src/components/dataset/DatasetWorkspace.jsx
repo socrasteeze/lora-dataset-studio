@@ -189,7 +189,6 @@ function GridStatusFilter({ value, counts, onChange }) {
 function GridSortSelect({ value, images, onChange }) {
   return (
     <label className="flex shrink-0 items-center gap-1 text-xs text-content-subtle">
-      Sort
       <Select size="sm" value={value} onChange={(e) => onChange(e.target.value)}
         aria-label="Sort the grid"
         title="Order the images by face similarity to your reference, or group them by shot type. Images the pass never reached sink to the end."
@@ -1074,7 +1073,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
   );
 
   return (
-    <div className="flex flex-col gap-3 lg:gap-4">
+    <div className="flex flex-col gap-2 lg:gap-3">
       {/*
        * Header: dataset identity and ONE primary action, Export ZIP. Secondary configuration
        * actions (settings, fidelity) live in More. Data actions (backup, merge import, publish)
@@ -1159,7 +1158,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
           guided Progress checklist below it for character datasets), the ACTIVE
           section's content on the right. On mobile the sidebar folds into a
           horizontal chip rail — same responsive pattern as the Settings page. */}
-      <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-6 lg:items-start">
+      <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-4 lg:items-start">
         <aside>
           {/* Mobile: horizontal chip rail.
 
@@ -1199,7 +1198,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
             <GuidedChecklist steps={steps} currentId={nextStep ? nextStep.id : null} onJump={jumpTo} />
           </details>
           {/* Desktop: sticky rail + guided progress below it */}
-          <div data-probe-panel="sections-rail" className="hidden lg:sticky lg:top-20 lg:flex lg:flex-col lg:gap-3">
+          <div data-probe-panel="sections-rail" className="hidden lg:sticky lg:top-20 lg:flex lg:flex-col lg:gap-2">
             <nav aria-label="Dataset sections">
               <p className="m-0 px-3 pb-2 font-mono text-2xs uppercase tracking-[0.18em] text-content-subtle lg:text-xs">Dataset</p>
               <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
@@ -1226,7 +1225,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
           </div>
         </aside>
 
-        <div className="flex flex-col gap-3 min-w-0 mt-1 lg:mt-0 lg:gap-4">
+        <div className="flex flex-col gap-2 min-w-0 mt-1 lg:mt-0 lg:gap-3">
           {/*
            * GLOBAL banners remain visible in every section: a GPU pass or generation batch
            * concerns the whole screen.

@@ -36,12 +36,13 @@ function Distribution({ item }) {
   )
 }
 
-export default function BankOverview({ payload }) {
+export default function BankOverview({ payload, compact = false }) {
   const model = bankOverviewModel(payload)
   // Deliberately component-local: a live payload refresh updates every number
   // without reopening a panel the user folded away (or closing one they were
-  // reading). It starts open once, when this overview itself is mounted.
-  const [open, setOpen] = useState(true)
+  // reading). The compact mobile panel starts folded; the desktop overview
+  // starts open. Both keep the user's choice across live payload refreshes.
+  const [open, setOpen] = useState(() => !compact)
   const contentId = useId()
   const totalText = model.available && model.total != null
     ? `${model.total.toLocaleString()} images`
