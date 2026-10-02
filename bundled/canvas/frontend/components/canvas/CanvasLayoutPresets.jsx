@@ -134,7 +134,7 @@ export default function CanvasLayoutPresets({ positions, imageNodes, lanePlaceme
           did. From `sm` up it is the anchored menu it has always been. */}
       <div className="fixed inset-x-2 bottom-28 z-40 w-auto rounded-lg border border-border bg-surface-overlay p-2 shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:top-full sm:mt-1 sm:w-[min(18rem,calc(100vw-2rem))]">
         <div className="mb-1.5 flex items-center gap-1">
-          <span className="text-content text-2xs font-semibold">Save this arrangement</span>
+          <span className="text-content text-2xs font-semibold">Save Layout</span>
           <HelpBadge topic="canvas-layouts" />
         </div>
         <div className="flex items-center gap-1">
@@ -149,7 +149,7 @@ export default function CanvasLayoutPresets({ positions, imageNodes, lanePlaceme
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } }}
             className="h-10 min-w-0 flex-1 rounded border border-border bg-app/60 px-2 text-content text-xs focus:border-primary focus:outline-none lg:h-8" />
           <button type="button" onClick={save} disabled={busy === 'save'}
-            className="h-10 shrink-0 rounded border border-indigo-400/50 bg-indigo-500/15 px-2 text-indigo-100 text-2xs font-semibold disabled:opacity-50 lg:h-8">
+            className="h-10 shrink-0 rounded border border-indigo-400/50 bg-indigo-500/15 px-2 text-xs font-semibold text-indigo-100 disabled:opacity-50 lg:h-8">
             {busy === 'save' ? '' : 'Save'}
           </button>
         </div>

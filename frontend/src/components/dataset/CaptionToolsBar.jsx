@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { FolderOpen } from 'lucide-react';
 import { captionCategoryCopy, captionFrequencyEntries } from './captionCategory';
 import SettingsLink from '../common/SettingsLink';
+import { btnClass, fieldClass } from '../common/controls';
 
 /* Bulk caption tools (collapsible): find/replace across the kept images'
    captions + a category-aware frequency panel. Booru counts exact comma tags;
@@ -45,18 +46,12 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
     fn?.(t);
     setFilterInput('');
   };
-  // Plain-language description of the match rule for THIS dataset's caption style —
-  // documented in-UI so "exclude smile" behaves the way the user expects.
-  const matchHelp = mode === 'prose'
-    ? 'Captions here are prose, so a filter matches a whole word (case-insensitive) — “smile” matches “a warm smile” but not “smiling”.'
-    : 'Captions here are comma-separated tags, so a filter matches one whole tag exactly (case-insensitive).';
-
   return (
     <div className="rounded-lg border border-border bg-surface px-3 py-2">
       <button type="button" data-workspace-focus
         onClick={() => setOpen((v) => !v)} aria-expanded={open}
         className="flex items-center gap-2 w-full text-left text-content text-sm font-semibold">
-        <span aria-hidden>📝</span> Caption tools
+        <span aria-hidden>📝</span> Caption Tools
         <span className="text-content-subtle text-2xs font-normal">
           find/replace · {categoryCopy.frequencyTitle.toLowerCase()} ({captioned.length} captioned)
         </span>
@@ -64,39 +59,31 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
       </button>
       {open && (
         <div className="mt-2 flex flex-col gap-2">
-          {/* Plain-language primer: what captions are and what these tools do —
-              a newcomer shouldn't need to guess why find/replace or tag frequency
-              matter for training. */}
-          <p className="m-0 text-content-subtle text-2xs leading-relaxed">
-            Captions are the text the LoRA reads each image by. These tools edit{' '}
-            <span className="text-content-muted font-medium">every kept caption at once</span> — use them to
-            fix a word that slipped into all of them, or to strip/rename a tag that keeps repeating.
-            {' '}<span className="text-content-muted font-medium">Text</span> mode matches a whole word, any
-            case (so “bulldog” also strips “Bulldog” — the same rule as the filter and the word counts below);
-            {' '}<span className="text-content-muted font-medium">tag</span> mode treats captions as
-            comma-separated tags and matches a whole tag (best for booru / SDXL).
-            {' '}<SettingsLink section="captioning" focus="captioning-backend">Which model writes them, and how</SettingsLink>
-          </p>
-          <span className="text-content-subtle text-2xs uppercase tracking-wide">Find &amp; replace</span>
+          <div className="flex items-center gap-2">
+            <span className="text-content-muted text-xs font-medium">Find &amp; Replace</span>
+            <SettingsLink section="captioning" focus="captioning-backend">Settings</SettingsLink>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <input value={find} onChange={(e) => setFind(e.target.value)}
               placeholder={tagMode ? 'tag to replace/remove' : 'text to find'}
               aria-label="Find in captions"
-              className="px-2 py-1 rounded bg-app/60 border border-border text-content text-xs w-44" />
+              className={`${fieldClass({ size: 'sm' })} w-44`} />
             <span aria-hidden className="text-content-subtle text-xs">→</span>
             <input value={replace} onChange={(e) => setReplace(e.target.value)}
               placeholder="replacement (empty = remove)"
               aria-label="Replace with"
-              className="px-2 py-1 rounded bg-app/60 border border-border text-content text-xs w-48" />
+              className={`${fieldClass({ size: 'sm' })} w-48`} />
             <label className="flex items-center gap-1 text-xs text-content-muted"
               title="Tag mode treats captions as comma-separated tags: the whole tag must match (case-insensitive), and removal keeps the commas clean. Recommended for booru (SDXL).">
               <input type="checkbox" checked={tagMode} onChange={(e) => setTagMode(e.target.checked)}
                 className="accent-indigo-500" />
-              tag mode
+              Tag Mode
             </label>
             <button type="button" onClick={apply} disabled={busy || !find.trim()}
-              className="px-3 py-1 rounded-lg bg-surface-raised border border-border text-content text-xs font-semibold disabled:opacity-40 hover:bg-surface">
-              Apply to {captioned.length} caption(s)
+              title={`Apply to ${captioned.length} kept caption${captioned.length === 1 ? '' : 's'}`}
+              aria-label={`Apply to ${captioned.length} kept caption${captioned.length === 1 ? '' : 's'}`}
+              className={btnClass({ size: 'sm' })}>
+              Apply
             </button>
           </div>
           {/* Grid tag-filter: the inverse of "show images with this tag" — hide the
@@ -104,45 +91,31 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
               what's left to do (community's #1 request). Multi-exclusions cumulate;
               active filters show as loud chips above the grid. Session-only (they
               reset on reload / dataset switch — a transient view, not dataset state). */}
-          <span className="text-content-subtle text-2xs uppercase tracking-wide">
-            Filter the grid by {categoryCopy.frequencyItem}
-          </span>
-          <p className="m-0 text-content-subtle text-2xs leading-relaxed">
-            <span className="text-content-muted font-medium">Exclude</span> hides images already tagged with a
-            word — walk a captioning checklist without re-checking what's done.{' '}
-            <span className="text-content-muted font-medium">Only&nbsp;with</span> does the inverse (isolate the
-            ones that have it). {matchHelp}
-          </p>
+          <span className="text-content-muted text-xs font-medium">Filter Grid</span>
           <div className="flex items-center gap-2 flex-wrap">
             <input value={filterInput} onChange={(e) => setFilterInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitFilter(onExclude); } }}
               placeholder={categoryCopy.filterPlaceholder}
               aria-label={`${categoryCopy.frequencyItem} to filter the grid by`}
-              className="px-2 py-1 rounded bg-app/60 border border-border text-content text-xs w-44" />
+              className={`${fieldClass({ size: 'sm' })} w-44`} />
             <button type="button" onClick={() => submitFilter(onExclude)} disabled={!onExclude || !filterInput.trim()}
               title="Hide every image that already carries this tag from the grid"
-              className="px-3 py-1 rounded-lg bg-surface-raised border border-border text-content text-xs font-semibold disabled:opacity-40 hover:bg-rose-500/15 hover:border-rose-400/50">
+              className={`${btnClass({ size: 'sm' })} hover:bg-rose-500/15 hover:border-rose-400/50`}>
               ⊘ Exclude
             </button>
             {onInclude && (
               <button type="button" onClick={() => submitFilter(onInclude)} disabled={!filterInput.trim()}
                 title="Show ONLY images that carry this tag (hide the rest)"
-                className="px-3 py-1 rounded-lg bg-surface-raised border border-border text-content text-xs font-semibold disabled:opacity-40 hover:bg-indigo-500/15 hover:border-indigo-400/50">
-                ◉ Only with
+                className={`${btnClass({ size: 'sm' })} hover:bg-indigo-500/15 hover:border-indigo-400/50`}>
+                ◉ Only With
               </button>
             )}
           </div>
           {freq.length > 0 && (
             <div className="flex flex-col gap-1">
-              <span className="text-content-subtle text-2xs uppercase tracking-wide">
+              <span className="text-content-muted text-xs font-medium">
                 {categoryCopy.frequencyTitle}
               </span>
-              <p className="m-0 text-content-subtle text-2xs leading-relaxed">
-                {categoryCopy.frequencyHelp}{' '}
-                Click a {categoryCopy.frequencyItem} to load it into Find
-                {mode === 'booru' ? ' (tag mode)' : ' (text mode)'}; leave Replace empty to strip it from every caption. The{' '}
-                <span className="text-rose-300 font-medium">⊘</span> hides every image whose caption contains it.
-              </p>
               <div className="flex flex-wrap gap-1" aria-label={`Most frequent caption ${categoryCopy.frequencyItem}s`}>
                 {freq.map(([tag, n]) => {
                   const isExcluded = excludes.includes(tag);
@@ -182,18 +155,18 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
               straight from the dataset folder — no ZIP download needed. */}
           {onWriteFiles && (
             <div className="flex flex-col gap-1">
-              <span className="text-content-subtle text-2xs uppercase tracking-wide">Caption files on disk</span>
+              <span className="text-content-muted text-xs font-medium">Caption Files</span>
               <div className="flex items-center gap-2 flex-wrap">
                 <button type="button" onClick={onWriteFiles} disabled={busy}
                   title="Writes <image>.txt next to each kept image in the dataset folder — same format as the ZIP export, for external tools"
-                  className="px-3 py-1 rounded-lg bg-surface-raised border border-border text-content text-xs font-semibold disabled:opacity-40 hover:bg-surface">
-                  💾 Write .txt files
+                  className={btnClass({ size: 'sm' })}>
+                  💾 Write Files
                 </button>
                 {onOpenFolder && (
                   <button type="button" onClick={onOpenFolder}
                     title="Open the dataset folder in the file explorer"
                     aria-label="Open the dataset folder"
-                    className="px-2 py-1 rounded-lg bg-surface-raised border border-border text-content text-xs hover:bg-surface">
+                    className={btnClass({ size: 'sm' })}>
                     <FolderOpen aria-hidden="true" className="h-3.5 w-3.5" />
                   </button>
                 )}

@@ -20,6 +20,7 @@
    cover them without a JSX parser. */
 import { useState } from 'react';
 import { putJson } from '../../api/fetchClient';
+import { Button, Select } from '../common/Controls.jsx';
 import {
   CLEAN_OUTPUT_MODES, cleanPromptText, clampMaxMp, formatMp, maxMpChoices, mpNote,
   normalizeOutput, outputNote,
@@ -68,10 +69,10 @@ export default function KleinCleanOptions({ caps = {}, disabled = false, classNa
   };
 
   return (
-    <div className={`min-w-0 space-y-2 text-2xs text-content-subtle ${className}`}>
+    <div className={`min-w-0 space-y-2 text-xs text-content-subtle ${className}`}>
+      <p className="m-0">Saves to Settings for Bank and Dataset.</p>
       <label className="block min-w-0">
-        <span className="font-medium text-content">Prompt sent to Klein</span>
-        {' — stored: the other surface reads the same value.'}
+        <span className="font-medium text-content">Clean Prompt</span>
         {/* A textarea, because an instruction can run to a sentence and a single-line
             input hides its own end. Enter SAVES (this is one instruction, not a
             paragraph) and Shift+Enter still breaks a line — said out loud below,
@@ -94,29 +95,27 @@ export default function KleinCleanOptions({ caps = {}, disabled = false, classNa
         />
         <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
           <span>
-            Enter saves, Shift+Enter adds a line. Short beats long here — the photo is
-            being cleaned, not described.
+            Enter saves. Shift+Enter adds a line.
           </span>
           {/* min-h-10 lg:min-h-0: this panel renders inside the bank's passes chrome,
               where the responsive probe holds every button to a finger-sized target
               below `lg` — and the fix for a short target is the height, never an
               exemption (.claude/rules/frontend-contracts.md). */}
-          <button type="button" disabled={disabled || saving || !dirty}
+          <Button size="sm" disabled={disabled || saving || !dirty}
             onClick={() => savePrompt(text)}
             /* Keep the caret where it is: without this the textarea blurs first, saves,
                and the click then saves again — two writes for one intent, and for
                Reset the FIRST of them would briefly store the text being discarded. */
-            onMouseDown={(e) => e.preventDefault()}
-            className="min-h-10 lg:min-h-0 underline text-content-muted hover:text-content disabled:opacity-40">
+            onMouseDown={(e) => e.preventDefault()}>
             Save
-          </button>
-          <button type="button" disabled={disabled || saving}
+          </Button>
+          <Button size="sm" disabled={disabled || saving}
             onClick={() => savePrompt('')}
             title="Back to the three words the app ships with — the short instruction Klein answers best on a whole photo."
             onMouseDown={(e) => e.preventDefault()}
-            className="min-h-10 lg:min-h-0 underline text-content-muted hover:text-content disabled:opacity-40">
-            Reset to default
-          </button>
+            aria-label="Reset to default">
+            Reset to Default
+          </Button>
           {dirty && !saving && (
             <span className="text-amber-300">Not saved yet — a run now uses “{prompt}”.</span>
           )}
@@ -129,33 +128,33 @@ export default function KleinCleanOptions({ caps = {}, disabled = false, classNa
       {/* flex-wrap + min-w-0 throughout: label and select stack rather than overflow at
           400 px, the width every delivery is checked at. */}
       <label className="block min-w-0">
-        <span className="font-medium text-content">Processing size</span>
+        <span className="font-medium text-content">Processing Size</span>
         <span className="mt-1 flex flex-wrap items-center gap-2">
-          <select value={formatMp(maxMp)} disabled={disabled || saving}
+          <Select size="sm" value={formatMp(maxMp)} disabled={disabled || saving}
             aria-label="Klein clean processing size in megapixels"
             onChange={(e) => save({ klein_max_mp: Number(e.target.value) })}
-            className="min-w-0 rounded border border-border bg-app px-1.5 py-0.5 text-content">
+            className="min-w-0 max-w-full">
             {maxMpChoices(maxMp).map((mp) => (
               <option key={mp} value={formatMp(mp)}>
                 {formatMp(mp)} MP{mp === 2 ? ' (default)' : ''}
               </option>
             ))}
-          </select>
+          </Select>
         </span>
         <span className="mt-1 block leading-snug">{mpNote(maxMp)}</span>
       </label>
 
       <label className="block min-w-0">
-        <span className="font-medium text-content">Write back</span>
+        <span className="font-medium text-content">Output Size</span>
         <span className="mt-1 flex flex-wrap items-center gap-2">
-          <select value={output} disabled={disabled || saving}
+          <Select size="sm" value={output} disabled={disabled || saving}
             aria-label="What dimensions the cleaned file is written at"
             onChange={(e) => save({ klein_output: e.target.value })}
-            className="min-w-0 max-w-full rounded border border-border bg-app px-1.5 py-0.5 text-content">
+            className="min-w-0 max-w-full">
             {CLEAN_OUTPUT_MODES.map((m) => (
               <option key={m.id} value={m.id}>{m.label}</option>
             ))}
-          </select>
+          </Select>
         </span>
         <span className={`mt-1 block leading-snug ${output === 'render' ? 'text-amber-300' : ''}`}>
           {outputNote(output)}

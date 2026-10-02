@@ -374,7 +374,7 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
     <div className="flex flex-col gap-3">
       <div data-probe-chrome="header" className="relative z-30 flex flex-wrap items-center gap-x-2 gap-y-1">
         <button type="button" onClick={onBack}
-          className="flex min-h-10 items-center gap-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-content-muted transition-colors hover:bg-surface-raised hover:text-content lg:min-h-0">
+          className="flex h-10 min-h-10 items-center gap-1 rounded-lg border border-border bg-surface px-3 py-0 text-sm text-content-muted transition-colors hover:bg-surface-raised hover:text-content lg:h-8 lg:min-h-0">
           <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Datasets
         </button>
         <h1 className="flex items-center gap-2 font-bold text-content">
@@ -388,7 +388,7 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
           <button type="button"
             onClick={() => { try { navigator.clipboard.writeText(ds.trigger_word) } catch { /* denied */ } }}
             title="Copy the trigger word — it is prepended to every sidecar at write time"
-            className="flex min-h-10 items-center gap-1 rounded-lg border border-indigo-400/40 bg-indigo-500/10 px-2 py-0.5 text-2xs lg:min-h-0">
+            className="flex h-10 min-h-10 items-center gap-1 rounded-lg border border-indigo-400/40 bg-indigo-500/10 px-2 py-0 text-sm lg:h-8 lg:min-h-0">
             <span className="text-content-subtle">trigger:</span>
             <code className="font-semibold text-indigo-300">{ds.trigger_word}</code>
             <Copy aria-hidden="true" className="h-3 w-3 text-content-subtle" />
@@ -406,8 +406,8 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
             this button does not exist and the toolbar is simply open. */}
         <button type="button" onClick={() => setToolsOpen((v) => !v)}
           aria-expanded={toolsOpen} aria-controls="vds-clips-tools"
-          className="ml-auto hidden min-h-10 items-center gap-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-content-muted hover:text-content [@media(max-height:500px)]:inline-flex">
-          🔎 Filter & sort
+          className="ml-auto hidden h-10 min-h-10 items-center gap-1 rounded-lg border border-border bg-surface px-3 py-0 text-sm text-content-muted hover:text-content lg:h-8 lg:min-h-0 [@media(max-height:500px)]:inline-flex">
+          🔎 Filter &amp; Sort
         </button>
         <span className="ml-auto hidden text-xs text-content-muted sm:inline [@media(max-height:500px)]:hidden">
           {counts.total} clip{counts.total === 1 ? '' : 's'} · {ds.target_label}
@@ -515,15 +515,14 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
                 <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
                   placeholder="Filter by file name, caption or source rush"
                   aria-label="Filter the clips"
-                  className="min-h-10 min-w-32 grow basis-0 rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content lg:min-h-0" />
-                <label className="flex shrink-0 items-center gap-1 text-xs text-content-subtle">
+                  className="h-10 min-h-10 min-w-32 grow basis-0 rounded-md border border-border bg-surface-raised px-3 py-0 text-sm text-content lg:h-8 lg:min-h-0" />
+                <label className="flex shrink-0 items-center text-xs text-content-subtle">
                   {/* The word costs 30 px and a phone cannot afford it: with it,
                       this row wraps and the toolbar doubles to 88 px of fixed
                       chrome. The select keeps its accessible name either way. */}
-                  <span className="hidden sm:inline">Sort</span>
                   <select value={sort} onChange={(e) => setSort(e.target.value)}
                     aria-label="Sort the clips"
-                    className="min-h-10 max-w-36 rounded-md border border-border bg-surface-raised px-2 py-1 text-xs text-content lg:min-h-0">
+                    className="h-10 min-h-10 max-w-36 rounded-md border border-border bg-surface-raised px-2 py-0 text-sm text-content lg:h-8 lg:min-h-0">
                     {CLIP_SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
                   </select>
                 </label>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Images, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react';
 import { apiFetch, postJson } from '../api/fetchClient';
 import GeneratedImageLightbox from '../components/shared/GeneratedImageLightbox';
-import { btnShape, fieldClass } from '../components/common/controls';
+import { btnClass, btnShape, fieldClass } from '../components/common/controls';
 import { isCameraView, poseLabel } from '../utils/cameraAngles';
 import { useCanvasImageImprove } from '../hooks/useCanvasImageImprove';
 import { useRestoreImproveSettings } from '../hooks/useRestoreImproveSettings';
@@ -532,7 +532,7 @@ export default function GalleryPage() {
             aria-pressed={bar.togglePressed}
             aria-label={picking ? 'Leave selection mode' : 'Select images to delete or download'}
             title={picking ? 'Leave selection mode' : 'Select images to delete or download'}
-            className={`min-h-10 lg:min-h-0 shrink-0 rounded-md border px-3 py-1.5 text-xs font-semibold ${picking
+            className={`${btnShape({ size: 'sm', noShrink: true })} border font-semibold ${picking
               ? 'border-indigo-300 bg-indigo-500/40 text-white'
               : 'border-indigo-400/70 bg-indigo-500/15 text-indigo-200 hover:bg-indigo-500/25'}`}>
             <span aria-hidden>{picking ? '✓' : '☑'}</span> {bar.toggleLabel}
@@ -540,7 +540,7 @@ export default function GalleryPage() {
           {picking && zipBtn.shown && (
             <button type="button" data-testid="gallery-download-zip"
               onClick={runZip} disabled={zipBtn.disabled} title={zipBtn.title}
-              className="min-h-10 lg:min-h-0 shrink-0 rounded-md border border-border px-2.5 py-1.5 text-content-muted text-xs hover:border-indigo-400/50 hover:text-content disabled:opacity-40">
+              className={`${btnClass({ size: 'sm', noShrink: true })} hover:border-indigo-400/50`}>
               {zipBtn.label}
             </button>
           )}
@@ -556,7 +556,7 @@ export default function GalleryPage() {
               onClick={runFiles} disabled={!!filesProgress}
               aria-busy={!!filesProgress}
               title="Save each selected image as its own file — no archive to unpack; your browser may ask once to allow multiple downloads"
-              className="min-h-10 lg:min-h-0 shrink-0 rounded-md border border-border px-2.5 py-1.5 text-content-muted text-xs hover:border-indigo-400/50 hover:text-content disabled:opacity-40">
+              className={`${btnClass({ size: 'sm', noShrink: true })} hover:border-indigo-400/50`}>
               {filesProgress
                 ? `Saving ${Math.min(filesProgress.done + 1, filesProgress.total)}/${filesProgress.total}`
                 : `⬇ Files (${selected.size})`}
@@ -570,13 +570,13 @@ export default function GalleryPage() {
               <button type="button"
                 onClick={() => setSelected(selected.size === images.length
                   ? new Set() : allGalleryImageIds(images))}
-                className="min-h-10 lg:min-h-0 rounded-md border border-border px-2 py-1.5 text-content-muted text-2xs hover:text-content">
+                className={btnClass({ size: 'sm' })}>
                 {bar.selectAllLabel}
               </button>
               <button type="button" data-testid="gallery-delete"
                 disabled={bar.deleteDisabled}
                 onClick={() => setConfirming(true)}
-                className="ml-auto min-h-10 lg:min-h-0 rounded-md border border-rose-500/50 px-3 py-1.5 text-xs text-rose-300 disabled:opacity-40 hover:bg-rose-500/10">
+                className={`${btnShape({ size: 'sm' })} ml-auto border border-rose-500/50 text-rose-300 hover:bg-rose-500/10`}>
                 <Trash2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Delete{selected.size ? ` (${selected.size})` : ''}
               </button>
             </>

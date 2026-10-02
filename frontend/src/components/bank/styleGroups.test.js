@@ -33,4 +33,6 @@ test('the rail offers the browser, and the browser reads the full list', () => {
   assert.match(rail, /onBrowseStyles/)
   assert.match(browser, /\/api\/bank\/\$\{bankId\}\/style-groups/)
   assert.match(browser, /data-probe-layer/)
+  assert.match(browser, /aria-label="Sort style groups"/)
+  assert.doesNotMatch(browser, />\s*Sort\s*<Select/)
 })

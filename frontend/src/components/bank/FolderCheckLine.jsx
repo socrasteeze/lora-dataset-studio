@@ -24,15 +24,16 @@ export default function FolderCheckLine({ banks, busy = false, onRescan }) {
     <>
       {note.stale ? (
         <>
-          <p className="basis-full text-xs text-amber-300/90">{note.text}</p>
+          <p className="text-xs font-medium text-amber-300/90" title={note.text}
+            aria-label={note.text}>Counts May Be Stale</p>
           <Button size="md" noShrink onClick={onRescan} disabled={busy}
-            title="Walk every bank's source folder now and pick up the images added to it">
-            <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />{busy ? 'Checking folders' : 'Rescan folders'}
+            title={note.text}>
+            <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />{busy ? 'Checking Folders' : 'Rescan Folders'}
           </Button>
         </>
       ) : (
         <Button size="md" noShrink onClick={onRescan} disabled={busy} title={note.text}>
-          <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />{busy ? 'Checking folders' : 'Rescan folders'}
+          <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />{busy ? 'Checking Folders' : 'Rescan Folders'}
         </Button>
       )}
     </>

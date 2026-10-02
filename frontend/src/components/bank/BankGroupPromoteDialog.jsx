@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { apiFetch, postJson } from '../../api/fetchClient'
 import { useToast } from '../common/Toast'
+import { Button } from '../common/Controls.jsx'
 
 /** ⬆ Promote a whole NAME GROUP into one dataset.
  *
@@ -85,14 +86,13 @@ export default function BankGroupPromoteDialog({ row, onClose, onStarted }) {
         )}
 
         <div className="flex justify-end gap-2 border-t border-border pt-3">
-          <button type="button" onClick={onClose} disabled={busy}
-            className="rounded-md border border-border px-3 py-1.5 text-sm text-content-muted hover:text-content hover:bg-surface-raised disabled:opacity-50">
+          <Button type="button" size="md" onClick={onClose} disabled={busy}>
             Cancel
-          </button>
-          <button type="button" onClick={start} disabled={busy || !datasetId || row.keep === 0}
-            className="rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
+          </Button>
+          <Button type="button" size="md" variant="primary" onClick={start}
+            disabled={busy || !datasetId || row.keep === 0}>
             {busy ? 'Starting' : `⬆ Promote ${row.keep} image(s)`}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

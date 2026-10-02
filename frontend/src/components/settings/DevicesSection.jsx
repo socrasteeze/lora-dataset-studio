@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiFetch, postJson } from '../../api/fetchClient'
 import { useToast } from '../common/Toast'
-import { INPUT_CLASS, Card } from './primitives'
+import { INPUT_CLASS, SIDE_BUTTON_CLASS, Card } from './primitives'
+import { btnClass } from '../common/controls.js'
 import ResetToDefault from './ResetToDefault'
 import { peerVersionNote } from './peerVersionNote.js'
 
@@ -258,12 +259,12 @@ export default function DevicesSection({ config, setField, handleSave, configDef
                 className={`${INPUT_CLASS} max-w-[16rem]`} placeholder="http://laptop:8188" />
             </div>
             <button type="button" disabled={busy || !backendUrl.trim()} onClick={testBackendUrl}
-              className="rounded-md border border-border-strong px-3 py-2 text-sm text-content disabled:opacity-50">
+              className={`${SIDE_BUTTON_CLASS} disabled:opacity-50`}>
               Test
             </button>
             <button type="button" disabled={busy || !backendUrl.trim()} onClick={addApiBackend}
-              className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50">
-              Add backend
+              className={btnClass({ variant: 'primary' })}>
+              Add Backend
             </button>
             {backendTest === 'testing' && <span className="text-xs text-content-muted">testing</span>}
             {backendTest === 'online' && <span className="text-xs text-emerald-400">✓ reachable</span>}
@@ -283,13 +284,13 @@ export default function DevicesSection({ config, setField, handleSave, configDef
           </p>
           <div className="flex flex-wrap items-end gap-2">
             <div>
-              <label htmlFor="join-label" className="block text-xs text-content-muted">Label (optional)</label>
+              <label htmlFor="join-label" className="block text-xs text-content-muted">Optional Label</label>
               <input id="join-label" value={joinLabel} onChange={(e) => setJoinLabel(e.target.value)}
                 className={`${INPUT_CLASS} max-w-[12rem]`} placeholder="laptop" />
             </div>
             <button type="button" disabled={busy} onClick={mintToken}
-              className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50">
-              Generate join token
+              className={btnClass({ variant: 'primary' })}>
+              Generate Token
             </button>
           </div>
           {minted?.token && (
@@ -358,13 +359,13 @@ export default function DevicesSection({ config, setField, handleSave, configDef
                 className={INPUT_CLASS} />
             </div>
             <div>
-              <label htmlFor="peer-join-token" className="block text-sm font-medium text-content">Join token</label>
+              <label htmlFor="peer-join-token" className="block text-sm font-medium text-content">Join Token</label>
               <input id="peer-join-token" value={peerToken}
                 onChange={(e) => setPeerToken(e.target.value)}
                 className={INPUT_CLASS} autoComplete="off" />
             </div>
             <div>
-              <label htmlFor="peer-name" className="block text-sm font-medium text-content">Name on Primary</label>
+              <label htmlFor="peer-name" className="block text-sm font-medium text-content">Peer Name</label>
               <input id="peer-name" value={peerName}
                 onChange={(e) => setPeerName(e.target.value)}
                 className={INPUT_CLASS} placeholder="G18 5080" />
@@ -380,7 +381,7 @@ export default function DevicesSection({ config, setField, handleSave, configDef
             </p>
             <button type="button" disabled={busy || !peerUrl.trim() || !peerToken.trim()}
               onClick={connectPeer}
-              className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50">
+              className={btnClass({ variant: 'primary' })}>
               Join Primary
             </button>
           </div>

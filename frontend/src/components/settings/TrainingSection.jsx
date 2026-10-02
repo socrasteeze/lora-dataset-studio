@@ -81,7 +81,7 @@ export default function TrainingSection(props) {
       <SettingsGroup {...groupProps(defaultsGroup)}>
       <Card title="Defaults" help="Preselected model family for new training runs — each dataset can still override it.">
         <div>
-          <label htmlFor="training-default-family" className="block text-sm font-medium text-content">Default training family</label>
+          <label htmlFor="training-default-family" className="block text-sm font-medium text-content">Training Family</label>
           <select
             id="training-default-family"
             value={config.training.default_family}

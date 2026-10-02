@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { postJson } from '@lds/plugin-sdk'
 import { useToast } from '@lds/plugin-sdk'
 import { HelpBadge } from '@lds/plugin-sdk'
+import { controlHeight } from '@lds/plugin-sdk/ui'
 import ConceptSourcesPanel from './ConceptSourcesPanel'
 import {
   findVideoBank,
@@ -82,12 +83,9 @@ export default function VideoBankScrapePanel({ banks, onDone }) {
     <section className="rounded-lg border border-border bg-surface">
       <button type="button" onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center gap-2 px-4 py-3 text-left">
+        className={`flex w-full items-center gap-2 px-4 text-left ${controlHeight('md')}`}>
         <span aria-hidden>🕸</span>
-        <span className="text-sm font-semibold text-content">Scrape the web into a video bank</span>
-        <span className="hidden text-2xs text-content-subtle sm:inline">
-          no folder to prepare — the clips land in a bank ready to cut
-        </span>
+        <span className="text-sm font-semibold text-content">Scrape Video</span>
         <HelpBadge topic="video-bank-scrape" />
         <span aria-hidden className="ml-auto text-content-subtle">{open ? '▾' : '▸'}</span>
       </button>
@@ -96,8 +94,8 @@ export default function VideoBankScrapePanel({ banks, onDone }) {
         <div className="flex flex-col gap-3 border-t border-border p-3 sm:p-4">
           {/* Destination first: it decides whether this scrape starts a pile or
               grows one. Wraps to one column at 400 px. */}
-          <div className="flex flex-col gap-2 rounded-lg border border-border bg-white/[0.03] p-3">
-            <span className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-medium text-content-muted">
               Destination
             </span>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-content">
@@ -105,7 +103,7 @@ export default function VideoBankScrapePanel({ banks, onDone }) {
                 <input type="radio" name="video-bank-scrape-dest" value="new"
                   checked={mode === 'new'} onChange={() => setMode('new')}
                   className="accent-indigo-500" />
-                New bank
+                New Bank
               </label>
               <label className={`flex items-center gap-1.5 ${eligible.length ? '' : 'opacity-50'}`}
                 title={eligible.length || !(banks || []).length ? undefined
@@ -114,7 +112,7 @@ export default function VideoBankScrapePanel({ banks, onDone }) {
                   disabled={!eligible.length}
                   checked={mode === 'existing'} onChange={() => setMode('existing')}
                   className="accent-indigo-500" />
-                Add to an existing bank
+                Existing Bank
               </label>
             </div>
             {/* The ONE refusal that survived 863cbb56 was also the one left
@@ -133,14 +131,14 @@ export default function VideoBankScrapePanel({ banks, onDone }) {
                 <input value={name} onChange={(e) => setName(e.target.value)}
                   aria-label="Name of the new video bank"
                   placeholder="Scraped clips 08/2026"
-                  className="w-full rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content" />
+                  className={`${controlHeight()} w-full rounded-md border border-border bg-surface px-2 py-0 text-sm text-content`} />
               </label>
             ) : (
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-content-muted">Bank</span>
                 <select value={bankId} onChange={(e) => setBankId(e.target.value)}
                   aria-label="Video bank that receives the clips"
-                  className="w-full rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content">
+                  className={`${controlHeight()} w-full rounded-md border border-border bg-surface px-2 py-0 text-sm text-content`}>
                   <option value="">Choose a bank</option>
                   {eligible.map((b) => (
                     <option key={b.id} value={b.id}>
@@ -161,10 +159,8 @@ export default function VideoBankScrapePanel({ banks, onDone }) {
               </p>
             )}
             <p className="text-2xs leading-relaxed text-content-subtle">
-              Clips are stored exactly as downloaded, then cut into shots by the bank&rsquo;s
-              own passes — length, motion and sharpness stay for you to judge there.
-              Whichever bank you pick receives them: the clips are added to the folder
-              that bank follows, alongside whatever is already in it.
+              Downloads keep their original quality. Bank passes cut them into shots.
+              Clips are added to the selected bank&rsquo;s folder alongside existing files.
             </p>
           </div>
 

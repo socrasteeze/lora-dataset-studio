@@ -20,7 +20,7 @@ export default function OverviewSection({ caps }) {
   const ready = summary.filter((s) => s.ok).length
   const waiting = summary.filter((s) => s.pending).length
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {!caps.configured && (
         <div role="status" className="rounded-xl border border-primary/40 bg-primary/10 p-4 text-sm text-content">
           <p className="font-medium">Your dataset workspace is ready.</p>
@@ -32,7 +32,7 @@ export default function OverviewSection({ caps }) {
         </div>
       )}
 
-      <section className="rounded-xl border border-border bg-surface p-5">
+      <section className="rounded-xl border border-border bg-surface p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <h2 className="text-base font-semibold text-content">Capabilities</h2>
           <span className="font-mono text-xs text-content-subtle">

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiFetch } from '../../api/fetchClient'
+import { Button } from './Controls.jsx'
 import {
   activityHeadline, eventPrefix, formatClock, mergeEvents, nextCursor,
   runningWhere, stallState,
@@ -85,10 +86,9 @@ export default function ActivityPanel({ onClose }) {
         <div className="flex items-center gap-2">
           <h2 className="text-base font-bold text-content">📋 Activity</h2>
           <span className={`text-xs ${TONE[headline.tone]}`}>{headline.text}</span>
-          <button type="button" onClick={onClose}
-            className="ml-auto rounded-md border border-border px-3 py-1 text-xs text-content hover:bg-surface-raised">
+          <Button size="sm" noShrink onClick={onClose} className="ml-auto">
             Close
-          </button>
+          </Button>
         </div>
 
         {error && (

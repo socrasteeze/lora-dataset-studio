@@ -45,7 +45,7 @@ export default function ImportDropzone({ onImport, busy, visionBusy = false, cro
       onDragLeave={() => setOver(false)}
       onDrop={(e) => { e.preventDefault(); setOver(false); handle(e.dataTransfer.files); }}
       onClick={() => inputRef.current?.click()}
-      className={`flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed p-4 lg:p-6 cursor-pointer text-center
+      className={`flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed p-3 lg:p-4 cursor-pointer text-center
         ${over ? 'border-primary bg-primary/10' : 'border-border bg-surface'} ${busy ? 'opacity-50 pointer-events-none' : ''}`}
     >
       <ImageDown aria-hidden="true" className="h-5 w-5 lg:h-6 lg:w-6" />

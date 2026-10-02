@@ -21,6 +21,6 @@ export default function SetupJourneyNotice() {
       <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden="true" /> Back to my setup plan
     </Link>
     <span className="text-content-muted">{SETUP_GOALS.find(goal => goal.id === journey.goal)?.title}</span>
-    <button type="button" onClick={closeGuide} className="min-h-10 text-xs text-content-muted underline">Close guide</button>
+    <button type="button" onClick={closeGuide} className="min-h-10 text-xs text-content-muted underline">Close Guide</button>
   </aside>
 }

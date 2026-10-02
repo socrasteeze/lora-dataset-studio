@@ -4,6 +4,7 @@ import { apiFetch } from '../../api/fetchClient'
 import { devicePartialLabel } from './devicePartialLabel.js'
 import { fetchDeviceList } from './deviceListCache.js'
 import { saveDeviceId } from './deviceMemory.js'
+import { Select } from './Controls.jsx'
 
 /* The remembered choice lives in deviceMemory.js — pure, and therefore
  * testable (node --test cannot import a .jsx). Re-exported here so every
@@ -14,7 +15,7 @@ export { loadSavedDeviceId, saveDeviceId } from './deviceMemory.js'
  * Compact select: "Run on" — only renders when Primary has at least one peer
  * (or always when `always` is set). Value is a device id (`local` or uuid).
  */
-export default function DevicePicker({ value, onChange, onDevice, kind = 'comfy', className = '', always = false }) {
+export default function DevicePicker({ value, onChange, onDevice, kind = 'comfy', className = '', always = false, size = 'md' }) {
   const [devices, setDevices] = useState(null)
 
   useEffect(() => {
@@ -72,16 +73,16 @@ export default function DevicePicker({ value, onChange, onDevice, kind = 'comfy'
   const current = value || 'local'
 
   return (
-    <label className={`inline-flex items-center gap-2 text-sm text-content ${className}`}>
-      <span className="text-content-muted whitespace-nowrap">Run on</span>
-      <select
+    <label className={`inline-flex min-w-0 items-center gap-2 ${size === 'sm' ? 'text-xs' : 'text-sm'} text-content ${className}`}>
+      <span className="text-content-muted whitespace-nowrap">Run On</span>
+      <Select size={size}
         value={current}
         onChange={(e) => {
           const id = e.target.value
           saveDeviceId(id, kind)
           onChange?.(id)
         }}
-        className="rounded-md border border-border-strong bg-surface-raised px-2 py-1.5 text-sm text-content max-w-[14rem]"
+        className="min-w-0 max-w-[14rem] border-border-strong bg-surface-raised"
         aria-label="Run on device"
       >
         {eligible.map((d) => {
@@ -123,7 +124,7 @@ export default function DevicePicker({ value, onChange, onDevice, kind = 'comfy'
             </option>
           )
         })}
-      </select>
+      </Select>
     </label>
   )
 }

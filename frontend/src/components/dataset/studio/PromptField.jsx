@@ -35,7 +35,7 @@ export default function PromptField({ value, placeholder, onChange, onReset, isC
     <div className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-content-muted text-2xs uppercase">Test prompt</span>
+          <span className="text-content-muted text-xs font-medium">Test Prompt</span>
           {onInjectTrigger && (
             <label className="flex items-center gap-1 text-content-subtle text-2xs cursor-pointer"
               title="Prefix the dataset's trigger word to this prompt when generating. Uncheck to send the prompt exactly as written — useful when a render keeps typing the trigger back (speech bubbles, signs) or for pure style/scene tests.">
@@ -79,10 +79,10 @@ export default function PromptField({ value, placeholder, onChange, onReset, isC
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        rows={5}
+        rows={4}
         placeholder={placeholder}
         aria-label="LoRA test prompt"
-        className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-content resize-y focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
+        className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-content resize-y focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
       />
       {isCustom && (
         <button type="button" onClick={onReset}

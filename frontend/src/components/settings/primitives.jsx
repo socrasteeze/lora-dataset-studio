@@ -92,10 +92,10 @@ export function TestButton({ target, onResult, beforeTest }) {
 
 export function Card({ title, help, children, id }) {
   return (
-    <section id={id} className="scroll-mt-24 rounded-xl border border-border bg-surface p-5">
+    <section id={id} className="scroll-mt-24 rounded-xl border border-border bg-surface p-4">
       <h2 className="text-base font-semibold text-content">{title}</h2>
       {help && <p className="mt-1 text-sm text-content-muted">{help}</p>}
-      <div className="mt-4 space-y-4">{children}</div>
+      <div className="mt-3 space-y-3">{children}</div>
     </section>
   )
 }

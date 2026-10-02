@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { canStartDatasetToBank } from './datasetToBank';
+import { btnClass } from '../common/controls';
 
 /**
  * Copy a dataset's kept images into a new bank. This stays separate from the
@@ -124,11 +125,11 @@ export default function DatasetToBankDialog({ datasetName, keptCount, onClose, o
 
         <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
           <button type="button" onClick={dismiss} disabled={busy}
-            className="rounded-lg border border-border px-3 py-2 text-sm text-content hover:bg-surface-raised disabled:opacity-40">
+            className={btnClass({ size: 'lg' })}>
             Cancel
           </button>
           <button type="submit" disabled={!canStart}
-            className="rounded-lg bg-gradient-primary px-4 py-2 text-sm font-semibold text-gray-950 disabled:opacity-40">
+            className={btnClass({ variant: 'primary', size: 'lg' })}>
             {busy ? 'Starting' : 'Create bank'}
           </button>
         </div>

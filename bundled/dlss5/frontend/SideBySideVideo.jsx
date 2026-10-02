@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { controlHeight } from '@lds/plugin-sdk/ui'
 import { syncActions, sidesFor } from './videoSync'
 import { isAbort, saveUrlAsFile } from '@lds/plugin-sdk/files';
 
@@ -140,21 +141,21 @@ export default function SideBySideVideo({ originalSrc, renderSrc, title, exportH
           {exportHref && (
             <button type="button" onClick={exportFile} disabled={exporting}
               title="Save the two clips as one video, side by side — labelled, in step, ready to send"
-              className="min-h-10 rounded-md border border-border px-2 py-1 text-xs text-content-muted hover:text-content disabled:opacity-60 lg:min-h-0">
+              className={`${controlHeight('sm')} rounded-md border border-border px-2 py-0 text-xs text-content-muted hover:text-content disabled:opacity-60`}>
               {exporting ? 'Building' : '⬇ Export'}
             </button>
           )}
           <button type="button" onClick={() => setOneToOne((z) => !z)} aria-pressed={oneToOne}
             title="Show the pixels at their real size — the detail the render adds is invisible once the frame is shrunk to fit"
-            className={`min-h-10 rounded-md border px-2 py-1 text-xs lg:min-h-0 ${oneToOne ? 'border-border-strong bg-surface-raised text-content' : 'border-border text-content-muted hover:text-content'}`}>
+            className={`${controlHeight('sm')} rounded-md border px-2 py-0 text-xs ${oneToOne ? 'border-border-strong bg-surface-raised text-content' : 'border-border text-content-muted hover:text-content'}`}>
             1:1
           </button>
           <button type="button" onClick={() => setSwapped((s) => !s)}
-            className="min-h-10 rounded-md border border-border px-2 py-1 text-xs text-content-muted hover:text-content lg:min-h-0">
-            Swap sides
+            className={`${controlHeight('sm')} rounded-md border border-border px-2 py-0 text-xs text-content-muted hover:text-content`}>
+            Swap Sides
           </button>
           <button type="button" onClick={onClose} aria-label="Close the comparison"
-            className="min-h-10 rounded-md border border-border px-3 py-1 text-sm text-content hover:bg-surface-raised lg:min-h-0">
+            className={`${controlHeight('sm')} rounded-md border border-border px-3 py-0 text-xs text-content hover:bg-surface-raised`}>
             ✕
           </button>
         </div>

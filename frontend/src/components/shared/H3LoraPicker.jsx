@@ -26,6 +26,7 @@ import { apiFetch, postForm, postJson } from '../../api/fetchClient.js';
 import { useToast } from '../common/Toast.jsx';
 import { groupTrained, shortLoraName, splitDeployed } from './h3LoraGroups.js';
 import SliderLock, { useSliderLock } from './SliderLock.jsx';
+import { Button, Input } from '../common/Controls.jsx';
 
 const ROW = 'flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left min-h-10 lg:min-h-0';
 const ROW_IDLE = 'border-border bg-surface-raised hover:border-primary/50';
@@ -109,7 +110,7 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
 
   const groups = groupTrained(trained);
   const { candidates, parts } = splitDeployed(deployed);
-  const selectedName = value ? shortLoraName(value) : 'No LoRA — the base model alone';
+  const selectedName = value ? shortLoraName(value) : 'Base Model';
   const selectedGroup = value && groups.find((g) => g.checkpoints.some((c) => c.deployed_as === value));
 
   return (
@@ -117,20 +118,19 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
       className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-3">
       <header className="flex items-center gap-2">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold text-content">
-          <FlaskConical aria-hidden="true" className="h-4 w-4 text-content-muted" />LoRA under test
+          <FlaskConical aria-hidden="true" className="h-4 w-4 text-content-muted" />LoRA
         </h2>
-        <button type="button" onClick={() => setOpen((current) => !current)}
+        <Button size="sm" noShrink onClick={() => setOpen((current) => !current)}
           aria-expanded={open}
           aria-label={open ? 'Collapse LoRA list' : 'Change LoRA'}
-          className="ml-auto flex shrink-0 items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs text-content-muted hover:text-content min-h-10 lg:min-h-0">
+          className="ml-auto">
           {open ? 'Collapse' : 'Change'}
           <ChevronDown aria-hidden="true" className={`h-3.5 w-3.5 ${open ? 'rotate-180' : ''}`} />
-        </button>
+        </Button>
         {open && (
-          <button type="button" onClick={load} title="Refresh the list"
-            className="shrink-0 rounded-lg border border-border px-2 py-1 text-content-muted hover:text-content min-h-10 lg:min-h-0">
+          <Button size="sm" noShrink onClick={load} title="Refresh the list" aria-label="Refresh LoRAs">
             <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         )}
       </header>
 
@@ -142,7 +142,7 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
             <span className="block truncate text-2xs text-content-subtle">
               {value
                 ? (selectedGroup ? `trained here — run #${selectedGroup.run_id}` : 'from ComfyUI’s folder')
-                : 'The comparison point: the same seed without your LoRA.'}
+                : 'No LoRA applied'}
             </span>
           </span>
         </div>
@@ -153,9 +153,9 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
           <button type="button" onClick={() => pick({ lora: null, runId: null, datasetId: null })}
             className={`${ROW} ${!value ? ROW_ON : ROW_IDLE}`}>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm text-content">No LoRA — the base model alone</span>
+              <span className="block truncate text-sm text-content">Base Model</span>
               <span className="block truncate text-2xs text-content-subtle">
-                The comparison point: the same seed without your LoRA.
+                No LoRA applied
               </span>
             </span>
           </button>
@@ -169,7 +169,7 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
             const chosen = g.checkpoints.some((c) => c.deployed_as && c.deployed_as === value);
             return (
               <div key={g.run_id}
-                className={`flex w-full flex-col gap-1.5 rounded-lg border px-2.5 py-2 ${chosen ? ROW_ON : 'border-border bg-surface-raised'}`}>
+                className={`flex w-full flex-col gap-1.5 border-l-2 pl-2.5 py-1 ${chosen ? 'border-primary' : 'border-border'}`}>
                 <div className="flex min-w-0 items-baseline gap-2">
                   <span className="min-w-0 flex-1 truncate text-sm text-content">{g.name}</span>
                   <span className="shrink-0 text-2xs text-content-subtle">run #{g.run_id}</span>
@@ -224,8 +224,9 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
               candidate. */}
           {parts.length > 0 && (
             <details className="mt-1 rounded-lg border border-border">
-              <summary className="cursor-pointer px-2.5 py-1.5 text-2xs text-content-subtle min-h-10 lg:min-h-0 flex items-center">
-                Engine parts in the folder ({parts.length}) — turbo, camera, ref2v: grafted by the options, not LoRAs to test
+              <summary title="Turbo, camera and ref2v adapters are added by engine options. They are not trained LoRAs."
+                className="cursor-pointer px-2.5 py-1.5 text-xs text-content-subtle min-h-10 lg:min-h-0 flex items-center">
+                Engine Parts ({parts.length})
               </summary>
               <div className="flex flex-col gap-1 border-t border-border p-1.5">
                 {parts.map((d) => (
@@ -245,25 +246,24 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
               in a file explorer, with this window open beside it. */}
           <details className="rounded-lg border border-border">
             <summary className="min-h-10 cursor-pointer select-none px-2 py-1.5 text-xs text-content-muted hover:text-content lg:min-h-0">
-              ⇧ Import a LoRA from this machine
+              ⇧ Import LoRA
             </summary>
             <div className="flex flex-col gap-1.5 border-t border-border p-2">
               <label className="flex flex-col gap-1 text-xs text-content-muted">
-                Path to a .safetensors file
+                File Path
                 <span className="flex gap-1.5">
-                  <input type="text" value={importPath}
+                  <Input size="sm" type="text" value={importPath}
                     placeholder="D:\loras\my_lora.safetensors"
                     onChange={(e) => setImportPath(e.target.value)}
-                    className="min-h-10 min-w-0 flex-1 rounded-lg border border-border bg-app px-2 py-1.5 text-content lg:min-h-0" />
-                  <button type="button" disabled={!importPath.trim() || importing}
-                    onClick={() => runImport({ path: importPath.trim() })}
-                    className="min-h-10 shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-content disabled:opacity-40 lg:min-h-0">
-                    {importing ? '' : 'Import'}
-                  </button>
+                    className="min-w-0 flex-1" />
+                  <Button size="sm" noShrink disabled={!importPath.trim() || importing}
+                    onClick={() => runImport({ path: importPath.trim() })}>
+                    {importing ? 'Importing' : 'Import'}
+                  </Button>
                 </span>
               </label>
               <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-2 py-2 text-xs text-content-muted hover:border-primary/60 lg:min-h-0">
-                <span className="flex-1">or choose the file (copied over the network)</span>
+                <span className="flex-1">Upload .safetensors</span>
                 <span className="shrink-0 rounded-md border border-border px-2 py-1">Browse</span>
                 <input type="file" accept=".safetensors" className="hidden"
                   onChange={(e) => {
@@ -273,9 +273,7 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
                   }} />
               </label>
               <p className="text-2xs leading-snug text-content-subtle">
-                Copied into ComfyUI’s h3 folder, where the loader reads it. A
-                different file already under that name is never overwritten —
-                rename yours, so the two stay tellable apart.
+                Imports copy to ComfyUI’s h3 folder. If a different file has the same name, rename the import first.
               </p>
             </div>
           </details>

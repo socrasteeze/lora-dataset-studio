@@ -19,6 +19,7 @@ import { useFocusTrap } from '../../hooks/useFocusTrap';
 import DatasetZonesPreview from './DatasetZonesPreview.jsx';
 import WatermarkEngineChoice from '../shared/WatermarkEngineChoice.jsx';
 import { watermarkEngineStatus } from '../../utils/watermarkEngine.js';
+import { btnClass, btnShape } from '../common/controls';
 
 export default function WatermarkScanDialog({
   onClose, onLaunch, kept = 0, dismissed = 0, threshold = 0.94,
@@ -168,13 +169,13 @@ export default function WatermarkScanDialog({
         )}
         <div className="flex items-center justify-end gap-2 pt-1">
           <button type="button" onClick={onClose} disabled={busy}
-            className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-content disabled:opacity-40">
+            className={btnClass()}>
             {ran ? 'Close' : 'Cancel'}
           </button>
           <button type="button" onClick={launch}
             disabled={busy || live || willRead === 0}
             title={willRead === 0 ? 'Nothing to read in this scope.' : undefined}
-            className="rounded-lg bg-amber-500/90 px-3 py-1.5 text-sm font-bold text-black disabled:opacity-40">
+            className={`${btnShape()} bg-amber-500/90 font-bold text-black`}>
             {busy ? 'Scanning' : `Scan ${willRead} image${willRead === 1 ? '' : 's'}`}
           </button>
         </div>

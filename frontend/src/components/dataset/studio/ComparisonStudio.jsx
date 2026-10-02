@@ -303,8 +303,8 @@ export default function ComparisonStudio({ selection, baseModels = [], axes = nu
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 items-start">
-      <aside className="flex flex-col gap-3 lg:sticky lg:top-16 lg:max-h-[calc(100vh-7rem)] lg:overflow-auto">
+    <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-3 items-start">
+      <aside className="flex flex-col gap-2 lg:sticky lg:top-16 lg:max-h-[calc(100vh-7rem)] lg:overflow-auto">
         {/*
          * Explain unusual default-base conditions even without a picker: single-base installations
          * still need this information.
@@ -321,7 +321,7 @@ export default function ComparisonStudio({ selection, baseModels = [], axes = nu
          * selected default to node 20.
          */}
         {baseModels.length > 0 && (
-          <div className="flex flex-col gap-1 rounded-lg border border-border bg-surface p-3">
+          <div className="flex flex-col gap-1 rounded-lg border border-border bg-surface p-2">
             <span className="text-content-muted text-2xs uppercase">
               Base model ({FAMILY_LABELS[runType] || runType})
             </span>
@@ -436,7 +436,7 @@ export default function ComparisonStudio({ selection, baseModels = [], axes = nu
         )}
       </aside>
 
-      <main id="st-results" className="flex flex-col gap-3 min-w-0 scroll-mt-16">
+      <main id="st-results" className="flex flex-col gap-2 min-w-0 scroll-mt-16">
         <StudioPreflightBanner missing={preflight} archMismatch={archMismatch}
           onRefresh={async () => { await onRefreshModels?.(); setPreflight(null); }}
           onDismiss={() => { setPreflight(null); setArchMismatch(null); }} />
@@ -476,7 +476,7 @@ export default function ComparisonStudio({ selection, baseModels = [], axes = nu
         )}
 
         {!runId ? (
-          <p className="text-content-subtle text-sm rounded-lg border border-border bg-surface px-3 py-6 text-center">
+          <p className="rounded-lg border border-border bg-surface px-3 py-4 text-center text-sm text-content-subtle">
             Set up the run on the left then “🚀 Run the test”{combine
               ? ` to render the ${selection.length} LoRAs together in one image.`
               : ` to compare the ${selection.length} LoRAs side by side.`}

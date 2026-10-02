@@ -30,6 +30,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import WatermarkRegionEditor from '../dataset/WatermarkRegionEditor';
 import InpaintBrushEditor, { maskPngFromCanvas } from './InpaintBrushEditor';
+import { btnShape, fieldClass } from '../common/controls.js';
 
 export default function RepairDialog({ open, src, alt = 'image', onClose, onSubmit, onUndo = null }) {
   const dialogRef = useRef(null);
@@ -141,12 +142,12 @@ export default function RepairDialog({ open, src, alt = 'image', onClose, onSubm
       onClick={(e) => e.stopPropagation()}
       ref={dialogRef}>
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span className="text-sm font-semibold text-white">✦ Repair an area</span>
+        <span className="text-sm font-semibold text-white">✦ Repair Area</span>
         <span className="text-2xs text-white/60">
-          Draw the zone, say what should be there. Everything outside it is left untouched.
+          Repair changes only the selected area.
         </span>
         <button type="button" onClick={() => onClose()} disabled={busy}
-          aria-label="Close" className="ml-auto h-8 w-8 rounded-full bg-white/10 text-white hover:bg-white/20 disabled:opacity-40">
+          aria-label="Close" className={`${btnShape({ size: 'sm' })} ml-auto min-w-10 bg-white/10 text-white hover:bg-white/20 lg:min-w-0`}>
           ×
         </button>
       </div>
@@ -154,20 +155,20 @@ export default function RepairDialog({ open, src, alt = 'image', onClose, onSubm
       {/* ONE row, and it only appears where it means something. The brush
           controls are the brush's own; showing them next to a box editor that
           cannot use them would be the clutter this dialog exists to avoid. */}
-      <div className="mb-2 flex flex-wrap items-center gap-2 text-2xs text-white/70">
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-white/70">
         <div role="group" aria-label="Repair shape"
-          className="flex items-center rounded-lg border border-white/15 bg-white/5 p-0.5">
+          className="flex items-center gap-1.5">
           <button type="button" aria-pressed={!brush} disabled={busy}
             onClick={() => setMode('box')}
             title="Draw a rectangle — quickest, and the model works on a crop of it"
-            className={`rounded-md px-2.5 py-1 font-semibold disabled:opacity-40 ${!brush
+            className={`${btnShape({ size: 'sm' })} font-semibold ${!brush
               ? 'bg-sky-500/25 text-sky-100' : 'text-white/60 hover:text-white'}`}>
             ▭ Box
           </button>
           <button type="button" aria-pressed={brush} disabled={busy}
             onClick={() => setMode('brush')}
             title="Paint over the thing to remove — the model sees the whole picture, better for jewelry, glasses or straps"
-            className={`rounded-md px-2.5 py-1 font-semibold disabled:opacity-40 ${brush
+            className={`${btnShape({ size: 'sm' })} font-semibold ${brush
               ? 'bg-pink-500/25 text-pink-100' : 'text-white/60 hover:text-white'}`}>
             🖌 Brush
           </button>
@@ -183,7 +184,7 @@ export default function RepairDialog({ open, src, alt = 'image', onClose, onSubm
             </label>
             <button type="button" aria-pressed={eraser} disabled={busy}
               onClick={() => setEraser((v) => !v)}
-              className={`min-h-8 rounded-lg border px-2.5 py-1 font-semibold disabled:opacity-40 ${eraser
+              className={`${btnShape({ size: 'sm' })} border font-semibold ${eraser
                 ? 'border-amber-300/60 bg-amber-500/20 text-amber-100'
                 : 'border-white/20 bg-white/10 text-white hover:bg-white/20'}`}>
               ⌫ Erase
@@ -194,10 +195,9 @@ export default function RepairDialog({ open, src, alt = 'image', onClose, onSubm
                 c?.getContext('2d')?.clearRect(0, 0, c.width, c.height);
                 setPainted(false);
               }}
-              className="min-h-8 rounded-lg border border-white/20 bg-white/10 px-2.5 py-1 font-semibold text-white hover:bg-white/20 disabled:opacity-40">
+              className={`${btnShape({ size: 'sm' })} border border-white/20 bg-white/10 font-semibold text-white hover:bg-white/20`}>
               Clear
             </button>
-            <span className="text-white/45">Paint over what should go.</span>
           </>
         )}
       </div>
@@ -237,16 +237,17 @@ export default function RepairDialog({ open, src, alt = 'image', onClose, onSubm
         <div className="flex flex-wrap items-center gap-2">
           <input type="text" value={prompt} onChange={(e) => setPrompt(e.target.value)}
             disabled={busy} placeholder='What should be there? e.g. "remove the extra finger"'
-            className="min-w-[16rem] flex-1 rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/35 disabled:opacity-40" />
+            aria-label="Repair description"
+            className={`${fieldClass({ size: 'lg' })} min-w-0 basis-64 flex-1`} />
           {done && onUndo && (
             <button type="button" onClick={undo} disabled={busy}
               title="Put back the image from just before this repair, so you can try another description"
-              className="rounded-lg border border-amber-400/50 bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-100 disabled:opacity-40">
-              ↩ Undo repair
+              className={`${btnShape({ size: 'lg' })} border border-amber-400/50 bg-amber-500/20 text-amber-100`}>
+              ↩ Undo Repair
             </button>
           )}
           <button type="button" onClick={() => onClose(done ? { ok: true } : undefined)} disabled={busy}
-            className="rounded-lg border border-white/25 px-4 py-2 text-sm text-white disabled:opacity-40">
+            className={`${btnShape({ size: 'lg' })} border border-border text-content`}>
             {done ? 'Done' : 'Cancel'}
           </button>
           <button type="button" onClick={run} disabled={!ready || busy}
@@ -257,8 +258,8 @@ export default function RepairDialog({ open, src, alt = 'image', onClose, onSubm
                 : !prompt.trim()
                   ? 'Say what should be painted in that area'
                   : 'Repaint only that area — everything outside it stays byte-identical'}
-            className="rounded-lg border border-sky-400/60 bg-sky-500/25 px-5 py-2 text-sm font-semibold text-sky-50 disabled:opacity-40">
-            {busy ? '✦ Repairing' : done ? '✦ Repair again' : '✦ Repair'}
+            className={`${btnShape({ size: 'lg' })} border border-sky-400/60 bg-sky-500/25 text-sky-50`}>
+            {busy ? '✦ Repairing' : done ? '✦ Repair Again' : '✦ Repair'}
           </button>
         </div>
       </div>

@@ -5,6 +5,7 @@ import KleinImproveNote, {
   flushImproveSettings, whenImproveSettingsSettled,
 } from '../dataset/KleinImproveNote';
 import ImproveResultView from './ImproveResultView';
+import { btnClass } from '../common/controls.js';
 
 /* ✨ The improve MODAL — settings on demand, result in place.
 
@@ -171,7 +172,7 @@ export default function ImproveModal({ img, host = 'library', datasetId = null,
           )}
         </div>
 
-        <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-white/10 px-4 py-3">
+        <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-white/10 px-4 py-3">
           {phase === 'failed' && (
             <button type="button"
               onClick={(e) => {
@@ -180,17 +181,17 @@ export default function ImproveModal({ img, host = 'library', datasetId = null,
                 // candidate and flips straight back to this same error.
                 setCandidateId(null); setResult(null); setError(null); setPhase('settings');
               }}
-              className="min-h-10 lg:min-h-0 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-gray-300 hover:border-white/25">
-              Back to settings
+              className={btnClass({ size: 'sm' })}>
+              Back to Settings
             </button>
           )}
           <button type="button" onClick={close}
-            className="min-h-10 lg:min-h-0 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-gray-300 hover:border-white/25">
+            className={btnClass({ size: 'sm' })}>
             {phase === 'done' ? 'Done' : 'Close'}
           </button>
           {phase === 'settings' && (
             <button type="button" data-testid="improve-modal-generate" onClick={generate}
-              className="min-h-10 lg:min-h-0 rounded-lg bg-gradient-primary px-4 py-1.5 text-xs font-semibold text-gray-950">
+              className={btnClass({ size: 'sm', variant: 'primary' })}>
               ✨ Generate
             </button>
           )}

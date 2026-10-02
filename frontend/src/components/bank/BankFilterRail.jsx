@@ -281,10 +281,9 @@ export default function BankFilterRail({
               Styles ({styleClusters.length} group{styleClusters.length > 1 ? 's' : ''} — biggest first)
             </GroupLabel>
             {/* The strip stops at the 40 biggest; the browser shows every group. */}
-            <button type="button" onClick={onBrowseStyles}
-              className="min-h-10 lg:min-h-0 lg:h-7 ml-auto shrink-0 rounded-md border border-border px-2 text-xs text-content-muted hover:text-content">
-              Browse all
-            </button>
+            <Button type="button" size="sm" noShrink className="ml-auto" onClick={onBrowseStyles}>
+              Browse All
+            </Button>
           </div>
           {/* `relative` makes this scroller the containing block for any
               absolutely-positioned descendant — without it, overflow-x-auto

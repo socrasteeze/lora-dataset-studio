@@ -23,6 +23,7 @@
 import { useState } from 'react';
 import { HelpBadge } from '../../help/HelpMode';
 import { KIND_LABELS, kindSwitchSummary, normalizeKindLabel } from './datasetKindSwitch';
+import { btnClass } from '../common/controls';
 
 const FIELD =
   'px-3 py-1.5 rounded-lg bg-surface-raised border border-border text-content text-sm ' +
@@ -218,11 +219,11 @@ export default function DatasetSettingsModal({ d, busy, onSave, onClose }) {
 
         <div className="flex justify-end gap-2 pt-1">
           <button type="button" onClick={onClose}
-            className="px-3 py-1.5 rounded-lg border border-border bg-surface text-content-muted hover:text-content text-sm">
+            className={btnClass()}>
             Cancel
           </button>
           <button type="button" onClick={save} disabled={!canSave || busy}
-            className="px-3 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
+            className={btnClass({ variant: 'primary' })}>
             {kindChanged ? 'Change kind & save' : 'Save'}
           </button>
         </div>

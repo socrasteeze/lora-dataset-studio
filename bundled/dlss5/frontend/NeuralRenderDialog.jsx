@@ -4,6 +4,7 @@ import {
   temporalOutcome, nrRefusal, costMultiplier,
 } from './neuralRenderParams'
 import { HelpBadge } from '@lds/plugin-sdk';
+import { controlHeight } from '@lds/plugin-sdk/ui';
 
 /** ✨ Neural render (DLSS 5) — the dials, asked ONCE, before a render.
  *
@@ -79,7 +80,7 @@ export default function NeuralRenderDialog({
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Starting point">
           {NR_PRESETS.map((p) => (
             <button key={p.id} type="button" onClick={() => set(p.params)} aria-pressed={preset === p.id}
-              className={`min-h-10 rounded-full border px-3 py-0.5 text-2xs font-semibold lg:min-h-0 ${
+              className={`${controlHeight('sm')} rounded-full border px-3 py-0 text-xs font-semibold ${
                 preset === p.id ? 'border-border-strong bg-surface-raised text-content'
                   : 'border-border text-content-muted hover:text-content'}`}>
               {p.label}
@@ -106,7 +107,7 @@ export default function NeuralRenderDialog({
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Passes">
             {Array.from({ length: PASSES_MAX }, (_, i) => i + 1).map((n) => (
               <button key={n} type="button" onClick={() => set({ passes: n })} aria-pressed={params.passes === n}
-                className={`min-h-10 rounded-full border px-3 py-0.5 text-2xs font-semibold lg:min-h-0 ${
+                className={`${controlHeight('sm')} rounded-full border px-3 py-0 text-xs font-semibold ${
                   params.passes === n ? 'border-border-strong bg-surface-raised text-content'
                     : 'border-border text-content-muted hover:text-content'}`}>
                 {n}
@@ -126,7 +127,7 @@ export default function NeuralRenderDialog({
             {TEMPORAL_MODES.map((m) => (
               <button key={m.id} type="button" onClick={() => set({ temporal: m.id })}
                 aria-pressed={params.temporal === m.id} title={m.hint}
-                className={`min-h-10 rounded-full border px-3 py-0.5 text-2xs font-semibold lg:min-h-0 ${
+                className={`${controlHeight('sm')} rounded-full border px-3 py-0 text-xs font-semibold ${
                   params.temporal === m.id ? 'border-border-strong bg-surface-raised text-content'
                     : 'border-border text-content-muted hover:text-content'}`}>
                 {m.label}
@@ -144,13 +145,13 @@ export default function NeuralRenderDialog({
             the panel's full width under its own padding. */}
         <div className="sticky bottom-0 -mx-4 -mb-4 mt-1 flex items-center justify-end gap-2 border-t border-border bg-surface-overlay px-4 py-3">
           <button type="button" onClick={onClose}
-            className="min-h-10 rounded-md border border-border px-3 py-1 text-sm text-content-muted hover:text-content lg:min-h-0">
+            className={`${controlHeight()} rounded-md border border-border px-3 py-0 text-sm text-content-muted hover:text-content`}>
             Cancel
           </button>
           <button type="button" disabled={!!refusal || busy}
             onClick={() => onRender?.(normalizeNrParams(params))}
             title={refusal || undefined}
-            className="min-h-10 rounded-md border border-border-strong bg-surface-raised px-3 py-1 text-sm font-semibold text-content hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0">
+            className={`${controlHeight()} rounded-md border border-border-strong bg-surface-raised px-3 py-0 text-sm font-semibold text-content hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50`}>
             {busy ? '' : costMultiplier(params) > 1 ? `✨ Render (≈ ×${costMultiplier(params)} time)` : '✨ Render'}
           </button>
         </div>

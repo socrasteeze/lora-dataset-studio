@@ -61,7 +61,7 @@ test('the single box shows the default and normalises a copy of it back to ""', 
   assert.match(field, /Custom override/);
   // Reset clears back to '' (= follow the default), it does not re-type it
   assert.match(field, /onClick=\{\(\) => onChange\(''\)\}/);
-  assert.match(field, /Reset to default/);
+  assert.match(field, /Reset to Default/);
 });
 
 test('the Extra refs row opens the identity-prompt modal', () => {

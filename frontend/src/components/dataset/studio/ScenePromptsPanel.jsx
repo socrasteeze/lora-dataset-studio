@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { apiFetch } from '../../../api/fetchClient';
 import { useToast } from '../../common/Toast';
 import { HelpBadge } from '../../../help/HelpMode';
+import { btnClass, btnShape, fieldClass } from '../../common/controls';
 import { SCENE_SOURCES, joinScenePrompt, sceneSource, sceneThumbUrl,
   toggleSceneIndex } from './scenePrompts';
 
@@ -91,7 +92,7 @@ export default function ScenePromptsPanel({ value, onChange }) {
           {SCENE_SOURCES.map((s) => (
             <button key={s.kind} type="button" onClick={() => pickKind(s.kind)}
               aria-pressed={kind === s.kind}
-              className={'rounded-lg border px-2 py-0.5 text-2xs font-semibold transition-colors '
+              className={`${btnShape({ size: 'sm' })} border font-semibold `
                 + (kind === s.kind
                   ? 'border-primary/50 bg-primary/20 text-white'
                   : 'border-border bg-app/40 text-content-muted hover:bg-surface-raised')}>
@@ -102,7 +103,7 @@ export default function ScenePromptsPanel({ value, onChange }) {
         <div className="flex flex-wrap items-center gap-1.5">
           <select value={sourceId} onChange={(e) => setSourceId(e.target.value)}
             aria-label={`${src.label.replace(/^\S+\s/, '')} to load scenes from`}
-            className="max-w-56 rounded border border-border bg-app/60 px-1 py-1 text-2xs text-content">
+            className={`${fieldClass({ size: 'sm' })} max-w-56`}>
             <option value="">
               {options === undefined ? 'Loading' : (options.length ? src.pick : src.empty)}
             </option>
@@ -111,18 +112,18 @@ export default function ScenePromptsPanel({ value, onChange }) {
             ))}
           </select>
           <button type="button" onClick={load} disabled={!sourceId || busy}
-            className="rounded-lg bg-gradient-primary px-2.5 py-1 text-2xs font-semibold text-gray-950 disabled:opacity-40">
+            className={`${btnShape({ size: 'sm' })} bg-gradient-primary font-semibold text-gray-950`}>
             {busy ? 'Loading' : scenes.length ? '⟳ Reload' : '⬇ Load scenes'}
           </button>
           {scenes.length > 0 && (
             <>
               <button type="button"
                 onClick={() => onChange({ ...value, picked: scenes.map((_, i) => i) })}
-                className="rounded border border-border px-1.5 py-0.5 text-2xs text-content-muted hover:bg-surface-raised">
+                className={btnClass({ size: 'sm' })}>
                 Select all
               </button>
               <button type="button" onClick={() => onChange({ ...value, picked: [] })}
-                className="rounded border border-border px-1.5 py-0.5 text-2xs text-content-muted hover:bg-surface-raised">
+                className={btnClass({ size: 'sm' })}>
                 None
               </button>
             </>
@@ -170,7 +171,7 @@ export default function ScenePromptsPanel({ value, onChange }) {
                       })}
                       placeholder="✏️ Custom prompt added to this scene (optional)"
                       aria-label={`Custom prompt appended to scene ${i + 1}`}
-                      className="mx-1.5 mb-1 min-h-10 lg:min-h-0 rounded border border-border bg-app/60 px-1.5 py-0.5 text-2xs text-content placeholder:text-content-subtle" />
+                      className={`${fieldClass({ size: 'sm' })} mx-1.5 mb-1 placeholder:text-content-subtle`} />
                   )}
                 </div>
               );

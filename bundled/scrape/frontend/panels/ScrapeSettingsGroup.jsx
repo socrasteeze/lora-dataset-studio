@@ -86,33 +86,30 @@ export default function ScrapeSettingsGroup(props) {
   const prompt = props.config?.klein?.small_image_prompt ?? ''
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* id: the deep-link target of the source picker's "Source credentials →"
           link. The card, not one key — the label names this card and the
           keys inside it are equally the answer. */}
       <Card
         id="scrape-credentials"
-        title="Source credentials"
+        title="Source Credentials"
         help="Credentials used when scanning image sources. Reddit's key is optional; Pexels requires its API key. Civitai uses the shared app key below. Fields stay blank even when a key is already saved."
       >
         {SCRAPE_SECRETS.map((f) => <SecretField key={f.key} field={f} {...props} />)}
       </Card>
       <Card
-        title="Klein rescue — small scraped images"
+        title="Small-image Rescue"
         help="Optional instruction for automatic rescue of scraped images under 768 px. The manual Upscale & improve is a different flow with its own instruction and strength, under Plugins ▸ Klein Improve ▸ Settings. Klein creates a separate 2 MP version to validate and leaves the original intact."
       >
         <div>
           <div className="flex items-center justify-between gap-3">
             <label htmlFor="klein-small-image-prompt" className="text-sm font-medium text-content">
-              Small-image rescue instruction
+              Rescue Instruction
             </label>
             <span className="text-xs text-content-subtle">optional</span>
           </div>
           <p className="mb-1 text-xs leading-relaxed text-content-muted">
-            Leave this empty to let Klein use the reference image alone. Add a short instruction only
-            when you want to guide automatic scraper rescue; Klein remains generative and may change
-            details. Manual improvement belongs to the optional Klein Improve plug-in.
-            When installed, its prompt is in Plugins ▸ Klein Improve ▸ Settings.
+            Empty uses only the reference. Klein may change details.
           </p>
           <textarea id="klein-small-image-prompt" rows={4} value={prompt}
             onChange={(e) => props.setField('klein', 'small_image_prompt', e.target.value)}

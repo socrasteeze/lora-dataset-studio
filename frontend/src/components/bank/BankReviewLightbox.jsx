@@ -459,13 +459,13 @@ export default function BankReviewLightbox({
               {img.edit_history_count > 0 && <>
                 <button type="button" onClick={undoCurrent} disabled={busy}
                   title="Undo only the last crop or upscale, keeping earlier edits."
-                  className="min-h-10 rounded-lg border border-white/25 px-3 py-2 text-sm text-white disabled:opacity-50 hover:bg-white/10">
+                  className="min-h-10 lg:min-h-0 rounded-lg border border-white/25 px-3 py-2 text-sm text-white disabled:opacity-50 hover:bg-white/10">
                   ↩ Undo last edit
                 </button>
                 <button type="button" onClick={() => setCompareKey(comparing ? null : editKey)}
                   disabled={busy} aria-pressed={!!comparing}
                   title="Compare the current result with the image just before its last edit."
-                  className="min-h-10 rounded-lg border border-white/25 px-3 py-2 text-sm text-white disabled:opacity-50 hover:bg-white/10">
+                  className="min-h-10 lg:min-h-0 rounded-lg border border-white/25 px-3 py-2 text-sm text-white disabled:opacity-50 hover:bg-white/10">
                   {comparing ? 'Close comparison' : 'Compare before / after'}
                 </button>
               </>}

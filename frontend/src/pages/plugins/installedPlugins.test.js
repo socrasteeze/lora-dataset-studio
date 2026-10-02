@@ -66,7 +66,7 @@ for (const [kind, reason] of [
   test(`a ${kind} load failure is shown with a reload and is not a healthy Active now`, () => {
     const html = renderWithProblems([{ plugin: 'video', reason }])
     assert.match(html, new RegExp(reason.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
-    assert.match(html, /Reload page/)
+    assert.match(html, /Reload Page/)
     assert.doesNotMatch(html, /Active now/)
   })
 }
@@ -74,13 +74,13 @@ for (const [kind, reason] of [
 test('a backend-active plugin with no load problem still says Active now', () => {
   const html = renderWithProblems([])
   assert.match(html, /Active now/)
-  assert.doesNotMatch(html, /Reload page/)
+  assert.doesNotMatch(html, /Reload Page/)
   assert.doesNotMatch(html, /Interface did not load/)
 })
 
 test('plugin settings still explain a load failure and offer reload', () => {
   const src = readFileSync(new URL('../PluginSettingsPage.jsx', import.meta.url), 'utf8')
   assert.match(src, /This plugin’s interface did not load\. Reload the page, or repair the plugin from Plugins\./)
-  assert.match(src, />Reload page</)
+  assert.match(src, />Reload Page</)
   assert.match(src, /window\.location\.reload\(\)/)
 })

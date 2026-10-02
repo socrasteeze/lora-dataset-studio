@@ -8,7 +8,7 @@ function StepChoices({ choices, selected, onToggle, label, amber = false }) {
   const buttonClass = 'min-h-10 min-w-10 rounded-lg border px-2.5 py-1 text-xs tabular-nums transition-colors';
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-content-muted text-2xs uppercase">{label}</span>
+      <span className="text-content-muted text-xs font-medium">{label}</span>
       <div role="group" aria-label={label} className="flex items-center gap-2">
         <button type="button" aria-label="Show lower step counts" title="Show lower step counts"
           disabled={start === 0} onClick={() => setPosition(start - 1)}
@@ -73,7 +73,7 @@ export default function AxisPickers({
            * Generic label: each FAMILY supplies its own list (Z-Image, SDXL checkpoints, or
            * official/local Krea UNETs).
            */}
-          <span className="text-content-muted text-2xs uppercase">Base model (multi)</span>
+          <span className="text-content-muted text-xs font-medium">Base Models</span>
           <div className="flex gap-2 flex-wrap">
             {zModels.map((m) => (
               <button key={m.value} type="button" onClick={() => onToggleModel(m.value)}
@@ -91,7 +91,7 @@ export default function AxisPickers({
 
       {Array.isArray(aspects) && aspects.length > 1 && (
         <div className="flex flex-col gap-1">
-          <span className="text-content-muted text-2xs uppercase">Image formats (multi)</span>
+          <span className="text-content-muted text-xs font-medium">Formats</span>
           <div className="flex gap-2 flex-wrap">
             {aspects.map((a) => (
               <button key={a} type="button" onClick={() => onToggleAspect(a)}
@@ -118,7 +118,7 @@ export default function AxisPickers({
 
       {Array.isArray(cfgChoices) && (
         <div className="flex flex-col gap-1">
-          <span className="text-content-muted text-2xs uppercase">CFG (multi) — default {fmt(defaultCfg ?? 1.0)}</span>
+          <span className="text-content-muted text-xs font-medium">CFG · Default {fmt(defaultCfg ?? 1.0)}</span>
           <div className="flex gap-2 flex-wrap">
             {cfgChoices.map((v) => (
               <button key={v} type="button" onClick={() => onToggleCfg(v)}
@@ -137,7 +137,7 @@ export default function AxisPickers({
       {Array.isArray(stepsChoices) && (
         <StepChoices key={`steps-${defaultSteps}`} choices={stepsChoices}
           selected={effectiveSteps} onToggle={onToggleStep}
-          label={`${hasPass2 ? 'Steps · pass 1 — classic (multi)' : 'Steps (multi)'} — default ${defaultSteps ?? 8}`} />
+          label={`${hasPass2 ? 'Steps · Pass 1' : 'Steps'} · Default ${defaultSteps ?? 8}`} />
       )}
 
       {/*
@@ -147,7 +147,7 @@ export default function AxisPickers({
       {hasPass2 && (
         <StepChoices key={`steps2-${defaultSteps2}`} choices={steps2Choices}
           selected={effectiveSteps2} onToggle={onToggleStep2} amber
-          label={`Steps · pass 2 — detail daemon (multi) — default ${defaultSteps2 ?? 8}`} />
+          label={`Steps · Pass 2 · Detail · Default ${defaultSteps2 ?? 8}`} />
       )}
     </>
   );

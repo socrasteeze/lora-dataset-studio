@@ -118,14 +118,14 @@ export default function CanvasDatasetFilter({
         <input id="canvas-dataset-pick" type="search" value={pick}
           onChange={(e) => setPick(e.target.value)}
           placeholder="Find a dataset"
-          className="mb-1.5 h-9 w-full rounded-md border border-border bg-app/60 px-2.5 text-content text-xs placeholder:text-content-subtle focus:border-primary focus:outline-none" />
+          className="mb-1.5 h-10 w-full rounded-md border border-border bg-app/60 px-2.5 text-content text-xs placeholder:text-content-subtle focus:border-primary focus:outline-none lg:h-8" />
         <div className="mb-1.5 flex items-center gap-1.5">
           <button type="button" onClick={onAll}
-            className="flex h-10 items-center rounded-md border border-border bg-app/60 px-2.5 text-content-muted text-2xs hover:text-content lg:h-8">
-            Select all
+            className="flex h-10 items-center rounded-md border border-border bg-app/60 px-2.5 text-xs text-content-muted hover:text-content lg:h-8">
+            Select All
           </button>
           <button type="button" onClick={onNone}
-            className="flex h-10 items-center rounded-md border border-border bg-app/60 px-2.5 text-content-muted text-2xs hover:text-content lg:h-8">
+            className="flex h-10 items-center rounded-md border border-border bg-app/60 px-2.5 text-xs text-content-muted hover:text-content lg:h-8">
             Clear
           </button>
           <span className="ml-auto text-content-subtle text-2xs tabular-nums">

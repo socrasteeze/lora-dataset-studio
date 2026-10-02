@@ -64,7 +64,7 @@ export default function GuidePage({ helpOnly = false }) {
       map[t.guide.anchor] = (
         <button type="button" onClick={() => navigate(routeWithFocus(t.app))}
           className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-indigo-400/40 bg-indigo-500/10 px-2.5 py-1 text-xs font-medium text-indigo-200 transition-colors hover:bg-indigo-500/20">
-          Open this screen →
+          Open Screen →
         </button>
       )
     }
@@ -143,7 +143,7 @@ export default function GuidePage({ helpOnly = false }) {
       </aside>}
 
       <article className={`min-w-0 max-w-4xl pb-10 ${helpOnly ? 'mx-auto' : 'mt-2 lg:mt-0'}`}>
-        <header className="relative mb-4 overflow-hidden rounded-2xl border border-border bg-surface px-5 py-5 sm:px-6 sm:py-6">
+        <header className="relative mb-3 overflow-hidden rounded-2xl border border-border bg-surface px-4 py-4 sm:px-5 sm:py-5">
           <div aria-hidden className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-indigo-500/10 blur-3xl" />
           <div className="relative">
             <div className="mb-3 flex flex-wrap items-center gap-2 font-mono text-2xs uppercase tracking-[0.14em] text-content-subtle">
@@ -159,7 +159,7 @@ export default function GuidePage({ helpOnly = false }) {
         </header>
 
         {headings.length > 0 && (
-          <nav aria-label="On this page" className="mb-4 rounded-xl border border-border bg-surface p-3 xl:hidden">
+          <nav aria-label="On this page" className="mb-3 rounded-xl border border-border bg-surface p-3 xl:hidden">
             <p className="m-0 mb-2 font-mono text-2xs uppercase tracking-[0.16em] text-content-subtle">On this page</p>
             <div className="flex gap-2 overflow-x-auto pb-0.5">
               {headings.map((item) => (

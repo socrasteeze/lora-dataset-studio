@@ -150,12 +150,12 @@ export default function CanvasUndeployPanel({ open, onClose, onChanged }) {
           <>
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" onClick={() => setKeys(allKeys())} disabled={busy}
-                className="rounded-md border border-border px-2 py-1 text-2xs font-medium text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-40">
-                Select all ({rows.length})
+                className="h-10 rounded-md border border-border px-2 py-0 text-xs font-medium text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-40 lg:h-7">
+                Select All ({rows.length})
               </button>
               <button type="button" onClick={() => setKeys(new Set())}
                 disabled={busy || keys.size === 0}
-                className="rounded-md border border-border px-2 py-1 text-2xs font-medium text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-40">
+                className="h-10 rounded-md border border-border px-2 py-0 text-xs font-medium text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-40 lg:h-7">
                 Clear
               </button>
             </div>
@@ -203,11 +203,11 @@ export default function CanvasUndeployPanel({ open, onClose, onChanged }) {
 
         <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} disabled={busy}
-            className="rounded-lg border border-border bg-app px-3 py-1.5 text-xs text-content-muted hover:text-content disabled:opacity-50">
+            className="h-10 rounded-lg border border-border bg-app px-3 py-0 text-xs text-content-muted hover:text-content disabled:opacity-50 lg:h-7">
             Cancel
           </button>
           <button type="button" onClick={run} disabled={busy || keys.size === 0}
-            className="rounded-lg border border-amber-400/50 bg-amber-500/15 px-4 py-1.5 text-xs font-semibold text-amber-100 disabled:opacity-40">
+            className="h-10 rounded-lg border border-amber-400/50 bg-amber-500/15 px-4 py-0 text-xs font-semibold text-amber-100 disabled:opacity-40 lg:h-7">
             {busy ? '⏏ Undeploying' : undeployButtonLabel(keys.size)}
           </button>
         </div>

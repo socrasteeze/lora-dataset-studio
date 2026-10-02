@@ -97,7 +97,7 @@ export default function SetupStart({ onTools, onRecheck, scanned = false, detect
   function recheck() { setRevision(value => value + 1); onRecheck?.() }
   function changeGoal() { saveSetupJourney(null); setParams({}, { replace: true }); setError('') }
 
-  return <div className="mx-auto max-w-2xl space-y-6" data-probe-reading="setup-start"
+  return <div className="mx-auto max-w-2xl space-y-4" data-probe-reading="setup-start"
     data-probe-content="setup" data-probe-setup={checking ? 'checking' : 'ready'}>
     <header>
       <div className="flex items-center justify-between gap-3">
@@ -135,7 +135,7 @@ export default function SetupStart({ onTools, onRecheck, scanned = false, detect
       <p className="text-xs text-content-muted">You can add other tools later. Downloads and any purchases are reviewed before they start.</p>
       <div className="flex flex-wrap items-center justify-end gap-3">
         {selected !== 'dataset' && <button type="button" onClick={() => follow('/datasets', true, 'dataset')} disabled={busy}
-          className="mr-auto min-h-10 text-sm text-content-muted underline">Open LDS without these tools</button>}
+          className="mr-auto min-h-10 text-sm text-content-muted underline">Open LDS</button>}
         <button type="button" disabled={busy} onClick={() => selected === 'dataset'
           ? follow('/datasets', true, 'dataset') : choose({ goal: selected })} className={PRIMARY}>
           {busy ? 'Opening LDS' : selected === 'dataset' ? 'Open LDS' : 'Continue'}
@@ -183,7 +183,7 @@ export default function SetupStart({ onTools, onRecheck, scanned = false, detect
             </button>
             <p className="text-xs text-content-muted">When you finish, use “Back to my setup plan”. The plan checks what is ready; opening an installer does not complete a step.</p>
           </section>}
-          {(ready || plan.manual) && plan.first && <section className="space-y-3 rounded-xl border border-border bg-surface p-5" aria-label="Your first try">
+          {(ready || plan.manual) && plan.first && <section className="space-y-3 rounded-xl border border-border bg-surface p-4" aria-label="Your first try">
             <p className={'text-xs font-medium ' + (ready ? 'text-emerald-400' : 'text-content-muted')}>
               {ready ? 'Ready for your first try' : 'First try — follow the plugin’s checks'}
             </p>
@@ -196,21 +196,21 @@ export default function SetupStart({ onTools, onRecheck, scanned = false, detect
         </>}
       </>}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button type="button" className="min-h-10 text-sm text-content-muted underline" onClick={changeGoal}>← Change goal</button>
+        <button type="button" className="min-h-10 text-sm text-content-muted underline" onClick={changeGoal}>← Change Goal</button>
         {journey.goal === 'plugins' && journey.plugin && <button type="button" className={SECONDARY}
-          onClick={() => choose({ goal: 'plugins' })}>Choose another plugin</button>}
+          onClick={() => choose({ goal: 'plugins' })}>Choose Plugin</button>}
         {journey.goal === 'images' && journey.engine && <button type="button" className={SECONDARY}
           onClick={() => choose({ goal: 'images' })}>Change engine</button>}
         {selectedPlugin && journey.capability && <button type="button" className={SECONDARY}
           onClick={() => choose({ goal: 'plugins', plugin: journey.plugin })}>Change function</button>}
-        {needsChecks && <button type="button" onClick={recheck} disabled={checking || detecting} className={SECONDARY}>Check again</button>}
+        {needsChecks && <button type="button" onClick={recheck} disabled={checking || detecting} className={SECONDARY}>Check Again</button>}
       </div>
       <p className="text-xs text-content-muted">Your chosen goal stays in this browser after a restart. Return through Setup or “Back to my setup plan”.</p>
     </>}
     {error && <p role="alert" className="break-words text-sm text-rose-300">{error}</p>}
     {storageWarning && <p role="status" className="text-sm text-amber-300">This browser could not save the plan. Keep this tab’s setup URL to return to it after a restart.</p>}
     <div className="border-t border-border pt-4">
-      <button type="button" onClick={onTools} className="min-h-10 text-sm text-content-muted underline">All tools & advanced setup</button>
+      <button type="button" onClick={onTools} className="min-h-10 text-sm text-content-muted underline">All Tools</button>
     </div>
   </div>
 }

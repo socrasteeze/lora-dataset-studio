@@ -24,6 +24,7 @@ import DevicePicker from '../common/DevicePicker'
 import { captionButtonLabel, captionScopeNote } from './bankCaptionScope.js'
 import { holdsTheGpu } from './bankScoreDevice.js'
 import { activeLocalLlm, localLlmLabel } from '../../utils/localLlm'
+import { Button } from '../common/Controls.jsx'
 
 /* Below lg the panel folds everything that is not a pass button. Measured by
    the responsive probe at 360 px: the panel was ~1 500 px tall — engine card,
@@ -165,8 +166,7 @@ export default function BankPassesPanel({
                 pressed. Self-hides with no peers. 🔎 Scan and 🔖 Tags are
                 absent from the gate on purpose: they never travel. */}
             <DevicePicker value={passDevice} onChange={onPassDevice}
-              onDevice={onPassDeviceObj} kind="bank-pass"
-              className="text-2xs" />
+              onDevice={onPassDeviceObj} kind="bank-pass" size="md" />
           </div>
           {/* Watermark CLEANING — the two manual levels (crop, then inpaint), with
               their own per-level progress. Lives in its own component so the
@@ -212,12 +212,11 @@ export default function BankPassesPanel({
               recovery route accessible even when detection looks healthy. */}
           {onPickPython && (
             <div>
-              <button type="button" onClick={() => onPickPython('scoring')}
+              <Button type="button" size="sm" onClick={() => onPickPython('scoring')}
                 disabled={live || semanticOperationBusy}
-                title="Inspect, test or change the Python used by Score"
-                className="min-h-10 lg:min-h-0 rounded-md border border-border px-2 py-1 text-xs font-medium text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-50">
+                title="Inspect, test or change the Python used by Score">
                 Manage Score Python
-              </button>
+              </Button>
             </div>
           )}
           {captionVocab === 'explicit' && !visionModelLooksUncensored && (
@@ -238,9 +237,7 @@ export default function BankPassesPanel({
         </div>
       </div>
       <div className="min-w-0 xl:col-span-5">
-        <Fold compact={compact} title="Bank overview">
-        <BankOverview payload={payload} />
-        </Fold>
+        <BankOverview payload={payload} compact={compact} />
       </div>
     </div>
   )

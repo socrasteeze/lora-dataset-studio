@@ -42,11 +42,11 @@ export default function QuickVoteModal({ vote, datasetId, fmt }) {
       <div className="text-content-subtle text-2xs">← swipe/left arrow = 👎 · right = 👍 → · Esc = close · ("skip" button to pass)</div>
       <div className="flex items-center gap-4">
         <button type="button" onClick={() => vote.voteCurrent(-1)} aria-label="Dislike"
-          className="px-7 py-3 rounded-2xl text-2xl border border-red-400/60 bg-red-500/20 text-red-200 hover:bg-red-500/30">👎</button>
+          className="h-16 w-16 rounded-2xl border border-red-400/60 bg-red-500/20 text-2xl text-red-200 hover:bg-red-500/30">👎</button>
         <button type="button" onClick={vote.advanceVote} aria-label="Skip"
-          className="px-3 py-2 rounded-xl text-xs border border-border bg-surface text-content-muted hover:text-content">skip</button>
+          className="h-16 rounded-xl border border-border bg-surface px-3 text-xs text-content-muted hover:text-content">Skip</button>
         <button type="button" onClick={() => vote.voteCurrent(1)} aria-label="Like"
-          className="px-7 py-3 rounded-2xl text-2xl border border-green-400/60 bg-green-500/20 text-green-200 hover:bg-green-500/30">👍</button>
+          className="h-16 w-16 rounded-2xl border border-green-400/60 bg-green-500/20 text-2xl text-green-200 hover:bg-green-500/30">👍</button>
       </div>
     </div>
     ,

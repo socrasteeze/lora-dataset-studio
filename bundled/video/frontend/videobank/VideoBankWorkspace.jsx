@@ -35,7 +35,7 @@ import { filterByFlag, flagChips, flagFilterNote } from './videoMetricsFilter'
 import { cameraChips, filterByCamera } from './videoCameraMotion'
 import PromoteVideoDialog from './PromoteVideoDialog'
 import DescribeShotsDialog from './DescribeShotsDialog'
-import { GuideInfoDot } from '@lds/plugin-sdk/ui';
+import { controlHeight, GuideInfoDot } from '@lds/plugin-sdk/ui';
 import { VIDEO_PASS_TOPICS } from './videoPassTopics'
 import { Stat } from '@lds/plugin-sdk/ui';
 import { loadRailOpen, passesButtonLabel, railIsColumn, saveRailOpen } from '@lds/plugin-sdk/bank';
@@ -597,20 +597,20 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
   const problems = countsProblems(counts)
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <header data-probe-chrome="header"
-        className="space-y-2 rounded-xl border border-border bg-surface p-3 [@media(max-height:500px)]:space-y-1 [@media(max-height:500px)]:p-2">
+        className="space-y-2 [@media(max-height:500px)]:space-y-1">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <button type="button" onClick={onBack}
-            className="min-h-10 lg:min-h-0 rounded-md border border-border bg-surface-raised px-2.5 py-1 text-sm text-content hover:bg-surface">
+            className={`${controlHeight()} rounded-md border border-border bg-surface-raised px-2.5 py-0 text-sm text-content hover:bg-surface`}>
             ← Banks
           </button>
           <h1 className="min-w-0 truncate text-xl font-bold text-content">🎬 {bank.name}</h1>
           <HelpBadge topic="page-video-bank" />
           <button type="button" onClick={rescan}
             title="Re-walk the folder and inventory anything new"
-            className="min-h-10 lg:min-h-0 ml-auto rounded-md border border-border bg-surface-raised px-2.5 py-1 text-xs font-semibold text-content hover:bg-surface">
-            ↻ Rescan folder
+            className={`${controlHeight()} ml-auto rounded-md border border-border bg-surface-raised px-2.5 py-0 text-sm font-semibold text-content hover:bg-surface`}>
+            ↻ Rescan Folder
           </button>
         </div>
         {/* The path is desktop reading — on a phone it was a quarter of the
@@ -640,14 +640,14 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
           {!railIsColumnNow && (
             <button type="button" onClick={() => setRail(true)}
               aria-expanded={railOpen} aria-controls="video-filter-rail"
-              className="min-h-10 lg:min-h-0 rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content hover:bg-surface">
+              className={`${controlHeight()} rounded-md border border-border bg-surface-raised px-3 py-0 text-sm text-content hover:bg-surface`}>
               ☰ Filters
             </button>
           )}
           <button type="button" onClick={() => setPassesOpen((v) => !v)}
             aria-expanded={passesOpen} aria-controls="video-passes-panel"
             title="Open the analysis passes — probe, find shots, thumbnails, measure, embeddings, captions, duplicates, watermarks, safe zones, defects, camera and AI check."
-            className="min-h-10 lg:min-h-0 rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content hover:bg-surface">
+            className={`${controlHeight()} rounded-md border border-border bg-surface-raised px-3 py-0 text-sm text-content hover:bg-surface`}>
             {passesButtonLabel(busy)}
           </button>
           <span className="inline-flex items-center gap-1">
@@ -655,7 +655,7 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
               disabled={busy || !!passBlockedBy(capability, 'pipeline')}
               title={passBlockedBy(capability, 'pipeline')?.why
                 || 'Chain the preparation passes — scan, find shots, thumbnails, and whichever of measure, embeddings, duplicates and camera you tick. Start it and walk away.'}
-              className="min-h-10 lg:min-h-0 rounded-md bg-gradient-primary px-4 py-2 text-sm font-bold text-gray-950 shadow disabled:opacity-50">
+              className={`${controlHeight()} rounded-md bg-gradient-primary px-4 py-0 text-sm font-bold text-gray-950 shadow disabled:opacity-50`}>
               ▶ {PASS_LABELS.pipeline}
             </button>
             <GuideInfoDot topic={VIDEO_PASS_TOPICS.pipeline} label={PASS_LABELS.pipeline} />
@@ -665,14 +665,14 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
             <button type="button" onClick={() => setPromoting(true)}
               disabled={busy || !counts.keep}
               title={!counts.keep ? 'Keep some shots first' : undefined}
-              className="min-h-10 lg:min-h-0 rounded-md bg-gradient-primary px-3 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-50">
+              className={`${controlHeight()} rounded-md bg-gradient-primary px-3 py-0 text-sm font-semibold text-gray-950 disabled:opacity-50`}>
               🎬 {PASS_LABELS.promote}
             </button>
             <GuideInfoDot topic={VIDEO_PASS_TOPICS.promote} label={PASS_LABELS.promote} />
           </span>
           {busy && (
             <button type="button" onClick={cancel}
-              className="min-h-10 lg:min-h-0 rounded-md border border-rose-500/60 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-200 hover:bg-rose-500/20">
+              className={`${controlHeight()} rounded-md border border-rose-500/60 bg-rose-500/10 px-3 py-0 text-sm font-semibold text-rose-200 hover:bg-rose-500/20`}>
               ⏹ Stop
             </button>
           )}
@@ -767,11 +767,11 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
                 : (search ? `${shownClips.length} found` : `${clips.length} of ${total} shown`)))}
         </span>
         <button type="button" onClick={() => triage(selected, 'keep')} disabled={!selected.length}
-          className="rounded-md bg-emerald-600/80 px-2.5 py-1 font-semibold text-white hover:bg-emerald-600 disabled:opacity-30">
+          className={`${controlHeight('sm')} rounded-md bg-emerald-600/80 px-2.5 py-0 font-semibold text-white hover:bg-emerald-600 disabled:opacity-30`}>
           ✓ Keep
         </button>
         <button type="button" onClick={() => triage(selected, 'reject')} disabled={!selected.length}
-          className="rounded-md bg-rose-600/80 px-2.5 py-1 font-semibold text-white hover:bg-rose-600 disabled:opacity-30">
+          className={`${controlHeight('sm')} rounded-md bg-rose-600/80 px-2.5 py-0 font-semibold text-white hover:bg-rose-600 disabled:opacity-30`}>
           ✕ Reject
         </button>
         {/* The third verb of the same endpoint. Without it a mis-kept shot could
@@ -779,17 +779,17 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
             bank has had this exit all along, and a decision you cannot take back
             is exactly what makes people afraid to triage fast. */}
         <button type="button" onClick={() => triage(selected, 'pending')} disabled={!selected.length}
-          className="rounded-md border border-border bg-surface-raised px-2.5 py-1 text-content hover:bg-surface disabled:opacity-30">
-          ↩ To triage
+          className={`${controlHeight('sm')} rounded-md border border-border bg-surface-raised px-2.5 py-0 text-content hover:bg-surface disabled:opacity-30`}>
+          ↩ To Triage
         </button>
         <button type="button" onClick={() => setSelected(shownClips.map((c) => c.id))}
           disabled={!shownClips.length}
-          className="rounded-md border border-border bg-surface-raised px-2.5 py-1 text-content hover:bg-surface disabled:opacity-30">
-          Select page
+          className={`${controlHeight('sm')} rounded-md border border-border bg-surface-raised px-2.5 py-0 text-content hover:bg-surface disabled:opacity-30`}>
+          Select Page
         </button>
         {selected.length > 0 && (
           <button type="button" onClick={() => setSelected([])}
-            className="rounded-md border border-border bg-surface-raised px-2.5 py-1 text-content hover:bg-surface">
+            className={`${controlHeight('sm')} rounded-md border border-border bg-surface-raised px-2.5 py-0 text-content hover:bg-surface`}>
             Clear
           </button>
         )}
@@ -797,8 +797,8 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
             here that also hits shots you cannot see. */}
         <button type="button" onClick={() => triageEverything('reject')}
           disabled={!counts.clips}
-          className="ml-auto rounded-md border border-border bg-surface-raised px-2.5 py-1 text-content-muted hover:bg-surface disabled:opacity-30">
-          Reject all
+          className={`${controlHeight('sm')} ml-auto rounded-md border border-border bg-surface-raised px-2.5 py-0 text-content-muted hover:bg-surface disabled:opacity-30`}>
+          Reject All
         </button>
       </div>
 
@@ -830,7 +830,7 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
       {!search && hasMore({ loaded: clips.length, total }) && (
         <div className="flex justify-center">
           <button type="button" onClick={() => loadClips(true)} disabled={loadingClips}
-            className="rounded-md border border-border bg-surface-raised px-4 py-1.5 text-sm font-semibold text-content hover:bg-surface disabled:opacity-40">
+            className={`${controlHeight()} rounded-md border border-border bg-surface-raised px-4 py-0 text-sm font-semibold text-content hover:bg-surface disabled:opacity-40`}>
             {loadingClips ? 'Loading' : `Load more (${total - clips.length} left)`}
           </button>
         </div>

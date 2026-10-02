@@ -1,55 +1,57 @@
 # HANDOFF
 
-**Updated:** 2026-10-01 | **Branch:** noble/refactor-review-handoff | **Base:** 8eb52792b | **Tree:** task-branch commits
+**Updated:** 2026-10-02 | **Branch:** noble/compact-app-interface | **Base:** c60852194 | **Tree:** dirty
 
 ## State
-The four P2 regressions from the `f3815e82e..8eb52792b` review are fixed on this task branch. `main` is unchanged.
-Targeted node tests for those fixes, and `npm run build`, exited 0. `scripts/gates.ps1`, full `npm test`, lint, responsive probes, ruff, backend pytest, and the application were not run. Cloud Gates remain the landing gate.
+The interface density pass and rebuilt frontend/dist are on noble/compact-app-interface. The authorized publication target is this branch on origin; main retains its cloud landing gate.
+Build, both linters and the privacy scanner passed. The user explicitly requested commit and clean push without tests. Tests, responsive probes and Gates remain deferred.
 
 ## Done this session
-- Checked the refactor diff, affected callers and applicable repository rules. Confirmed all four findings against the previous implementation.
-- Bank browse groups the full filtered list, then pages those display rows. Selection mode still pages raw banks. A filtered singleton stays a single bank. The promote dialog quotes the complete member count and kept total. The client still does not send a member list.
-- An installed plugin whose script, stylesheet, or descriptor failed to load shows that failure and Reload page. A plugin with no load problem still says Active now. Plugin settings keep their load-failure explanation and reload action.
-- ZIP consent shows each compatibility issue message, including a missing dependency and a required API version, and Install stays disabled. The generic refusal remains only when install is blocked and no issue details are present.
-- `docs/guide/installation.md` describes the installed-plugin and trusted-ZIP workflow. `docs/guide/getting-started.md` no longer describes All, Installed, and Updates filters on Plugins. History and specs were left unchanged.
-- Four benefit-first What's New entries were prepended. `frontend/dist` was rebuilt in a separate `build(frontend):` commit.
+- Removed redundant Bank creation/workspace boxes, nested pass option cards and the duplicate overview disclosure; placed the pressed Subfolders toggle between Browse and Create.
+- Matched Image/Video Bank headers and creation control heights. Kept equal-width lane choices and accessible sort names without visible Sort prefixes.
+- Compacted Dataset, Studio, captions, primary/advanced training, Runs, settings, setup and plugin surfaces. Retained warnings, recovery guidance and functional help controls.
+- Aligned shared host controls and standalone SDK settings fields. Textareas release the fixed single-line height.
+- Updated contracts, guide labels and What's New. The read-only census covered 357 JSX sources; deeper sibling-row fixes include Repair, timeline, Canvas, Video and model pickers. Coverage: docs/UI_DENSITY_AUDIT.md.
 
 ## Open
-1. **Carry forward the release boundary.** Do not restore `bundled/civitai_publish`. Keep the link tables, `CIVITAI_API_KEY`, cloud/API compatibility shims and twelve enabled plugins.
-2. **Cloud landing gate.** Run the checks below in a separate cloud task against the exact fix commits before any landing push. Keep main unchanged until that gate passes.
+1. Do not start tests, responsive probes or Gates unless the user requests validation again.
+2. When validation is authorized, run frontend and bundled tests, privacy/contracts, and populated responsive probes for all affected routes. Fix failures without weakening probe thresholds.
+3. Carry forward the cloud Gates landing requirement for the previous refactor fixes and this density pass. Prior targeted tests are not full qualification.
+4. Preserve separate source and consolidated build(frontend): commits. Validate the exact published task-branch commits before any future landing on main.
 
 ## Decisions
-- Use `f3815e82e` as the refactor baseline recorded in PLAN.md, rather than the supplied current-HEAD base, whose diff is empty.
-- Keep the fixes on this task branch until a cloud landing gate passes. Do not publish main from source inspection alone.
-- S remains compact tiles. Preserve `datasetLibraryPageSize` and `bankListPageSize`; video sets use the shared pager above 24 items.
-- Preserve the large field size (`lg:h-9`); unknown control sizes still throw. A numbered jump reads "1 to 9"; a truncated name list reads "and N more".
-- The staged-only attribution check predates this refactor. It was excluded from the four introduced regressions.
+- Removed framing only where it repeated the same parent task. Kept distinct data cards, measured results, confirmations and recovery boundaries.
+- Used existing control sizes: 40px below lg; sm/md/lg remain 28/32/36px on desktop. Kept font sizes consistent within each control group.
+- Retained short visible stale-count and input-format guidance. Moved repeated explanations into existing tooltips and the Guide.
 
 ## Traps
-- Do not rewrite `150ff3f65` or amend a commit to fix its message.
-- A token replacement of `host.docker.internal` also rewrites its escaped scanner form. `fork_outbound_scan.py --write` rewrites the whole inventory; remove only reviewed entries.
-- The default pytest basetemp under the user temp directory returns Access denied. Use distinct, short, writable scratch paths.
-- Empty Bank/Dataset/Studio fixtures skip image or clip states. Cold Bank/Studio probes can miss an opener or report unmarked chrome. Use populated isolated fixtures, inspect skipped states and repeat a cold-start miss warm; never weaken probe limits.
-- Keep the escaped U+2026 inside `doesNotMatch` regexes; removing it makes the check reject the new label.
-- `scripts/gates.ps1` stops at the first failing step. A targeted pytest run does not satisfy the landing gate. Local tests and probes require explicit permission; a commit request does not grant it.
+- The SDK exports controlHeight, but does not export host Button/Input/Select or fieldClass. Bundled code must use its public SDK boundary.
+- Preserve local-only generation and the curated plugin distribution. Do not restore bundled/civitai_publish; retain existing compatibility shims.
+- Isolate LDS_DATA_DIR, LDS_CONFIG, LDS_ENV, LDS_PLUGINS_DIR and LDS_EXTENSIONS_DIR before application imports. Vite writes must target an isolated backend.
+- Empty fixtures skip key Bank/Dataset/Studio states. Use populated fixtures and inspect coverage; a skipped state is not a pass.
+- Gates stop at the first failure. Use distinct short pytest scratch paths; do not reuse another run's basetemp or production state.
+- The served bundle is read from disk. Source and dist must stay together in delivery, but in separate commits. Do not rewrite prior commit history.
 
 ## Verify
-This session ran the targeted node tests named in the fix and `npm run build`. Those are not the landing gate.
-Run the documented checks in a separate cloud task against the exact fix commit. Do not execute them locally without permission. Isolate all five user-state roots before application imports, and point the frontend at an isolated backend before exercising writes.
-
-Prior handoff evidence, not rerun here: two Gates runs on `281b713f8` exited 0, each reporting 10025 passed, 9 skipped, 390 warnings and 8 subtests. The logs did not identify the skips. Docker was not run.
-Prior warm responsive evidence, not rerun here: Datasets with 30 datasets, 35 measurements; Bank with 30 empty banks, 24 measurements; Studio with an empty dataset, 25 measurements; Bank with one image per bank, 38 measurements including review at 360. Each exited 0 with no violations; empty fixtures skipped absent image/clip states.
+Ran: npm run build, npm run lint (32 warnings, zero errors), .venv/Scripts/python.exe -m ruff check ., git diff --check, and scripts/scan-sensitive.sh (zero findings).
+The commands below require cloud execution or explicit local-test permission. They were not run in this session. Responsive URLs must point at populated isolated fixtures.
 
 ```powershell
 Set-Location frontend
-node --import ./scripts/registerSdk.mjs --test src/components/bank/bankGroups.test.js src/pages/plugins/installedPlugins.test.js tests/pagination.test.mjs tests/plugin-framework-guide.test.mjs
 npm test
 npm run lint
 npm run build
 npm run probe:responsive -- --url http://127.0.0.1:5173/#/bank
+npm run probe:responsive -- --url http://127.0.0.1:5173/#/datasets
+npm run probe:responsive -- --url http://127.0.0.1:5173/#/canvas
+npm run probe:responsive -- --url http://127.0.0.1:5173/#/video-bank
+npm run probe:responsive -- --url http://127.0.0.1:5173/#/settings
+npm run probe:responsive -- --url http://127.0.0.1:5173/#/setup
+npm run probe:responsive -- --url http://127.0.0.1:5173/#/plugins
+npm run probe:responsive -- --url http://127.0.0.1:5173/#/guide
 Set-Location ..
-.venv\Scripts\python.exe -m ruff check .
+.venv/Scripts/python.exe -m ruff check .
 pwsh -File scripts/gates.ps1 -Phase Gates
 ```
 
-After frontend or guide fixes, keep source changes and the consolidated `build(frontend):` bundle in separate commits. Obtain any required push authorization before publication; keep main unchanged until the required cloud gates pass.
+Also probe the affected Dataset and Video Dataset workspaces, populated Studio routes, Camera Angles, DLSS and scraper dialogs. Use the existing probe's portrait, landscape, tablet and desktop viewports, plus manual visual review of saved screenshots. Do not treat unsupported route states measured only at rest as complete interaction coverage.

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Palette } from 'lucide-react'
 import { apiFetch } from '../../api/fetchClient'
 import { sortStyleGroups, SMALL_STYLE_GROUP } from './styleGroups.js'
+import { IconButton, Select } from '../common/Controls.jsx'
 
 /**
  * Every 🎨 style group of a bank as a grid of preview mosaics. The rail's strip
@@ -47,23 +48,19 @@ export default function StyleGroupsBrowser({ bankId, activeStyle, onPick, onClos
           <h2 id="style-groups-title" className="mr-auto text-base font-semibold text-content">
             Style groups{groups ? ` (${groups.length})` : ''}
           </h2>
-          <label className="flex items-center gap-1 text-xs text-content-muted">
-            Sort
-            <select value={sort} onChange={(e) => setSort(e.target.value)}
-              className="min-h-10 lg:min-h-0 rounded-md border border-border bg-surface px-2 py-0.5 text-xs text-content">
-              <option value="size">Largest first</option>
-              <option value="aesthetic">Best aesthetic first</option>
-              <option value="small">Smallest first</option>
-            </select>
-          </label>
-          <label className="flex min-h-10 lg:min-h-0 items-center gap-1 text-xs text-content-muted">
+          <Select size="md" value={sort} onChange={(e) => setSort(e.target.value)}
+            aria-label="Sort style groups">
+            <option value="size">Largest first</option>
+            <option value="aesthetic">Best aesthetic first</option>
+            <option value="small">Smallest first</option>
+          </Select>
+          <label className="flex h-10 min-h-10 items-center gap-1 text-sm text-content-muted lg:h-8 lg:min-h-0">
             <input type="checkbox" checked={hideSmall} onChange={(e) => setHideSmall(e.target.checked)} />
             Hide under {SMALL_STYLE_GROUP} images
           </label>
-          <button type="button" onClick={onClose} aria-label="Close style groups"
-            className="min-h-10 min-w-10 lg:min-h-0 rounded-md border border-border px-2 py-0.5 text-content-muted hover:text-content">
+          <IconButton type="button" size="md" onClick={onClose} label="Close style groups">
             ✕
-          </button>
+          </IconButton>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {error && <p className="text-sm text-red-300">{error}</p>}

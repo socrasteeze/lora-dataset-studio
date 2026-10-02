@@ -5,7 +5,7 @@ import { buildLineageGraph, CARD_W } from '@lds/plugin-sdk/lineage';
 import { GraphCard, CheckpointPill } from '@lds/plugin-sdk/lineage';
 import { LineageEdgeDefs, LineageEdges } from '@lds/plugin-sdk/lineage';
 import { clampPopoverToViewport, POPOVER_W, popoverHeight } from '@lds/plugin-sdk/lineage';
-import { useFocusTrap } from '@lds/plugin-sdk/ui';
+import { controlHeight, useFocusTrap } from '@lds/plugin-sdk/ui';
 import { fmtSize } from './videoCheckpoints'
 import { PluginSlot } from '@lds/plugin-sdk/ui';
 import { previewKey, previewSelector } from './videoPreviewSelection.js'
@@ -226,12 +226,12 @@ export default function VideoLineageGraph({
     <>
       <div className="mb-1.5 flex flex-wrap items-center gap-2 text-2xs text-content-subtle" data-probe-reading data-probe-chrome="video-preview-toolbar">
         {onGenerate && <button type="button" onClick={() => onGenerate()}
-          className="min-h-10 rounded-md border border-primary/50 bg-primary/15 px-3 py-1 text-xs font-semibold text-content lg:min-h-0">Generate previews{selected.length ? ` (${selected.length})` : ''}</button>}
+          className={`${controlHeight('sm')} rounded-md border border-primary/50 bg-primary/15 px-3 py-0 text-xs font-semibold text-content`}>Generate previews{selected.length ? ` (${selected.length})` : ''}</button>}
         {onRenderedPreviews && <button type="button" onClick={() => onRenderedPreviews()}
-          className="min-h-10 rounded-md border border-border px-2 py-1 text-xs text-content lg:min-h-0">Rendered previews ({renderedCount})</button>}
+          className={`${controlHeight('sm')} rounded-md border border-border px-2 py-0 text-xs text-content`}>Rendered previews ({renderedCount})</button>}
         <button type="button" onClick={toggleBigPreviews} aria-pressed={bigPreviews}
           title={bigPreviews ? 'Back to compact pills' : 'Enlarge the sample stills to compare steps at a glance'}
-          className={'min-h-10 lg:min-h-0 rounded-md border px-2 py-0.5 text-2xs font-semibold transition-colors '
+          className={`${controlHeight('sm')} rounded-md border px-2 py-0 text-xs font-semibold transition-colors `
             + (bigPreviews
               ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-100 '
               : 'border-border bg-app/60 text-content-muted hover:text-content ')}>

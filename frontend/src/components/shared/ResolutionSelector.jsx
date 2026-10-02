@@ -98,7 +98,7 @@ export default function ResolutionSelector({
       {/* Multiplier — enlarges the chosen preset linearly. Default 1.0 = unchanged. */}
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between text-2xs uppercase tracking-wide text-content-muted">
-          <span>Resolution multiplier</span>
+          <span>Multiplier</span>
           <span className={`tabular-nums font-semibold ${overTrain ? 'text-amber-400' : 'text-content'}`}>
             ×{m.toFixed(1)}
           </span>
@@ -113,7 +113,7 @@ export default function ResolutionSelector({
         <span className="text-2xs text-content-muted/70 tabular-nums normal-case tracking-normal">
           {enlarged
             ? `${bw}×${bh} → ${fw}×${fh}`
-            : `${bw}×${bh} · slide to enlarge past the training resolution`}
+            : `${bw}×${bh}`}
         </span>
         {overTrain && (
           <span className="text-2xs text-amber-400/90 normal-case tracking-normal leading-snug">

@@ -7,6 +7,7 @@
  * forward it as `z_loras`. LoRA files live in ComfyUI/models/loras/z image/.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { controlHeight } from '../common/controls.js';
 
 // Per-family LoRA strength ranges: Krea uses 0-6, extended to 20 for utility LoRAs such as
 // filter-bypass with little effect below about 13, matching inject_krea_loras <= 20. Accept
@@ -131,7 +132,7 @@ export default function ZImageLoraConfig({ loras = [], onChange, zModel = '', is
                 aria-pressed={fav}
                 aria-label={fav ? `Remove ${l.displayName} from this model's favorites` : `Mark ${l.displayName} as favorite for this model`}
                 title={fav ? 'Favorite for this model — click to remove' : 'Mark as favorite for this model'}
-                className={`shrink-0 leading-none text-base ${fav ? 'text-amber-300' : 'text-content-muted/40 hover:text-amber-300'} ${zModel ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'}`}
+                className={`${controlHeight('sm')} inline-flex min-w-10 shrink-0 items-center justify-center text-sm lg:min-w-0 lg:w-7 ${fav ? 'text-amber-300' : 'text-content-muted/40 hover:text-amber-300'} ${zModel ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'}`}
               >
                 {fav ? '★' : '☆'}
               </button>
@@ -148,7 +149,7 @@ export default function ZImageLoraConfig({ loras = [], onChange, zModel = '', is
                   <button type="button" onClick={() => toggleLock(l.filename)}
                     aria-pressed={!!c.locked}
                     title={c.locked ? 'Strength locked — click to unlock' : 'Lock the strength (prevents accidental changes)'}
-                    className={`px-1 py-0.5 rounded text-xs border leading-none ${c.locked ? 'border-amber-400/60 bg-amber-400/15 text-amber-300' : 'border-border bg-surface text-content-muted hover:text-content'}`}>
+                    className={`${controlHeight('sm')} inline-flex min-w-10 shrink-0 items-center justify-center rounded border text-sm lg:min-w-0 lg:w-7 ${c.locked ? 'border-amber-400/60 bg-amber-400/15 text-amber-300' : 'border-border bg-surface text-content-muted hover:text-content'}`}>
                     {c.locked ? '●' : '○'}
                   </button>
                 </>

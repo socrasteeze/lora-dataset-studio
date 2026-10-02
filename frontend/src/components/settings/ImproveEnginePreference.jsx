@@ -10,7 +10,7 @@ export default function ImproveEnginePreference({ config, configDefaults, setFie
   const selected = engines.some(engine => engine.id === saved) ? saved : engines[0].id
   return (
     <div>
-      <label htmlFor="improve-engine" className="block text-sm font-medium text-content">Default improvement engine</label>
+      <label htmlFor="improve-engine" className="block text-sm font-medium text-content">Improvement Engine</label>
       <select id="improve-engine" value={selected} className={INPUT_CLASS}
         onChange={event => setField('improve', 'engine', event.target.value)}>
         {engines.map(engine => <option key={engine.id} value={engine.id}>{engine.label}</option>)}

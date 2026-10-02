@@ -25,10 +25,10 @@ export default function Dlss5Settings() {
     finally { setBusy(false) }
   }
   const environment = facts?.environment
-  return <div className="space-y-4">
+  return <div className="space-y-3">
     {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
-    <section className="rounded-xl border border-border bg-surface p-5">
-      <h2 className="text-base font-semibold text-content">1. Prepare the DLSS engine</h2>
+    <section className="rounded-xl border border-border bg-surface p-4">
+      <h2 className="text-base font-semibold text-content">DLSS Engine</h2>
       <p className="mt-2 text-sm text-content-muted">A dedicated Python environment contains NumPy and the video encoder. Video lane, ComfyUI and other plugins are not required.</p>
       {environment?.action && <div className="mt-3"><InstallRunner action={environment.action}
         buttonLabel={environment.ready ? 'Repair DLSS engine' : 'Install DLSS engine'} onDone={refresh} /></div>}
@@ -41,10 +41,10 @@ export default function Dlss5Settings() {
         </label>
         <p className="mt-2 text-xs text-content-muted">Optional. This environment must contain NumPy and imageio-ffmpeg. Clear the field to use the managed engine. Your former Video interpreter choice is preserved once, and can then be changed independently.</p>
         <button type="button" disabled={busy || !facts} onClick={save}
-          className="mt-3 min-h-10 rounded-md border border-border px-3 text-sm text-content disabled:opacity-50">Save DLSS settings</button>
+          className="mt-3 min-h-10 rounded-md border border-border px-3 text-sm text-content disabled:opacity-50">Save</button>
       </details>
     </section>
     <Dlss5InstallCard caps={{ dlss5nr: facts?.status }} onDone={refresh} />
-    <button type="button" onClick={refresh} className="min-h-10 rounded-md border border-border px-3 text-sm text-content">Check preparation again</button>
+    <button type="button" onClick={refresh} className="min-h-10 rounded-md border border-border px-3 text-sm text-content">Check Again</button>
   </div>
 }

@@ -11,6 +11,7 @@ const page = readFileSync(new URL('../../pages/BankPage.jsx', import.meta.url), 
 const workspace = bankTreeSource()
 const facets = readFileSync(new URL('./bankFacets.js', import.meta.url), 'utf8')
 const overview = readFileSync(new URL('./BankOverview.jsx', import.meta.url), 'utf8')
+const laneTabs = readFileSync(new URL('./BankLaneTabs.jsx', import.meta.url), 'utf8')
 
 test('/bank shares the wide 1800px shell with Canvas', () => {
   assert.match(app, /pathname === '\/canvas' \|\| pathname === '\/bank'/)
@@ -19,6 +20,12 @@ test('/bank shares the wide 1800px shell with Canvas', () => {
 
 test('bank list grows to three columns only at xl', () => {
   assert.match(page, /grid-cols-1 sm:grid-cols-2 xl:grid-cols-3/)
+})
+
+test('bank kind controls stay on one equal-width row without a redundant prefix', () => {
+  assert.match(laneTabs, /flex flex-nowrap items-stretch/)
+  assert.match(laneTabs, /min-w-0 flex-1 items-center justify-center/)
+  assert.doesNotMatch(laneTabs, />bank of</i)
 })
 
 test('the four-megapixel resolution bucket is inclusive in the workspace too', () => {
@@ -61,7 +68,7 @@ test('the rail sits beside the grid, and folds instead of squeezing it', () => {
   assert.match(panel, /grid gap-4 xl:grid-cols-12 xl:items-start/)
   assert.match(panel, /xl:col-span-7/)
   assert.match(panel, /xl:col-span-5/)
-  assert.match(panel, /<BankOverview payload=\{payload\} \/>/)
+  assert.match(panel, /<BankOverview payload=\{payload\} compact=\{compact\} \/>/)
 })
 
 test('the rail stays on screen while the grid scrolls under it', () => {
@@ -120,13 +127,15 @@ test('non-zero Bank segments use exact widths and remain physically visible', ()
   assert.doesNotMatch(page, /width: `\$\{row\.percent\}%`/)
 })
 
-test('the overview is open by default and folds without tying its state to live payload refreshes', () => {
-  assert.match(overview, /const \[open, setOpen\] = useState\(true\)/)
+test('the overview starts folded only in the compact panel and does not nest disclosures', () => {
+  const panel = readFileSync(new URL('./BankPassesPanel.jsx', import.meta.url), 'utf8')
+  assert.match(overview, /const \[open, setOpen\] = useState\(\(\) => !compact\)/)
   assert.match(overview, /onClick=\{\(\) => setOpen\(\(value\) => !value\)\}/)
   assert.match(overview, /aria-expanded=\{open\}/)
   assert.match(overview, /aria-controls=\{contentId\}/)
   assert.match(overview, /<div id=\{contentId\} hidden=\{!open\}/)
   assert.doesNotMatch(overview, /useState\([^)]*payload/)
+  assert.doesNotMatch(panel, /<Fold compact=\{compact\} title="Bank overview">/)
 })
 
 test('the overview header and live total stay visible while its details fold', () => {

@@ -101,7 +101,7 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
         style={{ maxHeight: '90dvh' }}>
         <h2 className="flex items-center gap-2 text-base font-bold text-content"><Folder aria-hidden="true" className="h-4 w-4" /> Choose Folder</h2>
         <p className="mt-1 text-xs text-content-muted [@media(max-height:500px)]:hidden">
-          Browse drives and folders on the LDS host. Access uses the host account's permissions.
+          Folders on the LDS host. Access uses the host account's permissions.
         </p>
 
         {/* An address bar, for the same reason the native dialog needed one: the
@@ -111,7 +111,7 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
             lanes that never get a native dialog at all — LAN, tablet, Linux —
             where this browser is the whole picker. Enter jumps; a path that does
             not exist reports itself in the amber box and leaves you put. */}
-        <form className="mt-3 flex flex-wrap items-center gap-2"
+        <form className="mt-2 flex flex-wrap items-center gap-2"
           onSubmit={(e) => { e.preventDefault(); const v = typed.trim(); if (v) load(v) }}>
           <div className="flex w-full gap-2 sm:contents">
           <button type="button" onClick={() => load(null)} disabled={busy || loading}
@@ -143,7 +143,7 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
           disabled={busy || loading} onChange={(e) => setQuery(e.target.value)}
           className="mt-2 min-h-11 w-full shrink-0 rounded-md border border-border bg-surface-raised px-3 text-sm text-content" />
 
-        <ul aria-busy={loading} className="mt-2 min-h-0 grow overflow-y-auto rounded-md border border-border bg-surface-raised">
+        <ul aria-busy={loading} className="mt-2 min-h-0 grow overflow-y-auto border-y border-border">
           {loading ? (
             <li className="px-3 py-2 text-xs text-content-muted">Loading</li>
           ) : entries.length === 0 ? (
@@ -168,13 +168,13 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
             <span className="block whitespace-pre-wrap break-words text-xs leading-relaxed text-red-200">
               {error}
             </span>
-            <span className="mt-1 block text-2xs text-content-subtle">
-              You are still where you were — pick another folder and try again.
+            <span className="mt-1 block text-xs text-content-subtle">
+              This folder is still open. Choose another folder and retry.
             </span>
           </div>
         )}
 
-        <div className="mt-4 grid shrink-0 grid-cols-2 gap-2">
+        <div className="mt-3 grid shrink-0 grid-cols-2 gap-2">
           <button type="button" onClick={dismiss} disabled={busy}
             className="min-h-11 rounded-md border border-border px-3 py-1.5 text-sm text-content hover:bg-surface-raised disabled:opacity-50">
             Cancel
