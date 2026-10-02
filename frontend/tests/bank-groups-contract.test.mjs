@@ -19,6 +19,7 @@ const page = read('../src/pages/BankPage.jsx')
 const card = read('../src/components/bank/BankGroupCard.jsx')
 const promote = read('../src/components/bank/BankGroupPromoteDialog.jsx')
 const logic = read('../src/components/bank/bankGroups.js')
+const compose = read('../src/components/bank/bankListCompose.js')
 const rule = read('../../backend/app/services/bank_groups.py')
 
 test('the two implementations of the rule agree on the four decisions', () => {
@@ -33,13 +34,18 @@ test('the two implementations of the rule agree on the four decisions', () => {
   assert.match(rule, /str\(name or ''\)\.strip\(\)/)
 })
 
-test('the list renders group rows instead of a flat bank list', () => {
-  // Grouping must stay the LAST step: sort → filter (the search box) → group.
-  // Group first and a filtered-down pair would keep rendering as a group whose
-  // member list no longer matches what is on screen.
+test('the list filters, groups the full filtered list, then pages display rows', () => {
+  // Search filters before grouping, so a name reduced to one bank is not a
+  // group. groupRows only sums what it is given, so the page must not slice
+  // members first. Selection still pages the raw banks.
   assert.match(page, /const visibleBanks = sortBanks\(banks \|\| \[\], sort\)\.filter\(/)
-  assert.match(page, /paginate\(visibleBanks/)
-  assert.match(page, /groupRows\(paged\.items\)/)
+  assert.match(page, /composeBankList\(visibleBanks/)
+  assert.match(compose, /groupRows\(banks\)[\s\S]*paginate\(grouped/)
+  const selecting = compose.slice(compose.indexOf('if (selecting)'), compose.indexOf('const grouped'))
+  assert.match(selecting, /paginate\(banks/)
+  assert.doesNotMatch(selecting, /groupRows/)
+  assert.doesNotMatch(page, /groupRows\(paged\.items\)/)
+  assert.doesNotMatch(compose, /groupRows\(paged/)
   assert.match(page, /selectVisibleBanks\(prev, paged\.items\)/)
   assert.match(page, /selectVisibleBanks\(prev, visibleBanks\)/)
   assert.match(page, /bankListPageSize/)

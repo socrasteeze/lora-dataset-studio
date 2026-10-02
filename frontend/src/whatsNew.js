@@ -85,6 +85,34 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-01-zzzzzzzzzzzz-whole-bank-groups',
+    date: '2026-10-01',
+    title: 'A bank group stays whole across pages',
+    blurb: 'Banks that share a name stay one card. The member count and the kept-image total cover every bank in the group, including banks past the first page. Promote quotes that same complete group.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-01-zzzzzzzzzzz-plugin-screen-failed',
+    date: '2026-10-01',
+    title: 'A plugin screen that failed to load says so',
+    blurb: 'If a plugin’s script, stylesheet, or descriptor did not load, its card shows the failure and a reload. A plugin that loaded still reads Active now.',
+    to: '/plugins',
+  },
+  {
+    id: '2026-10-01-zzzzzzzzzz-zip-says-why',
+    date: '2026-10-01',
+    title: 'A blocked plugin ZIP explains what to fix',
+    blurb: 'When a ZIP cannot be installed, the confirmation lists each compatibility message, such as a plugin to install first or an API version this app does not provide. Install stays off until the archive fits.',
+    to: '/plugins',
+  },
+  {
+    id: '2026-10-01-zzzzzzzzz-install-guide',
+    date: '2026-10-01',
+    title: 'The install guide matches how you add a plugin',
+    blurb: 'The installation guide now follows the Plugins page. Features that ship with the app are already installed, a ZIP you trust is added there, and one restart applies it.',
+    to: '/plugins',
+  },
+  {
     id: '2026-10-01-zzzzzzzz-no-civitai-publish',
     date: '2026-10-01',
     title: 'Checkpoints stay on this machine',

@@ -25,6 +25,16 @@ function mark(name) {
   return (name || '?').trim().split(/\s+/).slice(0, 2).map(part => part[0] || '').join('').toUpperCase()
 }
 
+function browserLoadProblem(pluginId) {
+  const problems = globalThis.window?.lds?.loadProblems
+  if (!Array.isArray(problems)) return null
+  return problems.find(item => item && item.plugin === pluginId) || null
+}
+
+function reloadPage() {
+  globalThis.window?.location?.reload()
+}
+
 export default function InstalledPlugins({ plugins = [], busy, caps, capsKnown = false, onToggle, onRemove, onInstalled }) {
   if (!plugins.length) {
     return <p className="py-6 text-sm text-content-muted">No plugin installed yet.</p>
@@ -38,10 +48,11 @@ export default function InstalledPlugins({ plugins = [], busy, caps, capsKnown =
         const removing = plugin.pending_action === 'remove'
         const packagePending = ['install', 'update', 'remove'].includes(plugin.pending_action)
         const active = pluginActive(plugin)
-        const readiness = active && capsKnown ? productReadiness(plugin.id, caps) : []
+        const loadProblem = browserLoadProblem(plugin.id)
+        const readiness = active && capsKnown && !loadProblem ? productReadiness(plugin.id, caps) : []
         const settingsPath = pluginSettingsPath(plugin.id)
-        const experience = active ? plugin.package_contract?.experience : null
-        const state = active ? 'loaded' : (plugin.state || 'disabled')
+        const experience = active && !loadProblem ? plugin.package_contract?.experience : null
+        const state = loadProblem ? 'error' : (active ? 'loaded' : (plugin.state || 'disabled'))
         return (
           <article key={plugin.id} id={'plugin-row-' + plugin.id} data-plugin-id={plugin.id}
             aria-labelledby={'plugin-title-' + plugin.id}
@@ -56,10 +67,16 @@ export default function InstalledPlugins({ plugins = [], busy, caps, capsKnown =
               </div>
               <span className={'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ' + stateClass(state)}>
                 <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
-                {active ? 'Active now' : STATE_LABEL[plugin.state] || plugin.state || 'Inactive'}
+                {loadProblem ? 'Interface did not load' : (active ? 'Active now' : STATE_LABEL[plugin.state] || plugin.state || 'Inactive')}
               </span>
             </header>
             <div className="flex flex-1 flex-col gap-3 px-4 py-4 sm:px-5">
+              {loadProblem && (
+                <div role="alert" data-plugin-load-problem={plugin.id} className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+                  <p>{loadProblem.reason || 'This plugin’s interface did not load.'}</p>
+                  <button type="button" className={BTN} onClick={reloadPage}>Reload page</button>
+                </div>
+              )}
               {pending && <p className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-content" data-plugin-pending>{pending}</p>}
               {plugin.description && <p className="text-sm leading-relaxed text-content-muted">{plugin.description}</p>}
               <div className="flex flex-wrap items-center gap-2">
