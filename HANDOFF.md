@@ -1,5 +1,45 @@
 # HANDOFF
 
+**Updated:** 2026-10-03 | **Branch:** docs/upstream-review-2026-10-03 | **Base:** c60852194
+
+## Upstream review: no adoptions
+
+The first upstream fetch after the refactor was completed on 2026-10-03.
+`git fetch upstream` found no new branch commits. The default branch is `v2`;
+its tip remains `ba403227b9247bfd323dea2b27dd44153c83562e`
+(`build(frontend): include H3 plugin startup fix`, 2026-09-29).
+`git ls-remote --symref upstream` independently confirmed that tip.
+`v1` remains at `3fe3d4f0e`.
+
+**Decision: adopt nothing through upstream tip `ba403227b`.** No merge,
+cherry-pick, application change or bundle rebuild was performed in this review.
+Continue treating upstream as a read-only source for occasional cherry-picks.
+
+The review used fork commit `8eb52792b` and merge base `d13337cc3`.
+Git counted 656 fork-only and 16 upstream-only commits. The latter count is
+an ancestry difference, not 16 missing features: useful changes already have
+fork commits or fork-specific equivalents.
+
+| Upstream commits | Decision and evidence |
+| --- | --- |
+| `19f13edaa`, `fbeecb7f7`, `3658f9766` | Bank edit history and undo already ported as `91e508c0a`; feed ordering carried as `83326b3ea`; fork bundle already rebuilt. |
+| `1e520ab1f`, `f73ba6dc9` | Persistent dataset comparison already ported as `be3ffd25f`, with the fork bundle rebuilt. |
+| `16510a496`, `7df8eaf8b`, `ba403227b` | Model-download revision / H3 startup recovery already ported as `e5f831b0f`, with release note `5a49ca2b0` and the fork bundle rebuilt. The model fix is patch-equivalent. |
+| `af799647d` | Worker test doubles and watermark polling assertions are already covered by fork-specific adaptations. Preserve those adaptations. |
+| `4b902f150`, `fe4697e40` | Unlimited API batches are inapplicable to the local-only generation policy. Keep configured local queue limits. |
+| `bd0c3c8b9`, `4bdddc855`, `95d8702a7`, `4bfbf7c48` | Skip the optional support banner and associated Patreon guide wording, link fix and bundles. The banner is absent here, and the guide has no corresponding broken Patreon link. |
+| `d61fa0af1` | Keep the fork version `2026.10.01+fork`; do not adopt upstream's release identity. |
+
+Only this handoff is changed for publication. It is based on the newer fork tip
+`c60852194`, preserving the three fork commits published after the review base.
+No tests, probes, application imports or Gates were run for this documentation
+update. The prior validation evidence below is historical, not a fresh result.
+Publish this documentation branch only; main landing still requires the cloud
+gate specified in AGENTS.md. A later review should start with commits after
+`ba403227b` and check fork equivalents before proposing an adoption.
+
+## Previous refactor handoff (carried forward)
+
 **Updated:** 2026-10-01 | **Branch:** noble/refactor-review-handoff | **Base:** 8eb52792b | **Tree:** task-branch commits
 
 ## State
