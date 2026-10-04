@@ -1,0 +1,1 @@
+function o(){var i;const r=(i=globalThis.window)==null?void 0:i.lds,n=String((r==null?void 0:r.sdkVersion)||""),e=n.split(".").map(Number);if(!r||r.api!==1||!/^1\.\d+\.\d+$/.test(n)||e[1]<7)throw new Error("This plugin requires LDS frontend SDK 1.7 or later in major version 1.");return r}export{o as r};
