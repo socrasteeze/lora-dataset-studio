@@ -25,7 +25,7 @@ export default function LoraStackPanel({ selection, mode, onMode, weights, onWei
   const configCount = blendConfigCount(selection, { weights, sets });
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-3">
+    <div className="lds-section flex flex-col gap-2 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-content-muted text-2xs uppercase">
           How to use the {selection.length} LoRAs

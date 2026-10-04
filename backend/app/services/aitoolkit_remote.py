@@ -150,9 +150,15 @@ class RemoteAiToolkit:
 
     # -- plumbing ---------------------------------------------------------
     def _request(self, method, path, *, timeout=_TIMEOUT, **kwargs):
+        from ..utils.local_api import local_api_url
+        try:
+            base_url = local_api_url(self.base_url)
+        except ValueError as exc:
+            raise RemoteError(str(exc)) from exc
         headers = kwargs.pop('headers', {})
         headers.setdefault('Authorization', f'Bearer {self.token}')
-        return requests.request(method, f'{self.base_url}{path}',
+        kwargs['allow_redirects'] = False
+        return requests.request(method, f'{base_url}{path}',
                                 headers=headers, timeout=network_timeout(timeout), **kwargs)
 
     def _json(self, method, path, **kwargs):

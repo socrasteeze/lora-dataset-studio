@@ -68,6 +68,10 @@ def _discover(registry: PluginRegistry, root: Path, *, bundled: bool) -> None:
         path = root / name
         if not path.is_dir() or name.startswith(('.', '_')):
             continue
+        # Offline exclusions also apply to development/distribution overrides.
+        # Saved enablement and an old installed package cannot restore them.
+        if name in fork_profile.EXCLUDED:
+            continue
         if fork_profile.active():
             if bundled and name not in fork_profile.ENABLED:
                 continue

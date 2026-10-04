@@ -160,6 +160,8 @@ def _http_ok(url, timeout=3, reason=None, *, readiness=False) -> bool:
         request_options = {'allow_redirects': False, 'stream': True}
     resp = None
     try:
+        from .utils.local_api import local_api_url
+        url = local_api_url(url)
         resp = requests.get(url, timeout=network_timeout(effective_timeout), **request_options)
         return resp.status_code < 500
     except Exception as e:
@@ -459,6 +461,8 @@ def _ollama_tags(url, timeout=3) -> list:
     vision_model=no). Blanks are dropped and order is preserved. Network seam
     (patched in tests)."""
     try:
+        from .utils.local_api import local_api_url
+        url = local_api_url(url)
         resp = requests.get(f'{url}/api/tags', timeout=network_timeout(timeout))
         if resp.status_code >= 400:
             return []
@@ -700,6 +704,8 @@ def comfyui_runtime(timeout=3) -> dict:
         return {}
     out = {}
     try:
+        from .utils.local_api import local_api_url
+        api = local_api_url(api)
         r = requests.get(f'{api}/system_stats', timeout=network_timeout(timeout))
         if r.status_code == 200:
             j = r.json() or {}
@@ -720,6 +726,8 @@ def comfyui_runtime(timeout=3) -> dict:
     except Exception:
         pass
     try:
+        from .utils.local_api import local_api_url
+        api = local_api_url(api)
         r = requests.get(f'{api}/queue', timeout=network_timeout(timeout))
         if r.status_code == 200:
             j = r.json() or {}
@@ -963,6 +971,9 @@ def probe_vast() -> dict:
     """Live check of the vast.ai API key (used by the Settings 'Test' button).
     The capability gate itself is key-presence only — probe() must stay
     network-free for this entry (it runs on every /api/capabilities call)."""
+    from .plugins.fork_profile import offline_only
+    if offline_only():
+        return {'ok': False, 'detail': 'Online rental APIs are disabled in this offline fork.'}
     key = cfg.secret('VAST_API_KEY')
     if not key:
         return {'ok': False, 'detail': 'API key missing'}
@@ -2133,6 +2144,8 @@ def detect_comfyui_folders(timeout=3) -> dict:
     if not api or comfyui_ignored():
         return {}
     try:
+        from .utils.local_api import local_api_url
+        api = local_api_url(api)
         r = requests.get(f'{api}/system_stats', timeout=network_timeout(timeout))
         if r.status_code != 200:
             return {}

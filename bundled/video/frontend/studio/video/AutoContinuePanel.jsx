@@ -8,7 +8,7 @@ export default function AutoContinuePanel({ session, ready, busy, error, directi
   const changed = session && (direction !== session.direction || Number(maxClips) !== session.max_clips);
   return (
     <section aria-label="Auto continuation" data-testid="auto-continue-panel"
-      className="space-y-2 rounded-xl border border-border bg-surface p-3">
+      className="lds-section space-y-2 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-content">Auto continuation <HelpBadge topic="video-auto-continue" /></h3>
         {session && <span className="text-xs text-content-muted">

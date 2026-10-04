@@ -106,7 +106,7 @@ export default function WatermarkScanDialog({
             again” — your rulings are otherwise final to this pass.
           </span>
         </label>
-        <div className="space-y-2 rounded-md border border-border bg-surface-raised p-2">
+        <div className="lds-section space-y-2 py-2">
           <p className="m-0 text-2xs font-semibold uppercase tracking-wide text-content-muted">
             Options for this run
           </p>

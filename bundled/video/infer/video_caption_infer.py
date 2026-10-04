@@ -130,7 +130,7 @@ def _load_token_counter(tokenizer_dir):
             _log(f'[caption] sentencepiece counter unavailable: {type(e).__name__}: {e}')
     try:
         from transformers import AutoTokenizer
-        tok = AutoTokenizer.from_pretrained(folder)
+        tok = AutoTokenizer.from_pretrained(folder, local_files_only=True)
         return (lambda text: len(tok(str(text), add_special_tokens=True).input_ids)), \
             'transformers'
     except Exception as e:  # noqa: BLE001
@@ -172,7 +172,9 @@ def main() -> int:
     device = 'cuda' if (want != 'cpu' and torch.cuda.is_available()) else 'cpu'
     _log(f'[caption] loading {model_id} ({device})')
     try:
-        kwargs = {'cache_dir': models_root} if models_root else {}
+        kwargs = {'local_files_only': True}
+        if models_root:
+            kwargs['cache_dir'] = models_root
         processor = AutoProcessor.from_pretrained(model_id, **kwargs)
         model = Qwen3VLForConditionalGeneration.from_pretrained(
             model_id,

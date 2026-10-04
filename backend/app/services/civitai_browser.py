@@ -101,6 +101,9 @@ def _http_get_json(url, key=None):
     """GET → parsed JSON. The single network seam (tests monkeypatch it).
     Auth/network/HTTP failures raise RuntimeError with a user-facing sentence;
     a 401 raises PermissionError so callers can tell 'key refused' apart."""
+    from ..plugins.fork_profile import offline_only
+    if offline_only():
+        raise RuntimeError('Civitai browsing is disabled in this offline fork.')
     headers = {'User-Agent': _UA}
     if key:
         headers['Authorization'] = f'Bearer {key}'

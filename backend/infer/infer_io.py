@@ -29,6 +29,7 @@ claiming on import took stdout away from pytest and broke five unrelated tests
 in a suite that passed one file at a time.
 """
 from __future__ import annotations
+import os
 import sys
 
 
@@ -56,6 +57,9 @@ def claim_result_stream(module_name=None):
     `sys.stdout` to stderr first, so a library's bare `print()` lands on the
     progress channel. Anything else — imported, or an unnamed caller — changes
     no global state. Idempotent either way."""
+    if module_name == '__main__' and os.environ.get('LDS_INFER_OFFLINE_HELPER'):
+        import runpy
+        runpy.run_path(os.environ['LDS_INFER_OFFLINE_HELPER'])['enforce_inference_offline']()
     if module_name in (None, '__main__') and \
             getattr(sys, '_lds_result_stream', None) is None:
         sys._lds_result_stream = sys.stdout

@@ -68,11 +68,11 @@ export default function Dlss5Page() {
     </header>
     {error && <p role="alert" className="rounded-lg border border-red-500/40 p-3 text-sm text-red-400">{error}</p>}
     {folderError && <p role="alert" className="rounded-lg border border-red-500/40 p-3 text-sm text-red-400">{folderError}</p>}
-    {status && !status.ready && <div role="status" className="rounded-lg border border-border bg-surface p-4 text-sm text-content-muted">
+    {status && !status.ready && <div role="status" className="lds-section py-4 text-sm text-content-muted">
       <p>Complete DLSS preparation before rendering.</p><ul className="mt-2 list-inside list-disc">{status.missing?.map(text => <li key={text}>{text}</li>)}</ul>
       <Link to="/plugins/dlss5/settings" className="mt-3 inline-block text-primary">Prepare DLSS 5 →</Link>
     </div>}
-    <section className="rounded-xl border border-border bg-surface p-4">
+    <section className="lds-section py-4">
       <label className="block text-sm font-semibold text-content">Import Video
         <input aria-label="Import a finished video" type="file" accept="video/mp4,video/quicktime,video/x-matroska,video/webm,video/x-msvideo,.m4v"
           disabled={busy} onChange={upload} className="mt-3 block max-w-full text-sm" />
@@ -80,7 +80,7 @@ export default function Dlss5Page() {
       <p className="mt-2 text-xs text-content-muted">MP4, MOV, MKV, WebM, AVI or M4V · Up to 512 MB. The original stays untouched; each render starts from it.</p>
     </section>
     {clip ? <section className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-      <div className="min-w-0 rounded-xl border border-border bg-surface p-4">
+      <div className="lds-section min-w-0 py-4">
         <h2 className="break-words text-base font-semibold text-content">{clip.name}</h2>
         <video key={`${clip.id}:${clip.has_result}:${clip.state}`} controls preload="metadata"
           className="mt-3 max-h-[60vh] w-full rounded-lg bg-black" src={`${base}/${clip.id}/media/${clip.has_result ? 'result' : 'original'}`} />

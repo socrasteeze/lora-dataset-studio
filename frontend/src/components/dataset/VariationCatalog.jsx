@@ -1043,7 +1043,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3">
+    <div className="lds-section flex flex-col gap-3 py-3">
       <div className="flex items-center gap-2">
         <Clapperboard aria-hidden="true" className="h-4 w-4" />
         <h2 className="text-content font-semibold text-sm">Generate variations</h2>
@@ -1056,7 +1056,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
           shot catalog AND the identity lock so the prompts stop assuming a person
           (a dog keeps its breed/markings, a product its shape/logo). Persisted per
           dataset; changing it reloads the shot list and its default preset. */}
-      <div className="flex flex-col gap-1 rounded-lg border border-border bg-app/30 px-2.5 py-2">
+      <div className="lds-section flex flex-col gap-1 py-2">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-content-muted text-2xs uppercase">Subject type</span>
           <div role="radiogroup" aria-label="Subject type" className="flex flex-wrap gap-1">
@@ -1177,7 +1177,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
           anything (2+ engines): with a single one both modes are identical, and
           an inert radio pair would just be noise. */}
       {multiEngine && (
-        <fieldset className="rounded-lg border border-border bg-app/30 px-2.5 py-2 flex flex-col gap-1.5">
+        <fieldset className="lds-section py-2 flex flex-col gap-1.5">
           <legend className="px-1 text-content-muted text-2xs uppercase">
             {engines.length} engines selected
           </legend>
@@ -1212,7 +1212,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
           count, so the same dataset held tiles of two sizes and two shapes.
           Both now spend this budget on the shot card's ratio. */}
       {localEngineIds().some((id) => engines.includes(id) && available[id]) && (
-        <div className="rounded-lg border border-border bg-app/30 px-2.5 py-2">
+        <div className="lds-section py-2">
           <KreaDial
             id="variation-output-size-dial"
             label="Output size (MP)"
@@ -1238,7 +1238,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
           A <details> so the defaults stay out of a newcomer's way — children
           remain mounted, so the model picker still reports its choice. */}
       {klAvailable && (
-        <details className="rounded-lg border border-border bg-app/30 open:pb-2"
+        <details className="lds-section open:pb-2"
           onToggle={(e) => { if (e.currentTarget.open) requestHelpTip('klein-tuning-open'); }}>
           <summary className="cursor-pointer select-none px-2.5 py-1.5 text-xs text-content font-semibold">
             <Monitor aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Klein tuning
@@ -1372,7 +1372,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
           same value, same widget, same scan — so the sentence above about every
           future run covers it too. */}
       {isKrea && krAvailable && (
-        <details className="rounded-lg border border-border bg-app/30 open:pb-2">
+        <details className="lds-section open:pb-2">
           <summary className="cursor-pointer select-none px-2.5 py-1.5 text-xs text-content font-semibold">
             <Dna aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Krea 2 Edit tuning
             <span className="ml-2 font-normal text-content-subtle text-2xs">
@@ -1823,7 +1823,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
           NSFW mode is on with Klein). Included in the next Generate alongside the
           selected catalog shots. Collapsed by default (power-user tool) — the
           <details> keeps its fields mounted, so drafts survive fold/unfold. */}
-      <details ref={customDetailsRef} className="rounded-lg border border-border bg-app/30 open:pb-2">
+      <details ref={customDetailsRef} className="lds-section open:pb-2">
         <summary className="cursor-pointer select-none px-2.5 py-1.5 text-xs text-content font-semibold">
           {editingShot ? '✏️ Editing a custom shot' : '✨ Custom shot'}
           <span className="ml-2 font-normal text-content-subtle text-2xs">
@@ -1878,7 +1878,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
           have an LLM write 40 more shots in the same shape, import the result.
           Export FIRST on purpose: nobody (and no LLM) can produce the right JSON
           without an example of it. Collapsed by default. */}
-      <details className="rounded-lg border border-border bg-app/30 open:pb-2">
+      <details className="lds-section open:pb-2">
         <summary className="cursor-pointer select-none px-2.5 py-1.5 text-xs text-content font-semibold">
           <Download aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Shot catalog (JSON)
           <span className="ml-2 font-normal text-content-subtle text-2xs">
@@ -1910,7 +1910,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
               partly-bad file safe: the user sees exactly what would land and what
               was refused, and decides. */}
           {importReview && (
-            <div className="rounded-lg border border-border bg-app/60 p-2 flex flex-col gap-1.5">
+            <div className="lds-section py-2 flex flex-col gap-1.5">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="text-2xs font-semibold text-content truncate max-w-full">
                   {importReview.name}
@@ -1960,7 +1960,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
           Applies to EVERY engine at generation time and shares the dataset
           fields with the ⚙️ Settings modal; persisted just before the batch is
           enqueued. Collapsed unless a suffix is already set. */}
-      <details className="rounded-lg border border-border bg-app/30 open:pb-2"
+      <details className="lds-section open:pb-2"
         open={suffixOpen} onToggle={(e) => setSuffixOpen(e.currentTarget.open)}>
         <summary className="cursor-pointer select-none px-2.5 py-1.5 text-xs text-content font-semibold flex items-center gap-1.5">
           ✨ Prompt suffixes

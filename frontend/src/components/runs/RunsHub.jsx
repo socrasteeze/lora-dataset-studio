@@ -630,7 +630,7 @@ const renderRunCard = (run, i) => {
               const testRun = group.runs.find((run) => !isFullTransformerRun(run));
               return (
                 <section key={`g${gi}-${gkey}`}
-                  className="flex flex-col rounded-xl border border-border bg-surface">
+                  className="lds-section flex flex-col">
                   {/* discreet group header: the dataset these consecutive runs share */}
                   <div className="flex items-center gap-2 px-3 py-2">
                     <button type="button" onClick={() => toggleGroup(group.datasetId)}

@@ -154,7 +154,7 @@ export default function VideoFilterRail({
           totalClips={totalClips} onApplied={onThresholdsApplied} />
       )}
 
-      <details className="min-w-0 rounded-lg border border-border bg-surface">
+      <details className="lds-section min-w-0">
         <summary className="min-h-10 lg:min-h-0 cursor-pointer px-3 py-2 text-sm font-semibold text-content">
           Files ({counts.sources || 0})
         </summary>

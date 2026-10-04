@@ -4012,6 +4012,9 @@ def scrape_import_to_video_bank(user_id, items, bank_id=None, name=None, *,
     Returns {'bank_id', 'name', 'created', 'saved', 'already_there', 'added',
     'skipped': {...}} — ``added`` is what the walk actually inventoried. Raises
     ValueError (bad input) or BankJobBusy (a pass owns the bank)."""
+    from lds_sdk.lifecycle import offline_only
+    if offline_only():
+        raise ValueError('Online media imports are disabled in this offline fork.')
     items = [it for it in (items or []) if isinstance(it, dict) and it.get('url')]
     if not items:
         raise ValueError('no items')

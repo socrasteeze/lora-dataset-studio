@@ -223,7 +223,7 @@ export default function LiveStudio() {
               strength={strength} onStrength={setStrength} />
           </div>
 
-          <section className="rounded-xl border border-border bg-surface p-3">
+          <section className="lds-section py-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="text-sm font-semibold">Scenes</h3>
               <span className="text-2xs text-content-subtle">
@@ -249,7 +249,7 @@ export default function LiveStudio() {
         </div>
 
         <aside className="flex flex-col gap-3 lg:sticky lg:top-16" data-probe-panel="live-rail">
-          <section className="rounded-xl border border-border bg-surface p-3">
+          <section className="lds-section py-3">
             <h3 className="text-sm font-semibold">Channel</h3>
             <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
               <label className="flex flex-col gap-1">
@@ -319,7 +319,7 @@ export default function LiveStudio() {
           </section>
 
           {status && status.state !== 'idle' && (
-            <section className="rounded-xl border border-border bg-surface p-3 text-xs" data-testid="live-status">
+            <section className="lds-section py-3 text-xs" data-testid="live-status">
               <p className="text-content">{paceLine(status)}</p>
               <p className="mt-1 text-content-subtle">
                 {status.produced || 0} rendered · {status.inflight || 0} in the queue · {status.buffered_clips || 0} buffered

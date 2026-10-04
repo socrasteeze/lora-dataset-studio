@@ -21,7 +21,7 @@ from ..extensions import db
 from .registry import OwnershipConflict, PluginRegistry
 
 LDS_PLUGIN_API_MAJOR = 1
-LDS_PLUGIN_API_MINOR = 23  # Local dataset engines through the shared image queue.
+LDS_PLUGIN_API_MINOR = 24  # Public offline-policy query for local plugin workflows.
 
 
 PUBLIC_NAMES = (

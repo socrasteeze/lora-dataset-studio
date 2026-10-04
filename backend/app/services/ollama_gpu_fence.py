@@ -607,6 +607,8 @@ def _probe_ollama(endpoint):
     failure — it simply leaves the claim to be judged on its own freshness.
     """
     try:
+        from ..utils.local_api import local_api_url
+        endpoint = local_api_url(endpoint)
         response = requests.get(f'{endpoint}/api/ps', timeout=network_timeout((3, 5)), allow_redirects=False)
         status = getattr(response, 'status_code', None)
         if type(status) is not int or not 200 <= status < 300:
@@ -637,7 +639,7 @@ def _probe_ollama(endpoint):
             else:
                 _probe_families.pop(endpoint, None)
         return ('empty' if not names else 'models'), names, expiry
-    except (requests.RequestException, OSError) as exc:
+    except (requests.RequestException, OSError, ValueError) as exc:
         if _connection_refused(exc):
             return 'down', set(), {}
         return 'unknown', set(), {}
@@ -656,6 +658,8 @@ def _post_unload(endpoint, model) -> bool:
             logger.warning('LM Studio fence: unload request failed for %s (%s)', model, exc)
             return False
     try:
+        from ..utils.local_api import local_api_url
+        endpoint = local_api_url(endpoint)
         response = requests.post(f'{endpoint}/api/generate',
                                  json={'model': model, 'keep_alive': 0},
                                  timeout=network_timeout((10, 30)), allow_redirects=False)

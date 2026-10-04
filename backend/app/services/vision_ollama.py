@@ -26,7 +26,13 @@ def _ollama_url() -> str:
     # Total accessor: cfg.get() can return None (missing/corrupted config
     # section) and callers rstrip('/') the result unconditionally -- this
     # must never hand back None, or the never-raise contract below breaks.
-    return cfg.get('ollama.url') or 'http://127.0.0.1:11434'
+    from ..utils.local_api import local_api_url
+    return local_api_url(cfg.get('ollama.url') or 'http://127.0.0.1:11434')
+
+
+def _local_ollama_url(value=None):
+    from ..utils.local_api import local_api_url
+    return local_api_url(value or _ollama_url())
 
 
 def _ollama_error_detail(exc: Exception) -> str:
@@ -191,7 +197,7 @@ def describe_frames_ollama(frames, prompt, *,
     if not b64s:
         return ''
     try:
-        url = (ollama_url or _ollama_url()).rstrip('/')
+        url = _local_ollama_url(ollama_url).rstrip('/')
         model_name = model or get_vision_model()
         payload = {
             'model': model_name,
@@ -276,7 +282,7 @@ def describe_image_ollama(image_bytes: bytes, prompt: str, *,
         logger.warning('vision_ollama: describe skipped: image is unsafe or unreadable')
         return ''
     try:
-        url = (ollama_url or _ollama_url()).rstrip('/')
+        url = _local_ollama_url(ollama_url).rstrip('/')
         model_name = model or get_vision_model()
         # Every valid source was converted above to a bounded, metadata-free JPEG.
         # Without this, WebP dataset bytes hit HTTP 400 "Failed to load image or
@@ -401,7 +407,7 @@ def generate_text_ollama(prompt: str, *,
     check a Settings value that was never the problem. The batch captioner keeps the
     default: it has a long caption to fall back on, so a failure there is not an error."""
     try:
-        url = (ollama_url or _ollama_url()).rstrip('/')
+        url = _local_ollama_url(ollama_url).rstrip('/')
         model_name = model or get_vision_model()
         payload = {
             'model': model_name,
@@ -467,7 +473,7 @@ def unload_vision_model(*, ollama_url: str | None = None, model: str | None = No
     a bare call releases every tracked custom model, not just today's default.
     """
     try:
-        url = ollama_url or _ollama_url()
+        url = _local_ollama_url(ollama_url)
         if not isinstance(url, str) or not url.strip():
             raise ValueError('invalid Ollama URL')
         url = url.rstrip('/')

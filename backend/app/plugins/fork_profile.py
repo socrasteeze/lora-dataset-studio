@@ -6,7 +6,8 @@ from pathlib import Path
 
 _POLICY = json.loads((Path(__file__).resolve().parents[3] / 'fork-plugins.json').read_text())
 ENABLED = frozenset(_POLICY['enabled'])
-RESERVED = ENABLED | frozenset(_POLICY['held']) | frozenset(_POLICY['excluded'])
+EXCLUDED = frozenset(_POLICY['excluded'])
+RESERVED = ENABLED | frozenset(_POLICY['held']) | EXCLUDED
 BUILD_MARKER = Path(__file__).resolve().parents[3] / 'frontend' / 'dist' / 'plugin-build.json'
 
 
@@ -44,5 +45,14 @@ def active():
     return distribution() == 'fork'
 
 
+def offline_only():
+    """Online product APIs stay unavailable, regardless of saved credentials.
+
+    Operator-started Setup downloads are a separate preparation path. Local
+    ComfyUI, Ollama, LM Studio and operator-configured LAN peers stay supported.
+    """
+    return True
+
+
 def refuses_archive(plugin_id):
-    return active() and plugin_id in RESERVED
+    return plugin_id in EXCLUDED or (active() and plugin_id in RESERVED)

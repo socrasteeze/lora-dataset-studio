@@ -109,7 +109,7 @@ function AutoTriageBar({ images, allImages, datasetId, faceThresholds, onBatch, 
     const empty = autoTriageEmptyReason(images, allImages);
     if (!empty) return null;
     return (
-      <div className="flex items-center gap-2 flex-wrap rounded-lg border border-dashed border-border bg-surface px-3 py-2">
+      <div className="lds-section flex items-center gap-2 flex-wrap py-2">
         <span className="inline-flex items-center gap-1.5 text-content-muted text-sm font-semibold shrink-0"><Target aria-hidden="true" className="h-4 w-4" /> Auto-triage</span>
         <span role="status" className="text-xs text-content-subtle">{empty.message}</span>
       </div>
@@ -168,7 +168,7 @@ function AutoTriageBar({ images, allImages, datasetId, faceThresholds, onBatch, 
   };
 
   return (
-    <div className="relative flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2">
+    <div className="lds-section relative flex flex-wrap items-center gap-3 py-2">
       <span className="inline-flex items-center gap-1.5 text-content text-sm font-semibold shrink-0"><Target aria-hidden="true" className="h-4 w-4" /> Auto-triage</span>
       <button type="button" onClick={() => setShowHelp((v) => !v)}
         aria-expanded={showHelp} aria-label="About Auto-triage"

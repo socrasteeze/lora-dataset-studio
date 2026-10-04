@@ -158,6 +158,9 @@ def _validate_public_http_url(url):
 
 def _download_with_ytdlp(url, dest_template):
     """Run `python -m yt_dlp` in a subprocess. Return (ok, error)."""
+    from ..plugins.fork_profile import offline_only
+    if offline_only():
+        return False, 'Online media imports are disabled in this offline fork.'
     _check_ytdlp_version()   # Non-blocking warning if the version is too old
     if _ffmpeg_available():
         fmt_args = ['-f', 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b',
@@ -280,6 +283,9 @@ import glob as _glob
 def download_via_ytdlp(url, dest_base):
     """Download with yt-dlp into the dest_base directory; keep the first valid video.
     Return (ok, filename|None, error|None). Never raises."""
+    from ..plugins.fork_profile import offline_only
+    if offline_only():
+        return False, None, 'Online media imports are disabled in this offline fork.'
     dest_dir = _os.path.dirname(dest_base)
     uid = _os.path.basename(dest_base)
     _os.makedirs(dest_dir, exist_ok=True)
@@ -317,6 +323,9 @@ def fetch_hardened_bytes(url, *, allowed_types, max_bytes, require_image_magic=F
     - Cap bytes while streaming, before reading the entire body.
     - With require_image_magic, require a known raster signature as well, so
       non-admins receive real images rather than disguised HTML/SVG/executables."""
+    from ..plugins.fork_profile import offline_only
+    if offline_only():
+        return False, None, None, 'offline'
     try:
         from curl_cffi import requests as cf_requests
     except ImportError:

@@ -198,7 +198,7 @@ export default function CaptionLab({ surface, currentCaption, onKeep }) {
       )}
 
       {/* Reference: the caption currently on the image. */}
-      <div className="rounded-xl border border-border bg-surface p-3">
+      <div className="lds-section py-3">
         <p className="m-0 text-2xs font-semibold uppercase tracking-[0.16em] text-content-subtle">Current caption</p>
         <p className="m-0 mt-1 whitespace-pre-wrap text-xs leading-5 text-content-muted">
           {currentCaption?.trim() ? currentCaption : <span className="italic text-content-subtle">— no caption yet —</span>}
@@ -207,7 +207,7 @@ export default function CaptionLab({ surface, currentCaption, onKeep }) {
 
       <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto sm:grid-cols-2">
         {candidates.map((c) => (
-          <div key={c.id} className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-3">
+          <div key={c.id} className="lds-section flex flex-col gap-2 py-3">
             {/* Config picker */}
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between gap-2">

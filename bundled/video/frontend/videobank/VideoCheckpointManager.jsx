@@ -245,7 +245,7 @@ export default function VideoCheckpointManager({ ds, refreshKey = 0, onSavesChan
   const refreshPreviews = () => { loadPreviews(); load() }
   return (
     <div className="flex flex-col gap-3">
-      <details open className="rounded-lg border border-border bg-surface-raised p-2"
+      <details open className="lds-section py-2"
         data-probe-reading>
         <summary className="cursor-pointer text-xs font-semibold text-content">
           ◉ Run graph{hasGraph ? ` — ${graphSummary(tree)}` : ''}

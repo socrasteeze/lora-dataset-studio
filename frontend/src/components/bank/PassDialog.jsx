@@ -39,7 +39,7 @@ import {
 
 function Block({ title, subtitle, children }) {
   return (
-    <section className="rounded-lg border border-border bg-surface p-3 space-y-2">
+    <section className="lds-section py-3 space-y-2">
       <div>
         <h3 className="text-xs font-bold uppercase tracking-wide text-content-muted">{title}</h3>
         {subtitle && <p className="mt-0.5 text-2xs leading-snug text-content-subtle">{subtitle}</p>}
@@ -202,7 +202,7 @@ export default function PassDialog({
                 </span>
               </label>
             )) : (
-              <div className="rounded-md border border-border bg-surface-raised p-2 text-sm">
+              <div className="lds-section py-2 text-sm">
                 <p className="m-0 font-medium text-content">
                   {spec.fixedScopeLine}
                   {countable && passScopeCount(payload, passId, DEFAULT_PASS_SCOPE, false) !== null

@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 // Old bookmarks stay understandable when their owner is absent, disabled or
 // failed to load. Reaching a bookmark never installs or enables its plugin.
 export default function UnavailablePluginPage({ label = 'This workspace' }) {
-  return <section className="space-y-3 rounded-xl border border-border bg-surface p-4">
+  return <section className="lds-section space-y-3 py-4">
     <h1 className="text-xl font-semibold">{label} Unavailable</h1>
     <p role="status" className="text-sm text-content-muted">Its plugin is not active in this session. Open Plugins to check whether it is installed, enabled, or needs a reload.</p>
     <div className="flex flex-wrap gap-4">

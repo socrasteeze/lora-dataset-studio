@@ -7,7 +7,7 @@ This is the long-form route from an empty dataset to an exported LoRA. The root 
 | Stop | Outcome |
 |---|---|
 | [1. Decide what you are teaching](#1-decide-what-you-are-teaching) | Dataset kind, subject type, trigger and target family are defined |
-| [2. Fill it with images](#2-fill-it-with-images) | References, imports, scrapes or Image Bank keepers enter the dataset |
+| [2. Fill it with images](#2-fill-it-with-images) | References, local imports or Image Bank keepers enter the dataset |
 | [3. Curate down to the keepers](#3-curate-down-to-the-keepers) | Off-identity, weak and redundant shots are removed |
 | [4. Caption for the model](#4-caption-for-the-model) | Every kept image has family- and kind-appropriate wording |
 | [5. Scrub watermarks](#5-scrub-watermarks) | Marks are reviewed and removed without losing originals |
@@ -42,8 +42,7 @@ Sources mix freely inside one dataset:
 |---|---|
 | **Generate from references** | Build a Character set from one primary reference and optional extra angles |
 | **Import** | Bring your own JPEG, PNG, WebP or BMP images; Character can auto-crop while Concept/Style preserve the frame |
-| **Scrape** | Select permitted material from Reddit, Pexels or supported gallery/direct-media URLs |
-| **Image Bank** | Triage a large unsorted folder or scrape before promoting a smaller set |
+| **Image Bank** | Triage a large unsorted local folder before promoting a smaller set |
 
 ### Generate from references
 
@@ -62,7 +61,7 @@ Every generated tile reopens the exact prompt used to make it. The separate refe
 
 ### The Image Bank
 
-The **Bank** tab inventories a live folder in place, or scrapes into a new/existing bank. It can quality-scan, score, group duplicates/crops/people/styles, caption, search, sort, rotate, review, build diverse or framing-balanced shortlists, edit watermark masks, and promote keepers.
+The **Bank** tab inventories a local folder in place. It can quality-scan, score, group duplicates/crops/people/styles, caption, search, sort, rotate, review, build diverse or framing-balanced shortlists, edit watermark masks, and promote keepers.
 
 The two directions are explicit copies:
 
@@ -83,17 +82,7 @@ Nothing in a source folder is removed unless you explicitly choose **Delete reje
 
 ### The built-in web scraper
 
-The scraper's **Reddit | Pexels | URL** switch keeps each source separate. It de-duplicates near-identical results, blocks internal/loopback URLs, hides dead media, and applies dataset quality filters when importing directly into a dataset. Scraping into a bank intentionally stores first and lets the bank's own passes decide later.
-
-Credentials live in **Settings → Scraping & sources**. A personal Reddit client ID avoids the shared public quota. Pexels always requires an API key and uses its official API.
-
-> **Pexels authorization required:** an API key alone does not authorize dataset or machine-learning use. Configure this source only if Pexels has explicitly authorized the use case. Read the [official Pexels terms and conditions](https://help.pexels.com/hc/en-us/articles/900005880463-What-are-the-Terms-and-Conditions); the app requires a locally stored confirmation before a Pexels query can run.
-
-The scraper can reach adult sources. Use only material you have the right and consent to train on; see [Legal & responsible use](../../README.md#legal--responsible-use).
-
-<p align="center">
-  <img src="../screenshots/06-scraper.png" alt="Scraper panel with Reddit, Pexels and URL modes" width="820">
-</p>
+Online scraping is excluded from this fork. Import local files, upload files from your browser, or promote keepers from a bank. Existing source metadata remains available.
 
 ## 3. Curate down to the keepers
 
@@ -326,14 +315,13 @@ Nothing in the workflow locks data into the app:
 | **Training ZIP / sidecars** | Kept images with same-stem captions in a standard ai-toolkit/Kohya-compatible layout |
 | **Merge ZIP/folder** | Images and captions from an existing dataset, with perceptual duplicates skipped |
 | **Portable backup** | Datasets, references, decisions, captions, settings and run history; API keys are excluded |
-| **Hugging Face dataset** | Kept image/caption pairs, private by default and published only after a rights confirmation |
 | **ComfyUI deployment** | A selected checkpoint copied into the configured LoRA tree |
 | **Trash** | App-managed deletions remain recoverable until Trash is emptied |
 
 When trained LoRAs are included in a portable backup, restore can rebuild both dataset state and training history on another installation.
 
 <p align="center">
-  <img src="../screenshots/export/import-export.png" alt="Import and export step with the ZIP round trip, bank promotion, portable backup and Hugging Face publishing" width="820">
+  <img src="../screenshots/export/import-export.png" alt="Import and export step with the ZIP round trip, bank promotion and portable backup" width="820">
 </p>
 
 ---

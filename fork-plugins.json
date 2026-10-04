@@ -3,19 +3,20 @@
     "camera_angles",
     "canvas",
     "dlss5",
-    "hf_publish",
     "image_upscale",
     "live",
     "model_tools",
     "qwen_dataset",
     "resource_monitor",
-    "scrape",
     "seedvr2",
     "video"
   ],
   "held": [],
   "excluded": [
     "api_engines",
-    "cloud_training"
+    "civitai_publish",
+    "cloud_training",
+    "hf_publish",
+    "scrape"
   ]
 }

@@ -46,7 +46,7 @@ export default function PluginSettingsGroups({ pluginId, groups, ...props }) {
   const improves = contributions('improve.engine').some(item => item.plugin === pluginId)
   const engines = contributions('engine.spec').filter(item => item.plugin === pluginId)
   return <div className="space-y-4">
-    {engines.length > 0 && <fieldset id="plugin-enabled-engines" className="rounded-lg border border-border p-4">
+    {engines.length > 0 && <fieldset id="plugin-enabled-engines" className="lds-section py-4">
       <legend className="px-1 text-sm font-medium">Enabled engines</legend>
       <div className="flex flex-wrap gap-4">{engines.map(engine => <label key={engine.id} className="inline-flex min-h-10 items-center gap-2 text-sm">
         <input type="checkbox" checked={(props.config.engines?.enabled || []).includes(engine.id)}
@@ -56,13 +56,13 @@ export default function PluginSettingsGroups({ pluginId, groups, ...props }) {
     </fieldset>}
     {improves && <ImproveEnginePreference {...props} />}
     {groups.length === 0 && !improves && preparation.length === 0 && installs.size === 0 && <p className="text-sm text-content-muted">This plugin has no global settings. Its tools expose their options where you use them.</p>}
-    {(preparation.length > 0 || installs.size > 0) && <details id="plugin-preparation" aria-label="Preparation" className="space-y-4 rounded-xl border border-border bg-surface p-4">
+    {(preparation.length > 0 || installs.size > 0) && <details id="plugin-preparation" aria-label="Preparation" className="lds-section space-y-4 py-4">
       <summary className="min-h-10 cursor-pointer text-base font-semibold">Preparation</summary>
       {installs.size > 0 && <PluginPreparation key={pluginId} pluginId={pluginId} items={[...installs.values()]} onPrepared={onPrepared} />}
       {preparation.filter(card => typeof card.panel === 'function').map(card =>
         <PluginPanel key={card.id} panelKey={`${card.plugin}:${card.id}:setup`} importer={card.panel}
           caps={props.caps} onDone={onPrepared} />)}
-      {installs.size > 0 && <details className="rounded-xl border border-border bg-surface p-4">
+      {installs.size > 0 && <details className="lds-section py-4">
         <summary className="min-h-10 cursor-pointer text-sm font-medium">Install or repair individual components</summary>
         <div className="mt-4 space-y-3">{[...installs.values()].map(item =>
           <InstallItem key={item.action} item={item} onDone={onPrepared} />)}</div>

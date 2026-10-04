@@ -134,7 +134,7 @@ export default function LoraPicker({ preselectDataset, preselectFamily = null, o
   const count = selection.length;
 
   return (
-    <div data-probe-panel="picker" className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-3">
+    <div data-probe-panel="picker" className="lds-section flex flex-col gap-2 py-3">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-content-muted text-2xs uppercase">LoRA to test</span>
         {/*

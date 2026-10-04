@@ -287,7 +287,7 @@ export default function ContinueDialog({
         <div className="flex flex-col gap-1">
           <span className="text-content text-xs">Resume mode</span>
           <div role="radiogroup" aria-label="Training state to restore"
-            className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface-raised p-2.5">
+            className="lds-section flex flex-col gap-1.5 py-2.5">
             <label className={'flex items-start gap-2 text-xs '
               + (fullStateAvailable ? 'text-content' : 'text-content-subtle')}>
               <input type="radio" name="resume-mode" value="full_state"
@@ -343,7 +343,7 @@ export default function ContinueDialog({
             {showSettings ? '▾' : '▸'} Adjust settings (optional)
           </button>
           {showSettings && (
-            <div className="flex flex-col gap-2.5 rounded-lg border border-border bg-surface-raised p-2.5">
+            <div className="lds-section flex flex-col gap-2.5 py-2.5">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-content text-xs w-28 shrink-0">Save checkpoint</span>
                 <select value={String(trajectoryLocked ? inheritedSave : saveEvery)}

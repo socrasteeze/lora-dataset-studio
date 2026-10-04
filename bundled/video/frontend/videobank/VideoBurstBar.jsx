@@ -29,7 +29,7 @@ export default function VideoBurstBar({
   const undo = undoLine(undoStack)
 
   return (
-    <div className="rounded-lg border border-border bg-surface p-2">
+    <div className="lds-section py-2">
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <button type="button" onClick={onToggle} aria-pressed={on}
           title="Judge shots from the keyboard: one key per shot, and the cursor moves to the next untriaged one on its own."
@@ -88,7 +88,7 @@ export default function VideoBurstBar({
         /* A region, not a dialog: it must never take the focus, because the
            keyboard IS the feature being documented. */
         <div id="video-burst-shortcuts" role="region" aria-label="Burst mode shortcuts"
-          className="mt-2 rounded-md border border-border bg-surface-raised p-2">
+          className="lds-section mt-2 py-2">
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
             {BURST_SHORTCUTS.map((s) => (
               <div key={s.keys} className="contents">

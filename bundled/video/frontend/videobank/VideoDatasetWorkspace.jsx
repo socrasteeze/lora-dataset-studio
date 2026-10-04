@@ -583,7 +583,7 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
             </div>
             {selected.length > 0 && (
               <div id="vds-clips-bulk"
-                className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2">
+                className="lds-section flex flex-wrap items-center gap-2 py-2">
                 <span className="text-xs font-semibold text-content">
                   {selected.length} selected
                 </span>
@@ -709,7 +709,7 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
           <section className={sectionCls('studio')} aria-hidden={section !== 'studio'}>
             {heading('studio')}
             <div id="vds-studio-launcher"
-              className="flex flex-col gap-2 rounded-lg border border-border bg-surface-raised p-3">
+              className="lds-section flex flex-col gap-2 py-3">
               {/* A launcher and not the Studio itself — the image workspace makes
                   the same choice: the Studio is a page (queues, a picker across
                   every dataset's LoRAs), and it opens on its Video tab here. */}
@@ -775,7 +775,7 @@ function ClipsFolderNote({ path }) {
     } catch { /* clipboard denied — the path is still readable on screen */ }
   }
   return (
-    <div className="min-w-0 rounded-lg border border-border bg-surface px-3 py-2 text-xs">
+    <div className="lds-section min-w-0 py-2 text-xs">
       <div className="flex min-w-0 items-center gap-2">
         <span className="inline-flex shrink-0 items-center gap-1.5 text-content-subtle">
           <Folder aria-hidden="true" className="h-3.5 w-3.5" /> Clips folder
@@ -811,7 +811,7 @@ function CaptionTools({ id, clips, selected, busy, onApply }) {
     [scope])
 
   return (
-    <div id={id} className="flex flex-col gap-2 rounded-lg border border-border bg-surface px-3 py-2">
+    <div id={id} className="lds-section flex flex-col gap-2 py-2">
       <p className="text-xs font-semibold text-content">
         Caption tools
         <span className="ml-1.5 font-normal text-content-subtle">
@@ -922,7 +922,7 @@ function ReferenceAttach({ ds, onChanged }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2">
+    <div className="lds-section flex flex-wrap items-center gap-2 py-2">
       <span className={`text-xs ${ds.references > 0 ? 'text-content-muted' : 'text-amber-300'}`}>
         📎 References: {ds.references || 0}{ds.references > 0 ? '' : ' — required, the launch is refused without them'}
       </span>

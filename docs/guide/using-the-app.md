@@ -259,27 +259,7 @@ never an automatic continuation.
 Pick **Concept** at creation and describe the concept in the required field —
 the captioner needs to know exactly *what to omit*. What changes vs character:
 
-- **No reference photo.** Images come from **import** or the built-in
-  **scraper** (paste a gallery URL or run a Reddit keyword search, tick the
-  frames you want, they land straight in the dataset — deduplicated and
-  quality-filtered). Already have a kohya-style dataset on disk (images +
-  same-name `.txt` captions)? **⋯ More → 📂 Import from folder** merges it in
-  from a pasted folder path — captions attach, duplicates are skipped (a ZIP
-  works too, via **📦 Import dataset**). On gallery sites (PornPics), a category/tag/search scan
-  shows **the same previews the listing page does** — one per gallery, the shot
-  that actually matches your keyword. Tick **Scan full albums** to pull every
-  photo of each matched gallery instead, or paste a single `/galleries/<id>` URL
-  to get that whole album. Sex.com works the same way for keyword searches
-  (`sex.com/en/pics?search=<query>`) — every pin **is** a single matching image, so
-  there is no album option to worry about. Civitai searches return **SFW
-  results only** unless you add a Civitai API key in **Settings → Scraping &
-  sources**.
-
-  > **Reddit says "wait N seconds" (429)?** By default Reddit scans share a
-  > public client id (and its ~1000 requests / 10 min quota) with many other
-  > people, so it can be exhausted before your first scan. Add your own free
-  > client ID in **Settings → Scraping & sources** — a one-minute, step-by-step
-  > guide is built into that page.
+- **No reference photo.** Import local images, upload them from your browser, or promote bank keepers. **More > Import from folder** merges image/caption pairs from a local host folder. **Import dataset** accepts a ZIP. Online scraping is excluded.
 - **Captions invert**: they describe everything *except* the concept, so the
   concept is what binds to the trigger. The leak check watches for stray
   descriptions of it.
@@ -523,28 +503,6 @@ The funnel itself:
    many as fit and tells you how many it left out, so nothing you already
    triaged stops working. That ceiling counts what is in the folder now — files
    you deleted from it don't count against it.
-1bis. **Scrape Images** — you don't need a folder you prepared
-   by hand. Unfold **Scrape Images** on the bank list, choose a
-   destination (a **new bank**, or **add to an existing one**), then scan a
-   gallery URL and pick images exactly as you would for a dataset. They are
-   downloaded into that bank's own folder and inventoried on the spot.
-
-   Two things are worth knowing, because they are the whole point:
-
-   - **Nothing is filtered on the way in.** Scraping straight into a *dataset*
-     applies training-grade gates (short side ≥ 768 px, ratio ≤ 3:1, perceptual
-     de-duplication) *before* anything is stored. A bank is the step **before**
-     that judgement: "too small", "near-duplicate" and "wrong framing" are
-     verdicts its own passes produce, with thresholds you move. So the bank
-     stores what it downloaded and lets you decide. If you already know what you
-     are collecting, scraping straight into a dataset is still the shorter road.
-   - **A second scrape resumes the same bank.** Pick *Add to an existing bank*
-     and the new images join the pile — nothing is replaced, and no triage
-     decision you already made is reset. Re-downloading the exact same file
-     lands on the same name instead of piling up copies; that is file identity,
-     not a duplicate verdict (the bank's own passes own that word).
-
-   The rest of the funnel is unchanged: scan, cull, promote into a dataset.
 2. **🔎 Scan quality** — a background pass (CPU only, a few minutes even on
    thousands of images) scores every file: sharpness, noise, flat/empty
    frames, resolution — and groups **near-duplicates**. The flags follow the
@@ -2998,30 +2956,7 @@ can judge; the three hundred shots inside it are.
    `.webm` and `.avi` under it (subfolders included) is inventoried in place.
    Nothing is copied, and **no pass ever modifies your files** — scanning,
    cutting and building all write elsewhere. The one thing that adds to that
-   folder is a scrape you send to this bank yourself (next step).
-1bis. **Scrape Video** — you don't need a folder of rushes
-   you assembled by hand. Unfold **Scrape Video** on the
-   video bank list, choose a destination, then scan a URL and pick clips exactly
-   as you would pick images. The scanner has always listed videos — RedGifs,
-   Erome, Picazor, TikTok, X, Civitai and the gallery sources all return them —
-   and the picker now shows them, with a ▶ badge and their length. They are
-   downloaded, inventoried on the spot, and cut into shots when you run the
-   passes above.
-
-   Two things are worth knowing:
-
-   - **Nothing is judged on the way in**, exactly like the image bank. Length,
-     motion, sharpness and near-duplicates are verdicts the **📊 Measure
-     quality** pass produces, with thresholds you move. A clip refused at
-     download time is one you could never have reviewed.
-   - **Any bank can receive them, and the picker says where they will land.**
-     A **new bank** gets a folder of its own under the app's own storage. **Add
-     to an existing bank** offers every bank you have, including one you pointed
-     at your own footage — the clips are simply added to the folder that bank
-     follows, and the picker prints that folder's path before you start.
-     Choosing the bank is the whole confirmation; there is no second checkbox.
-     The one destination that is refused is a bank sitting on a *dataset's* own
-     folder, where new files would end up inside training material.
+   folder comes from local files you add yourself.
 2. **▶ Run everything** chains the three passes in the only order that works:
    **scan** reads what each file is (length, size, frame rate), **find shots**
    cuts it at its shot boundaries, and **make thumbnails** grabs one frame from

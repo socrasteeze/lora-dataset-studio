@@ -53,7 +53,7 @@ const COMPARE_SAMPLE = 8
 
 function LevelCard({ index, title, blurb, state, onRun }) {
   return (
-    <div className="flex-1 min-w-[15rem] rounded-lg border border-border bg-app/40 p-2.5 space-y-1.5">
+    <div className="lds-section flex-1 min-w-[15rem] py-2.5 space-y-1.5">
       <div className="flex items-baseline gap-1.5">
         <span className="text-2xs font-bold uppercase tracking-wide text-content-subtle">
           Level {index}
@@ -211,7 +211,7 @@ export default function BankWatermarkPanel({
 
   return (
     <div id="bank-watermark-cleaning" data-workspace-focus
-      className="rounded-lg border border-border bg-surface-raised">
+      className="lds-section">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
         className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 p-3 text-left">
         <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-content"><Flag aria-hidden="true" className="h-4 w-4" /> Watermarks</span>

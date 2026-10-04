@@ -303,7 +303,7 @@ export default function VideoSourcePicker({ mode, onMode, frames = [], onAdd, on
 
   return (
     <section data-probe-panel="video-studio-source"
-      className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface p-2">
+      className="lds-section flex flex-col gap-1.5 py-2">
       {!libraryOnly && <header className="flex flex-wrap items-center gap-1.5">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold text-content">
           {libraryOnly ? 'Library images' : mode === 't2v' ? 'Last frame' : 'Start frame'}
@@ -611,7 +611,7 @@ export default function VideoSourcePicker({ mode, onMode, frames = [], onAdd, on
             with its ✕ (the same corner the reference panel uses). One frame
             reads as it always did; several say what a click will do. */}
         {!libraryOnly && mode !== 't2v' && frames.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-app p-1.5">
+          <div className="lds-section flex flex-wrap items-center gap-2 py-1.5">
             {frames.map((f, i) => (
               <div key={f.key} className="relative shrink-0" title={f.image}>
                 {/* 🔍 The tile opens the SHARED viewer (the host wires it): the
@@ -666,7 +666,7 @@ export default function VideoSourcePicker({ mode, onMode, frames = [], onAdd, on
             it. Its own row under the strip, with the same ✕ and the same
             viewer as a start frame. */}
         {endFrame && (
-          <div data-testid="video-end-frame" className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-app p-1.5">
+          <div data-testid="video-end-frame" className="lds-section flex flex-wrap items-center gap-2 py-1.5">
             <div className="relative shrink-0" title={endFrame.image}>
               {onOpenEnd ? (
                 <button type="button" onClick={() => onOpenEnd(endFrame)} aria-label="Open the last frame"

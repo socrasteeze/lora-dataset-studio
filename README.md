@@ -1,4 +1,6 @@
 > [!WARNING]
+
+This fork runs local workflows. Online publishing, scraping, Civitai browsing and in-app update APIs are disabled. Setup downloads require an explicit action; runtime models must already be present. See [Offline Workflows](docs/OFFLINE_WORKFLOWS.md).
 > **No affiliation with loradataset.com.** That website is not operated, endorsed, or supported by the LoRA Dataset Studio team. Any payments made to that service do not support this project. Use this repository and the links provided here to find our official downloads and community channels.
 
 # LoRA Dataset Studio V2
@@ -59,7 +61,6 @@ Four ways to fill a dataset, and one choice at creation that rewires everything 
 | **✨ Generate from references** | A local Klein/ComfyUI model, each request wrapped in identity-preservation instructions (this fork is local-only for generation) |
 | **Variation catalog** | Character sets fan out expression / angle / lighting / framing / outfit / background without you writing a single prompt |
 | **📥 Import your own** | Drag photos in — full frame for Concept/Style, optional auto head-crop for Character |
-| **🌐 Scrape the web** | Reddit keyword search, Pexels via its official API, or a supported gallery / album / direct-media URL — into the open dataset, or straight into an **Image bank**. The dataset route filters on the way in (under 768 px, wider than 3:1, near-duplicates are dropped before you see them); the bank route stores what it downloaded and lets the bank's own passes judge it |
 | **✏️ Edit the prompt, regenerate** | Every generated tile reopens its exact prompt inline and re-renders through the same engine, identity guard included |
 | **📷 Cover a subject from more angles** | Open a kept image and re-shoot it from other camera positions — the views arrive as ordinary pending candidates you keep or reject. Each is **born with its angle already written into the caption** ("seen from behind, low camera angle") and the captioner re-injects that phrase on every later pass, because an angle left undescribed is what binds "back-facing" to your trigger word. The Image bank deliberately does *not* carry the button: it holds real material, and a re-shot view is a plausible one — promote to a dataset first |
 
@@ -67,7 +68,7 @@ Four ways to fill a dataset, and one choice at creation that rewires everything 
 
 Optional features that ship with the app are already installed. Open **Plugins** to turn one off, or install a ZIP you trust. Each plugin has its own settings and preparation steps. Model downloads, hardware and provider credentials depend on the feature.
 
-Point a bank at a folder, or scrape straight into one. It reads what is there **in place**: your files are never modified, moved or renamed, and the single action that does touch the source folder announces itself in capitals before it runs. Then **one pass measures the whole pile**, and every question afterwards is answered against those measurements instead of against your eyes — what is blurry, what is a duplicate of what, who is in it, how it is framed, whether it is a photograph or a render, and what it actually shows. You keep, reject and shortlist; a kept selection graduates into a dataset with its analysis attached, and can come back the other way.
+Point a bank at a local folder. It reads what is there **in place**: your files are never modified, moved or renamed, and the single action that does touch the source folder announces itself in capitals before it runs. Then **one pass measures the whole pile**, and every question afterwards is answered against those measurements instead of against your eyes — what is blurry, what is a duplicate of what, who is in it, how it is framed, whether it is a photograph or a render, and what it actually shows. You keep, reject and shortlist; a kept selection graduates into a dataset with its analysis attached, and can come back the other way.
 
 The cuts are measured rather than guessed: the aesthetic and near-duplicate thresholds were calibrated on a real bank of **7,316 images**, and every measure that cannot answer says "unsure" or "not measured" instead of inventing a verdict. The image lane is out of Beta; the **video** lane still carries the chip, and says why below.
 
@@ -155,7 +156,7 @@ the target model accepts.
 
 | Capability | What it provides |
 |---|---|
-| **Folder → video bank** | Point a bank at a folder of videos. It is referenced **in place**: no pass ever writes to it, exactly like the image bank. The one thing that adds to it is a scrape you send to that bank yourself |
+| **Folder → video bank** | Point a bank at a local folder of videos. Scans read files in place and store their results in LDS. |
 | **Automatic shot detection** | Finds the cuts with TransNetV2, so a long file becomes individually reviewable shots instead of one blob |
 | **Review without waiting** | The grid shows thumbnails; a click plays that shot from the source, so nothing is encoded before you have decided |
 | **Target-aware cutting** | Pick the model you are building for and the clip length offers **only counts that model can actually ingest** — Wan wants 4n+1 frames, LTX 8n+1, MiniMax H3 five modulo seventeen, and none of them will tell you if you get it wrong |
@@ -366,7 +367,6 @@ A LoRA that's *trained* isn't necessarily a LoRA that's *good*. Compare them on 
 | **Multi-LoRA grids** | Select several LoRAs of the same family and compare them against strength |
 | **🔎 Describe** | Drop any image and the local Ollama vision model turns it into a test prompt — never the identity or trigger |
 | **🎲 Caption** | Choose a dataset once, then use a random nonblank caption from one of its kept images as the test prompt; ▾ changes the source and typed text is confirmed before replacement |
-| **🌐 Civitai** | Browse Civitai's most-reacted images (day, week, month, year, all time) with the prompt each was posted with shown next to it, and reuse it in one click. Same button on the Test Studio, the multi-LoRA comparison and *Generate from the board*. Reading prompts uses the same free **Civitai API key** the scraper already stores in **Settings → Scraping & sources**; without one the top images still browse |
 | **Vote & rank** | Quick votes feed a Wilson ranking; Character results can also be ranked by face similarity |
 | **Export the grid** | One labeled image ready to post — the composer works even with ComfyUI offline |
 | **Flip in place** | Swipe, ‹ › buttons or arrow keys with wrap-around; strength variants sit adjacent |
@@ -405,12 +405,12 @@ the first already invented, so the button is refused there and says why.
       <a href="docs/screenshots/release/camera-angles-picker.png"><img src="docs/screenshots/release/camera-angles-picker.png" alt="The Camera angles dialog: an azimuth dial, camera height and distance choices, the exact prompts that will be sent and the cost of the run" width="100%"></a>
     </td>
     <td width="50%" valign="top">
-      <a href="docs/screenshots/studio/civitai-prompt-browser.png"><img src="docs/screenshots/studio/civitai-prompt-browser.png" alt="The Civitai top prompts browser: most-reacted images of the week, each next to the generation prompt it was posted with, with Copy and Use prompt buttons" width="100%"></a>
+      <a href="docs/screenshots/studio/studio-grid.png"><img src="docs/screenshots/studio/studio-grid.png" alt="Local Test Studio checkpoint and strength comparison grid" width="100%"></a>
     </td>
   </tr>
   <tr>
     <td valign="top"><sub><strong>📷 Camera angles</strong> — pick positions on the dial, read the exact prompts and the cost <em>before</em> you shoot. Lives in the Gallery viewer, on every kept dataset image, and in its own Camera angles workspace.</sub></td>
-    <td valign="top"><sub><strong>🌐 Civitai top prompts</strong> — the most-reacted images next to the prompt they were posted with; ⤵ drops one into your prompt field, ☐ Batch collects several for one run. Next to the prompt box on every generation surface.</sub></td>
+    <td valign="top"><sub><strong>Local Test Studio</strong> compares checkpoints and strengths using your saved prompts and captions.</sub></td>
   </tr>
   <tr>
     <td width="50%" valign="top">
@@ -435,7 +435,6 @@ Nothing here locks your data in — every stage has an exit.
 | **Training ZIP** | Kept `image` + same-stem `.txt` pairs for ai-toolkit/Kohya, or sidecars written beside the images |
 | **Merge existing data** | Import a training ZIP or recursively merge a local folder; perceptual duplicates are skipped |
 | **💾 Back up everything** | Every dataset, its training history and your settings in one portable file (API keys excluded), Trained state restored |
-| **Hugging Face publishing** | Publish kept images and captions as a dataset repository — private by default |
 | **📦 Import into ComfyUI** | One click for any checkpoint a run produced |
 | **🗑 Trash** | Everything the app deletes lands there and stays recoverable until you empty it |
 
@@ -468,14 +467,14 @@ This README follows the app itself: the road you actually walk, from an empty da
 | Stop on the road | What you do there |
 | :-- | :-- |
 | **[1 · Decide what you're teaching](#1-decide-what-youre-teaching)** | Pick Character, Concept or Style — the choice rewires captioning, masking and step-scaling downstream. |
-| **[2 · Fill it with images](#2-fill-it-with-images)** | Generate from references through the local Klein/ComfyUI engine, import your own, scrape the web, or triage a giant unsorted dump in the **Image bank**. |
+| **[2 · Fill it with images](#2-fill-it-with-images)** | Generate from references through the local Klein/ComfyUI engine, import your own, or triage a giant unsorted dump in the **Image bank**. |
 | **[3 · Curate down to the keepers](#3-curate-down-to-the-keepers)** | Keep/reject on a real curation grid, with face-similarity scoring, auto-triage and a live composition meter. |
 | **[4 · Caption for the model](#4-caption-for-the-model)** | Prose or booru tags, model-matched and machine-written, with a Vocabulary preset, a Caption Lab and full find/replace. |
 | **[5 · Scrub watermarks](#5-scrub-watermarks)** | Find overlaid logos/URLs, then crop or repaint them (LaMa on the marked zones, or a Klein whole-photo re-render) behind a review step. |
 | **[6 · Train](#6-train--guided-advanced-when-you-need-it)** | Guided training over six families and eighteen configuration starters, adaptive steps and guards, sliders — on this machine's GPU, or another machine's. |
 | **[7 · Read the family tree](#7-read-the-family-tree)** | Every continuation and fork drawn as a lineage graph you can inspect, diff, annotate and preview. |
 | **[8 · Pick the best checkpoint](#8-pick-the-best-checkpoint)** | Sweep checkpoint × strength in **Test Studio**, vote, rank, and export a shareable grid. |
-| **[9 · Take it with you](#9-take-it-with-you)** | Training ZIPs, portable backups, merges, Hugging Face publishing, one-click ComfyUI import. |
+| **[9 · Take it with you](#9-take-it-with-you)** | Training ZIPs, portable backups, merges and one-click local ComfyUI import. |
 
 ### Recent improvements
 
@@ -495,7 +494,7 @@ This README follows the app itself: the road you actually walk, from an empty da
 - **Image bank (Beta) — a giant unsorted folder becomes a dataset** — point the new **Bank** tab at a huge, messy dump (a Telegram export, a scrape pile): a quality scan flags blurry/noisy/flat/too-small shots, near-duplicates group up with one **keep-best** click, and a face pass sorts everything **by person — no reference photo needed** (now **GPU-accelerated** when the card is free). Then **Score** rates aesthetics, flags NSFW and groups by visual style, **Find crops & variants** catches the same shot re-cropped or re-compressed (reusing Score's embeddings, no extra GPU pass), **Find watermarks** flags overlaid logos/URLs, **Caption** describes images right in the Bank and a **search** filters a 9,000-image dump by what's in it. Any captioned tile's 🏷️ badge lifts that image's own words into the filter bar as tickable chips, so "more like this one, and I can see why" is one click — several chips mean AND, and each matches as a whole word. It only finds what a captioner actually wrote down, and a prose caption yields separate WORDS, so "golden hour" becomes two chips. A per-subfolder scope slices a big export by chat — importing a folder of folders can make **one bank per subfolder**, with any of them **unticked** to leave it out — and a **Browse** button opens your own folder dialog. Two banks given the **same name** show as one card with combined counts, one queue action and one promote, while their files stay in their own folders on their own disks. Your source folder is never modified; promote the keepers straight into a dataset. **Launch all** runs the whole pipeline end to end while you sleep, with a morning report.
 - **Sharper training recipes from verified research** — two defaults re-tuned from a fact-checked sweep of recent community results: a **FLUX.2 Klein style** LoRA now trains the winning **128/64/64/32** network (a 64-run sweep and Black Forest Labs' own example converge on it), and **Slider** LoRAs default to **alpha 4** (matching the Ostris slider notebook). Both are just smarter defaults — existing runs are untouched, and Advanced options still lets you set the alpha back.
 - **Per-dataset caption options** — a new **Options** button in Captions lets you pick the engine (Auto / JoyCaption / Ollama vision), choose or **pull** the exact Ollama vision model, set a **Vocabulary** preset for how nudity is named (Explicit / Clinical / Safe), and add your own wording instructions — all remembered on the dataset and layered on top of the built-in guardrails.
-- **"Update & restart" now works for ZIP installs** — installed from a release ZIP with no Git? The update button used to just send you off to download by hand; now it names the release and its size, **downloads and installs** it with a live progress bar, keeps your datasets, settings, `.env` and Python environment intact, and **rolls back automatically** if anything fails. Git checkouts update exactly as before.
+- **App updates** are maintained outside LDS in this offline fork. Restart LDS after updating the checkout or replacing a local release.
 - **A one-click install step in Setup** — after you configure your services, **Install everything** queues every installable component (ML extras, the Ollama vision model, Klein weights) with a live **X / N** progress bar; heavy installs run one at a time so they never clash. A per-item menu stays available with a **Reinstall** on each, to repair a single broken component without redoing the rest.
 - **Back up everything — Trained state included** — a **Back up everything** button packs every dataset (images, captions, statuses, references), its training history and your settings into one file (API keys deliberately excluded). Restore rebuilds every dataset without overwriting, and now brings back each one's **Trained** status and run history instead of "Not trained yet". Tick **Include trained LoRAs** to bundle the `.safetensors` themselves.
 - **Dual long + short captions** — a new Advanced option turns on ai-toolkit's native long+short captioning: every image trains with a full caption **and** a brief one, so the LoRA leans less on any single wording. The short variant is written for you from the long one (same rules, no trigger) and is editable per image. Local training only for now.
@@ -578,7 +577,6 @@ An empty dataset needs material. There are four ways in, and they mix freely ins
 
 - **Generate** — from one or more reference photos, through the local **Klein/ComfyUI** engine (this fork is local-only for generation). Each request wraps the selected references in identity-preservation instructions so the face is preserved; generated results still need human review. (Character sets add up to 3 extra reference angles for multi-view consistency.)
 - **📥 Import** — drag in your own photos. Uncropped JPEG/JPG, PNG, WebP and BMP files stay byte-for-byte in their original format by default; training creates its disposable PNG working pairs only when a run starts. Every source, including WebP normalization and head-crop, must be at most **16 Mi-pixels** and **8192 px per side**; a larger file is rejected, so convert or resize it before importing. Concept/Style keep the full frame; Character can optionally auto-crop around the head (or use a centered/manual crop when local vision is unavailable), which deliberately creates a derived WebP.
-- **🌐 Scrape** — collect real images from supported web sources (below).
 - **🗃️ Image bank** — when you're not starting from a handful of shots but from a **giant unsorted dump**, triage it first, then promote the keepers.
 
 ### The Image bank — triage a giant folder in place
@@ -623,33 +621,7 @@ Every threshold behind these flags (sharpness, noise, NSFW, same-person similari
 
 ### The built-in web scraper
 
-The scraper is available in every dataset (and is especially useful for Concept/Style sets). Its **Reddit | Pexels | URL** switch keeps each workflow clear: search Reddit by keyword with an optional community, search Pexels by keyword without constructing a URL, or paste a supported gallery / album / direct-media URL for sources such as Instagram, X/Twitter, Civitai and direct Pexels photos or collections. Switching source does not discard the current result grid, and pagination stays attached to the last search actually launched. Selected frames download **directly into the open dataset**, never a shared pool.
-
-<details>
-<summary>📸 See the scraper panel — Reddit, Pexels or URL search</summary>
-
-<p align="center">
-  <img src="docs/screenshots/06-scraper.png" alt="Scraper panel with Reddit, Pexels and URL source modes, a grid of result thumbnails with selection checkboxes, and an import button" width="820">
-</p>
-<p align="center"><em>Choose Reddit, Pexels or URL, launch a search, then pick frames straight into the dataset.</em></p>
-
-</details>
-
-What it does on your behalf:
-
-- **SSRF-hardened** — the fetcher refuses internal/loopback/link-local targets, so a hostile URL can't turn the scraper into a request proxy into your network.
-- **Perceptual de-duplication** — near-identical frames are dropped so the same shot doesn't get counted five times.
-- **Quality filters at import** — images wider than a 3:1 ratio are rejected. Images under 768 px on the short side are rejected by default, or can be sent to the optional Klein rescue flow instead.
-- **Dead-link hygiene** — source links whose thumbnails fail to load are hidden from the grid, so you only ever pick live images.
-- **Sensible guidance baked in** — the panel nudges you toward 20–50 varied images, at most ~10 per gallery (one gallery ≈ one shoot), which is what actually trains well.
-
-Source credentials live in **Settings → Scraping & sources**. Your own free **Reddit client ID** is optional (the built-in shared one is rate-limited — a personal id gives you a private quota and clears the "retry in Ns" 429s), as is a **Civitai API key** (Civitai scans return SFW results only without one). **Pexels** is the exception: its API key is required for every Pexels scan, and Pexels listings are queried through its **official API**, not `gallery-dl`. [Create a free key](https://www.pexels.com/api/key/) (free quota **200 requests/hour and 20,000/month**), pick French (`fr-FR`, default) or English (`en-US`), and optionally restrict orientation. Keep the photographer, photo-source and Pexels attribution links that LDS displays with API results.
-
-> **Pexels authorization required:** An API key alone does not authorize dataset or machine-learning use. Configure and use this integration only if Pexels has explicitly authorized this use case. The Pexels panel links the [official Pexels terms and conditions](https://help.pexels.com/hc/en-us/articles/900005880463-What-are-the-Terms-and-Conditions) and requires a locally persisted confirmation before any Pexels keyword search or direct Pexels URL scan can run.
-
-The scraper can reach adult communities as well — this is an NSFW-capable tool — so use it only for material you have the right to train on. See [Legal & responsible use](#legal--responsible-use). The scraping extras (`gallery-dl`, `curl_cffi`, …) install with one click from the panel when they're missing.
-
----
+Online scraping is excluded from this fork. Import local files or folders, or upload files from your browser. Existing source metadata is retained. See [Offline Workflows](docs/OFFLINE_WORKFLOWS.md).
 
 ## 3. Curate down to the keepers
 
@@ -856,7 +828,7 @@ Nothing here locks your data in — every stage has an exit.
 - **Training ZIP** — export kept `image` + same-stem `.txt` caption pairs for ai-toolkit/Kohya-compatible training, or write the sidecars directly beside images in the dataset folder.
 - **Merge existing data** — import a training ZIP or recursively merge a local folder containing images and same-stem `.txt` files; perceptual duplicates are skipped.
 - **💾 Back up everything** — one portable backup packs every dataset (images, references, keep/reject decisions, captions, scores), its **training history** and your settings into a single file (API keys deliberately excluded). Restore rebuilds every dataset without overwriting, bringing back each one's **Trained** status and run history; tick **Include trained LoRAs** to bundle the `.safetensors` too.
-- **Hugging Face Hub** — with a write-enabled `HF_TOKEN`, publish kept images and captions as a dataset repository. Publishing is **private by default**; you choose visibility/license and must explicitly confirm sharing rights and consent.
+- **Local export** remains available. Online Hub publishing is excluded from this fork.
 - **Import into ComfyUI** — any checkpoint imports in one click, once a ComfyUI LoRA folder is configured.
 
 ---
@@ -868,7 +840,7 @@ Nothing here locks your data in — every stage has an exit.
 | Stage | ai-toolkit alone | LoRA Dataset Studio |
 |---|---|---|
 | Build from references | ❌ bring your own images | ✅ Klein and Krea 2 Edit through ComfyUI, subject-aware catalogs including Anime, reference edits and exact retries |
-| Build from the web | ❌ none | ✅ Reddit, Pexels, keyword search across the open web, and gallery/direct-media URL scans (through gallery-dl, which covers several hundred sites) into a dataset or Image Bank, with deduplication and explicit provider warnings |
+| Local imports | ❌ external preparation | ✅ Host folders, browser uploads and existing Image Bank files |
 | Triage a large dump | ❌ none | ✅ Image Bank scans, scores, search, filters, sorts, balanced/diverse shortlists, watermark masks and dataset round trips |
 | Curate and repair | ❌ external file tools | ✅ keep/reject, crop/mirror/rotate, InsightFace scoring, composition guidance, improve/compare and recoverable originals |
 | Captions | ❌ write or prepare them yourself | ✅ JoyCaption/Ollama, kind/family rules, Caption Lab, external `.txt` round trip and dual-caption support |
@@ -876,7 +848,7 @@ Nothing here locks your data in — every stage has an exit.
 | Training | ✅ **it is the engine** — direct YAML/config control | ⚙️ guided/scoped recipes, preflight guards, advanced controls, queueing (local only), and continuation |
 | Track experiments | ⚙️ inspect outputs manually | ✅ Runs hub, lineage graphs and a cross-dataset LoRA Canvas with notes, diffs, galleries and actions |
 | Pick a checkpoint | ❌ samples + your eye | ✅ Test Studio grids, multi-LoRA comparison, dataset-caption prompts, votes/rankings, outage-safe pause and export |
-| Move or publish | ⚙️ manual file handling | ✅ ZIP/sidecars, portable backup/restore, folder merge, ComfyUI deployment and optional Hugging Face publishing |
+| Move or export | ⚙️ manual file handling | ✅ ZIP/sidecars, portable backup/restore, folder merge and local ComfyUI deployment |
 
 API providers apply their own billing and content policies. Model licenses also apply, including MiniMax H3's territory restrictions; check the [video limits](docs/guide/features.md#video-bank-beta--first-release-read-the-limits) before using it. Plugin authors can start with the [SDK and package guide](docs/plugins/README.md).
 
@@ -899,11 +871,9 @@ Missing dependencies are shown in Setup/Settings and gated features stay unavail
 | Image Bank scoring, crops and semantic tools | The Bank scoring extra provides CLIP and ✨ Score. Each Bank can instead select the optional pinned SigLIP 2 engine from Setup; it builds a separate index, while aesthetic/NSFW/style/medium remain on CLIP. Balanced picks also need Framing. Both ship **CPU-only PyTorch** on purpose; on a machine that already has a CUDA Python (ai-toolkit's, ComfyUI's) each can be pointed at it instead — checked package by package, never installed into, and separately for ✨ Score and for SigLIP 2. |
 | Watermark detection | A local LLM (Ollama or LM Studio) with a vision model, **or** the dedicated detector (torch + transformers — the bank-scoring extra's environment is reused when present — plus ~0.9 GB of model downloads at first use) |
 | Watermark inpainting | LaMa extra from `backend/requirements-ml.txt`, or ComfyUI + Klein, which erases the found zones and re-renders the whole photo; crop remains model-free |
-| Scraping | `backend/requirements-scrape.txt`; Pexels also needs `PEXELS_API_KEY` and explicit authorization. Gallery/URL scanning goes through gallery-dl for any site it recognizes, whatever its bundled extractors cover; an unrecognized site returns "No images found" in the picker (the single item gallery-dl's yt-dlp fallback can still fetch is video-typed, so it never reaches the image list), and a listing of albums returns one cover per album unless **Scan full albums** is ticked. A scan that was cut short — by the time budget, a result cap, or a source that blocked or rate-limited it — now says so under the results ("this scan stopped before the end of the listing"), instead of presenting a partial list as the whole thing. Web image search needs no key — it queries a metasearch layer over several backends and asks for photos, but the filter is not honored uniformly, so some non-photo results can still come through; results are capped per search rather than guaranteed — a request for the 120 maximum routinely comes back with far fewer — come from third-party sites whose licence is your responsibility, and a few links — mainly stock-photo CDNs that redirect to the actual file — are refused by the hardened fetch that protects every import |
 | Video Bank — reading and triaging | `backend/requirements-ml.txt` (PyAV). Shot detection additionally needs `transnetv2-pytorch` (weights bundled, nothing to download), which rides the bank-scoring environment because it pulls torch. The three pieces install and fail **apart**, and Setup reports them as three separate rows |
 | Video Bank — cutting clips into a dataset | An ffmpeg binary: `imageio-ffmpeg` ships one, or any ffmpeg on PATH. Needed **only to promote** — without it you can still scan, detect shots, watch and triage a whole bank |
 | Video Bank — shot captions and scene search | The Bank scoring extra's environment (torch + `transformers` ≥ 4.57) plus a Qwen3-VL checkpoint downloaded at first use; the model is a setting, and the same environment serves ✨ Score, SigLIP 2 and the watermark detector |
-| Civitai scanning | `backend/requirements-scrape.txt`; without `CIVITAI_API_KEY` the scan runs but returns SFW results only |
 | 🌐 Civitai top prompts (Studio/Canvas) | Browsing needs nothing; reading the prompts needs `CIVITAI_API_KEY` (free account) — the same key Civitai scanning uses |
 | 📷 Camera angles | ComfyUI reachable + the Qwen-Image-Edit stack Setup's Camera card downloads (the VAE is shared with Krea 2 Edit) |
 | 🔤 Find text (bank & dataset) | The same small CPU OCR package the Video Bank's text pass uses, installed from Setup |
@@ -915,7 +885,6 @@ Missing dependencies are shown in Setup/Settings and gated features stay unavail
 | LoRA Canvas browsing, layout, notes and diffs | No external service; generating needs ComfyUI and same-family checkpoints, continuing needs a working local training setup |
 | Test Studio | ComfyUI reachable + assets for a supported Studio family |
 | Backup/restore and ZIP/folder merge | No external service |
-| Hugging Face publishing | Write-enabled `HF_TOKEN`; repositories are private by default |
 
 ## Run it your way
 
@@ -1015,9 +984,9 @@ npm run build
 
 ### Option 3 — Pinokio (one click, any OS)
 
-In [Pinokio](https://pinokio.computer), open **Discover → Download from URL** and paste `https://github.com/socrasteeze/lora-dataset-studio.git`, then click **Install** and **Start**. Pinokio builds the Python environment, installs the core requirements and opens Studio; **Update** fast-forwards the same checkout the in-app updater uses.
+In [Pinokio](https://pinokio.computer), open **Discover → Download from URL** and paste `https://github.com/socrasteeze/lora-dataset-studio.git`, then click **Install** and **Start**. Pinokio builds the Python environment, installs the core requirements and opens Studio; **Update** manages the checkout outside LDS.
 
-Only the core app is installed this way. Complete **Setup**, then open **Plugins** for the features that ship with the app. Each plugin carries its own settings and preparation steps. Updates go through Pinokio's **Update** tab: because Pinokio starts and stops the server, the app detects this install shape and shows *Stop → Update → Start* instead of its own **Update & restart** button, which would relaunch the server outside Pinokio's control.
+Only the core app is installed this way. Complete **Setup**, then open **Plugins** for the features that ship with the app. Each plugin carries its own settings and preparation steps. Updates go through Pinokio's **Update** tab. Stop LDS before updating, then start it again.
 
 ### External tools (install once, connect in Settings)
 
@@ -1032,11 +1001,10 @@ Which of the two serves those features is a single setting (**Settings ▸ Local
 
 ### Getting API keys
 
-- **Hugging Face** (gated model downloads and dataset publishing): create a token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens). Read access is enough for accepted gated models; publishing requires a write-enabled token.
+- **Hugging Face** (operator-started gated model downloads): create a read token at [Hugging Face tokens](https://huggingface.co/settings/tokens) and accept the required model licence before preparation.
 
 Secrets saved in Settings live in the git-ignored `.env`, never in `config.json` or a commit.
 
-> **Pexels authorization required:** An API key alone does not authorize dataset or machine-learning use. Configure this integration only if Pexels has explicitly authorized this use case, and keep the attribution LDS displays. Read the [official Pexels terms and conditions](https://help.pexels.com/hc/en-us/articles/900005880463-What-are-the-Terms-and-Conditions/).
 
 ## Minimum requirements
 
@@ -1044,7 +1012,7 @@ The app scales from "no GPU at all" to a full local training rig — each capabi
 
 | Mode / capability | GPU (NVIDIA) | Disk | Notes |
 |---|---|---|---|
-| **Curation-only** (import/scrape, curate, caption manually, export/backup) | none | ~2 GB | Any machine with Python 3.10+ (3.13/3.14 run the core app fine — the 3.10–3.12 window is an ML-extras constraint) |
+| **Curation-only** (local import, curate, caption manually, export/backup) | none | ~2 GB | Any machine with Python 3.10+ (3.13/3.14 run the core app fine — the 3.10–3.12 window is an ML-extras constraint) |
 | **Auto-captioning & framing** (Ollama vision, 8B model) | ~8 GB VRAM | ~7 GB | Runs alongside generation, not concurrently |
 | **Local generation** (Klein 9B **KV** fp8 via ComfyUI) | ~16 GB VRAM | ~30 GB (model + text encoder + VAE) | Free, local and NSFW-capable; Setup downloads the models. The KV build is up to **2.5× faster on multi-reference edits** at the same quality |
 | **LoRA training — Z-Image / SDXL** (ai-toolkit) | 16 GB+ recommended | 10 GB+ free enforced per run | Quantized (qfloat8) + low-VRAM mode |
@@ -1078,11 +1046,7 @@ To **rent another PC’s GPU** while keeping datasets on one machine, use **Sett
 
 Under the hood: the app has **no user accounts**, so on `127.0.0.1` (the default) that's fine, but any other bind would hand the whole network your GPU and datasets. On a non-loopback bind you can require an **access token**: with the token gate on, `run.py` generates one at boot (printed to the console with a ready-to-open URL) unless you set `LDS_ACCESS_TOKEN` yourself. Open `http://<machine>:<port>/?token=<token>` once from the remote device — a signed session cookie takes over from there. Requests from localhost never need the token. If your network is already locked down (VPN, authenticated reverse proxy), `LDS_ALLOW_UNAUTHENTICATED=1` disables the guard explicitly. The whole interface also works on a phone or tablet on your own network, so checking a run or triaging a bank does not need the machine that is training.
 
-**What leaves this machine.** There is no telemetry and no analytics: nothing about you, your images or your datasets is sent anywhere. The app does reach the internet in three situations:
-
-- **Update check** — on load and once an hour, it asks GitHub whether a newer version exists (a `git fetch` on a checkout, the releases API on a packaged install). It sends nothing about you, and there is currently **no setting to turn it off** — block the process at the firewall if you need it silent.
-- **Model downloads you start** — Setup and the Install buttons stream weights from Hugging Face, Civitai, Ollama and pytorch.org. Two extras also fetch their own weights the first time you use them: the aesthetic head (~13 MB, from GitHub) and the NSFW classifier plus SigLIP 2 (Hugging Face).
-- **The built-in scraper** — the sites you ask it to scan, and nothing else.
+**What leaves this machine.** Local workflows use prepared model files and local tools. Online publishing, scraping, Civitai browsing and in-app update APIs are disabled. Setup may fetch packages, node packs and weights only after an explicit action. Inference workers refuse public socket connections and training disables hub downloads and online experiment logging. Private-network peers receive work only through the existing operator actions. See [Offline Workflows](docs/OFFLINE_WORKFLOWS.md).
 
 When the app is served on an address the public internet can reach — a rented pod's proxy hostname, a tunnel — set `LDS_PUBLIC=1`. That forces the access token on whatever the setting says, so the switch cannot be turned off into an open door, and generates a token at boot if none exists. It applies to non-loopback binds only, and `LDS_ALLOW_UNAUTHENTICATED=1` still overrides it for setups that authenticate elsewhere.
 

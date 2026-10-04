@@ -615,6 +615,12 @@ _git_check_cache = {'ts': 0.0, 'data': None}
 
 @bp.get('/update/check')
 def update_check():
+    from ..plugins.fork_profile import offline_only
+    if offline_only():
+        from ..version import APP_VERSION
+        return jsonify({'ok': False, 'current': APP_VERSION, 'update_available': False,
+                        'can_apply': False, 'manual': True,
+                        'reason': 'Manage updates outside the app in this offline fork.'})
     import time
     import requests
     from ..version import APP_VERSION
@@ -698,6 +704,10 @@ def update_apply():
     /api/update/progress and, when it reports 'restarting', /api/health. The
     trivial ZIP outcomes (up to date / no ZIP asset / offline) come back inline
     just like the git path. Both defer changed requirements to the restart helper."""
+    from ..plugins.fork_profile import offline_only
+    if offline_only():
+        return jsonify({'ok': False, 'can_apply': False, 'manual': True,
+                        'reason': 'Manage updates outside the app in this offline fork.'}), 403
     from ..services import updater
     # Pinokio owns the process: pulling here would work, but the restart that
     # follows would detach the server from the launcher that is supposed to

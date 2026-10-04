@@ -321,7 +321,7 @@ export default function ComparisonStudio({ selection, baseModels = [], axes = nu
          * selected default to node 20.
          */}
         {baseModels.length > 0 && (
-          <div className="flex flex-col gap-1 rounded-lg border border-border bg-surface p-2">
+          <div className="lds-section flex flex-col gap-1 py-2">
             <span className="text-content-muted text-2xs uppercase">
               Base model ({FAMILY_LABELS[runType] || runType})
             </span>

@@ -10,7 +10,7 @@ export default function ImportQueuePanel({ queue }) {
   const small = session?.items.reduce((n, item) => n + (item.result?.small || 0), 0) || 0;
   const complete = total > 0 && done === total;
   const button = 'min-h-11 min-w-0 rounded-lg border border-border px-2 text-sm disabled:opacity-40';
-  return <section aria-label="Photo import" className="rounded-lg border border-border bg-surface p-3">
+  return <section aria-label="Photo import" className="lds-section py-3">
     <p role="status" className="text-sm font-semibold text-content">
       {running ? (session ? 'Importing' : 'Preparing Upload') : complete ? 'Import Complete' : 'Import Paused'}
       {session && ` · ${done}/${total} processed · ${imported} imported`}

@@ -81,21 +81,9 @@ test('the probe opens the VIDEO lane, and the tab whose grid lives deeper', () =
   assert.match(read("../../../../../bundled/video/frontend/studio/video/VideoTestStudio.jsx"), /data-testid="video-prompt-mode"/);
 });
 
-test('the probe opens the 🌐 Civitai browser, whose action row grew a third button', () => {
-  /*
-   * Prompt batches expanded a card's action row from two buttons to three in a roughly 250px
-   * column at 360px viewport width beside its thumbnail. No probe state opened the dialog, so the
-   * row was never measured. Pin both access and markers: renaming the button could otherwise make
-   * the surface unreachable while the probe stayed green.
-   */
-  const modal = read('./CivitaiBrowserModal.jsx');
-  const button = read('./CivitaiBrowserButton.jsx');
-  // The modal intentionally covers the page: mark it as an unbudgeted layer and name its panel for
-  // fill measurements.
-  assert.match(modal, /data-probe-layer data-probe-panel="civitai-browser"/);
-  // Button text IS the probe selector.
-  assert.match(button, /🌐 Civitai/);
-  assert.match(probe, /\{ name: 'civitai', open: \['button:has-text\("🌐 Civitai"\)'\] \}/);
+test('the offline probe does not advertise the retired Civitai surface', () => {
+  assert.match(read('./CivitaiBrowserButton.jsx'), /return null/);
+  assert.doesNotMatch(probe, /name: 'civitai'/);
 });
 
 test('the probe opens the ✨ neural render dialog, and the dialog outranks the bar it opens over', () => {

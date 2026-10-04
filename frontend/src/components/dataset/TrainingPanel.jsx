@@ -1843,7 +1843,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
        * Essential path: choose the LoRA type and launch. Base/variant, masking, step cap and
        * scheduling stay in Advanced options below, collapsed by default but one click away.
        */}
-      <div className="flex items-center gap-2 flex-wrap rounded-lg border border-border bg-surface px-3 py-2">
+      <div className="lds-section flex items-center gap-2 flex-wrap py-2">
         <span className="text-content-muted text-2xs uppercase">Model family</span>
         <SettingsLink section="training" focus="training-default-family" className="order-last ml-auto">
           Training defaults
@@ -2139,7 +2139,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
       )}
 
       <details id="ds-training-advanced" open={advancedOpen}
-        className="rounded-lg border border-border bg-surface open:pb-2.5 scroll-mt-20">
+        className="lds-section open:pb-2.5 scroll-mt-20">
         <summary data-workspace-focus
           onClick={togglePanel('advanced', advancedOpen, setAdvancedOpen)}
           className="cursor-pointer select-none px-3 py-2 text-sm text-content font-semibold">
@@ -2174,7 +2174,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
            * REPLACES explicit dataset settings. Ignore unknown imported keys for version
            * compatibility.
            */}
-          <div className="flex items-center gap-1.5 flex-wrap rounded-lg border border-border bg-app/40 px-2 py-1.5">
+          <div className="lds-section flex items-center gap-1.5 flex-wrap py-1.5">
             <span className="text-content-muted text-2xs uppercase">Presets</span>
             <select value={presetSel} onChange={(e) => setPresetSel(e.target.value)}
               aria-label="Training preset"
@@ -3189,7 +3189,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           </p>
         )}
 
-      </> : <div className="flex items-start gap-2 rounded-lg border border-border bg-surface p-3 text-content-muted text-sm">
+      </> : <div className="lds-section flex items-start gap-2 py-3 text-content-muted text-sm">
         <GraduationCap aria-hidden="true" className="h-4 w-4 shrink-0" />
         <div className="min-w-0 space-y-2">
           <p>To train on this computer, <a href="#/settings/local-tools?focus=aitoolkit-python" className="text-accent underline">set up ai-toolkit</a>.</p>
@@ -3203,7 +3203,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
        */}
       <CheckpointPortal host={checkpointHost}>
       <details id="ds-training-checkpoints" data-probe-content="checkpoints" open={Boolean(checkpointHost) || checkpointsOpen}
-        className="rounded-lg border border-border bg-surface open:pb-2.5 scroll-mt-20 [&_button]:min-h-10 lg:[&_button]:min-h-0 [&_summary]:min-h-10 lg:[&_summary]:min-h-0 [&_select]:min-h-10 lg:[&_select]:min-h-0 [&_input]:min-h-10 lg:[&_input]:min-h-0">
+        className="lds-section open:pb-2.5 scroll-mt-20 [&_button]:min-h-10 lg:[&_button]:min-h-0 [&_summary]:min-h-10 lg:[&_summary]:min-h-0 [&_select]:min-h-10 lg:[&_select]:min-h-0 [&_input]:min-h-10 lg:[&_input]:min-h-0">
         <summary data-workspace-focus
           onClick={checkpointHost
             ? (event) => event.preventDefault()
@@ -3217,7 +3217,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           </span>
         </summary>
         <div className="px-3 pt-1 flex flex-col gap-2">
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-app px-3 py-2 flex-wrap">
+          <div className="lds-section flex items-center gap-2 py-2 flex-wrap">
             <span className="text-content-muted text-2xs uppercase">Browse results</span>
             <select value={checkpointTrainType} onChange={(event) => onCheckpointTypeChange(event.target.value)}
               aria-label="LoRA family to browse"

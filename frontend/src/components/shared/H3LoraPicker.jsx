@@ -115,7 +115,7 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
 
   return (
     <section data-probe-panel="video-studio-lora"
-      className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-3">
+      className="lds-section flex flex-col gap-2 py-3">
       <header className="flex items-center gap-2">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold text-content">
           <FlaskConical aria-hidden="true" className="h-4 w-4 text-content-muted" />LoRA

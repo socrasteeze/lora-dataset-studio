@@ -42,7 +42,8 @@ _STDERR_TAIL = 2000     # chars of the launch log surfaced on failure
 
 
 def _url() -> str:
-    return (cfg.get('ollama.url') or _DEFAULT_URL).rstrip('/')
+    from ..utils.local_api import local_api_url
+    return local_api_url(cfg.get('ollama.url') or _DEFAULT_URL).rstrip('/')
 
 
 def _reachable(url) -> bool:

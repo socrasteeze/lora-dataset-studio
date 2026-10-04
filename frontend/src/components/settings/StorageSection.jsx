@@ -131,7 +131,7 @@ function LocationEditor({
       )}
 
       {choices.length > 0 && !busy && (
-        <div className="space-y-2 rounded-lg border border-border bg-surface-raised p-3">
+        <div className="lds-section space-y-2 py-3">
           <p className="text-xs text-content-muted">
             {check.default
               ? 'This goes back to the folder inside the app’s data directory.'

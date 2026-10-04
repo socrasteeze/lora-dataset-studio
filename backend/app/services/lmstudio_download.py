@@ -64,10 +64,12 @@ def _headers() -> dict:
 def _post_download(ref: str) -> tuple[int, dict]:
     """POST the download/status request. (status_code, body-or-{}) — never raises."""
     try:
-        resp = requests.post(f'{_base_url()}/api/v1/models/download',
+        from ..utils.local_api import local_api_url
+        endpoint = local_api_url(_base_url())
+        resp = requests.post(f'{endpoint}/api/v1/models/download',
                              json={'model': ref}, headers=_headers(),
                              timeout=network_timeout(_TIMEOUT))
-    except requests.RequestException as exc:
+    except (requests.RequestException, ValueError) as exc:
         return 0, {'error': {'message': str(exc), 'type': 'unreachable'}}
     try:
         return resp.status_code, resp.json()

@@ -68,6 +68,7 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
 #: The interpreter flag that drops the per-user site-packages directory.
 NO_USER_SITE_FLAG = '-s'
@@ -126,4 +127,12 @@ def worker_env(python=None, base=None, **extra) -> dict:
             env.pop(key, None)
         else:
             env[key] = str(value)
+    # Runtime workers use files already installed on this machine. Setup's
+    # explicit download jobs do not run through this inference environment.
+    env['HF_HUB_OFFLINE'] = '1'
+    env['HF_DATASETS_OFFLINE'] = '1'
+    env['TRANSFORMERS_OFFLINE'] = '1'
+    env['HF_HUB_DISABLE_TELEMETRY'] = '1'
+    env['LDS_INFER_OFFLINE_HELPER'] = str(Path(__file__).resolve().parents[2]
+                                          / 'infer' / 'offline_network.py')
     return env

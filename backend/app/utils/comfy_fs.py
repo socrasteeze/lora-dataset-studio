@@ -226,6 +226,8 @@ def comfyui_sees_input(name) -> bool | None:
     if not base or not api or comfyui_ignored():
         return None
     try:
+        from .local_api import local_api_url
+        api = local_api_url(api)
         r = requests.head(urljoin(api.rstrip('/') + '/', 'view'),
                           params={'filename': base, 'type': 'input'},
                           timeout=network_timeout(VISIBILITY_TIMEOUT), allow_redirects=False)
@@ -256,7 +258,10 @@ def _comfy_folder_note() -> str:
     if not api or comfyui_ignored():
         return ''
     try:
-        r = requests.get(f'{api.rstrip("/")}/system_stats', timeout=network_timeout(VISIBILITY_TIMEOUT))
+        from .local_api import local_api_url
+        api = local_api_url(api)
+        r = requests.get(f'{api.rstrip("/")}/system_stats', timeout=network_timeout(VISIBILITY_TIMEOUT),
+                         allow_redirects=False)
         if r.status_code != 200:
             return ''
         argv = ((r.json() or {}).get('system') or {}).get('argv')

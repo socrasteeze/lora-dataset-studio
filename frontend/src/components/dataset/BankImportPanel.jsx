@@ -127,7 +127,7 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
 
   return (
     <div id="ds-add-bank-import" tabIndex={-1}
-      className="scroll-mt-20 flex flex-col gap-2 rounded-lg border border-border bg-surface px-3 py-2">
+      className="lds-section scroll-mt-20 flex flex-col gap-2 py-2">
       <div className="flex items-center gap-2">
         <Archive aria-hidden="true" className="h-4 w-4" />
         <span className="text-sm font-medium text-content">Import from a bank</span>

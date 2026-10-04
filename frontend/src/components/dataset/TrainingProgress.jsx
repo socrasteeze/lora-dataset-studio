@@ -155,7 +155,7 @@ export default function TrainingProgress({ datasetId, base, trainType, variant,
   const pct = prog.step && prog.total ? Math.min(100, Math.round((prog.step / prog.total) * 100)) : null;
   const samples = prog.samples || [];
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface px-3 py-2">
+    <div className="lds-section flex flex-col gap-2 py-2">
       {masksWarn}
       {cloud && showLaunch && prog.launch ? <LaunchProgress launch={prog.launch} /> : cloud && prog.phase && (
         <p className="m-0 text-sky-300 text-2xs">{prog.phase}{prog.phase_detail ? ` — ${prog.phase_detail}` : ''}</p>

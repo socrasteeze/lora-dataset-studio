@@ -240,7 +240,7 @@ export default function ScoringPythonDialog({ onClose, onChanged,
                     </div>
                   )}
                   {cost && (
-                    <div className="rounded border border-border bg-surface-raised p-2 space-y-1">
+                    <div className="lds-section py-2 space-y-1">
                       <p className="text-2xs text-content-muted">⚡ {cost.text}</p>
                       {cost.comfyui && (
                         <p className="text-2xs text-amber-300/90">{cost.comfyui}</p>

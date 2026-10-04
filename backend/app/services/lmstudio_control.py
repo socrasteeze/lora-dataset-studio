@@ -125,9 +125,11 @@ def _reachable(url: str, timeout: float = 2.0) -> bool:
     make the Start button report failure for a server it started perfectly.
     """
     try:
-        requests.get(f'{url}/api/v0/models', timeout=network_timeout(timeout))
+        from ..utils.local_api import local_api_url
+        url = local_api_url(url)
+        requests.get(f'{url}/api/v0/models', timeout=network_timeout(timeout), allow_redirects=False)
         return True
-    except requests.RequestException:
+    except (requests.RequestException, ValueError):
         return False
 
 

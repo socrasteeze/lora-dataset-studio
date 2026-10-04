@@ -165,7 +165,7 @@ export default function RunLineageTree({ tree, loading, error, onSelect, onConti
   const rows = buildLineageRows(tree);
   if (!rows.length) return null;
   return (
-    <div className="lds-lineage-in overflow-x-auto rounded-xl border border-border bg-surface p-2.5">
+    <div className="lds-section lds-lineage-in overflow-x-auto py-2.5">
       <div className="mb-1.5 flex items-center gap-2 px-0.5">
 
         <span className="text-content text-2xs font-semibold">Lineage</span>

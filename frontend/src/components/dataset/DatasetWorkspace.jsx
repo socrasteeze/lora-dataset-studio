@@ -1462,7 +1462,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 onResolve={ds.resolveSmallImageRescue}
                 onPreview={(image) => setViewImg({ ...image, _rescueReviewPreview: true })}
                 nonces={ds.nonces} />
-              <div className="flex items-center gap-2 flex-wrap rounded-lg border border-border bg-surface px-3 py-2">
+              <div className="lds-section flex items-center gap-2 flex-wrap py-2">
                 {!isConceptual && (
                   <button id="ds-curation-face-analysis" type="button" data-workspace-focus
                     onClick={ds.analyzeFaces} disabled={faceAnalysis.disabled}
@@ -1809,7 +1809,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                */}
               {unused > 0 && (
                 <div id="ds-curation-rejected-cleanup" tabIndex={-1}
-                  className="flex items-center gap-2 flex-wrap rounded-lg border border-border bg-surface px-3 py-2 scroll-mt-20">
+                  className="lds-section flex items-center gap-2 flex-wrap py-2 scroll-mt-20">
                   <button type="button" data-workspace-focus disabled={ds.busy}
                     onClick={() => {
                       if (window.confirm(`Permanently delete the ${unused} rejected/failed image(s) (files included)?`)) ds.purgeUnused();
@@ -1844,7 +1844,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 </p>
               )}
               <div id="ds-captions-generate" tabIndex={-1}
-                className="flex items-center gap-2 flex-wrap rounded-lg border border-border bg-surface px-3 py-2 scroll-mt-20">
+                className="lds-section flex items-center gap-2 flex-wrap py-2 scroll-mt-20">
                 {!isConceptual && (
                   <select value={effCaptionMode} onChange={(e) => setCaptionMode(e.target.value)} disabled={ds.busy}
                     title={d.train_type === 'anima'
@@ -1936,7 +1936,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   editable IN PLACE (saves on blur, like the grid). Style sets have no leak
                   concept, so the panel only opens for character/concept. */}
               {showLeaks && !isStyle && (
-                <div className="rounded-lg border border-border bg-surface-raised p-3 flex flex-col gap-3 text-xs">
+                <div className="lds-section py-3 flex flex-col gap-3 text-xs">
                   <div className="flex items-start gap-2">
                     <Drama aria-hidden="true" className="h-5 w-5 shrink-0 text-content-muted" />
                     <div className="flex flex-col gap-1">
@@ -2107,7 +2107,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   screen that had no way in. The bench runs on one image, so the button
                   opens a picker rather than guessing which one. */}
               <div id="ds-captions-lab" tabIndex={-1}
-                className="flex items-center gap-2 flex-wrap rounded-lg border border-border bg-surface px-3 py-2 scroll-mt-20">
+                className="lds-section flex items-center gap-2 flex-wrap py-2 scroll-mt-20">
                 <button type="button" data-workspace-focus
                   onClick={() => setLabPickerOpen(true)} disabled={ds.busy || kept === 0}
                   aria-label="Open the Caption Lab"
@@ -2153,7 +2153,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
             <div id="gf-export" className="scroll-mt-20 flex flex-col gap-2">
               <span className="text-content-subtle text-2xs uppercase tracking-wide">Bring images in</span>
               <div id="ds-export-import" tabIndex={-1}
-                className="flex items-center gap-2 flex-wrap rounded-lg border border-border bg-surface px-3 py-2 scroll-mt-20">
+                className="lds-section flex items-center gap-2 flex-wrap py-2 scroll-mt-20">
                 <button type="button" data-workspace-focus
                   onClick={() => zipInput.current?.click()} disabled={importBusy}
                   title="Merge an existing training dataset into this one: a ZIP of images with kohya-style same-name .txt captions (any folder layout). Aspect kept, perceptual duplicates skipped."
@@ -2190,7 +2190,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 }} />
 
               <span className="text-content-subtle text-2xs uppercase tracking-wide">Get this dataset out</span>
-              <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface px-3 py-2">
+              <div className="lds-section flex flex-col gap-2 py-2">
                 <div id="ds-export-training-zip" tabIndex={-1}
                   className="flex items-center gap-2 flex-wrap scroll-mt-20">
                   <button type="button" data-workspace-focus={kept ? '' : undefined}
@@ -2210,7 +2210,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     jump, so the sidebar links to Import to bank / Backup / a
                     plugin's row keep working. Do NOT make this a controlled
                     <details> without teaching `land` about it. */}
-                <details className="rounded-lg border border-border bg-surface-raised">
+                <details className="lds-section">
                   <summary className="flex items-center gap-2 px-2.5 py-1.5 text-2xs text-content-muted hover:text-content cursor-pointer select-none">
                     More ways out
                     <span className="text-content-subtle">

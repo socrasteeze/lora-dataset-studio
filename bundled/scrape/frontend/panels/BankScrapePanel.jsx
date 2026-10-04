@@ -68,7 +68,7 @@ export default function BankScrapePanel({ banks, onDone }) {
   }
 
   return (
-    <section className="rounded-lg border border-border bg-surface">
+    <section className="lds-section">
       <button type="button" onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className={`flex w-full items-center gap-2 px-4 text-left ${controlHeight('md')}`}>

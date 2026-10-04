@@ -41,7 +41,7 @@ export default function VideoPreviewResults({ previews, filterKey = null, onClea
   return <div className="flex min-w-0 flex-col gap-3">
     {filterKey && <button type="button" className="min-h-10 self-start rounded border border-border px-3 text-xs text-content lg:min-h-0" onClick={onClearFilter}>Show all checkpoints</button>}
     {!previews.length && <p className="text-sm text-content-muted">No rendered preview yet. Training samples remain available from each checkpoint.</p>}
-    {active && <section className="rounded-lg border border-border bg-app p-3" aria-label="Preview playback">
+    {active && <section className="lds-section py-3" aria-label="Preview playback">
       <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-content-muted">
         <span>{compare ? 'Compare A / B · A controls both players' : 'Rendered preview'}</span>
         {compare && active.batch_id !== compare.batch_id && <span className="text-amber-200">Different batches — check prompts and settings.</span>}

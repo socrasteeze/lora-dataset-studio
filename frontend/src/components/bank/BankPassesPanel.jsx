@@ -35,11 +35,11 @@ import { Button } from '../common/Controls.jsx'
 function Fold({ compact, title, children }) {
   if (!compact) return children
   return (
-    <details className="rounded-lg border border-border bg-surface">
-      <summary className="min-h-10 cursor-pointer select-none px-3 py-2 text-sm text-content-muted hover:text-content">
+    <details className="lds-section">
+      <summary className="min-h-10 cursor-pointer select-none py-2 text-sm text-content-muted hover:text-content">
         {title}
       </summary>
-      <div className="px-3 pb-3">{children}</div>
+      <div className="pb-3">{children}</div>
     </details>
   )
 }

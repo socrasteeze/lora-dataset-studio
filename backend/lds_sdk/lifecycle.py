@@ -14,7 +14,13 @@ def is_available(plugin_id):
             and record is not None and record.enabled and record.state == 'loaded')
 
 
-__all__ = ['is_available', 'state_change_lock']
+def offline_only():
+    """The fork's runtime policy, separate from operator-started Setup downloads."""
+    from app.plugins.fork_profile import offline_only as policy
+    return policy()
+
+
+__all__ = ['is_available', 'state_change_lock', 'offline_only']
 
 
 def require_plugins(plugin_ids, error_type=RuntimeError):

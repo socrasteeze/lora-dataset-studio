@@ -382,8 +382,8 @@ blocker — mounting volumes afterwards is fine), and a generation that cannot r
 the folder answers with the folder path and the reason instead of a bare `500`.
 Those messages are path-redacted, so they are safe to paste in a help thread.
 
-**Everything else keeps working without shared folders**: scraping, curation,
-captioning through Ollama, training, and Hugging Face publishing. Only the
+**Other local workflows work without shared folders**: local imports, curation,
+captioning through Ollama, training and local export. Only the
 ComfyUI engines need the filesystem.
 
 *(Reported by nofaceman on Discord.)*

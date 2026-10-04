@@ -195,7 +195,7 @@ export default function ServerSection({ config, setField, runtime, handleSave, c
         )}
       </div>
 
-      <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-surface-raised px-3 py-2.5">
+      <div className="lds-section flex items-start justify-between gap-4 py-2.5">
         <div>
           <p className="text-sm font-medium text-content">
             {bindManaged ? 'Current browser address uses a network host' : 'Available on the local network'}
@@ -220,7 +220,7 @@ export default function ServerSection({ config, setField, runtime, handleSave, c
         </button>
       </div>
 
-      <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-surface-raised px-3 py-2.5">
+      <div className="lds-section flex items-start justify-between gap-4 py-2.5">
         <div>
           <p className="text-sm font-medium text-content">Open a browser tab on launch</p>
           <p className="mt-0.5 text-xs text-content-muted">
@@ -242,7 +242,7 @@ export default function ServerSection({ config, setField, runtime, handleSave, c
         <>
           {/* Trusted-LAN default: no token to type on a phone. The token is an
               opt-in extra layer, off by default (see backend server.require_token). */}
-          <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-surface-raised px-3 py-2.5">
+          <div className="lds-section flex items-start justify-between gap-4 py-2.5">
             <div>
               <p className="text-sm font-medium text-content">Require an access token</p>
               <p className="mt-0.5 text-xs text-content-muted">

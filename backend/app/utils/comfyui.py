@@ -129,10 +129,14 @@ def _out_dir() -> str | None:
 
 
 def api_address() -> str:
-    """COMFYUI_API_ADDRESS-equivalent accessor. Always resolves (config.py's
-    DEFAULTS ship 'http://127.0.0.1:8188') — unlike the directory accessors
-    above, there's no "unconfigured" state to guard against here."""
-    return cfg.get('comfyui.api_url')
+    """Configured local API target; refuse invalid or public addresses."""
+    from .local_api import local_api_url
+    return local_api_url(cfg.get('comfyui.api_url'))
+
+
+def _worker_api_address(worker_url=None):
+    from .local_api import local_api_url
+    return local_api_url(worker_url or api_address())
 
 
 COMFYUI_IGNORED_MESSAGE = ('ComfyUI is set to Ignore in Settings. Turn off '
@@ -153,7 +157,7 @@ def _ignored_target(worker_url=None) -> bool:
         return False
     if not worker_url:
         return True
-    return str(worker_url).rstrip('/') == str(api_address() or '').rstrip('/')
+    return str(worker_url).rstrip('/') == str(cfg.get('comfyui.api_url') or '').rstrip('/')
 
 
 
@@ -464,8 +468,13 @@ def queue_prompt_to_comfyui(prompt_workflow, client_id, worker_url=None):
         return None, "Workflow data is missing"
 
     # Target URL: remote or local worker
-    local_api = api_address()
-    api_addr = worker_url or local_api
+    local_api = cfg.get('comfyui.api_url') or ''
+    if _ignored_target(worker_url):
+        return None, f"COMFYUI_UNREACHABLE (nothing was submitted): {COMFYUI_IGNORED_MESSAGE}"
+    try:
+        api_addr = _worker_api_address(worker_url)
+    except ValueError as exc:
+        return None, f'COMFYUI_UNREACHABLE (nothing was submitted): {exc}'
     is_local = not worker_url or api_addr.rstrip('/') == local_api.rstrip('/')
 
     # Ignored by the operator: refuse before any request. Same tag as a refused
@@ -645,8 +654,8 @@ def get_comfyui_history_probe(prompt_id, worker_url=None) -> ComfyHistoryProbe:
     """Classify /history without confusing a worker outage with no output yet."""
     if _ignored_target(worker_url):
         return ComfyHistoryProbe(ComfyHistoryHealth.UNHEALTHY, detail=COMFYUI_IGNORED_MESSAGE)
-    api_addr = worker_url or api_address()
     try:
+        api_addr = _worker_api_address(worker_url)
         response = requests.get(
             urljoin(api_addr, f'/history/{prompt_id}'), timeout=network_timeout(5), allow_redirects=False)
         status = getattr(response, 'status_code', None)
@@ -733,7 +742,7 @@ def comfyui_prompt_is_absent(prompt_id, worker_url=None):
     if not prompt_id or _ignored_target(worker_url):
         return None
     try:
-        api_addr = worker_url or api_address()
+        api_addr = _worker_api_address(worker_url)
         response = requests.get(
             urljoin(api_addr, '/queue'), timeout=network_timeout(3), allow_redirects=False)
         status = getattr(response, 'status_code', None)
@@ -763,7 +772,6 @@ def cancel_comfyui_prompt_state(prompt_id, client_id, worker_url=None) -> ComfyP
     """Delete only LDS's exact queued prompt; never use global /interrupt."""
     if not prompt_id or not client_id or _ignored_target(worker_url):
         return ComfyPromptState.UNKNOWN
-    api_addr = worker_url or api_address()
 
     def exact(entry):
         queued_prompt_id, queued_client_id = _queue_entry_identity(entry)
@@ -771,6 +779,7 @@ def cancel_comfyui_prompt_state(prompt_id, client_id, worker_url=None) -> ComfyP
                 and str(queued_client_id or '') == str(client_id))
 
     try:
+        api_addr = _worker_api_address(worker_url)
         response = requests.get(
             urljoin(api_addr, '/queue'), timeout=network_timeout(3), allow_redirects=False)
         status = getattr(response, 'status_code', None)
@@ -819,7 +828,7 @@ def _running_entries(worker_url=None):
     """ComfyUI's `queue_running` list, or None when it cannot be asked."""
     if _ignored_target(worker_url):
         return None
-    api_addr = worker_url or api_address()
+    api_addr = _worker_api_address(worker_url)
     # A read timeout tolerant of a starved HTTP loop: under a paging GPU the
     # repo measured 3-second /queue timeouts two in a row while the render
     # was alive (ComfyQueueVerdict). Asking to stop that render is the one
@@ -862,8 +871,8 @@ def interrupt_own_prompt(prompt_id, client_id, worker_url=None) -> str:
     running one), 'foreign' (another client's prompt runs) or 'unknown'."""
     if not prompt_id or not client_id:
         return 'unknown'
-    api_addr = worker_url or api_address()
     try:
+        api_addr = _worker_api_address(worker_url)
         running = _running_entries(worker_url)
         if running is None:
             return 'unknown'
@@ -910,12 +919,14 @@ def upload_input_image_to_worker(name, src_path, worker_url, timeout=120):
     """
     base = os.path.basename(str(name))
     try:
+        worker_url = _worker_api_address(worker_url)
         with open(src_path, 'rb') as fh:
             response = requests.post(
                 urljoin(worker_url, '/upload/image'),
                 files={'image': (base, fh, 'application/octet-stream')},
                 data={'overwrite': 'true', 'type': 'input'},
                 timeout=timeout,
+                allow_redirects=False,
             )
         response.raise_for_status()
     except OSError as e:
@@ -923,6 +934,8 @@ def upload_input_image_to_worker(name, src_path, worker_url, timeout=120):
     except requests.RequestException as e:
         raise RuntimeError(
             f'could not upload {base} to backend {worker_url}: {e}') from e
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from exc
     try:
         stored = (response.json() or {}).get('name') or base
     except ValueError:
@@ -1627,7 +1640,7 @@ def free_comfyui_vram(worker_url=None, timeout=10) -> ComfyVramFreeVerdict:
         return ComfyVramFreeVerdict.COMFYUI_OFFLINE
     api_addr = ''
     try:
-        api_addr = (worker_url or api_address()).rstrip('/')
+        api_addr = (_worker_api_address(worker_url)).rstrip('/')
         if not api_addr:
             raise ValueError('empty ComfyUI API address')
         response = requests.post(
@@ -3087,10 +3100,10 @@ def fetch_node_info(class_type, timeout=10, worker_url=None):
     where the whole registry is megabytes: the right call for a question about
     one node, such as which attention backends the block-attention switch can
     offer on THIS ComfyUI."""
-    api = (worker_url or api_address() or '').rstrip('/')
-    if not api or not class_type or _ignored_target(worker_url):
+    if not class_type or _ignored_target(worker_url):
         return None
     try:
+        api = _worker_api_address(worker_url).rstrip('/')
         r = requests.get(f'{api}/object_info/{class_type}', timeout=network_timeout(timeout))
         if r.status_code != 200:
             return None

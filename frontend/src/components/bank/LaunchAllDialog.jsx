@@ -223,7 +223,7 @@ export default function LaunchAllDialog({
                 </span>
               </label>
               {s.key === 'auto_reject' && autoRejectOn && (
-                <div className="ml-6 mt-1.5 space-y-2 rounded-md border border-border bg-surface p-2">
+                <div className="lds-section ml-6 mt-1.5 space-y-2 py-2">
                   {/* The count is what the flag would catch RIGHT NOW — undecided
                       images only, the same pile the pass touches. It is not the
                       outcome: 🔎 Scan runs before auto-reject in this funnel, so
@@ -257,7 +257,7 @@ export default function LaunchAllDialog({
           ))}
         </ul>
 
-        <div className="rounded-md border border-border bg-surface-raised p-3 text-sm">
+        <div className="lds-section py-3 text-sm">
           <p className="font-semibold text-content">What will run</p>
           {manyBanks && (
             <label className="mt-1 flex items-start gap-1.5 text-sm text-content">
