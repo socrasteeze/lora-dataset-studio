@@ -238,7 +238,9 @@ def main() -> int:
         return 1
 
     try:
-        kwargs = {'cache_dir': models_root} if models_root else {}
+        kwargs = {'local_files_only': True}
+        if models_root:
+            kwargs['cache_dir'] = models_root
         # ⚠️ THE WHOLE MODEL IS LOADED AND THE VISION TOWER TAKEN OFF IT, rather
         # than `XCLIPVisionModel.from_pretrained(id)` — which is the obvious call,
         # is what the reference does, and IS SILENTLY WRONG HERE.

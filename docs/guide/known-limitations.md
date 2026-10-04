@@ -20,4 +20,4 @@ These are current boundaries, not setup failures.
 
 ComfyUI-dependent paths are covered extensively against a mocked API, but not every model/custom-node combination has been exercised on live third-party installations. A failed preflight should name the missing asset; use **Settings → Local tools → Test** and attach the diagnostic report when a supported layout is not detected.
 
-Provider policies, moderation and service availability are outside this project's control for the lanes this fork still uses — see the [Pexels](workflow.md#the-built-in-web-scraper) notes before depending on it. (Upstream also links Gemini/ChatGPT-subscription/OpenRouter notes here; those engines are not carried on this fork — see Divergence 1 in FORK_NOTES.md.)
+Online publishing, scraping and Civitai browsing are excluded. Preparation downloads require an explicit action. See [Offline Workflows](../OFFLINE_WORKFLOWS.md).

@@ -2,8 +2,7 @@ import PluginSlot from './plugins/PluginSlot.jsx'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useFocusTrap } from './hooks/useFocusTrap.js'
 import { HashRouter, Routes, Route, Navigate, Outlet, NavLink, useLocation } from 'react-router'
-import { Archive, ArrowUp, Dumbbell, FlaskConical, FolderOpen, Images, Loader2, Menu, Settings, X } from 'lucide-react'
-import { apiFetch, postJson } from './api/fetchClient'
+import { Archive, Dumbbell, FlaskConical, FolderOpen, Images, Menu, Settings, X } from 'lucide-react'
 import { JobsProvider } from './context/JobsContext'
 import { ToastProvider, useToast } from './components/common/Toast'
 import { CapabilitiesProvider, useCapabilities } from './context/CapabilitiesContext'
@@ -16,7 +15,6 @@ import SetupHealthNotice from './components/setup/SetupHealthNotice'
 import SetupJourneyNotice from './components/setup/SetupJourneyNotice'
 import ComfyRecoveryBanner from './components/common/ComfyRecoveryBanner'
 import GenerationQueueDock from './components/common/GenerationQueueDock'
-import PinokioUpdateInstructions from './components/common/PinokioUpdateInstructions'
 import { lazyPage } from './utils/lazyPage'
 
 // Each page is its own chunk, fetched on first navigation — the entry bundle
@@ -51,10 +49,8 @@ function PluginRoute({ routeKey, page }) {
 import { HelpModeProvider, useHelpMode, TipHost } from './help/HelpMode'
 import HeaderMenu from './components/common/HeaderMenu'
 import { useMediaQuery } from './hooks/useMediaQuery'
-import { versionLabel } from './utils/versionLabel'
 import { useTrainingActivity } from './hooks/useTrainingActivity'
 import { activityLabel } from './utils/trainingActivity'
-import { installMode } from './components/settings/updateStatus'
 
 // px-2 up to `lg`: the desktop bar starts at `md` (768 px) and now carries five
 // workspaces (Datasets · Bank · Runs · Canvas · Test Studio) plus the utility
@@ -76,13 +72,6 @@ const menuItemClass = ({ isActive }) =>
     isActive ? 'bg-surface-raised text-content' : 'text-content-muted hover:text-content hover:bg-surface-raised'
   }`
 
-/** Nav action (right of Settings): force an update check and give immediate
- * feedback — a toast when up to date, and the actionable UpdateBanner (with the
- * one-click "Update & restart") when there is an update.
- * AUTO-DETECTION: on mount (and every 6 h while the tab stays open) it runs the
- * git-aware check — server-side TTL cache keeps the network cost to one fetch
- * per 6 h across all page loads. An available update lights a dot on the button
- * and surfaces the UpdateBanner without any click. */
 /** 📋 in the header: opens the app-wide activity panel.
  *
  *  Deliberately always available and always silent. It carries no badge and no
@@ -101,50 +90,6 @@ function ActivityButton() {
       </button>
       {open && <ActivityPanel onClose={() => setOpen(false)} />}
     </>
-  )
-}
-
-function CheckUpdatesButton() {
-  const toast = useToast()
-  const [busy, setBusy] = useState(false)
-  const [available, setAvailable] = useState(false)
-  // No automatic check (fork Divergence 12): the dot lights only after a click.
-  const check = async () => {
-    if (busy) return
-    setBusy(true)
-    try {
-      const d = await apiFetch('/api/update/check?force=1')
-      setAvailable(!!d?.update_available)
-      window.dispatchEvent(new CustomEvent('lds:update-available', { detail: d }))
-      if (d?.update_available) {
-        sessionStorage.removeItem('updateBannerDismissed')     // re-show even if dismissed
-        toast.success(`Update available — v${d.latest || d.remote_sha || 'new'}`)
-      } else if (d?.ok) {
-        // On a git checkout the release number alone is misleading — see versionLabel.
-        toast.info(`You're up to date — ${versionLabel(d)}`)
-      } else {
-        toast.error(d?.reason || 'Could not check for updates.')
-      }
-    } catch (e) {
-      toast.error(e?.message || 'Update check failed.')
-    } finally {
-      setBusy(false)
-    }
-  }
-  return (
-    <button type="button" onClick={check} disabled={busy}
-      title={available ? 'Update available — click to review' : 'Check for updates'}
-      className={`${NAV_ITEM_BASE} relative ${available
-        ? 'text-emerald-300 hover:text-emerald-200'
-        : 'text-content-muted hover:text-content'} hover:bg-surface-raised disabled:opacity-50`}>
-      {busy
-        ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
-        : <ArrowUp aria-hidden="true" className="h-4 w-4" />}
-      {available && (
-        <span aria-hidden className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400" />
-      )}
-      <span className="sr-only">{available ? 'Update available' : 'Check for updates'}</span>
-    </button>
   )
 }
 
@@ -395,7 +340,6 @@ function NavBar() {
             <PeerWorkingChip activity={peerActivity} />
             <ActivityButton />
             <WhatsNewButton />
-            <CheckUpdatesButton />
           </div>
         </nav>
         <div className="ml-auto flex items-center gap-1 md:hidden">
@@ -403,7 +347,6 @@ function NavBar() {
           <PeerWorkingChip activity={peerActivity} />
           <ActivityButton />
           <WhatsNewButton />
-          <CheckUpdatesButton />
           <button type="button" onClick={() => setOpen((v) => !v)}
             aria-expanded={open} aria-label={open ? 'Close navigation menu' : 'Open navigation menu'}
             aria-controls="mobile-navigation"
@@ -424,115 +367,6 @@ function NavBar() {
         </nav>
       )}
     </header>
-  )
-}
-
-/** Shows the answer of the nav badge's explicit check:
- * Git compares its branch; packaged installs compare releases. */
-function UpdateBanner() {
-  const [info, setInfo] = useState(null)
-  const [applying, setApplying] = useState(false)
-  const [phase, setPhase] = useState('')     // '' | 'pulling' | 'restarting'
-  const [error, setError] = useState(null)
-  // Only a manual "Check for updates" (nav button) surfaces the banner, even
-  // after it was dismissed this session; nothing checks on mount (fork D12).
-  useEffect(() => {
-    const onFound = (e) => {
-      if (e.detail?.update_available) setInfo(e.detail)
-      else if (e.detail?.ok && !e.detail.reason) setInfo(null)
-    }
-    window.addEventListener('lds:update-available', onFound)
-    return () => window.removeEventListener('lds:update-available', onFound)
-  }, [])
-
-  // Poll /api/health until the re-execed server answers, then hard-reload so the
-  // new frontend/dist loads. Mirrors the Settings "Updates" card.
-  const waitForHealthAndReload = async () => {
-    for (let i = 0; i < 120; i += 1) {
-      await new Promise((r) => setTimeout(r, 1000))
-      try {
-        const res = await fetch('/api/health', { cache: 'no-store' })
-        if (res.ok) { window.location.reload(); return }
-      } catch { /* still restarting — keep waiting */ }
-    }
-    setApplying(false); setPhase('')          // gave up after ~2 min
-  }
-
-  // One-click pull + restart, same backend action as the Settings card. A packaged
-  // build (no git) comes back {manual:true} → fall back to the download page.
-  const apply = async () => {
-    // Pinokio owns start/stop: an in-app restart would orphan the server.
-    if (installMode(info) === 'pinokio') return
-    setApplying(true); setPhase('pulling'); setError(null)
-    try {
-      const res = await postJson('/api/update/apply', {})
-      if (res.restarting) {
-        setPhase('restarting')
-        waitForHealthAndReload()              // not awaited: the banner shows "restarting…"
-      } else if (res.manual) {
-        window.open(res.url || info.url, '_blank', 'noreferrer')
-        setApplying(false); setPhase('')
-      } else {
-        setApplying(false); setPhase('')
-        setError(res.reason || (res.ok ? null : 'Update failed'))
-      }
-    } catch (e) {
-      setApplying(false); setPhase('')
-      setError(e.message || 'Update failed')
-    }
-  }
-
-  if (!info) return null
-  const pinokioMode = installMode(info) === 'pinokio'
-  return (
-    <div className="mx-auto max-w-5xl px-4 pt-3">
-      <div role="status"
-        className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-sm">
-        <span aria-hidden>⬆</span>
-        {applying ? (
-          <span className="text-content">
-            {phase === 'restarting'
-              ? '↻ Updated — the app is restarting. This page reloads automatically when it’s back'
-              : '⬇ Pulling the latest version'}
-          </span>
-        ) : (
-          <>
-            <span className="text-content">
-              Update available — <span className="font-semibold">
-                {info.latest
-                  ? `v${info.latest}`
-                  : info.behind
-                    ? `${info.behind} new commit${info.behind === 1 ? '' : 's'}`
-                    : 'a new version'}
-              </span> (you run {versionLabel(info)}).
-            </span>
-            {pinokioMode ? (
-              <PinokioUpdateInstructions />
-            ) : (
-              <>
-                <button type="button" onClick={apply}
-                  className="rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-gray-950 transition-transform hover:-translate-y-px">
-                  Update &amp; restart
-                </button>
-                {/* Download link only for packaged builds (a git checkout updates in
-                    place via the button — a release ZIP would be the wrong artifact). */}
-                {!info.is_git && (
-                  <a href={info.url} target="_blank" rel="noreferrer"
-                    className="text-emerald-300 underline">
-                    Download
-                  </a>
-                )}
-              </>
-            )}
-            {error && <span className="text-rose-300">{error}</span>}
-            <button type="button"
-              onClick={() => { setInfo(null); sessionStorage.setItem('updateBannerDismissed', '1') }}
-              aria-label="Dismiss update notice"
-              className="ml-auto px-1.5 text-content-subtle hover:text-content">✕</button>
-          </>
-        )}
-      </div>
-    </div>
   )
 }
 
@@ -593,7 +427,6 @@ function Shell() {
           outranked by a broken install. */}
       <SetupHealthNotice />
       <ComfyRecoveryBanner />
-      <UpdateBanner />
       <main id="main-content" tabIndex={-1}
         className={boardRoute
           ? 'flex min-h-0 w-full flex-1 flex-col p-0 sm:px-3 sm:py-3'

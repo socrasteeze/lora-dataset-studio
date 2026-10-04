@@ -85,6 +85,20 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-03-offline-workflows',
+    date: '2026-10-03',
+    title: 'Offline Workflows',
+    blurb: 'Online publishing, scraping, Civitai browsing and in-app update APIs are disconnected. The curated plugins use local tools and private-network APIs. Runtime workers use prepared models; Setup downloads remain an explicit action.',
+    to: '/plugins',
+  },
+  {
+    id: '2026-10-03-flat-workspace-sections',
+    date: '2026-10-03',
+    title: 'Flatter Workspaces',
+    blurb: 'Workspace groups use headings, spacing and dividers instead of repeated card frames. Bank, Dataset, Studio, Settings, Setup and plugin tools share this layout. Controls, previews and warnings retain clear boundaries.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-02-compact-workspaces',
     date: '2026-10-02',
     title: 'More workspace, less repeated text',

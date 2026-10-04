@@ -75,7 +75,7 @@ export default function ScenePromptsPanel({ value, onChange }) {
 
   const nPicked = picked.length;
   return (
-    <details className="rounded-lg border border-border bg-app/30 open:pb-2" onToggle={(e) => { if (e.currentTarget.open) openList(kind); }}>
+    <details className="lds-section open:pb-2" onToggle={(e) => { if (e.currentTarget.open) openList(kind); }}>
       <summary className="cursor-pointer select-none px-2.5 py-1.5 text-xs text-content font-semibold">
         🎬 Scenes from a bank or dataset
         <HelpBadge topic="studio-scene-prompts" />

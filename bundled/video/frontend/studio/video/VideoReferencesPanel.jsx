@@ -187,7 +187,7 @@ export default function VideoReferencesPanel({ value, limits, disabled, onInsert
       : adoptLibrary(libraryTarget, selections)} />;
 
   return (
-    <section data-probe-panel="video-studio-references" className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-surface p-3">
+    <section data-probe-panel="video-studio-references" className="lds-section flex min-w-0 flex-col gap-3 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-sm font-semibold text-content">References</h2>
         <HelpBadge topic={identitiesOnly ? 'video-first-frame-refmods' : 'video-studio-references'} />

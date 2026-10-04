@@ -790,7 +790,7 @@ export default function SetupPage() {
       if (step.ignored) {
         return (
           <div className="space-y-4">
-            <div className="rounded-md border border-border bg-surface-raised px-3 py-2 text-sm text-content-muted">
+            <div className="lds-section py-2 text-sm text-content-muted">
               ⊘ ComfyUI is set to Ignore in Settings ▸ Local tools, so LDS does not contact it.
               Local generation and the Test Studio stay off until you turn that off.
             </div>
@@ -803,7 +803,7 @@ export default function SetupPage() {
       if (step.skipped) {
         return (
           <div className="space-y-4">
-            <div className="rounded-md border border-border bg-surface-raised px-3 py-2 text-sm text-content-muted">
+            <div className="lds-section py-2 text-sm text-content-muted">
               ⊘ You chose to continue without ComfyUI. Local generation, the Test Studio and
               custom-base training stay off — enter a directory below anytime to turn them back on.
             </div>
@@ -949,7 +949,7 @@ export default function SetupPage() {
       )
       // Already skipped by choice: neutral confirmation, never a warning.
       const ollamaSkipNotice = (
-        <div className="rounded-md border border-border bg-surface-raised px-3 py-2 text-sm text-content-muted">
+        <div className="lds-section py-2 text-sm text-content-muted">
           ⊘ You chose to continue without {llmName}. Auto-framing, head-crop, Describe/Enhance
           and the bank’s natural-language filter stay off — start {llmName} anytime to turn them
           back on.
@@ -1083,7 +1083,7 @@ export default function SetupPage() {
          external apps -- so this is a "which do you have", not a "which do you
          want", and the sentence says so. */
       const llmProviderPicker = (
-        <div className="rounded-md border border-border bg-surface-raised px-3 py-3">
+        <div className="lds-section py-3">
           <p className="text-sm font-medium text-content">Which local LLM do you run?</p>
           <p className="mt-1 text-xs leading-relaxed text-content-muted">
             One server does captioning, auto-framing and the prompt helpers. Pick the one
@@ -1145,7 +1145,7 @@ export default function SetupPage() {
               // Every piece the action installs, not just the first — see cardInstalled.
               const present = cardInstalled(c, caps)
               return (
-                <div key={c.action} className="rounded-md border border-border bg-surface-raised p-3 space-y-2 [&_button]:min-h-10 lg:[&_button]:min-h-0">
+                <div key={c.action} className="lds-section py-3 space-y-2 [&_button]:min-h-10 lg:[&_button]:min-h-0">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-sm font-semibold text-content">{c.icon} {c.title}</span>
                     <span className={`shrink-0 text-xs font-medium ${present ? 'text-emerald-400' : 'text-content-subtle'}`}>
@@ -1170,7 +1170,7 @@ export default function SetupPage() {
               )
             })}
           </div>
-          <details className="rounded-md border border-border bg-surface-raised px-3 py-2">
+          <details className="lds-section py-2">
             <summary className="cursor-pointer text-xs text-content-subtle hover:text-content">
               Install the shared quality helpers together
             </summary>
@@ -1464,7 +1464,7 @@ export default function SetupPage() {
           </p>
         </div>
 
-        <section className="rounded-xl border border-border bg-surface p-4">
+        <section className="lds-section py-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-content">
               {detecting ? 'Scanning your machine' : 'Machine scan'}
@@ -1551,7 +1551,7 @@ export default function SetupPage() {
           <h1 className="mt-2 text-2xl font-bold text-content">Tools Overview</h1>
           <p className="mt-1 text-sm text-content-muted">{readyCount} of {summary.length} capabilities ready.</p>
         </div>
-        <section className="rounded-xl border border-border bg-surface p-4">
+        <section className="lds-section py-4">
           <h2 className="text-base font-semibold text-content">Available Features</h2>
           <ul className="mt-3 grid gap-1 sm:grid-cols-2">
             {summary.map((s) => {
@@ -1665,7 +1665,7 @@ export default function SetupPage() {
         <button type="button" onClick={goBack} className="text-sm text-content-muted hover:text-content">{journey ? '← My setup plan' : '← Optional tools'}</button>
       </div>
 
-      <section className="rounded-xl border border-border bg-surface p-4">
+      <section className="lds-section py-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold text-content">

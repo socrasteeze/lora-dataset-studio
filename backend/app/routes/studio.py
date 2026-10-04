@@ -171,6 +171,9 @@ def studio_civitai_images():
 
     400 = bad filter value · 409 = Civitai unreachable / key refused (the
     sentence carries the remedy)."""
+    from ..plugins.fork_profile import offline_only
+    if offline_only():
+        return jsonify({'ok': False, 'error': 'Civitai browsing is disabled in this offline fork.'}), 403
     from ..services import civitai_browser
     a = request.args
     try:

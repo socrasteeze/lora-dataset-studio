@@ -25,7 +25,7 @@ export default function BankSemanticEngine({ state, disabled = false,
   const deviceNote = capsLoading ? null : semanticDeviceNote(state, gpuPresent)
 
   return (
-    <fieldset className="rounded-lg border border-indigo-400/30 bg-indigo-500/5 p-3 space-y-2"
+    <fieldset className="lds-section py-3 space-y-2"
       disabled={disabled || switching || live}>
       <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-content-muted">
         Semantic engine

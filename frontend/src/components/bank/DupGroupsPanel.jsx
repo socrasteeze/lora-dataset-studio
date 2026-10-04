@@ -142,7 +142,7 @@ export default function DupGroupsPanel({ bankId, live, onChanged, kind = 'exact'
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2">
+      <div className="lds-section flex flex-wrap items-center gap-2 py-2">
         <span className="text-sm font-semibold text-content">{k.header(data.total)}</span>
         <span className="text-xs text-content-subtle">{k.lead}</span>
         <span className="ml-auto" />

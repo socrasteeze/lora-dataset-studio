@@ -103,6 +103,10 @@ def video_dataset_create():
 @bp.post('/video-dataset/<int:dataset_id>/scrape-import')
 def video_dataset_import(dataset_id):
     data = request.get_json(silent=True) or {}
+    if request.path.endswith('/scrape-import') or data.get('items') is not None:
+        from lds_sdk.lifecycle import offline_only
+        if offline_only():
+            return jsonify({'ok': False, 'error': 'Online media imports are disabled in this offline fork.'}), 403
     uploads = request.files.getlist('files') if request.mimetype == 'multipart/form-data' else None
     try:
         out = intake.start(current_app._get_current_object(), LOCAL_USER, dataset_id,

@@ -613,165 +613,52 @@ def _reset_update_cache():
     sroutes._git_check_cache.update(ts=0.0, data=None)
 
 
-class _FakeResp:
-    def __init__(self, status_code, body=None):
-        self.status_code = status_code
-        self._body = body or {}
-    def json(self):
-        return self._body
+@pytest.mark.parametrize('query', ['', '?auto=1', '?force=1'])
+@pytest.mark.parametrize('install_mode', ['git', 'zip', 'pinokio'])
+def test_update_check_refuses_online_work_in_every_install_mode(
+        client, monkeypatch, _reset_update_cache, query, install_mode):
+    import requests
+    from app.services import updater
+    from app.routes import settings
+    from app.version import APP_VERSION
+
+    def unexpected(*args, **kwargs):
+        pytest.fail('offline update check attempted an online operation')
+
+    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: install_mode == 'git')
+    monkeypatch.setattr(updater, 'is_pinokio_runtime', lambda: install_mode == 'pinokio')
+    monkeypatch.setattr(updater, 'git_update_status', unexpected)
+    monkeypatch.setattr(requests, 'get', unexpected)
+    settings._update_cache.update(data={'ok': True, 'update_available': True})
+    result = client.get('/api/update/check' + query)
+    assert result.status_code == 200
+    body = result.get_json()
+    assert body['ok'] is False and body['current'] == APP_VERSION
+    assert body['update_available'] is False and body['can_apply'] is False
+    assert body['manual'] is True and 'offline' in body['reason']
+
+
+@pytest.mark.parametrize('install_mode', ['git', 'zip', 'pinokio'])
+def test_update_apply_refuses_before_fetch_or_restart(client, monkeypatch, install_mode):
+    from app.services import updater
+
+    def unexpected(*args, **kwargs):
+        pytest.fail('offline updater attempted a fetch or restart')
+
+    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: install_mode == 'git')
+    monkeypatch.setattr(updater, 'is_pinokio_runtime', lambda: install_mode == 'pinokio')
+    for name in ('apply_update', 'start_zip_update', 'schedule_restart'):
+        monkeypatch.setattr(updater, name, unexpected)
+    response = client.post('/api/update/apply')
+    assert response.status_code == 403
+    body = response.get_json()
+    assert body['ok'] is False and body['can_apply'] is False
+    assert body['manual'] is True and 'offline' in body['reason']
 
 
 def test_upstream_check_route_is_gone(client):
     """Fork Divergence 12: nothing asks upstream's GitHub about this checkout."""
     assert client.get('/api/update/upstream-check').status_code == 404
-
-
-def test_update_check_detects_newer_release(client, monkeypatch, _reset_update_cache):
-    import requests
-    from app.services import updater
-    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: False)
-    monkeypatch.setattr(requests, 'get', lambda *a, **k: _FakeResp(200, {
-        'tag_name': 'v9999.12.31', 'html_url': 'https://github.com/x/releases/tag/v9999.12.31'}))
-    d = client.get('/api/update/check?force=1').get_json()
-    assert d['update_available'] is True and d['latest'] == '9999.12.31'
-    assert d['url'].endswith('v9999.12.31')
-
-
-
-
-def test_update_check_pinokio_keeps_the_git_answer_but_drops_the_button(
-        client, monkeypatch, _reset_update_cache):
-    """A Pinokio install IS a git checkout worth measuring: its
-    Update tab pulls exactly those commits, so "3 commits behind" stays true and
-    useful. Only the in-app apply goes away."""
-    from app.services import updater
-    monkeypatch.setenv('LDS_RUNTIME', 'pinokio')
-    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: True)
-    monkeypatch.setattr(updater, 'git_update_status', lambda root=None: {
-        'ok': True, 'is_git': True, 'update_available': True, 'behind': 3,
-        'current_sha': 'aaaaaaa', 'remote_sha': 'bbbbbbb',
-    })
-
-    d = client.get('/api/update/check?force=1').get_json()
-
-    assert d['behind'] == 3 and d['is_git'] is True
-    assert d['install_mode'] == 'pinokio' and d['can_apply'] is False
-    assert d['manual'] is True
-    assert d['instructions'] == [
-        'Stop the app in Pinokio',
-        'Click the Update tab',
-        'Click Start',
-    ]
-
-
-def test_update_check_pinokio_never_advertises_a_zip_apply(
-        client, monkeypatch, _reset_update_cache):
-    """The passive (non-git-aware) path must not hand back can_apply just
-    because the latest release ships a ZIP asset."""
-    import requests
-    from app.services import updater
-    monkeypatch.setenv('LDS_RUNTIME', 'pinokio')
-    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: False)
-    monkeypatch.setattr(requests, 'get', lambda *a, **k: _FakeResp(200, {
-        'tag_name': 'v9999.12.31',
-        'assets': [{'name': 'LoRA-Dataset-Studio-windows.zip',
-                    'browser_download_url': 'https://x/win'}],
-    }))
-
-    d = client.get('/api/update/check?force=1').get_json()
-
-    assert d['update_available'] is True
-    assert d['install_mode'] == 'pinokio' and d['can_apply'] is False
-
-
-def test_update_apply_pinokio_refuses_before_touching_git(client, monkeypatch):
-    from app.services import updater
-    monkeypatch.setenv('LDS_RUNTIME', 'pinokio')
-    forbidden = lambda *a, **k: (_ for _ in ()).throw(
-        AssertionError('Pinokio apply must refuse before an updater is selected'))
-    monkeypatch.setattr(updater, 'is_git_checkout', forbidden)
-    monkeypatch.setattr(updater, 'apply_update', forbidden)
-    monkeypatch.setattr(updater, 'start_zip_update', forbidden)
-    monkeypatch.setattr(updater, 'schedule_restart', forbidden)
-
-    response = client.post('/api/update/apply')
-    body = response.get_json()
-
-    assert response.status_code == 200
-    assert body['ok'] is False and body['manual'] is True
-    assert body['install_mode'] == 'pinokio' and body['can_apply'] is False
-    assert body['instructions'] == [
-        'Stop the app in Pinokio',
-        'Click the Update tab',
-        'Click Start',
-    ]
-
-
-def test_update_check_same_version_then_serves_the_explicit_answer(
-        client, monkeypatch, _reset_update_cache):
-    import requests
-    from app.services import updater
-    from app.version import APP_VERSION
-    calls = []
-    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: False)
-    monkeypatch.setattr(requests, 'get',
-                        lambda *a, **k: calls.append(1) or _FakeResp(200, {'tag_name': f'v{APP_VERSION}'}))
-    d = client.get('/api/update/check?force=1').get_json()
-    assert d['update_available'] is False and d['latest'] == APP_VERSION
-    assert client.get('/api/update/check?auto=1').get_json() == d   # no network
-    assert len(calls) == 1
-
-
-def test_update_check_never_reaches_the_network_on_its_own(
-        client, monkeypatch, _reset_update_cache):
-    """Fork Divergence 12: ?auto=1 and the bare path touch neither git nor
-    GitHub. Before any explicit check they say automatic checks are off."""
-    import requests
-    from app.services import updater
-    boom = lambda *a, **k: (_ for _ in ()).throw(AssertionError('network call'))
-    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: True)
-    monkeypatch.setattr(updater, 'git_update_status', boom)
-    monkeypatch.setattr(requests, 'get', boom)
-    for url in ('/api/update/check', '/api/update/check?auto=1'):
-        d = client.get(url).get_json()
-        assert d['ok'] is False and d['update_available'] is False
-        assert d['auto_check'] is False and 'off' in d['reason']
-
-
-def test_update_check_force_fetches_git_every_time(client, monkeypatch, _reset_update_cache):
-    from app.services import updater
-    calls = []
-    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: True)
-    monkeypatch.setattr(updater, 'git_update_status',
-                        lambda root=None: calls.append(1) or {
-                            'ok': True, 'is_git': True, 'update_available': True,
-                            'behind': 2, 'current': '1.0'})
-    d = client.get('/api/update/check?force=1').get_json()
-    assert d['update_available'] is True and d['behind'] == 2
-    assert client.get('/api/update/check?auto=1').get_json() == d   # cached answer
-    client.get('/api/update/check?force=1')
-    assert len(calls) == 2
-
-
-def test_update_check_degrades_when_feed_unreachable(client, monkeypatch, _reset_update_cache):
-    import requests
-    from app.services import updater
-    def boom(*a, **k):
-        raise requests.ConnectionError('offline')
-    monkeypatch.setattr(requests, 'get', boom)
-    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: False)
-    d = client.get('/api/update/check?force=1').get_json()
-    assert d['ok'] is True and d['update_available'] is False
-    assert 'unreachable' in d['reason']
-
-
-def test_update_check_private_repo_404(client, monkeypatch, _reset_update_cache):
-    import requests
-    from app.services import updater
-    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: False)
-    monkeypatch.setattr(requests, 'get', lambda *a, **k: _FakeResp(404))
-    d = client.get('/api/update/check?force=1').get_json()
-    assert d['update_available'] is False and '404' in d['reason']
 
 
 def test_logs_tail_reads_app_log(client, tmp_path, monkeypatch):
@@ -825,8 +712,6 @@ def test_settings_restart_pins_saved_host_port_to_env(client, monkeypatch):
     assert os.environ['LDS_HOST'] == '0.0.0.0'
     assert os.environ['LDS_PORT'] == '5123'
     assert seen['block_during_update'] is True
-
-
 
 
 def test_put_settings_saves_server_lan_and_port(client):
@@ -914,25 +799,6 @@ def test_settings_restart_triggers_schedule_restart(client, monkeypatch):
     assert called[0]['environment_updates']['LDS_PORT'] == '5050'
 
 
-def test_update_apply_defers_changed_requirements_to_restart(client, monkeypatch):
-    from app.services import updater
-    monkeypatch.setattr(
-        updater, 'apply_update',
-        lambda: {'ok': True, 'changed': True, 'deps_changed': True},
-    )
-    calls = []
-    monkeypatch.setattr(updater, 'schedule_restart',
-                        lambda *a, **k: calls.append((a, k)))
-
-    response = client.post('/api/update/apply')
-
-    assert response.status_code == 200
-    assert response.get_json()['restarting'] is True
-    assert calls == [((), {'install_requirements': True})]
-
-
-
-
 def test_settings_restart_is_refused_during_active_update(client, monkeypatch):
     import os
     from app.services import updater
@@ -949,41 +815,6 @@ def test_settings_restart_is_refused_during_active_update(client, monkeypatch):
     assert response.status_code == 409
     assert response.get_json()['phase'] == 'restarting'
     assert os.environ['LDS_HOST'] == 'keep-host' and os.environ['LDS_PORT'] == '4321'
-
-
-def test_update_check_reports_can_apply_for_zip_release(client, monkeypatch, _reset_update_cache):
-    """A release with a ZIP asset -> can_apply True, so a packaged install can
-    update in-app instead of only linking to the releases page."""
-    import requests
-    from app.services import updater
-    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: False)
-    monkeypatch.setattr(requests, 'get', lambda *a, **k: _FakeResp(200, {
-        'tag_name': 'v9999.12.31',
-        'assets': [{'name': 'LoRA-Dataset-Studio-windows.zip',
-                    'browser_download_url': 'https://x/win'}]}))
-    d = client.get('/api/update/check?force=1').get_json()
-    assert d['update_available'] is True and d['can_apply'] is True
-
-
-def test_update_apply_zip_install_starts_async_release_update(client, monkeypatch):
-    """A NON-git install routes /update/apply to the async release-ZIP updater
-    (never the git pull path) and returns an async handle the client then polls."""
-    from app.services import updater
-    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: False)
-    called = {}
-    def fake_start():
-        called['zip'] = True
-        return {'ok': True, 'async': True, 'from': '2026.07.16.1',
-                'to': '9999.01.01', 'total': 42_000_000}
-    monkeypatch.setattr(updater, 'start_zip_update', fake_start)
-    monkeypatch.setattr(updater, 'apply_update',
-                        lambda: (_ for _ in ()).throw(AssertionError('git path must not run')))
-
-    r = client.post('/api/update/apply')
-
-    body = r.get_json()
-    assert r.status_code == 200 and called.get('zip') is True
-    assert body['async'] is True and body['to'] == '9999.01.01' and body['total'] == 42_000_000
 
 
 def test_update_progress_endpoint_returns_state(client, monkeypatch):

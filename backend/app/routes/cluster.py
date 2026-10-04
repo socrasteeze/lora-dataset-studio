@@ -129,6 +129,11 @@ def peer_connect_local():
     token = (data.get('token') or '').strip()
     if not primary_url or not token:
         return jsonify({'error': 'primary_url and token required'}), 400
+    from ..utils.local_api import local_api_url
+    try:
+        primary_url = local_api_url(primary_url)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
     import requests
     # Local probe, not a network call — keep it out of the block whose only
     # sentence is "could not reach Primary". It raising here is what turned a
@@ -143,6 +148,7 @@ def peer_connect_local():
                 'capabilities': caps,
             },
             timeout=30,
+            allow_redirects=False,
         )
         body = r.json() if r.content else {}
         if r.status_code >= 400:

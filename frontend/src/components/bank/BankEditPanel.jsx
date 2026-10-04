@@ -133,16 +133,16 @@ export default function BankEditPanel({
 
   return (
     <div id="bank-edits" data-workspace-focus
-      className="rounded-lg border border-border bg-surface-raised">
+      className="lds-section">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
-        className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 p-3 text-left">
+        className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 py-3 text-left">
         <span className="text-sm font-semibold text-content">✂ Edits</span>
         <span className="text-2xs text-content-subtle">{editSummary(payload)}</span>
         <HelpBadge topic="action-bank-crop" />
         <span aria-hidden className="ml-auto text-xs text-content-subtle">{open ? '▲' : '▼'}</span>
       </button>
       {open && (
-        <div className="space-y-2 px-3 pb-3">
+        <div className="space-y-2 pb-3">
           <p className="text-2xs text-content-subtle">
             crop and upscale here, re-analyse, then promote — your original files are
             never modified
@@ -158,7 +158,7 @@ export default function BankEditPanel({
             when it imports.
           </p>
 
-          <div className="rounded-lg border border-border bg-app/40 p-2.5 space-y-1.5">
+          <div className="lds-section py-2.5 space-y-1.5">
             <div className="flex items-baseline gap-1.5">
               <span className="text-sm font-semibold text-content">✨ Upscale &amp; improve</span>
               <span className="text-2xs text-content-subtle">

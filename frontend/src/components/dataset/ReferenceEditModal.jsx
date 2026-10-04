@@ -192,7 +192,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
                 const label = engineLabel(candidate.engine);
                 return (
                   <div key={candidate.engine}
-                    className="rounded-lg bg-surface-raised border border-border px-3 py-2">
+                    className="lds-section py-2">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-content text-xs font-semibold">{label}</span>
                       <span className={`text-2xs ${candidate.status === 'failed'

@@ -50,7 +50,7 @@ export default function BankOverview({ payload, compact = false }) {
 
   return (
     <section aria-labelledby="bank-overview-title"
-      className="rounded-xl border border-border bg-surface p-4 space-y-3">
+      className="lds-section py-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
         <h2 id="bank-overview-title" className="min-w-0 text-sm font-semibold text-content">
           <button type="button" onClick={() => setOpen((value) => !value)}

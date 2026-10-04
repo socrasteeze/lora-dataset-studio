@@ -58,7 +58,7 @@ export default function DescribeFilterBar({ bankId, onApply }) {
 
   const s = describeSummary(res)
   return (
-    <div className="rounded-lg border border-border bg-surface-raised p-2">
+    <div className="lds-section py-2">
       {/* flex-wrap and a full-width field: at 400 px the label, the input and the
           button cannot share a row.
           ⚠️ The field carries a MINIMUM width, not `min-w-0`. With min-w-0 a flex

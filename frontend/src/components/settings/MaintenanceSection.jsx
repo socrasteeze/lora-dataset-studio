@@ -1,206 +1,17 @@
 import { useEffect, useState } from 'react'
-import { apiFetch, postJson } from '../../api/fetchClient'
+import { apiFetch } from '../../api/fetchClient'
 import DiagnosticReport from '../common/DiagnosticReport'
 import GlobalStopPanel from './GlobalStopPanel'
-import PinokioUpdateInstructions from '../common/PinokioUpdateInstructions'
 import { Card } from './primitives'
-import { installMode, zipUpdateHeadline, progressLabel, progressPercent } from './updateStatus'
-import { versionLabel } from '../../utils/versionLabel'
 import { copyText } from '../../utils/copyText'
 
-/* In-app updater: "Check for updates" hits the git-aware check (commits-behind for a
-   clone, release tag for a packaged build). "Update & restart" pulls (git) or downloads
-   and swaps in the latest release ZIP (packaged install), then restarts the server; we
-   poll /api/health until the relaunched process answers and hard-reload the SPA so the
-   new frontend/dist loads. */
+/* Offline maintenance is performed outside the running app. */
 function UpdatesCard() {
-  const [status, setStatus] = useState(null)
-  const [checking, setChecking] = useState(false)
-  const [applying, setApplying] = useState(false)
-  const [phase, setPhase] = useState('')     // '' | 'pulling' | 'restarting'
-  const [progress, setProgress] = useState(null)   // ZIP mode: {phase, downloaded, total}
-
-  // No check runs on its own (fork Divergence 12): the card stays empty until
-  // "Check for updates" is pressed.
-  const check = async () => {
-    setChecking(true)
-    try {
-      setStatus(await apiFetch('/api/update/check?force=1'))
-    } catch (e) {
-      setStatus({ ok: false, reason: e.message || 'Check failed' })
-    } finally {
-      setChecking(false)
-    }
-  }
-
-  const waitForHealthAndReload = async () => {
-    // The server is re-execing: /api/health refuses connections for a few seconds,
-    // then answers again on the same port. Poll, then hard-reload to pull new dist.
-    for (let i = 0; i < 120; i += 1) {
-      await new Promise((r) => setTimeout(r, 1000))
-      try {
-        const res = await fetch('/api/health', { cache: 'no-store' })
-        if (res.ok) { window.location.reload(); return }
-      } catch { /* still down — keep waiting */ }
-    }
-    setApplying(false); setPhase('')          // gave up after ~2 min
-  }
-
-  // Packaged (ZIP) installs download+swap the release (with a progress bar); a git
-  // clone fast-forwards. 'unavailable' = non-git with no downloadable release.
-  const mode = installMode(status)
-
-  // ZIP mode: poll the server's progress until it restarts / finishes / fails.
-  // A release ZIP is tens of MB, so the user needs to see it advancing.
-  const pollProgress = async () => {
-    for (let i = 0; i < 1200; i += 1) {       // ~10 min ceiling at 500 ms
-      await new Promise((r) => setTimeout(r, 500))
-      let p
-      try { p = await apiFetch('/api/update/progress') } catch { continue }
-      setProgress(p)
-      if (p.phase === 'restarting') { setPhase('restarting'); waitForHealthAndReload(); return }
-      if (p.phase === 'error') {
-        setStatus({ ok: false, reason: p.error || 'Update failed and was rolled back.' })
-        setApplying(false); setPhase(''); setProgress(null); return
-      }
-      if (p.phase === 'done') {               // server decided it was already up to date
-        setStatus({ ...status, up_to_date: true }); setApplying(false); setPhase(''); setProgress(null); return
-      }
-    }
-    setApplying(false); setPhase(''); setProgress(null)   // gave up
-  }
-
-  const apply = async () => {
-    // Pinokio owns the process: the pull would succeed and the restart would
-    // detach the server from the launcher that owns it.
-    if (mode === 'pinokio') return
-    setApplying(true); setPhase('pulling'); setProgress(null)
-    try {
-      const res = await postJson('/api/update/apply', {})
-      if (res.restarting) {                   // git path: synchronous restart
-        setPhase('restarting')
-        waitForHealthAndReload()              // not awaited: UI shows "restarting…"
-      } else if (res.async) {                 // ZIP path: download+swap on the server, poll it
-        setProgress({ phase: 'downloading', downloaded: 0, total: res.total || 0 })
-        pollProgress()                        // not awaited
-      } else {                                // up to date / manual / error, inline
-        setStatus(res.ok ? { ...res, up_to_date: true } : res)
-        setApplying(false); setPhase('')
-      }
-    } catch (e) {
-      setStatus({ ok: false, reason: e.message || 'Update failed' })
-      setApplying(false); setPhase('')
-    }
-  }
-
-  const s = status
-  // In-app update is possible for a git clone (pull) or a packaged install whose
-  // latest release ships a ZIP asset (download + swap). Otherwise: link out.
-  const pinokioMode = mode === 'pinokio'
-  const canPull = s && s.update_available && (mode === 'git' || mode === 'zip')
   return (
-    <Card title="Updates" help={pinokioMode
-        ? 'Pinokio starts and stops this app, so it also owns the update: Stop, Update, Start.'
-        : 'Pull the latest version from GitHub and restart — without leaving the app.'}>
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={check} disabled={checking || applying}
-          className="rounded-md border border-border-strong px-3 py-1.5 text-sm font-medium text-content hover:bg-surface-raised disabled:opacity-50">
-          {checking ? 'Checking' : 'Check for updates'}
-        </button>
-        {s?.current && (
-          <span className="text-xs text-content-subtle">
-            Current build:{' '}
-            <span className="font-medium text-content">v{s.current}{s.current_sha ? ` (${s.current_sha})` : ''}</span>
-          </span>
-        )}
-        {s && (
-          <span className="text-xs text-content-subtle">
-            Latest build:{' '}
-            <span className="font-medium text-content">
-              {s.remote_sha
-                ? `${s.remote_sha}${typeof s.behind === 'number' && s.behind > 0 ? ` (+${s.behind} commit${s.behind === 1 ? '' : 's'})` : ''}`
-                : s.latest ? `v${s.latest}`
-                : s.update_available ? 'update available'
-                : '— press “Check for updates”'}
-            </span>
-          </span>
-        )}
-        {/* Read WHAT the update contains before pulling: the compare view lists
-            exactly the incoming commits; otherwise the branch history. Only
-            present after a git-aware "Check for updates" (force). */}
-        {s && (s.compare_url || s.commits_url) && (
-          <a href={s.compare_url || s.commits_url} target="_blank" rel="noreferrer"
-            className="text-xs font-medium text-sky-300 underline hover:text-sky-200">
-            {s.compare_url ? 'See what’s in this update ↗' : 'Browse recent commits ↗'}
-          </a>
-        )}
-      </div>
-
-      {applying && (
-        <div className="space-y-1.5" role="status" aria-live="polite">
-          <p className="text-sm text-content-muted">
-            {phase === 'restarting'
-              ? '↻ Updated — the app is restarting. This page reloads automatically when it’s back'
-              : progressLabel(progress) || (mode === 'zip'
-                ? '⬇ Downloading and installing the latest release'
-                : '⬇ Pulling the latest version')}
-          </p>
-          {/* Real progress bar while downloading a release ZIP (indeterminate when
-              the server reported no Content-Length). Git pulls stay text-only. */}
-          {phase !== 'restarting' && progress && progress.phase === 'downloading' && (
-            <div className="h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-surface-raised">
-              <div className="h-full rounded-full bg-gradient-primary transition-[width] duration-300"
-                style={{ width: `${progressPercent(progress) ?? 40}%` }} />
-            </div>
-          )}
-        </div>
-      )}
-
-      {!applying && s && (
-        <div className="text-sm">
-          {pinokioMode && s.update_available ? (
-            <div className="space-y-2">
-              <p className="text-content">
-                <span aria-hidden>⬆</span>{' '}
-                {typeof s.behind === 'number' && s.behind > 0
-                  ? `${s.behind} commit${s.behind === 1 ? '' : 's'} behind${s.current_sha && s.remote_sha ? ` (${s.current_sha} → ${s.remote_sha})` : ''}.`
-                  : `Update available${s.latest ? ` — v${s.latest}` : ''}.`}
-              </p>
-              <PinokioUpdateInstructions />
-            </div>
-          ) : canPull ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-content">
-                <span aria-hidden>⬆</span>{' '}
-                {typeof s.behind === 'number'
-                  ? `${s.behind} commit${s.behind === 1 ? '' : 's'} behind${s.current_sha && s.remote_sha ? ` (${s.current_sha} → ${s.remote_sha})` : ''}.`
-                  : `${zipUpdateHeadline(s)}.`}
-              </span>
-              <button type="button" onClick={apply}
-                className="rounded-md bg-gradient-primary px-3 py-1.5 text-sm font-semibold text-gray-950 transition-transform hover:-translate-y-px">
-                Update &amp; restart
-              </button>
-            </div>
-          ) : s.update_available ? (
-            <p className="text-content">
-              Update available{s.latest ? ` — v${s.latest}` : ''} —{' '}
-              <a href={s.url} target="_blank" rel="noreferrer" className="font-semibold text-emerald-300 underline">
-                download the latest release
-              </a>{' '}and replace the folder.
-            </p>
-          ) : s.ok ? (
-            <p className="text-emerald-400">
-              <span aria-hidden>✓</span> You’re up to date.{' '}
-              {/* Name the COMMIT on a git checkout: the release number alone would
-                  claim the last release while the tree may be well past it. */}
-              <span className="text-content-subtle">{versionLabel(s)}</span>
-            </p>
-          ) : (
-            <p className="text-content-muted"><span aria-hidden>⚠</span> {s.reason || 'Could not check for updates.'}</p>
-          )}
-        </div>
-      )}
-
+    <Card title="Updates" help="Online update APIs are disabled in this fork.">
+      <p className="text-sm text-content-muted">
+        Update the checkout or replace the local release outside LDS, then restart the app.
+      </p>
     </Card>
   )
 }
@@ -230,7 +41,7 @@ function LogViewer() {
     if (!res.ok) { setCopyFailed(true); setTimeout(() => setCopyFailed(false), 2500) }
   }
   return (
-    <section className="rounded-xl border border-border bg-surface p-4">
+    <section className="lds-section py-4">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
         className="flex w-full items-center gap-2 text-left">
         <h2 className="text-base font-semibold text-content">🪵 Server log</h2>

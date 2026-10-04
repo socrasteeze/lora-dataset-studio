@@ -47,7 +47,7 @@ export default function GlobalStopPanel() {
   const summary = report ? stopSummary(report) : null
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4 space-y-3">
+    <div className="lds-section py-4 space-y-3">
       <div>
         <p className="text-sm font-medium text-content">Stop everything</p>
         <p className="mt-1 text-xs text-content-muted">

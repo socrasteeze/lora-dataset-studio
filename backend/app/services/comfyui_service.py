@@ -62,7 +62,10 @@ class ComfyUIService:
                 s.settimeout(network_timeout(2))
                 if s.connect_ex((self.api_host, self.api_port)) != 0:
                     return False
-            r = requests.get(urljoin(cfg.get('comfyui.api_url'), "/system_stats"), timeout=network_timeout(3))
+            from ..utils.local_api import local_api_url
+            address = local_api_url(cfg.get('comfyui.api_url'))
+            r = requests.get(urljoin(address, "/system_stats"), timeout=network_timeout(3),
+                             allow_redirects=False)
             return r.status_code in (200, 404)
         except requests.exceptions.ReadTimeout:
             self._connection_error = (

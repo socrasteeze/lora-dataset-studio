@@ -718,33 +718,5 @@ def video_bank_promote(bank_id):
 
 @bp.post('/video-bank/scrape-import')
 def video_bank_scrape_import():
-    """Download the picked scan items into a video bank.
-
-    Body: {items:[{url,title,}], bank_id?} to APPEND to any existing bank, or
-    {items, name} to create one. The SAME contract as the image lane's
-    `/api/bank/scrape-import`, on purpose — the two destinations answer
-    {'ok','bank_id','name','created','saved','already_there','added','skipped'}
-    so one client helper drives both.
-
-    Synchronous, like the image outlet: the client sends a large selection as
-    successive batches. 400 on bad input — including the one destination that is
-    refused however explicitly it was picked: a bank sitting on a dataset's own
-    folder, where the clips would land inside training material. 409 when a pass
-    already owns the bank."""
-    data = request.get_json(silent=True) or {}
-    raw_bank_id = data.get('bank_id')
-    bank_id = None
-    if raw_bank_id is not None:
-        try:
-            bank_id = int(raw_bank_id)
-        except (TypeError, ValueError):
-            return jsonify({'error': 'bank_id must be a number'}), 400
-    try:
-        res = svc.scrape_import_to_video_bank(LOCAL_USER, data.get('items'),
-                                              bank_id=bank_id,
-                                              name=data.get('name'))
-    except bank_jobs.BankJobBusy as e:
-        return _busy(e)
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    return jsonify({'ok': True, **res})
+    """Compatibility refusal for retired online imports; never change a bank."""
+    return jsonify({'ok': False, 'error': 'Online media imports are disabled in this offline fork.'}), 403

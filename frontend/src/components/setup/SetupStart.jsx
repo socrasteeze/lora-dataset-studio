@@ -173,7 +173,7 @@ export default function SetupStart({ onTools, onRecheck, scanned = false, detect
               </li>
             })}
           </ol>
-          {plan.next?.action && <section className="space-y-3 rounded-xl border border-primary/40 bg-surface p-5" aria-label="Your next action" aria-live="polite">
+          {plan.next?.action && <section className="lds-section space-y-3 py-5" aria-label="Your next action" aria-live="polite">
             <p className="text-xs font-semibold uppercase tracking-wide text-primary">Your next action</p>
             <h2 className="text-xl font-semibold text-content">{plan.next.title}</h2>
             <p className="text-sm text-content-muted">{plan.next.description}</p>
@@ -183,7 +183,7 @@ export default function SetupStart({ onTools, onRecheck, scanned = false, detect
             </button>
             <p className="text-xs text-content-muted">When you finish, use “Back to my setup plan”. The plan checks what is ready; opening an installer does not complete a step.</p>
           </section>}
-          {(ready || plan.manual) && plan.first && <section className="space-y-3 rounded-xl border border-border bg-surface p-4" aria-label="Your first try">
+          {(ready || plan.manual) && plan.first && <section className="lds-section space-y-3 py-4" aria-label="Your first try">
             <p className={'text-xs font-medium ' + (ready ? 'text-emerald-400' : 'text-content-muted')}>
               {ready ? 'Ready for your first try' : 'First try — follow the plugin’s checks'}
             </p>

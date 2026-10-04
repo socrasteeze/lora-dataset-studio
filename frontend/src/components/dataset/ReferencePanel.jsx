@@ -28,7 +28,7 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
   // paid result would sit unannounced until the TTL deleted it.
   const waiting = onEditRef ? pendingEditNote(referenceEdit) : null;
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-3">
+    <div className="lds-section flex flex-col gap-2 py-3">
       <div className="flex items-center gap-3">
         <div className="w-20 h-20 rounded-lg bg-black overflow-hidden shrink-0 flex items-center justify-center">
           {refFilename

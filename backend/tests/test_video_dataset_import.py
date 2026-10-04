@@ -1,7 +1,6 @@
-"""Direct datasets: real CPU encoding, file/web parity and retry safety."""
+"""Direct datasets: local CPU encoding, offline refusal and retry safety."""
 import io
 from pathlib import Path
-import shutil
 import subprocess
 import time
 
@@ -90,28 +89,19 @@ def test_uploaded_clips_are_trainable_and_reimport_is_idempotent(client, app, cl
     assert all(p.suffix in ('.mp4', '.txt') for p in Path(data['output_dir']).iterdir())
 
 
-def test_web_import_downloads_selected_videos_and_reports_partial_failure(client, clip, monkeypatch):
-    def download(item, staging):
-        if item['url'].endswith('bad.mp4'):
-            return 'errors', None
-        path = Path(staging) / 'download'
-        shutil.copyfile(clip, path)
-        return 'ok', str(path)
-    monkeypatch.setattr(svc, '_download_scrape_video', download)
+def test_web_import_refuses_without_touching_existing_clips(client, monkeypatch):
+    def unexpected(*args, **kwargs):
+        pytest.fail('offline dataset import started a web download')
+    monkeypatch.setattr(svc, '_download_scrape_video', unexpected)
     dataset_id = _create(client).get_json()['id']
-    url = f'/api/video-dataset/{dataset_id}/scrape-import'
-    assert client.post(url, json={'items': [{'url': 'https://example.test/photo', 'type': 'image'}]}).status_code == 400
-    result = client.post(url, json={'items': [
-        {'url': 'https://example.test/bad.mp4', 'type': 'video'},
-        *[{'url': f'https://example.test/good-{i}.mp4', 'type': 'video', 'title': 'Not a caption'}
-          for i in range(7)],
-    ]})
-    assert result.status_code == 202
-    assert result.get_json()['queued'] == 8
-    data = _wait(client, dataset_id)
-    assert data['import_activity']['done'] == 8
-    assert data['clips'] == 1 and data['items'][0]['caption'] == ''
-    assert '1 errors' in data['import_activity']['detail']
+    before = client.get(f'/api/video-dataset/{dataset_id}').get_json()
+    result = client.post(f'/api/video-dataset/{dataset_id}/scrape-import', json={
+        'items': [{'url': 'https://example.invalid/clip.mp4', 'type': 'video'}],
+    })
+    assert result.status_code == 403
+    after = client.get(f'/api/video-dataset/{dataset_id}').get_json()
+    assert before['clips'] == after['clips'] == 0
+    assert before['items'] == after['items']
 
 
 def test_import_lease_protects_dataset_and_other_users(client, app):
@@ -125,7 +115,7 @@ def test_import_lease_protects_dataset_and_other_users(client, app):
             with pytest.raises(video_training.VideoTrainingUnsupported, match='import to finish'):
                 video_training.build_job_config(ds, ds.output_dir, 1000)
             with pytest.raises(ValueError, match='not found'):
-                intake.start(app, 'someone-else', dataset_id, items=[])
+                intake.start(app, 'someone-else', dataset_id, files=[])
         assert client.post(f'/api/video-dataset/{dataset_id}/import/cancel').get_json()['ok']
     finally:
         bank_jobs.abort(lease)

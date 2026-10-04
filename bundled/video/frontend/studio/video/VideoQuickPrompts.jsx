@@ -38,7 +38,7 @@ export default function VideoQuickPrompts({ mode, onAppend, hasReferenceImages =
 
   return (
     <section data-testid="video-quick-prompts"
-      className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface-raised p-2">
+      className="lds-section flex flex-col gap-1.5 py-2">
       <span className="text-2xs font-semibold uppercase tracking-wider text-content-muted">
         ⚡ Quick prompts
       </span>

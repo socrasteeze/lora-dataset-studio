@@ -88,7 +88,7 @@ export default function Dlss5InstallCard({ caps, onDone }) {
   )
 
   return (
-    <section className="rounded-xl border border-border bg-surface p-4">
+    <section className="lds-section py-4">
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
         <h3 className="text-base font-semibold text-content">
           2. Prepare the DLSS bridge and model
@@ -122,7 +122,7 @@ export default function Dlss5InstallCard({ caps, onDone }) {
       )}
 
       {!unfixable && (
-        <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3 text-sm text-content-muted">
+        <div className="lds-section mt-3 py-3 text-sm text-content-muted">
           <p>
             Place your copy of <code className="font-mono text-xs text-content">{st.model_file}</code> in this folder, then reopen this screen:
           </p>

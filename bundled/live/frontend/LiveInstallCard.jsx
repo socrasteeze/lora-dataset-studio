@@ -6,10 +6,10 @@ export default function LiveInstallCard({ caps, onDone }) {
   const live = caps?.live || {}, missing = Array.isArray(live.missing) ? live.missing : []
   const required = missing.filter(row => row.required), optional = missing.filter(row => !row.required)
   const canDownload = caps?.comfyui?.dir_valid === true
-  return <section className="rounded-xl border border-border bg-surface p-4" data-probe-panel="live-setup">
+  return <section className="lds-section py-4" data-probe-panel="live-setup">
     <h3 className="flex items-center gap-2 text-base font-semibold text-content">Live Channels <HelpBadge topic="setup-live" /></h3>
     <p className="mt-2 text-sm text-content-muted">Live includes its own player, scenes and LoRA controls. Install the stream encoder, then prepare H3 for local rendering. Existing H3 files are reused.</p>
-    <div className="mt-4 rounded-lg border border-border bg-surface-raised p-3">
+    <div className="lds-section mt-4 py-3">
       <p className="mb-2 text-sm text-content">{live.encoder ? '✓ Stream encoder ready' : 'Stream encoder needed'}</p>
       <InstallRunner action="live_encoder" buttonLabel={live.encoder ? 'Repair stream encoder' : 'Install stream encoder'} onDone={onDone} />
     </div>

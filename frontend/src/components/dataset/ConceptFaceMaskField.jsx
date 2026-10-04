@@ -323,7 +323,7 @@ export default function ConceptFaceMaskField({
           )}
 
           {preview && (
-            <div className="mt-2 rounded-lg border border-border bg-app/40 p-2">
+            <div className="lds-section mt-2 py-2">
               {/* A preview describes the exact kept set it was computed from. Once
                   that set moves, showing it as fresh would be worse than showing
                   nothing — the boxes would be drawn from photos that are no longer

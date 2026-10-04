@@ -12,6 +12,9 @@ The landing gate is `scripts/gates.ps1 -Phase Gates`.
 `fork-plugins.json` owns which plugins ship.
 Packaged images, compose files, and their launchers are not part of this fork.
 Install on the machine that runs the app. Remote ComfyUI stays.
+Runtime APIs must use localhost, private LAN addresses or the operator's tailnet.
+Hugging Face publishing and the web scraper are excluded. The ten remaining
+plugins run locally; explicit Setup downloads are preparation, not a runtime API.
 The Civitai publisher is not included. Saved link tables and the shared API key stay.
 API image engines and rented-GPU training stay excluded.
 Plugins that ship with the app are installed with it.
@@ -115,16 +118,19 @@ This fork has no `nightly` branch and no reduced gate before `main`.
 Do not land work by skipping the backend suite.
 `scripts/gates.ps1 -Phase Gates` is the landing gate.
 
-## Divergence 12: nothing leaves the machine unless the operator asks
+## Divergence 12: offline runtime
 
-The app reaches another machine only after an explicit click, and it
-does not send the operator's data or config anywhere new.
-Downloads the operator starts are allowed.
+The app does not call online product APIs or publish the operator's data.
+Localhost and operator-configured private-network tools and peers stay supported.
+Downloads the operator starts in Setup are allowed. Runtime inference and
+training use files already prepared locally; inference workers reject public
+network connections. See `docs/OFFLINE_WORKFLOWS.md`.
 
 What stays off:
 
-- An update check runs only for `?force=1` (Check for updates). Any other
-  call returns the last explicit answer, or `ok: false`.
+- In-app online update checks and apply operations are unavailable. Maintain
+  the checkout or replace the local release outside the app, then restart.
+- Civitai browsing and online media imports are unavailable, even with a saved key.
 - The "upstream is N commits ahead" check is deleted.
 - There is no plugin catalog. Installed plugins are listed by
   `GET /api/plugins/`, which also reports `can_manage`.
@@ -140,18 +146,17 @@ site. Remove any call that runs on its own.
 
 The gate does not see subprocesses or production-only boot threads.
 The inventory is the cover there.
-Update-check tests must stub `is_git_checkout`, or `?force=1` runs a
-real `git fetch`.
+Offline update-route tests must verify that no git fetch or release API runs.
 
 `create_app` does not resume rented-GPU work.
 `run.py` calls `incompatible_pillow_plugins()` and prints a repair command.
 It does not run pip.
 `test_startup_neither_resumes_rentals_nor_runs_pip` fails if boot does either.
 
-Still allowed, and only after a click: Hugging Face dataset export,
-the scraper, the Civitai browser, model and node-pack downloads,
-Setup installs, local-network peers the operator entered, and Check
-for updates.
+Still allowed: local file import/export, local generation and training,
+operator-started model/node-pack downloads and Setup installs, and the private
+network peers the operator entered. Stored credentials and historical link
+tables remain; they do not enable online runtime features.
 
 ## Mobile workflow contract
 

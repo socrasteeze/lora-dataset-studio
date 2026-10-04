@@ -73,6 +73,10 @@ def _require_dataset(user_id, dataset_id):
 
 def start(app, user_id, dataset_id, *, items=None, files=None, slice_long=False):
     """Stage uploads and launch one cancellable import. Web fetches run in the job."""
+    if files is None and items is not None:
+        from lds_sdk.lifecycle import offline_only
+        if offline_only():
+            raise ValueError('Online media imports are disabled in this offline fork.')
     _require_dataset(user_id, dataset_id)
     entries = list(files if files is not None else (items or []))
     if not entries:

@@ -47,7 +47,7 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
     setFilterInput('');
   };
   return (
-    <div className="rounded-lg border border-border bg-surface px-3 py-2">
+    <div className="lds-section py-2">
       <button type="button" data-workspace-focus
         onClick={() => setOpen((v) => !v)} aria-expanded={open}
         className="flex items-center gap-2 w-full text-left text-content text-sm font-semibold">

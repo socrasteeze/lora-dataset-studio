@@ -109,7 +109,7 @@ export default function SeedVr2InstallCard({ caps, onDone }) {
   }
 
   return (
-    <section className="rounded-xl border border-border bg-surface p-4">
+    <section className="lds-section py-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h3 className="text-base font-semibold text-content">
           SeedVR2 — fidelity upscaler <HelpBadge topic="setup-seedvr2-install" className="ml-2" />

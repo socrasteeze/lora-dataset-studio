@@ -124,7 +124,7 @@ export default function PersonPreflightDialog({
         </div>
 
         {phase !== 'choose' ? (
-          <div className="rounded-md border border-border bg-surface-raised p-3 text-sm space-y-1">
+          <div className="lds-section py-3 text-sm space-y-1">
             <p className="font-semibold text-content">
               {phase === 'stopping' ? 'Stopping the check' : 'Checking your folders'}
             </p>

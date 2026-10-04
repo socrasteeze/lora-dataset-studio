@@ -69,7 +69,7 @@ export default function ReferenceLibraryPicker({ kind, limit, heldKeys = [], dis
   const sources = feed.sources.length ? feed.sources.filter((s) => availableSources.some((a) => a.id === s.id)) : availableSources;
 
   return (
-    <section data-probe-panel="reference-library" className="flex min-w-0 flex-col gap-3 rounded-lg border border-primary/30 bg-app p-3" aria-label={`${targetLabel || labels[kind]} library`}>
+    <section data-probe-panel="reference-library" className="lds-section flex min-w-0 flex-col gap-3 py-3" aria-label={`${targetLabel || labels[kind]} library`}>
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-xs font-semibold text-content">Choose {targetLabel || labels[kind]} from the library</h3>
         <HelpBadge topic="video-reference-library" />

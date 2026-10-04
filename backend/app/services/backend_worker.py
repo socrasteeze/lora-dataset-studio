@@ -238,8 +238,10 @@ class BackendWorkerManager:
                                 'backend render has nowhere to land')
         local_name = f'backend_{job.job_id[:8]}_{os.path.basename(remote_filename)}'
         try:
+            from ..utils.local_api import local_api_url
+            backend_url = local_api_url(backend['url'])
             qs = urlencode({'filename': remote_filename, 'type': 'output'})
-            r = requests.get(urljoin(backend['url'] + '/', f'view?{qs}'),
+            r = requests.get(urljoin(backend_url + '/', f'view?{qs}'),
                              timeout=120, stream=True)
             r.raise_for_status()
             os.makedirs(out_dir, exist_ok=True)
@@ -248,7 +250,7 @@ class BackendWorkerManager:
                 for chunk in r.iter_content(chunk_size=256 * 1024):
                     if chunk:
                         fh.write(chunk)
-        except (OSError, requests.RequestException) as e:
+        except (OSError, ValueError, requests.RequestException) as e:
             return None, True, (f'could not download {remote_filename} from '
                                 f'backend {backend["name"]}: {e}')[:400]
         return local_name, False, None

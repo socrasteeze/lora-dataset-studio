@@ -111,6 +111,8 @@ def recover(clip):
         # comfyui.ignored: no request; fall through to the local saved-MP4 check.
         if url and job.comfyui_prompt_id and cfg.get('comfyui.ignored') is not True:
             try:
+                from lds_sdk.network import local_api_url
+                url = local_api_url(url)
                 response = requests.get(f'{url}/history/{quote(job.comfyui_prompt_id, safe="")}', timeout=(3, 5))
                 response.raise_for_status()
                 entry = response.json().get(job.comfyui_prompt_id) or {}

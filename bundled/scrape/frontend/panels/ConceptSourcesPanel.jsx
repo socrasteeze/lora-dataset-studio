@@ -334,7 +334,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy,
   };
 
   return (
-    <section className="bg-surface rounded-xl border border-border p-3 flex flex-col gap-2">
+    <section className="lds-section py-3 flex flex-col gap-2">
       <div className="flex items-center gap-2 flex-wrap">
         <h2 className="text-content font-semibold text-sm">
           <><Globe aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{toVideoDataset ? 'Import videos from the web' : toVideoBank ? 'Scrape videos into the bank'

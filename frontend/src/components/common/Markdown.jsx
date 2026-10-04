@@ -220,7 +220,7 @@ export default function Markdown({ source, variant = 'default', sectionActions =
           const action = sectionActions ? sectionActions[headingId] : null;
           return (
           <section key={`section-${index}`} id={headingId}
-            className="rounded-xl border border-border bg-surface px-4 py-4 shadow-sm shadow-black/10 sm:px-5 sm:py-5">
+            className="lds-section py-4 sm:py-5">
             <div className="mb-4 flex items-start gap-3 border-b border-border pb-3">
               <span aria-hidden className="mt-1 h-5 w-1 shrink-0 rounded-full bg-gradient-primary" />
               <div className="min-w-0 flex-1">{renderBlock(heading, index, true)}</div>

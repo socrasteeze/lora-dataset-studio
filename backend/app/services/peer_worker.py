@@ -166,7 +166,9 @@ class PeerWorker:
         }
 
     def _base(self) -> str:
-        return (cfg.get('cluster.primary_url') or '').rstrip('/')
+        from ..utils.local_api import local_api_url
+        value = (cfg.get('cluster.primary_url') or '').rstrip('/')
+        return local_api_url(value) if value else ''
 
     def _url(self, path: str) -> str:
         return urljoin(self._base() + '/', path.lstrip('/'))
@@ -282,7 +284,9 @@ class PeerWorker:
     def _download_one_artifact(self, job_id: str, name: str, dest_dir: Path) -> tuple[str, Path]:
         safe = os.path.basename(name)
         url = self._url(f'/api/cluster/peer/artifacts/{job_id}/{safe}')
-        r = requests.get(url, headers=self._headers(), timeout=120, stream=True)
+        from ..utils.local_api import local_api_url
+        url = local_api_url(url)
+        r = requests.get(url, headers=self._headers(), timeout=120, stream=True, allow_redirects=False)
         r.raise_for_status()
         path = dest_dir / safe
         with open(path, 'wb') as f:

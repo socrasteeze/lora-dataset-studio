@@ -26,11 +26,11 @@ export default function VideoPassesPanel({
   startPass, onDescribe, onCutsChanged,
 }) {
   return (
-    <div className="space-y-3 rounded-xl border border-border bg-surface p-3">
+    <div className="lds-section space-y-3 py-3">
       {/* What to do next, as ONE sentence. Twelve equal buttons and no order is
           how a user runs detection before the probe, gets "0 shots" and a green
           success, and concludes the app cannot read their files. */}
-      <div className="rounded-lg border border-border bg-surface-raised p-3 text-sm">
+      <div className="lds-section py-3 text-sm">
         <p className="text-content">{step.text}</p>
         {step.blocked && (
           <p className="mt-1 text-xs text-amber-300">⚠ {step.blocked.why}</p>

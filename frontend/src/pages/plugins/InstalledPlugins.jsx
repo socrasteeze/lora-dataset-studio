@@ -111,7 +111,7 @@ export default function InstalledPlugins({ plugins = [], busy, caps, capsKnown =
                 </p>
               )}
               {plugin.environment && (
-                <div className="mt-1 space-y-2 rounded-md border border-border p-3 [&_button]:min-h-10 lg:[&_button]:min-h-0">
+                <div className="lds-section mt-1 space-y-2 py-3 [&_button]:min-h-10 lg:[&_button]:min-h-0">
                   <p className="text-sm font-medium">Python environment · {plugin.environment.ready ? 'Ready' : 'Needs installation'}</p>
                   {plugin.environment.reason && <p className="text-xs text-content-muted">{plugin.environment.reason}</p>}
                   {plugin.environment.can_install && (

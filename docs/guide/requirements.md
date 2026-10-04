@@ -55,4 +55,3 @@ Core tools are prepared in **Setup**. Optional features that ship with the app a
 | LoRA Canvas browsing, layout, notes and diffs | No external service; generating needs ComfyUI and same-family checkpoints, continuing needs the local training lane |
 | Test Studio | ComfyUI reachable + assets for a supported Studio family |
 | Backup/restore and ZIP/folder merge | No external service |
-| Hugging Face publishing | Write-enabled `HF_TOKEN`; repositories are private by default |

@@ -686,7 +686,7 @@ export default function BankPage() {
           </label>
         )}
         {splitMode && preview && (
-          <div className="rounded-md border border-border bg-surface-raised p-3 text-sm">
+          <div className="lds-section py-3 text-sm">
             {preview.subfolders.length === 0 ? (
               <p className="text-content-muted">
                 No subfolders with images here — this will create a single bank

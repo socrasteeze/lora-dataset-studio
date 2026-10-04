@@ -97,7 +97,7 @@ const TOPICS = [
     keywords: ['engine', 'engines', 'generation', 'klein', 'comfyui', 'local', 'lora', 'preset'],
     guide: { chapter: 'settings-reference', anchor: 'image-engines' },
     app: { route: '/settings/engines' } },
-  { id: 'settings-scraping', kind: 'section', title: 'Settings · Scraping & sources',
+  { id: 'settings-scraping', kind: 'section', title: 'Settings · Shared Service Access',
     keywords: ['scraping', 'sources', 'reddit', 'civitai', 'pexels', 'scrape', 'import', 'rate limit', '429'],
     guide: { chapter: 'settings-reference', anchor: 'scraping-sources' },
     app: { route: '/settings/scraping' } },
@@ -892,7 +892,7 @@ const TOPICS = [
   // 🌐 Un seul composant (bouton + navigateur) monté par les TROIS surfaces de
   // génération — Studio du dataset, comparaison multi-LoRA, « Generate from the
   // board » : un seul sujet d'aide pour les trois.
-  action('studio-civitai-browser', '🌐 Civitai: browse top images and reuse their prompts',
+  action('studio-civitai-browser', 'Civitai Browsing Disabled',
     ['studio', 'test studio', 'canvas', 'generate from the board', 'civitai',
      'civitai prompts', 'top images', 'browse civitai', 'prompt ideas',
      'prompt inspiration', 'find a prompt', 'copy a prompt', 'use prompt',

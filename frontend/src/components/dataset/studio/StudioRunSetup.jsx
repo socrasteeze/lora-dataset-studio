@@ -93,7 +93,7 @@ export default function StudioRunSetup({
   }, [loadRecent, onToggleBatchPrompt, batchPrompts]);
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3">
+    <div className="lds-section flex flex-col gap-3 py-3">
       {gpuBusy && (
         <p className="m-0 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-red-300 text-sm" role="status">
           {gpuBusy}

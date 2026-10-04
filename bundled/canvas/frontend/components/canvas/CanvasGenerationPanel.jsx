@@ -47,7 +47,7 @@ function CanvasCheckpointRecap({ selection, onToggle, onClear }) {
   }, [selection]);
 
   return (
-    <div id="st-loras" className="scroll-mt-16 rounded-lg border border-border bg-app/40 p-2">
+    <div id="st-loras" className="lds-section scroll-mt-16 py-2">
       <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-2xs font-semibold text-content">
           Checkpoints

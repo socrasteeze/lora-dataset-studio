@@ -43,6 +43,11 @@ import sys
 from typing import Any
 
 
+if os.environ.get('LDS_INFER_OFFLINE_HELPER'):
+    import runpy
+    runpy.run_path(os.environ['LDS_INFER_OFFLINE_HELPER'])['enforce_inference_offline']()
+
+
 def _log(m):
     print(m, file=sys.stderr, flush=True)
 

@@ -74,7 +74,7 @@ export default function VideoClipSearchBox({
   }
 
   return (
-    <section className="rounded-lg border border-border bg-surface p-3">
+    <section className="lds-section py-3">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-sm font-semibold text-content">🔎 Find scenes</h2>
         <HelpBadge topic="video-bank-search" />
@@ -157,7 +157,7 @@ export default function VideoClipSearchBox({
             {showLimits ? 'Hide what it cannot do' : 'What it cannot do'}
           </button>
           {showLimits && (
-            <div className="space-y-1 rounded-md border border-border bg-app/40 p-2">
+            <div className="lds-section space-y-1 py-2">
               <p className="text-xs text-content-muted">{limitsSentence()}</p>
               <ul className="list-disc space-y-0.5 pl-4 text-xs text-content-subtle">
                 {VIDEO_CLIP_LIMITS.map((l) => <li key={l}>{l}</li>)}

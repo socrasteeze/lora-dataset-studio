@@ -109,7 +109,7 @@ export default function CameraInstallCard({ caps, onDone }) {
   const nothingToDownload = plan.length === 0 && phase !== 'running'
 
   return (
-    <section className="rounded-xl border border-border bg-surface p-4">
+    <section className="lds-section py-4">
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
         <h3 className="text-base font-semibold text-content">
           📷 Camera angles — re-shoot from another position

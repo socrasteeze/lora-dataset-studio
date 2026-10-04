@@ -981,7 +981,7 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
 
           <div id="vs-source" className="scroll-mt-16">
             {isReference ? <>
-              <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface p-2">
+              <div className="lds-section mb-2 flex flex-wrap items-center gap-2 py-2">
                 <div role="group" aria-label="Video input mode" className="flex w-full gap-1">
                   {[['i2v', 'From an image'], ['t2v', 'Text only'], ['ref2va', 'References']].map(([id, text]) => (
                     <button key={id} type="button" aria-pressed={mode === id} disabled={busy || reference.staging} onClick={() => setMode(id)}
@@ -1031,7 +1031,7 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
               onMode={setMode} onDrop={disarmContinuation} />
           </div>
 
-          <div id="vs-motion" data-probe-panel="video-studio-motion" className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface p-3 scroll-mt-16">
+          <div id="vs-motion" data-probe-panel="video-studio-motion" className="lds-section flex flex-col gap-1.5 py-3 scroll-mt-16">
             <span className="flex flex-wrap items-center gap-1.5">
               <label htmlFor="vs-motion-text" className="text-sm font-semibold text-content">Motion</label>
               <HelpBadge topic="video-studio-motion-writer" />
@@ -1153,7 +1153,7 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
             {/* The batch's prompt, asked only when there IS a batch: two
                 choices, so a segmented pair rather than a select. */}
             {mode === 'i2v' && sources.length > 1 && (
-              <div data-testid="video-prompt-mode" className="flex flex-col gap-1 rounded-lg border border-border bg-surface-raised px-2 py-1.5 text-2xs">
+              <div data-testid="video-prompt-mode" className="lds-section flex flex-col gap-1 py-1.5 text-2xs">
                 <span className="font-semibold text-content">Prompt for the {sources.length} pictures</span>
                 <div role="radiogroup" aria-label="Prompt for the batch" className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-surface p-0.5">
                   {[['same', 'Same for all'], ['per-image', '✨ Written per picture']].map(([id, text]) => (
@@ -1185,7 +1185,7 @@ export default function VideoTestStudio({ datasetId = null } = {}) {
             }} />
           <VideoOptionsPanel options={options} value={renderOpts} onChange={isReference ? reference.setSettings : setOpts} referenceMode={isReference}
             onRefresh={() => apiFetch(optionsUrl()).then(setOptions).catch((e) => toast.error(e?.message || 'Could not refresh model availability.'))} />
-          <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-3">
+          <div className="lds-section flex flex-col gap-2 py-3">
             <p className="break-words font-mono text-2xs leading-snug text-content-muted">
               {readback}
             </p>

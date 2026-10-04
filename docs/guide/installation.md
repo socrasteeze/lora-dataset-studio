@@ -78,12 +78,10 @@ Which of the two serves those features is a single setting (**Settings ▸ Local
 
 | Service | Used for | Where to create it |
 |---|---|---|
-| Pexels | Optional official-API image search | [Pexels API key](https://www.pexels.com/api/key/) |
-| Hugging Face | Gated weights and optional publishing | [Hugging Face tokens](https://huggingface.co/settings/tokens) |
+| Hugging Face | Operator-started gated weight downloads | [Hugging Face tokens](https://huggingface.co/settings/tokens) |
 
 Secrets saved in Settings live in the git-ignored `.env`, never in `config.json` or a commit. This build carries no referral or affiliate link of any kind, and no cloud generation or cloud training plugin ships or loads here — see [Known limitations](known-limitations.md).
 
-> **Pexels authorization required:** An API key alone does not authorize dataset or machine-learning use. Configure this integration only if Pexels has explicitly authorized this use case, and keep the attribution LDS displays. Read the [official Pexels terms and conditions](https://help.pexels.com/hc/en-us/articles/900005880463-What-are-the-Terms-and-Conditions/).
 
 ## Install on this machine
 

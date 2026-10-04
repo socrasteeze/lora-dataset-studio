@@ -247,6 +247,10 @@ def training_subprocess_env(hf_home=None) -> dict:
     """
     env = dict(os.environ, HF_HOME=str(hf_home if hf_home is not None else _hf_home()),
                PYTHONIOENCODING='utf-8')
+    # Training uses models already prepared on this machine. Preparation jobs
+    # own downloads; runtime training and experiment logging stay offline.
+    env.update(HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1',
+               HF_HUB_DISABLE_TELEMETRY='1', WANDB_MODE='offline', WANDB_DISABLED='true')
     token = (cfg.secret('HF_TOKEN') or '').strip()
     if token:
         env['HF_TOKEN'] = token

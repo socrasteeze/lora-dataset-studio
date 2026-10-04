@@ -270,6 +270,8 @@ def snapshot(max_age=_CACHE_SECONDS) -> dict:
         if cached is not None and now - _cache['at'] < max_age:
             return cached
     try:
+        from ..utils.local_api import local_api_url
+        api_url = local_api_url(api_url)
         fresh = _read(api_url)
     except Exception:                       # noqa: BLE001 — a glance is never fatal
         logger.exception('comfyui console: read failed')

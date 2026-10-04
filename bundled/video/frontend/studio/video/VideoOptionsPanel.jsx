@@ -132,7 +132,7 @@ export default function VideoOptionsPanel({ options, value, onChange, referenceM
 
   return (
     <section data-probe-panel="video-studio-options"
-      className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-3">
+      className="lds-section flex flex-col gap-3 py-3">
       <div className="flex flex-col gap-1.5">
         <h2 className="text-sm font-semibold text-content">Render</h2>
         {referenceMode && <VideoReferenceOptions options={options?.reference} value={value} onChange={set} onRefresh={onRefresh} performance={options?.performance} />}

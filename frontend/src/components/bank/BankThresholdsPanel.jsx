@@ -68,7 +68,7 @@ const SMALL_BTN = btnClass({ size: 'sm' })
 function Group({ group, open, onToggle, customised, children }) {
   const panelId = `bank-th-group-${group.id}`
   return (
-    <section className="rounded-lg border border-border bg-surface">
+    <section className="lds-section">
       <button type="button" onClick={onToggle} aria-expanded={open} aria-controls={panelId}
         className={`${controlHeight('md')} flex w-full items-center gap-2 px-3 text-left`}>
         <span aria-hidden className="text-sm">{group.emoji}</span>

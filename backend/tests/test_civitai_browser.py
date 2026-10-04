@@ -252,7 +252,7 @@ def test_want_and_skip_are_clamped(monkeypatch):
 
 # ------------------------------------------------------------------ route ----
 
-def test_route_passes_filters_and_answers_ok(client, monkeypatch):
+def test_route_refuses_online_browsing_before_consulting_filters(client, monkeypatch):
     seen = {}
 
     def fake_browse(**kwargs):
@@ -263,25 +263,22 @@ def test_route_passes_filters_and_answers_ok(client, monkeypatch):
     monkeypatch.setattr(cb, 'browse', fake_browse)
     r = client.get('/api/studio/civitai/images?period=month&sort=newest'
                    '&level=x&want=6&require_prompt=0&cursor=abc&skip=4')
-    assert r.status_code == 200
+    assert r.status_code == 403
     body = r.get_json()
-    assert body['ok'] is True and body['has_key'] is True
-    assert seen == {'period': 'month', 'sort': 'newest', 'level': 'x',
-                    'cursor': 'abc', 'skip': '4', 'want': '6',
-                    'require_prompt': False}
+    assert body['ok'] is False and 'offline' in body['error']
+    assert seen == {}
 
 
-def test_route_maps_upstream_failure_to_409(client, monkeypatch):
+def test_route_never_attempts_an_upstream_call(client, monkeypatch):
     def fake_browse(**kwargs):
-        raise RuntimeError('Civitai did not answer - check your connection '
-                           'and try again.')
+        pytest.fail('offline route attempted Civitai')
     monkeypatch.setattr(cb, 'browse', fake_browse)
     r = client.get('/api/studio/civitai/images')
-    assert r.status_code == 409
+    assert r.status_code == 403
     assert 'Civitai' in r.get_json()['error']
 
 
-def test_route_maps_bad_params_to_400(client, monkeypatch):
+def test_route_is_offline_even_with_bad_browser_params(client, monkeypatch):
     _wire(monkeypatch, FakeCivitai({}, {}))
     r = client.get('/api/studio/civitai/images?period=fortnight')
-    assert r.status_code == 400
+    assert r.status_code == 403

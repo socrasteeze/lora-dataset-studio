@@ -2,6 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Structural groups share the page or dialog surface. Their headings and
+   separators carry hierarchy; controls, records, media and alerts keep their
+   own boundaries. Card also uses this class through the public plugin SDK. */
+.lds-section {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding-inline: 0;
+}
+.lds-section + .lds-section {
+  border-top: 1px solid rgb(var(--border));
+}
+.lds-section > :is(summary, legend) {
+  padding-inline: 0;
+}
+
 /* The global header keeps workspaces above a separate machine/tools shelf. */
 .app-header {
   background: rgb(var(--surface-overlay));

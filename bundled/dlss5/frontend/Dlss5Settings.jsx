@@ -27,7 +27,7 @@ export default function Dlss5Settings() {
   const environment = facts?.environment
   return <div className="space-y-3">
     {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
-    <section className="rounded-xl border border-border bg-surface p-4">
+    <section className="lds-section py-4">
       <h2 className="text-base font-semibold text-content">DLSS Engine</h2>
       <p className="mt-2 text-sm text-content-muted">A dedicated Python environment contains NumPy and the video encoder. Video lane, ComfyUI and other plugins are not required.</p>
       {environment?.action && <div className="mt-3"><InstallRunner action={environment.action}

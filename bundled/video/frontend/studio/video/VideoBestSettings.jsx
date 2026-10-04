@@ -53,7 +53,7 @@ export default function VideoBestSettings({ state, busy, error, onApply, onRemov
   const best = state?.best_settings;
   if (!best && !error) return null;
   return (
-    <section data-probe-panel="video-best-settings" className="flex min-w-0 flex-col gap-2 rounded-xl border border-primary/40 bg-surface p-3">
+    <section data-probe-panel="video-best-settings" className="lds-section flex min-w-0 flex-col gap-2 py-3">
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-content">
         <Star aria-hidden="true" className="h-4 w-4 text-primary" />Best settings
       </h3>

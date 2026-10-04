@@ -42,7 +42,7 @@ export default function CanvasBlendPanel({
   const configCount = canvasBlendConfigCount(selection, { weights, sets });
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border bg-app/40 p-2">
+    <div className="lds-section flex flex-col gap-2 py-2">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-2xs font-semibold text-content">
           <span aria-hidden>⚗️</span> How to use these checkpoints

@@ -31,7 +31,7 @@ export default function TrainingMergeTool({ family }) {
   };
   return (
     <details open={mergeOpen}
-      className="rounded-lg border border-border bg-surface-raised px-3 py-2">
+      className="lds-section py-2">
       <summary onClick={toggleMerge}
         className="min-h-10 lg:min-h-0 cursor-pointer text-content text-xs font-semibold">
         <Dna aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Merge a LoRA into a base checkpoint

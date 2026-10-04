@@ -147,8 +147,10 @@ def _get(path: str, *, url: str | None = None, reach: '_Reach | None' = None,
     every failure sentence, out to a 500.
     """
     try:
-        resp = requests.get(f'{url or base_url()}{path}', headers=_headers(),
-                            timeout=network_timeout(timeout))
+        from ..utils.local_api import local_api_url
+        endpoint = local_api_url(url or base_url())
+        resp = requests.get(f'{endpoint}{path}', headers=_headers(),
+                            timeout=network_timeout(timeout), allow_redirects=False)
         if reach is not None:
             reach.answered = True
             status = getattr(resp, 'status_code', None)
@@ -380,11 +382,13 @@ def ensure_model_loaded(model: str, *, url: str | None = None,
             _seen_loaded.add((endpoint, model))
             return True, 'already loaded'
         try:
+            from ..utils.local_api import local_api_url
+            endpoint = local_api_url(endpoint)
             resp = requests.post(f'{endpoint}/api/v1/models/load',
                                  json={'model': model},
                                  headers={'Content-Type': 'application/json', **_headers()},
                                  timeout=network_timeout(timeout, processing=True))
-        except requests.RequestException as exc:
+        except (requests.RequestException, ValueError) as exc:
             return False, failure_sentence(None, str(exc))
         if resp.status_code >= 400:
             body = resp.text or ''
@@ -423,6 +427,8 @@ def release(endpoint: str | None = None, model: str | None = None) -> bool:
     _seen_loaded.difference_update({(url, t) for t in targets})
     for inst in targets:
         try:
+            from ..utils.local_api import local_api_url
+            url = local_api_url(url)
             resp = requests.post(f'{url}/api/v1/models/unload',
                                  json={'instance_id': inst},
                                  headers=_headers(), timeout=network_timeout((5, 30)))
@@ -554,7 +560,8 @@ def _chat(messages, *, model, max_tokens, temperature, timeout, url=None, as_jso
     if think is False:
         payload['reasoning_effort'] = 'none'
     headers = {'Content-Type': 'application/json', **_headers()}
-    target = f'{url or base_url()}/v1/chat/completions'
+    from ..utils.local_api import local_api_url
+    target = f'{local_api_url(url or base_url())}/v1/chat/completions'
     if not as_json:
         return requests.post(target, json=payload, headers=headers, timeout=network_timeout(timeout, processing=True))
 

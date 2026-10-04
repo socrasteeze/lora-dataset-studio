@@ -55,7 +55,7 @@ export default function VideoThresholdsPanel({ bankId, saved, totalClips, onAppl
   }
 
   return (
-    <details className="rounded-lg border border-border bg-surface">
+    <details className="lds-section">
       <summary className="min-h-10 lg:min-h-0 cursor-pointer px-3 py-2 text-sm font-semibold text-content">
         🎚 Quality cuts
       </summary>

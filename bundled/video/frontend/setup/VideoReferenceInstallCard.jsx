@@ -73,7 +73,7 @@ export default function VideoReferenceInstallCard({ caps, onDone }) {
   };
   if (!status) return null;
   return (
-    <section className="mt-4 flex flex-col gap-2 rounded-xl border border-border bg-app p-3" data-probe-panel="setup-video-references">
+    <section className="lds-section mt-4 flex flex-col gap-2 py-3" data-probe-panel="setup-video-references">
       <h3 className="flex items-center gap-2 text-sm font-semibold text-content">Reference-to-video <HelpBadge topic="video-studio-reference-model" /></h3>
       <p className="text-xs text-content-muted">Choose one base and its reference acceleration. Existing H3 prompt encoders and decoders are shared. LightX reference LoRAs are about 1.96 GB each; VDN uses its own stage.</p>
       <div className="grid gap-2 sm:grid-cols-2">

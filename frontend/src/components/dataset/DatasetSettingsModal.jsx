@@ -161,7 +161,7 @@ export default function DatasetSettingsModal({ d, busy, onSave, onClose }) {
             <span className="text-content-subtle font-normal">— optional creative direction</span>
           </button>
           {suffixOpen && (
-            <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface px-3 py-2.5">
+            <div className="lds-section flex flex-col gap-2 py-2.5">
               <label className="flex flex-col gap-1">
                 <span className="text-content-muted text-xs">All shots</span>
                 <input value={gSuffix} onChange={(e) => setGSuffix(e.target.value)}

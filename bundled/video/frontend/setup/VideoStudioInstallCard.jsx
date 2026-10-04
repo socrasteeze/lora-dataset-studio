@@ -155,7 +155,7 @@ export default function VideoStudioInstallCard({ caps, onDone }) {
   }
 
   return (
-    <section className="rounded-xl border border-border bg-surface p-5">
+    <section className="lds-section py-5">
       <h3 className="flex items-center gap-2 text-base font-semibold text-content">
         🎬 Video Test Studio
         <span className="rounded-md border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-2xs font-semibold text-amber-200">
@@ -223,7 +223,7 @@ export default function VideoStudioInstallCard({ caps, onDone }) {
       )}
 
       {/* Third-party ComfyUI packs are installed manually. */}
-      <div className="mt-4 rounded-lg border border-border bg-app p-3 text-sm">
+      <div className="lds-section mt-4 py-3 text-sm">
         <p className="font-medium text-content">Optional — installed on the ComfyUI side</p>
         <p className="mt-1 text-content-subtle">
           These third-party packs are ComfyUI custom nodes, not model files.
@@ -246,7 +246,7 @@ export default function VideoStudioInstallCard({ caps, onDone }) {
       </div>
 
       {!!byHand.length && (
-        <div className="mt-3 rounded-lg border border-border bg-app p-3 text-sm">
+        <div className="lds-section mt-3 py-3 text-sm">
           <p className="font-medium text-content">Two files this app will not download</p>
           <ul className="mt-1 space-y-1 text-content-muted">
             {byHand.map((m) => (

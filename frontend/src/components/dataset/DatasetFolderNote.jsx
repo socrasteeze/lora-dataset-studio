@@ -27,7 +27,7 @@ export default function DatasetFolderNote({ path }) {
     else { setFailed(true); setTimeout(() => setFailed(false), 2500) }
   }
   return (
-    <div className="min-w-0 rounded-lg border border-border bg-surface px-3 py-2 text-xs lg:text-sm">
+    <div className="lds-section min-w-0 py-2 text-xs lg:text-sm">
       <div className="flex min-w-0 items-center gap-2">
         <span className="inline-flex shrink-0 items-center gap-1.5 text-content-muted"><Folder aria-hidden="true" className="h-3.5 w-3.5" /> Images folder</span>
         <code className="min-w-0 grow truncate font-mono text-content-muted" title={path}>

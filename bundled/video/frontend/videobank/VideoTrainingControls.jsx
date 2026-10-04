@@ -6,7 +6,7 @@ export default function VideoTrainingControls({ value, onChange, error }) {
   const set = (key, next) => onChange({ ...value, [key]: next })
   const inputClass = 'min-h-10 lg:min-h-0 rounded border border-border bg-surface-raised px-2 py-1 text-xs text-content'
   return (
-    <div className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-surface p-3">
+    <div className="lds-section flex min-w-0 flex-col gap-2 py-3">
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-xs text-content-muted">
           LoRA rank
