@@ -85,6 +85,20 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-04-bank-launch-reject-opt-in',
+    date: '2026-10-04',
+    title: 'Choose When to Reject',
+    blurb: 'Bank Launch starts with Auto-reject unchecked. Select it when you want flagged images or duplicate groups rejected. The same default applies when launching one bank or queueing banks together.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-04-tagging-device-copy',
+    date: '2026-10-04',
+    title: 'GPU Tagging',
+    blurb: 'The Tags pass supports GPU or CPU inference. Launch All and Setup now describe both options. Select Tagging Device in Settings > Captioning: Auto uses CUDA when available, GPU only refuses CPU fallback, and CPU leaves the GPU free.',
+    to: '/settings/captioning',
+  },
+  {
     id: '2026-10-04-mobile-bank-rows',
     date: '2026-10-04',
     title: 'Organized Bank Controls',

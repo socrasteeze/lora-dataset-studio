@@ -1,11 +1,11 @@
 # HANDOFF
 
-**Updated:** 2026-10-04 | **Branch:** noble/compact-app-interface | **Base:** c60852194 | **Delivery:** task branch; main held
+**Updated:** 2026-10-04 | **Branch:** noble/compact-app-interface | **Base:** c60852194 | **Delivery:** main explicitly authorized without tests
 
 ## State
-Mobile Bank controls now fill equal-width rows. Name/Folder split evenly; Browse/Subfolders share the left half below them and Create Bank fills the right. Mobile toolbar totals and the stale-count notice are hidden. Card Open/Launch All actions fill equal halves. The shared Bank/Dataset pager puts page details and page size above full-row Previous/Next buttons, with 1rem plus the device safe-area inset below.
-Source and the consolidated published frontend bundle use separate commits on origin/noble/compact-app-interface. Main remains behind its cloud landing gate. The user requested no tests for this delivery; tests, responsive probes and Gates remain deferred.
-The published bundle excludes pre-existing local PixAI work. That work and the local runtime bundle remain in the desktop workspace. Build, frontend lint (32 warnings, zero errors), Ruff and the privacy scanner passed. These checks do not qualify rendered layout or physical PWA behavior.
+The user authorized a clean push and merge to main without tests on 2026-10-04. This explicitly overrides the deferred cloud landing gate for this wave. No tests, responsive probes or Gates ran; this delivery is not runtime or device qualification.
+Bank Launch now leaves Auto-reject unchecked for individual banks and multi-bank queues. Manual selection retains the existing rejection settings. Launch All and Setup correctly describe WD14 GPU/CPU support. Mobile Bank controls, card actions and the shared Bank/Dataset pager use full-width rows, with safe-area footer padding.
+Source and the consolidated publication bundle use separate commits. The publication snapshot excludes unrelated local PixAI source, tests, configuration and runtime bundle changes. Those remain in the desktop workspace. Build, both linters and privacy checks passed. Delivery commits request CI skipping to honor the no-tests instruction.
 ## Done this session
 - Removed redundant Bank creation/workspace boxes, nested pass option cards and the duplicate overview disclosure; placed the pressed Subfolders toggle between Browse and Create.
 - Matched Image/Video Bank headers and creation control heights. Kept equal-width lane choices and accessible sort names without visible Sort prefixes.
@@ -16,7 +16,7 @@ The published bundle excludes pre-existing local PixAI work. That work and the l
 ## Open
 1. Do not start tests, responsive probes or Gates unless the user requests validation again. Preserve the local PixAI source and runtime work when continuing this branch.
 2. When validation is authorized, run frontend and bundled tests, privacy/contracts, and populated responsive probes for all affected routes. Fix failures without weakening probe thresholds.
-3. Carry forward the cloud Gates landing requirement for the previous refactor fixes, density pass and flat-section pass. Prior targeted tests are not full qualification.
+3. The user explicitly waived the cloud landing gate for this delivery. The previous refactor, density, flat-section and mobile changes remain untested. Run qualification when separately authorized.
 4. Preserve separate source and consolidated build(frontend): commits. Validate the exact published task-branch commits before any future landing on main.
 5. Validate backend/tests/test_offline_workflows.py, the changed Civitai/update refusals and local/peer API contracts when testing is authorized. Check missing-model errors and manual Setup preparation. Startup health is confirmed; full runtime network behavior is not qualified.
 6. Reconcile legacy scraping/publishing test fixtures with the offline profile during the next validation wave. Those products cannot load through a distribution override. Do not restore retired features to satisfy old expectations. Keep backend and frontend plugin markers matched during future switches.

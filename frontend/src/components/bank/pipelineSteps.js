@@ -30,6 +30,7 @@ export const STEP_COPY = {
   },
   auto_reject: {
     label: 'Auto-reject flagged',
+    defaultOff: true,
   },
   score: {
     label: 'Score', needs: 'Bank scoring extra',
@@ -60,12 +61,12 @@ export const STEP_COPY = {
   },
   tags: {
     label: '🔖 Tags', needs: 'Image tagging (WD14)',
-    desc: 'CPU · never writes captions. Runs here only.',
+    desc: 'GPU or CPU · never writes captions. Runs here only.',
   },
   caption: {
     label: 'Caption', needs: 'Caption engine',
     desc: 'GPU · searchable, rides to the dataset.',
-    // The only step that does NOT start ticked. It is the slowest by a wide
+    // Captioning also starts unticked. It is the slowest by a wide
     // margin and the one people most often want to run separately, so an
     // overnight Launch-all should not quietly commit to it.
     defaultOff: true,
