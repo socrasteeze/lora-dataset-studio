@@ -1,4 +1,195 @@
-# PLAN.md — detach, prune, tighten
+# PLAN.md - remove scrapers, hosted APIs and cloud code
+
+Current plan: 2026-10-04. Requested by the operator after branch integration.
+Inventory reviewed against source at `87804276b` (source matches fork main
+`9536f5257`; the additional commits merge and document the upstream review).
+This section supersedes the older plan below wherever their scopes conflict,
+especially its default to keep Cloud/API SDK compatibility shims. This is a
+plan only; implementation and migrations have not begun.
+
+## Target and scope
+
+Remove the implementation of scraping, public-site media discovery, hosted
+generation/captioning, rental training, remote publishing and cloud provider
+integration. Disabled switches, unavailable-provider adapters, empty UI
+components and unused provider code do not meet this target.
+
+Provisional boundary, pending the operator's networking preference: retain
+local generation/training/captioning, the app's HTTP API, phone access over a
+private network, private LAN/Tailscale workers, and explicit Setup/package/model
+downloads. Runtime models remain local. Downloads must have a distinct owner;
+they must not preserve a browsing, publishing or hosted inference API. If the
+operator requests fully offline use, also remove download installers, download
+credentials, release checks and network peer features, replacing Setup with
+local file/package import. Resolve this boundary before editing those shared
+features.
+
+Eradication applies to the shipped source, SDK, UI, dependencies, package and
+generated frontend. Preserve Git history, licenses, attribution and an explicit
+legacy data migration. Existing datasets and downloaded checkpoints are user
+data, not expendable cloud code. No live data migration, credential cleanup,
+provider account action or rented-machine termination occurs during planning.
+
+## Verified removal inventory
+
+| Area | Present in this tree | Required outcome |
+|---|---|---|
+| Distribution | `fork-plugins.json` excludes five products, but `bundled/scrape` and `bundled/hf_publish` still exist | Delete those packages and their manifests, locks, Python/frontend implementations and feature tests. Keep a minimal retired-ID denial rule so external copies cannot restore them. |
+| Host scraping | `backend/app/scrape/`, `backend/app/routes/scrape.py`, scrape ingest in Dataset/Bank/Video, SDK netfetch exports | Remove public URL scan, thumbnail proxy and download/import paths, their registrations and job handlers. Keep local upload/folder import and media validation. |
+| Cloud orchestration | `backend/app/services/cloud_training.py`, `vast_client.py`, `hf_base_push.py`, `cloud_history.py`, `cloud_local_continuation.py` | Extract local responsibilities first; delete rental state machine, provider clients, upload/delivery, billing, supervision, cloud resume and cloud-only cleanup. |
+| Publishing/browsing | Host `hf_publish.py`, `civitai_browser.py`; routes in `datasets.py`, `studio.py`, `training.py` | Remove hosted publishing, Civitai image/prompt browsing and base-model upload, including status routes and polling. |
+| SDK | `backend/lds_sdk/cloud_*.py`, `_cloud_provider.py`, `cloud_host/`, `api_engines.py`, `hub.py`, cloud/video and scrape/netfetch facades | Remove provider dispatch and compatibility adapters. Move useful local exports to explicitly local SDK modules and update every bundled caller. |
+| Frontend | `CloudRunsPage.jsx`, cloud slots/parity helpers, Vast URL helpers in `runtimeHost.jsx` and `guideContent.js`, scraper/publisher components and fixtures | Retain the local Runs hub under a local name. Remove cloud launch, status, credentials, links, dead slots and exports. Update SDK contract declarations and consumers together. |
+| Setup/config | `scrape_extras`, `requirements-scrape.txt`, capability probes, rental/token checks, product settings and cloud paths | Delete scrape installers and cloud configuration. Retain only credentials/dependencies demonstrably owned by approved downloads or private workers. |
+| Persistence | `CloudTrainingRun`, `cloud_run_id`, cloud columns, provenance and provider links | Replace operational cloud schema with migrated local historical artifact records; remove provider credentials and remote control fields from the new runtime model. |
+| Documentation/package | README/Guide claims, settings reference, cloud/scraper screenshots, test manifests, release packaging and `frontend/dist` | Remove current feature documentation/assets and packaging references. Preserve necessary migration/release history without presenting removed features as available. |
+
+## Execute sequentially
+
+### 1. Establish contracts and a dependency map
+
+- Start from the reviewed integration source on a dedicated removal branch.
+  Preserve the existing generated bundle changes and unrelated work; do not
+  discard them to obtain a clean tree.
+- Classify each outgoing call as removed hosted functionality, approved Setup
+  download, or approved private worker traffic. Read every retained call site.
+  Use `backend/tests/fork_outbound_scan.py` and its reviewed inventory as the
+  starting list, including disabled updater/metadata clients and SDK adapters.
+- Map imports, route registration, background jobs, model/schema dependencies,
+  capability probes, plugin hooks, frontend slots and package inclusion rules.
+- Use the recorded 2026-10-04 full-suite results as the current baseline. On
+  integration `a1557696b` (application source identical to `9536f5257`),
+  host/tooling had 9927 passes, 61 failures, 54 errors and 9 skips; frontend
+  core had 5142 passes and 70 failures; bundled frontend had 1144 passes,
+  4 failures and 4 skips; bundled Python had 229 passes and 10 failures.
+  Lint, build and isolated startup passed; preflight had 76 passes, 2 failures
+  and 2 skips. The baseline is failing. Do not label it validated or green.
+
+Done when: every removal target and every retained network exception has a
+named owner, and local behaviors/data migration requirements are explicit.
+
+### 2. Move shared local behavior out of cloud modules
+
+- Split local run history, checkpoint storage/lookup, gallery serialization,
+  lineage, run deletion, Canvas layout/generation and storage cleanup out of
+  `cloud_training.py` into modules named for those responsibilities.
+- Replace `cloud_run_dataset.py` with a neutral run/dataset identity module;
+  preserve face/video ownership checks, including equal numeric IDs belonging
+  to different dataset tables.
+- Update routes, local training, memory release, archive/share/cascade deletion,
+  checkpoint backfills, Studio, Video, Canvas and `lds_sdk/run_history.py`,
+  `training.py`, `canvas.py` and `video_host/` callers.
+- Keep `aitoolkit_remote.py` only if private peer training remains in scope:
+  `peer_training.py` uses it independently of the rental orchestrator.
+- Move shared size limits/media validation out of scraper modules before
+  removing those modules. Local video upload already reads scraper constants.
+
+Done when: the retained workflows import and operate without cloud or scraper
+modules. Behavioral tests cover local checkpoint access, ownership, lineage,
+deletion recovery, Canvas and image/video import.
+
+### 3. Physically remove scraper and publisher functionality
+
+- Delete `bundled/scrape`, `bundled/hf_publish`, `backend/app/scrape/`, host scrape
+  routes, public-site browse/publish clients and cloud base upload services.
+- Remove scrape-import entry points and implementations from both host and
+  bundled Video code. Preserve ordinary uploads, local Bank scans, folder
+  imports, captions, promotion and provenance of already imported media.
+- Remove matching UI contributions, panels, source search, progress polling,
+  attribution components used only by fetching, Setup actions, optional
+  requirements, package locks and feature-only fixtures.
+- Audit every proposed dependency removal. `requests` supports private workers;
+  `huggingface-hub` can support approved downloads; YAML and media tools have
+  local consumers. A former scraper dependency is removed only after confirming
+  no retained feature uses it. Verify the fresh install rather than the existing
+  development environment, which may still contain old packages.
+- Remove official-product admission for scraper/publisher IDs; retain a small
+  rejection contract for retired external packages, without their implementation.
+
+Done when: no shipped scraper or publishing package, public-site intake route,
+installer or UI exists; local upload and folder import still work on both Bank
+and Dataset, including Video.
+
+### 4. Remove cloud providers, API adapters and schema coupling
+
+- Delete rental training orchestration, Vast clients/probes, hosted engine
+  adapters, cloud provider SDK packages, cloud-only hooks/settings and their
+  frontend runtime exports. Remove cloud actions rather than returning a
+  disabled response from retained implementation.
+- Remove cloud routes from `training.py`, provider checks in `settings.py`,
+  cloud readiness/continuation in local trainers and cloud capability flags.
+  Rename the retained Runs page and update navigation, imports and probes.
+- Prepare a versioned, transactional migration on synthetic legacy databases.
+  Preserve run IDs or an explicit mapping, dataset table identity, timestamps,
+  settings, notes, parent edges, checkpoint files, previews and imported-media
+  provenance. Historical artifacts become local records; cloud launch/resume
+  authority is removed. Verify counts, checksums and links before retiring the
+  old tables/columns. Support repeat execution and rollback from a backup.
+- Remove hosted secrets and their validation/UI/config ownership. Retain HF or
+  Civitai credentials only if the agreed download scope requires them; separate
+  that resolver from scraper/publisher code. Never print secrets in diagnostics.
+- Narrowly handle obsolete config keys in the upgrade migration. Do not keep
+  provider SDKs, route aliases or no-op cloud components as compatibility code.
+- Audit `fp8_export.py`, hub-presence facades, updater and installer helpers by
+  actual callers; retain local quantization/restart/download utilities where
+  needed and delete hosted delivery/metadata functionality.
+
+Done when: retained source has no dependency on removed provider modules or
+operational cloud schema; new installs create no cloud operational tables;
+upgraded fixtures retain usable historical data and contain no provider tokens.
+
+### 5. Reconcile contracts, documentation and tests
+
+- Rewrite removed-feature tests as absence/retirement and legacy-upgrade tests
+  where those assertions matter. Delete tests whose sole subject is the removed
+  implementation. Replace generic plugin fixtures with synthetic local plugins;
+  do not retain the scrape/HF packages just to satisfy test helpers.
+- Update frontend SDK contracts, plugin manifests, build/test discovery,
+  migration references, capability assertions and privacy inventory together.
+- Fix the recorded retained-workflow failures independently: local-network DNS
+  fixtures, Bank controls, changelog assertions, inference harness allowlist and
+  Video media recovery. The media recovery 404 needs diagnosis; removing cloud
+  tests must not hide it. Keep security and responsive thresholds intact.
+- Update FORK_NOTES, README, CONTRIBUTING, offline guide, settings reference,
+  help, current feature screenshots and benefit-first What's New. Existing
+  What's New IDs remain stable or receive withdrawal aliases.
+
+Done when: current docs describe the local product, generic tests no longer
+load retired owners, and all failures in retained features are resolved with
+measured evidence.
+
+### 6. Validate and rebuild the shipped product
+
+- Run both linters, targeted behavioral/migration/absence tests, privacy checks,
+  frontend core and bundled tests, bundled Python suites and the full
+  host/tooling suite using the pinned runtimes and `scripts/gates.ps1`.
+- Isolate `LDS_DATA_DIR`, `LDS_CONFIG`, `LDS_ENV`, `LDS_PLUGINS_DIR` and
+  `LDS_EXTENSIONS_DIR` before any application import; use unique short scratch
+  paths. Never validate migrations or smoke tests on the production database.
+- Test a clean install with only retained dependencies, an upgraded legacy
+  fixture, populated image/video Bank and Dataset, local Runs and Canvas.
+  Run the affected responsive probes. Report external/device checks separately.
+- Block public DNS/connections during startup and retained runtime actions.
+  Private workers and Setup downloads, if approved, get separate explicit-action
+  tests; page load must never trigger them. Refresh the outbound inventory only
+  after reading the reduced call sites; do not simply accept generated changes.
+- Rebuild `frontend/dist`, inspect served assets and the release ZIP for removed
+  modules, imports, routes, provider URLs, installers and obsolete feature assets.
+  Keep source and consolidated frontend build in separate commits.
+- Record exact results in HANDOFF.md. Land/publish only after required gates
+  pass for the exact final commit and applicable delivery authorization holds.
+
+Done when: the removal is present in source and shipped artifacts, fresh and
+upgraded installs pass the full applicable suite, local workflows remain
+functional, and no hosted feature can be restored through configuration or an
+old excluded plugin package.
+
+## Historical plan (2026-10-01)
+
+The following is retained as execution history. Its branch counts, test commands,
+feature assumptions and open decisions are historical, not current scope.
+
+### Original detach, prune, tighten plan
 
 Execution plan for the fork. Written 2026-10-01 from a read-only inventory of
 the tree at `7e9f69f73` (branch `integrate/2026-10-01`). It is complete on its
