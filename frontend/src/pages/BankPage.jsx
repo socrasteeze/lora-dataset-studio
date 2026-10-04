@@ -649,8 +649,8 @@ export default function BankPage() {
 
       <form onSubmit={create}
         className="space-y-3">
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="min-w-40 grow">
+        <div className="grid grid-cols-4 items-end gap-2 lg:flex lg:flex-wrap">
+          <div className="col-span-2 min-w-0 lg:min-w-40 lg:grow">
             <label htmlFor="bank-name" className="mb-1 block text-sm font-medium text-content">Name</label>
             <Input id="bank-name" size="lg" value={name} onChange={(e) => setName(e.target.value)}
               placeholder={splitMode ? 'Named per subfolder automatically' : 'Telegram export 07/2026'}
@@ -658,6 +658,8 @@ export default function BankPage() {
               className="w-full" />
           </div>
           <FolderPickerField inline size="lg" id="bank-folder" label="Folder"
+            fieldClassName="col-span-2 min-w-0 lg:min-w-64 lg:grow-[3]"
+            browseClassName="min-w-0 w-full !px-1 !text-xs lg:w-auto lg:!px-4 lg:!text-sm"
             value={folder} onChange={setFolder} required
             placeholder="C:\path\to\unsorted-images (subfolders included)" />
           <Button type="button" size="lg" aria-pressed={splitMode}
@@ -666,17 +668,18 @@ export default function BankPage() {
             title={splitMode
               ? 'Enabled: create one bank for each top-level subfolder. Select to disable.'
               : 'Disabled: create one bank for this folder. Select to create one bank for each top-level subfolder.'}
-            className={splitMode ? 'border-primary/60 bg-primary/15 text-content' : ''}>
+            className={`min-w-0 w-full !px-1 !text-xs lg:w-auto lg:!px-4 lg:!text-sm ${splitMode ? 'border-primary/60 bg-primary/15 text-content' : ''}`}>
             Subfolders
           </Button>
-          <HelpBadge topic="bank-split-subfolders" />
           <Button type="submit" size="lg" variant="primary" disabled={creating || !!folderNotice}
+            className="col-span-2 min-w-0 w-full lg:w-auto"
             title={folderNotice ? 'That folder belongs to a dataset' : undefined}>
             {creating ? 'Inventorying' : (
               <span className="inline-flex items-center gap-1.5"><Plus aria-hidden="true" className="h-4 w-4" />
-                {splitMode ? 'Create banks' : 'Create bank'}</span>
+                {splitMode ? 'Create Banks' : 'Create Bank'}</span>
             )}
           </Button>
+          <HelpBadge topic="bank-split-subfolders" className="col-span-4 lg:col-auto" />
         </div>
         {splitMode && (
           <label className="flex items-center gap-1.5 text-sm text-content-muted">
@@ -746,7 +749,7 @@ export default function BankPage() {
         <div className="flex items-center">
           <button type="button" onClick={() => setDialogScope({ kind: 'all' })}
             title="Queue every bank with undecided images. Banks run one at a time per machine; another machine runs its own queue alongside this one."
-            className={`${btnClass({ size: 'md' })} border-indigo-400/50 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20`}>
+            className={`${btnClass({ size: 'md' })} w-full lg:w-auto border-indigo-400/50 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20`}>
             ⏳ Queue all {queueAllCount} bank(s)
           </button>
         </div>
@@ -770,9 +773,10 @@ export default function BankPage() {
         </p>
       ) : (
         <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <FolderCheckLine banks={banks} busy={rescanning} onRescan={rescan} />
-          <p className="text-sm text-content-muted">
+        <div className="grid grid-cols-2 items-center gap-2 lg:flex lg:flex-wrap">
+          <FolderCheckLine banks={banks} busy={rescanning} onRescan={rescan}
+            className="min-w-0 w-full lg:w-auto" noticeClassName="hidden lg:block" />
+          <p className="hidden text-sm text-content-muted lg:block">
             {visibleBanks.length === banks.length
               ? `${banks.length} bank(s)`
               : `showing ${visibleBanks.length} of ${banks.length}`}
@@ -784,19 +788,19 @@ export default function BankPage() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Find a bank"
             aria-label="Find a bank"
-            className="min-w-[9rem] flex-1"
+            className="min-w-0 w-full lg:min-w-[9rem] lg:flex-1"
           />
           <Select size="md" value={sort} onChange={(e) => changeSort(e.target.value)}
-            aria-label="Sort the banks">
+            aria-label="Sort the banks" className="min-w-0 w-full lg:w-auto">
             {BANK_SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
           </Select>
           <Button size="md" type="button" onClick={() => {
             setSelectingBanks((value) => !value)
             if (selectingBanks) setSelectedBanks(new Set())
-          }} aria-pressed={selectingBanks}>
+          }} aria-pressed={selectingBanks} className="min-w-0 w-full lg:w-auto">
             {selectingBanks ? 'Done Selecting' : 'Select Banks'}
           </Button>
-          <HelpBadge topic="bank-bulk-manage" />
+          <HelpBadge topic="bank-bulk-manage" className="col-span-2 lg:col-auto" />
         </div>
         {selectingBanks && (
           <div data-probe-chrome="bank-bulk-actions"
@@ -914,16 +918,16 @@ export default function BankPage() {
               {!selectingBanks && (
                 <div className="flex flex-wrap items-center gap-2">
                   <PassCoverageRow coverage={b.pass_coverage} />
-                  <div className="ml-auto flex items-center gap-2">
+                  <div className="grid w-full grid-cols-2 gap-2 lg:ml-auto lg:flex lg:w-auto">
                     <button type="button" onClick={() => open(b.id)}
-                      className={btnClass({ size: 'sm' })}>
+                      className={`${btnClass({ size: 'sm' })} min-w-0 w-full lg:w-auto ${qs ? 'col-span-2' : ''}`}>
                       Open →
                     </button>
                     {!qs && (
                       <button type="button" onClick={() => setDialogScope({ kind: 'bank', bankId: b.id })} disabled={b.total === 0}
                         title="Run Launch all now, or add this bank to the queue"
-                        className={btnClass({ size: 'sm', variant: 'ghost' })}>
-                        Launch all
+                        className={`${btnClass({ size: 'sm', variant: 'ghost' })} min-w-0 w-full lg:w-auto`}>
+                        Launch All
                       </button>
                     )}
                   </div>
