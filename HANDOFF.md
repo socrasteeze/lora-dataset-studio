@@ -1,12 +1,11 @@
 # HANDOFF
 
-**Updated:** 2026-10-03 | **Branch:** noble/compact-app-interface | **Base:** c60852194 | **Delivery:** task branch; main held
+**Updated:** 2026-10-04 | **Branch:** noble/compact-app-interface | **Base:** c60852194 | **Delivery:** task branch; main held
 
 ## State
-The flat-section and offline-policy changes are prepared for origin/noble/compact-app-interface. Source and the consolidated frontend bundle use separate commits. Main remains behind the cloud landing gate. Tests, responsive probes and Gates remain deferred.
-The running local app uses the user-authorized ten-plugin bundle and pinned supervisor with browser opening disabled. The workspace also contains earlier PixAI Tagger captioner work. That work remains local and is excluded from this delivery; the published bundle is built from the staged source snapshot.
-Build, both linters, syntax compilation and the privacy scanner passed. Startup health was confirmed. These checks do not qualify rendered layout, inference, training or runtime network behavior.
-
+Mobile Bank controls now fill equal-width rows. Name/Folder split evenly; Browse/Subfolders share the left half below them and Create Bank fills the right. Mobile toolbar totals and the stale-count notice are hidden. Card Open/Launch All actions fill equal halves. The shared Bank/Dataset pager puts page details and page size above full-row Previous/Next buttons, with 1rem plus the device safe-area inset below.
+Source and the consolidated published frontend bundle use separate commits on origin/noble/compact-app-interface. Main remains behind its cloud landing gate. The user requested no tests for this delivery; tests, responsive probes and Gates remain deferred.
+The published bundle excludes pre-existing local PixAI work. That work and the local runtime bundle remain in the desktop workspace. Build, frontend lint (32 warnings, zero errors), Ruff and the privacy scanner passed. These checks do not qualify rendered layout or physical PWA behavior.
 ## Done this session
 - Removed redundant Bank creation/workspace boxes, nested pass option cards and the duplicate overview disclosure; placed the pressed Subfolders toggle between Browse and Create.
 - Matched Image/Video Bank headers and creation control heights. Kept equal-width lane choices and accessible sort names without visible Sort prefixes.

@@ -195,6 +195,7 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
  * `inline` puts the field and Browse on the parent's row instead of a nested box. */
 export default function FolderPickerField({
   id, label, value, onChange, placeholder, required, hint, size = 'md', inline = false,
+  fieldClassName = 'min-w-64 grow-[3]', browseClassName,
 }) {
   const [browsing, setBrowsing] = useState(false)
   const field = (
@@ -203,7 +204,7 @@ export default function FolderPickerField({
       className="w-full min-w-0 grow font-mono" />
   )
   const browse = (
-    <Button size={size} noShrink onClick={() => setBrowsing(true)}>
+    <Button size={size} noShrink className={browseClassName} onClick={() => setBrowsing(true)}>
       <FolderOpen aria-hidden="true" className="h-4 w-4" /> Browse</Button>
   )
   const modal = browsing && (
@@ -217,7 +218,7 @@ export default function FolderPickerField({
   if (inline) {
     return (
       <>
-        <div className="min-w-64 grow-[3]">
+        <div className={fieldClassName}>
           {label && (
             <label htmlFor={id} className="mb-1 block text-sm font-medium text-content">{label}</label>
           )}

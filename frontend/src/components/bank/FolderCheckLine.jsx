@@ -15,24 +15,24 @@ import { Button } from '../common/Controls.jsx'
  * as facts. So the page says what it knows and offers the walk, instead of
  * doing it behind their back on every visit.
  *
- * A fresh list keeps that sentence on the button title. A stale list prints
- * it above the toolbar, because a late count has to be visible. */
-export default function FolderCheckLine({ banks, busy = false, onRescan }) {
+ * Freshness stays on the button title. The host can hide the short stale
+ * notice on mobile to keep the toolbar compact. */
+export default function FolderCheckLine({ banks, busy = false, onRescan, className = '', noticeClassName = '' }) {
   const note = folderCheckNote(banks)
   if (!note) return null
   return (
     <>
       {note.stale ? (
         <>
-          <p className="text-xs font-medium text-amber-300/90" title={note.text}
+          <p className={`text-xs font-medium text-amber-300/90 ${noticeClassName}`} title={note.text}
             aria-label={note.text}>Counts May Be Stale</p>
           <Button size="md" noShrink onClick={onRescan} disabled={busy}
-            title={note.text}>
+            title={note.text} className={className}>
             <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />{busy ? 'Checking Folders' : 'Rescan Folders'}
           </Button>
         </>
       ) : (
-        <Button size="md" noShrink onClick={onRescan} disabled={busy} title={note.text}>
+        <Button size="md" noShrink onClick={onRescan} disabled={busy} title={note.text} className={className}>
           <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />{busy ? 'Checking Folders' : 'Rescan Folders'}
         </Button>
       )}

@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-04-mobile-bank-rows',
+    date: '2026-10-04',
+    title: 'Organized Bank Controls',
+    blurb: 'On mobile, Name and Folder share equal space. Browse and Subfolders share the left half below them, with Create Bank filling the right. Search, list controls and card actions fill equal-width rows. Previous and Next share a full row, with extra footer space above the phone safe area. The bank total and stale-count notice stay out of the mobile toolbar.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-03-offline-workflows',
     date: '2026-10-03',
     title: 'Offline Workflows',
