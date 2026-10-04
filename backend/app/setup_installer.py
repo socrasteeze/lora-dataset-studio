@@ -445,7 +445,7 @@ _ALL_NODE_PACKS = tuple(_NODE_PACKS) + tuple(_BUNDLED_NODE_PACKS)
 
 INSTALL_ACTIONS = ('ml_extras', 'scrape_extras', 'ollama_model',
                    'face_scoring', 'masks', 'watermark_inpaint',
-                   'bank_scoring', 'bank_siglip2', 'wd14',
+                   'bank_scoring', 'bank_siglip2', 'wd14', 'pixai',
                    'watermark_detect',
                    'video', 'shot_detect', 'video_text',
                    # ✨ DLSS 5 neural rendering bridge (two MIT DLLs, pinned release —
@@ -535,6 +535,7 @@ _CAPABILITY_PACKAGES = {
     'masks': ('rembg', 'onnxruntime', 'numpy', 'opencv-python-headless'),
     'watermark_inpaint': (_WATERMARK_PKG,),
     'wd14': ('onnxruntime', 'numpy', 'opencv-python-headless'),
+    'pixai': ('transformers', 'timm', 'numpy', 'pillow', 'huggingface-hub'),
     # 🎬 The video lane, split across two environments on purpose.
     #   video       decoding (PyAV, imported IN-PROCESS by Flask, so it must land
     #               in the app's own interpreter) plus a bundled static ffmpeg
@@ -607,7 +608,7 @@ _MANAGED_CAPABILITY_ACTIONS = (*_CAPABILITY_ML_ACTIONS, 'shot_detect')
 _IMPORT_CACHE_ACTIONS = (frozenset(_PIP_REQUIREMENTS)
                          | set(_CAPABILITY_ML_ACTIONS)
                          | {'watermark_inpaint', 'bank_scoring', 'bank_siglip2',
-                            'watermark_detect', 'shot_detect'})
+                            'watermark_detect', 'shot_detect', 'pixai'})
 
 # Actions that invoke pip and therefore MUST NOT run concurrently: two pip processes
 # writing the same environment race on a shared package's files/dist-info and corrupt
@@ -624,7 +625,7 @@ _PIP_ACTIONS = (frozenset(_PIP_REQUIREMENTS)
                 # torch), so it must share the pip queue too or the two race on
                 # one environment's dist-info.
                 | {'watermark_inpaint', 'bank_scoring', 'bank_siglip2',
-                   'watermark_detect', 'shot_detect'})
+                   'watermark_detect', 'shot_detect', 'pixai'})
 
 # Transient file-lock errors an install can hit even without concurrency: an antivirus
 # or the search indexer briefly holding a just-written file at the moment pip renames
@@ -888,7 +889,7 @@ def manual_command(action) -> str:
     the dev venv -- instead of whatever bare `pip` happens to be first on PATH
     (which is the whole point of the user's question: a plain `pip install` would
     land in the wrong environment and the extras would never be importable)."""
-    if action in ('ml_extras', 'face_scoring', 'masks', 'video_text', 'watermark_inpaint'):
+    if action in ('ml_extras', 'face_scoring', 'masks', 'video_text', 'watermark_inpaint', 'pixai'):
         return '(Use Install in Setup: LDS creates and verifies the isolated Python first.)'
     spec = plugin_action_spec(action)
     if spec is not None:
@@ -1260,6 +1261,10 @@ def _action_needed(action, caps) -> bool:
         if not (caps.get('python') or {}).get('ml_supported', True):
             return False
         return not caps.get('wd14')
+    if action == 'pixai':
+        # Explicit Setup card only. Install everything must not build the
+        # isolated env or download the snapshot on its own.
+        return False
     if action == 'ollama_model':
         # Only when Ollama is already reachable AND a model name is configured (the pull
         # needs a target) — Ollama itself can't be auto-installed here.
@@ -2178,6 +2183,96 @@ def _run_ml_capability(action) -> int:
     if rc == 0 and not _verify_capability_import(action, python):
         return 1
     return rc
+
+
+
+def _pixai_env_dir():
+    return cfg.data_dir() / 'envs' / 'pixai'
+
+
+def _run_pixai(action) -> int:
+    """PixAI Tagger: isolated env plus the local snapshot. Operator click only.
+
+    Pip never targets the app venv, the WD14 interpreter, or the ai-toolkit
+    venv. The download uses snapshot_download into models_dir() and nowhere
+    else. Re-clicking skips a snapshot that is already complete.
+    """
+    from .services import pixai_tagger
+    managed = _venv_python(_pixai_env_dir())
+    python = _ensure_managed_ml_env(action, _pixai_env_dir())
+    if not python:
+        return 1
+    if not _same_path(python, managed) or _is_flask_venv(python):
+        _append(action, 'Refusing to install PixAI Tagger outside data/envs/pixai.')
+        return 1
+    for label, other in (
+            ('app', sys.executable),
+            ('WD14', (cfg.get('wd14.python') or '').strip()),
+            ('ai-toolkit', (cfg.get('aitoolkit.python') or '').strip()),
+    ):
+        if other and _same_path(python, other):
+            _append(action, f'Refusing to install PixAI Tagger into the {label} Python.')
+            return 1
+    root = (cfg.get('aitoolkit.dir') or '').strip()
+    if root:
+        from pathlib import Path
+        derived = str(cfg.aitoolkit_derived_python(Path(root)))
+        if _same_path(python, derived):
+            _append(action, 'Refusing to install PixAI Tagger into the ai-toolkit venv.')
+            return 1
+    _append(action, f'target interpreter: {python}')
+    rc = _install_cpu_torch_pair(action, python)
+    if rc != 0:
+        return rc
+    rc = _run_pip(action, [python, '-m', 'pip', 'install',
+                          *(_requirement_spec(p) for p in _CAPABILITY_PACKAGES['pixai'])])
+    if rc != 0:
+        return rc
+    if not _verify_capability_import('pixai', python, log_action=action):
+        return 1
+    dest = pixai_tagger.models_dir()
+    if not pixai_tagger.missing_snapshot(dest):
+        _append(action, f'model already present: {dest}')
+    else:
+        parent = os.path.dirname(dest)
+        try:
+            os.makedirs(parent, exist_ok=True)
+        except OSError as exc:
+            _append(action, f'cannot create {parent}: {exc}')
+            return 1
+        _append(action, f'downloading {pixai_tagger.HF_REPO} into {dest}')
+        code = (
+            'import os, sys\n'
+            'os.environ.pop("HF_HUB_OFFLINE", None)\n'
+            'os.environ.pop("TRANSFORMERS_OFFLINE", None)\n'
+            'from huggingface_hub import snapshot_download\n'
+            'repo, dest = sys.argv[1], sys.argv[2]\n'
+            'snapshot_download(repo_id=repo, local_dir=dest)\n'
+            'print("ok")\n'
+        )
+        rc = _run_pip(action, [python, '-c', code, pixai_tagger.HF_REPO, dest])
+        if rc != 0:
+            _append(action, 'could not download the PixAI snapshot')
+            return rc
+        if pixai_tagger.missing_snapshot(dest):
+            _append(action, f'snapshot at {dest} is still incomplete')
+            return 1
+        _append(action, f'weights ready -> {dest}')
+    configured = (cfg.get('pixai.python') or '').strip()
+    if configured and not _same_path(configured, managed):
+        if pixai_tagger._forbidden_runtime(configured):
+            _append(action, 'Clearing a PixAI interpreter that points at the app, '
+                            'WD14, or ai-toolkit Python.')
+            try:
+                cfg.save_config({'pixai': {'python': managed}})
+            except Exception as exc:
+                _append(action, f'could not select the PixAI environment: {exc}')
+                return 1
+        else:
+            _append(action, f'Keeping the selected PixAI interpreter unchanged: {configured}')
+            return 0 if _verify_capability_import('pixai', configured, log_action=action) else 1
+        return 0
+    return 0 if _select_managed_python(action, 'pixai', managed) else 1
 
 
 def _run_wd14(action) -> int:
@@ -3236,6 +3331,7 @@ _WORKERS = {**{a: _run_ml_extras for a in _PIP_REQUIREMENTS},   # ml_extras + sc
             # serialization, the import-cache invalidation and manual_command()
             # all keep treating its pip half like every other scoped install.
             'wd14': _run_wd14,
+            'pixai': _run_pixai,
             **{a: _run_ml_capability for a in _CAPABILITY_ML_ACTIONS},  # face_scoring + masks + video
             'watermark_inpaint': _run_watermark_inpaint,
             'bank_scoring': _run_bank_scoring,

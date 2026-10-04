@@ -209,7 +209,11 @@ DEFAULTS = {
     'engines': {'default': 'klein',
                 'enabled': ['klein', 'krea'],
                 'known': []},
-    'captioning': {'backend': 'auto'},                         # auto|joycaption|ollama|none
+    'captioning': {'backend': 'auto'},                         # auto|joycaption|ollama|pixai|none
+    # PixAI Tagger v1.0. Blank python -> data/envs/pixai. Blank models_root ->
+    # data/models (folder pixai-tagger-v1.0). device: auto|cuda|cpu.
+    # Not part of Auto, and not the WD14 bank-tag column.
+    'pixai': {'python': '', 'models_root': '', 'device': 'auto'},
     # 📥 What happens to a photo the moment it enters a dataset. Until now this
     # was two hardcoded numbers with no sentence anywhere saying they existed
     # (reported by Qeeyana on Reddit: "images added to dataset are automatically

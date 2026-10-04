@@ -1018,6 +1018,9 @@ CAPABILITY_IMPORTS = {
                      'from transformers import Siglip2Model, AutoProcessor'),
     'watermark_inpaint': 'import simple_lama_inpainting',
     'wd14': 'import onnxruntime',
+    'pixai': ('import torch, torchvision, transformers, timm, numpy; '
+             'from PIL import Image; from transformers import pipeline; '
+             'from huggingface_hub import snapshot_download'),
     # The detector extra runs backend/infer/watermark_detect_infer.py, which needs
     # torch (both models) and transformers (BOTH heads are transformers-native —
     # that is precisely why Grounding DINO was chosen over Florence-2, whose
@@ -1259,6 +1262,30 @@ def probe_wd14() -> dict:
                 'detail': 'onnxruntime OK, model not downloaded '
                           f"({', '.join(missing)})"}
     return {'ok': True, 'detail': 'onnxruntime + WD14 model OK'}
+
+
+def probe_pixai() -> dict:
+    """PixAI Tagger readiness: isolated interpreter AND the local snapshot.
+
+    Files are checked first so a capabilities poll does not import torch when
+    the operator has not installed the env or the weights. Caption time stays
+    offline; this probe does not download.
+    """
+    from .services import pixai_tagger
+    import os
+    python = pixai_tagger.pixai_python()
+    folder = pixai_tagger.models_dir()
+    if not os.path.isfile(python):
+        return {'ok': False,
+                'detail': 'PixAI Tagger environment is not installed '
+                          f'({pixai_tagger._managed_python()})'}
+    if pixai_tagger.missing_snapshot(folder):
+        return {'ok': False,
+                'detail': f'PixAI Tagger weights are not in {folder}'}
+    if not _cached_import('pixai', python, CAPABILITY_IMPORTS['pixai']):
+        return {'ok': False,
+                'detail': 'torch/transformers import failed in the PixAI environment'}
+    return {'ok': True, 'detail': 'PixAI Tagger ready'}
 
 
 def wd14_gpu_available() -> bool:
@@ -2676,6 +2703,7 @@ def _probe_uncached():
         # Fork-only lane: another cached-but-possibly-cold `import onnxruntime`,
         # so it belongs in the pool with the rest rather than ahead of it.
         'wd14': probe_wd14,
+        'pixai': probe_pixai,
         'watermark_clean': _watermark_clean_options,
     })
     comfy, models, klein, krea = results['comfy_models']
@@ -2692,6 +2720,7 @@ def _probe_uncached():
     _video, _dlss5nr, video_text = results['video'], results['dlss5nr'], results['video_text']
     scrape_deps, _wm_clean = results['scrape_deps'], results['watermark_clean']
     wd14 = results['wd14']
+    pixai = results['pixai']
     (_keh, klein_missing, klein_invalid, klein_unsupported_enums,
      klein_ready) = klein
     (krea_missing, krea_nodes_missing, krea_nodes_installed, krea_invalid,
@@ -2812,6 +2841,10 @@ def _probe_uncached():
             # exact pip command when it can't, so the UI/error can name the fix.
             'joycaption': joycaption['ok'],
             'joycaption_detail': joycaption['detail'],
+            # Separate from Auto. False until the isolated env and the
+            # local snapshot both exist. Auto does not read this flag.
+            'pixai': pixai['ok'],
+            'pixai_detail': pixai['detail'],
             'ollama': ollama['ok'],
             # The ACTIVE provider's readiness, which is the question every screen
             # was really asking. Keyed on `ollama` alone, a working LM Studio
@@ -2845,6 +2878,8 @@ def _probe_uncached():
         # different places — a bare bool would send half of them to the wrong one.
         'wd14': wd14['ok'],
         'wd14_detail': wd14['detail'],
+        'pixai': pixai['ok'],
+        'pixai_detail': pixai['detail'],
         # Optional, user-selected semantic alternative. It is deliberately not
         # folded into bank_scoring: CLIP aesthetic scoring remains usable without
         # the additional 1.5 GB checkpoint.

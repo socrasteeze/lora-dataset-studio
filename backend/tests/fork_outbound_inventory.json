@@ -310,7 +310,7 @@
    ]
   },
   "backend/app/setup_installer.py": {
-   "calls": 8,
+   "calls": 9,
    "hosts": [
     "civitai.com",
     "codeload.github.com",

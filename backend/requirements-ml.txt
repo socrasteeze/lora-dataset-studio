@@ -33,6 +33,10 @@ transnetv2-pytorch>=1.0.5,<2
 # venv, not the Flask one (see _BANK_SCORING_PKGS in app/setup_installer.py).
 transformers>=4.57,<6
 
+# PixAI Tagger runs in its own environment. Setup uses these shared bounds.
+timm>=0.9,<2
+huggingface-hub>=0.34,<2
+
 # Pillow backs the burned-in-text reader's unicode-path fallback (cv2.imread
 # cannot open non-ASCII paths on Windows). The app's own requirements pin it
 # ==12.3.0; this range brackets that pin for the scoped installs that read

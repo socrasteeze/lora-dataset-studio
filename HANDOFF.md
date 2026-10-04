@@ -1,63 +1,52 @@
 # HANDOFF
 
-**Updated:** 2026-10-04 | **Branch:** noble/compact-app-interface | **Base:** c60852194 | **Delivery:** main explicitly authorized without tests
+**Updated:** 2026-10-04 | **Branch:** main (local delivery target) | **Base:** 669df5f79
 
 ## State
-The user authorized a clean push and merge to main without tests on 2026-10-04. This explicitly overrides the deferred cloud landing gate for this wave. No tests, responsive probes or Gates ran; this delivery is not runtime or device qualification.
-Bank Launch now leaves Auto-reject unchecked for individual banks and multi-bank queues. Manual selection retains the existing rejection settings. Launch All and Setup correctly describe WD14 GPU/CPU support. Mobile Bank controls, card actions and the shared Bank/Dataset pager use full-width rows, with safe-area footer padding.
-Source and the consolidated publication bundle use separate commits. The publication snapshot excludes unrelated local PixAI source, tests, configuration and runtime bundle changes. Those remain in the desktop workspace. Build, both linters and privacy checks passed. Delivery commits request CI skipping to honor the no-tests instruction.
+PixAI delivery includes reviewed source and its rebuilt frontend bundle for the user-authorized local main merge. The latest origin/main plan is integrated. No push or restart is part of this delivery.
+The user explicitly waived the main validation hold for this local merge. Tests, responsive probes and Gates remain deferred; the work is not fully qualified.
+
 ## Done this session
-- Removed redundant Bank creation/workspace boxes, nested pass option cards and the duplicate overview disclosure; placed the pressed Subfolders toggle between Browse and Create.
-- Matched Image/Video Bank headers and creation control heights. Kept equal-width lane choices and accessible sort names without visible Sort prefixes.
-- Compacted Dataset, Studio, captions, training, Runs, settings, setup and plugins. Flattened 159 groups in 96 JSX files through shared lds-section and host/SDK Card styling. Retained warnings, recovery and help controls.
-- Aligned host and SDK controls. Updated contracts, guide labels and What's New. Coverage: docs/UI_DENSITY_AUDIT.md.
-- Activated the ten local plugins. Excluded online publishing and scraping, refused Civitai/web imports and online updates, and checked local API targets before tool/peer calls. Inference uses prepared files. Setup downloads still require an explicit action.
+- Reviewed the remaining local PixAI source, tests, config and frontend changes for delivery.
+- Replaced workstation-specific defaults with app-relative model storage; preserved the original model parent in ignored local configuration. No weights moved or downloaded.
+- Added Setup package ownership and shared dependency bounds; expanded the isolated dependency probe.
+- Added the settings reference, help topic and What's New entry for local booru captioning.
+- Reconciled the incoming integration-removal plan without executing its future work.
 
 ## Open
-1. Do not start tests, responsive probes or Gates unless the user requests validation again. Preserve the local PixAI source and runtime work when continuing this branch.
-2. When validation is authorized, run frontend and bundled tests, privacy/contracts, and populated responsive probes for all affected routes. Fix failures without weakening probe thresholds.
-3. The user explicitly waived the cloud landing gate for this delivery. The previous refactor, density, flat-section and mobile changes remain untested. Run qualification when separately authorized.
-4. Preserve separate source and consolidated build(frontend): commits. Validate the exact published task-branch commits before any future landing on main.
-5. Validate backend/tests/test_offline_workflows.py, the changed Civitai/update refusals and local/peer API contracts when testing is authorized. Check missing-model errors and manual Setup preparation. Startup health is confirmed; full runtime network behavior is not qualified.
-6. Reconcile legacy scraping/publishing test fixtures with the offline profile during the next validation wave. Those products cannot load through a distribution override. Do not restore retired features to satisfy old expectations. Keep backend and frontend plugin markers matched during future switches.
+1. Run the exact merged commit through cloud validation when the user resumes tests. Tests and rendered checks were not run for this delivery.
+2. Install and qualify PixAI only with explicit permission. Weights remain absent; CPU/CUDA inference and model compatibility are unverified.
+3. Validate PixAI dataset storage, Caption Lab, protected-caption recovery and partial failures with isolated fixtures.
+4. Validate the offline runtime and shared local/peer API contracts; startup health is not proof of complete network isolation.
+5. Reconcile legacy scraping/publishing fixtures with the offline profile. Do not restore excluded features to satisfy old expectations.
+6. Continue the removal work only under a new implementation instruction; PLAN.md is a future plan.
 
 ## Decisions
-- Removed framing only where it repeated the same parent task. Structural groups use shared lds-section styling. Kept distinct data cards, measured results, confirmations and recovery boundaries.
-- Offline policy: exclude hf_publish and scrape; keep the ten local plugins. Civitai browsing, web imports and in-app online updates are refused. Local API targets are limited to localhost/private networks. Operator-started Setup downloads remain allowed pending the user's optional clarification.
-- Used existing control sizes: 40px below lg; sm/md/lg remain 28/32/36px on desktop. Kept font sizes consistent within each control group.
-- Retained short visible stale-count and input-format guidance. Moved repeated explanations into existing tooltips and the Guide.
+- The user requested all remaining local changes, including PixAI, to be committed and merged into local main before cloud Gates. This is a local merge waiver, not a passing validation result or push authorization.
+- PixAI stays a dataset-only booru backend. Auto, WD14 tags, Concept and prose captioning retain existing behavior.
+- Setup preparation requires an explicit Install click and uses an isolated interpreter. Runtime uses local snapshots with offline guards.
+- Source and frontend/dist remain separate commits in the same delivery.
 
 ## Traps
-- The SDK exports controlHeight, but does not export host Button/Input/Select or fieldClass. Bundled code must use its public SDK boundary.
-- Preserve local-only generation and the curated offline distribution. Do not restore API generators, rentals, hf_publish, scrape or bundled/civitai_publish. Keep existing compatibility shims, stored credentials and historical data.
-- Isolate LDS_DATA_DIR, LDS_CONFIG, LDS_ENV, LDS_PLUGINS_DIR and LDS_EXTENSIONS_DIR before application imports. Vite writes must target an isolated backend.
-- Empty fixtures skip key Bank/Dataset/Studio states. Use populated fixtures and inspect coverage; a skipped state is not a pass.
-- Gates stop at the first failure. Use distinct short pytest scratch paths; do not reuse another run's basetemp or production state.
-- The served bundle is read from disk. Source and dist must stay together in delivery, but in separate commits. Do not rewrite prior commit history.
+- Do not run tests, responsive probes, fixture-backed checks or Quick/Gates locally without explicit permission.
+- Isolate LDS_DATA_DIR, LDS_CONFIG, LDS_ENV, LDS_PLUGINS_DIR and LDS_EXTENSIONS_DIR before importing the app for tests. Vite writes require an isolated API target.
+- Preserve the curated ten-plugin offline distribution and the SDK public boundary. Do not restore online generators, rentals, scraping or publishers.
+- The app serves frontend/dist from disk. Keep source and bundle together in delivery; preserve runtime data and local configuration.
+- No browser opening, restart, model download or GPU job is authorized by this commit/merge instruction.
+- Populated fixtures are required for rendered checks. Skipped states are not passes; keep thresholds and coverage intact.
 
 ## Verify
-The earlier density pass ran npm run build, npm run lint (32 warnings, zero errors), .venv/Scripts/python.exe -m ruff check ., git diff --check, and scripts/scan-sensitive.sh (zero findings).
-The 2026-10-03 flat-section pass ran npm run build, npm run lint (32 warnings, zero errors), git diff --check and scripts/scan-sensitive.sh (3049 text files, zero findings). Parsed-source comparison found only className changes in its 96 JSX files. No tests, responsive probes or Gates ran for this pass.
-The offline-policy pass ran Ruff (clean), frontend lint (32 warnings, zero errors), syntax compilation of 51 changed Python files and Vite build (exit 0). The privacy scanner checked 3049 text files with zero findings. Source-only outbound inventory comparison matched the reviewed inventory. Regression coverage was updated but not run.
-The user-authorized startup and guarded restart reached /api/health successfully. /api/plugins/ reported API 1.24, all ten curated plugins active, no excluded plugin and zero lifecycle errors. Startup logs reported no errors. The local bundle is installed; prior bundles were retained in task scratch. LDS_NO_BROWSER=1 and LDS_OPEN_BROWSER=0 were set before launch and retained by the supervisor. No browser was opened. These status reads do not qualify inference, training, transfers or rendered layout.
-The commands below require cloud execution or explicit local-test permission. They were not run in this session. Responsive URLs must point at populated isolated fixtures.
+Delivery checks passed: frontend build, Ruff, frontend lint (32 existing warnings, no errors), syntax of nine changed Python files, reviewed outbound inventory and diff checks. The privacy scan checked 3049 text files with zero findings. Attribution candidates were technical provenance, scrub fixtures or history; no unresolved authorship attribution remains. The optional private-name list is unconfigured.
+Tests, responsive probes and Gates: not run. Existing recorded test results are not validation of this PixAI delivery.
+
+The following test commands require cloud execution or explicit local-test permission:
 
 ```powershell
+.venv/Scripts/python.exe -m pytest backend/tests/test_pixai_tagger.py backend/tests/test_caption_provenance.py backend/tests/test_setup_installer.py backend/tests/test_no_personal_data.py backend/tests/test_fork_outbound_gate.py -q
 Set-Location frontend
 npm test
-npm run lint
-npm run build
-npm run probe:responsive -- --url http://127.0.0.1:5173/#/bank
-npm run probe:responsive -- --url http://127.0.0.1:5173/#/datasets
-npm run probe:responsive -- --url http://127.0.0.1:5173/#/canvas
-npm run probe:responsive -- --url http://127.0.0.1:5173/#/video-bank
 npm run probe:responsive -- --url http://127.0.0.1:5173/#/settings
 npm run probe:responsive -- --url http://127.0.0.1:5173/#/setup
-npm run probe:responsive -- --url http://127.0.0.1:5173/#/plugins
-npm run probe:responsive -- --url http://127.0.0.1:5173/#/guide
 Set-Location ..
-.venv/Scripts/python.exe -m ruff check .
 pwsh -File scripts/gates.ps1 -Phase Gates
 ```
-
-Also probe the affected Dataset and Video Dataset workspaces, populated Studio routes, Camera Angles and DLSS. The retired online Civitai probe state was removed because the feature is excluded; all remaining probe limits and coverage reporting stay intact. Use the existing portrait, landscape, tablet and desktop viewports, plus manual visual review of saved screenshots. Do not treat unsupported route states measured only at rest as complete interaction coverage.

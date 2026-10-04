@@ -26,6 +26,7 @@ export const ENGINE_OPTIONS = [
   // says so). This is the alias path CLAUDE.md asks for, applied to the label side.
   { id: 'auto', label: 'Auto — JoyCaption, then the local LLM' },
   { id: 'joycaption', label: 'JoyCaption only' },
+  { id: 'pixai', label: 'PixAI Tagger' },
   { id: 'ollama', label: 'Local LLM only (Ollama / LM Studio)' },
   { id: 'none', label: 'None — captioning disabled' },
 ];

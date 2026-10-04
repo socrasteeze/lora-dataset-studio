@@ -44,13 +44,15 @@ export const CAPTION_WRITERS = [
   { key: 'joycaption_refined', short: 'JoyCaption + local LLM',
     solo: 'Drafted by JoyCaption, rewritten by the local LLM vision model.' },
   { key: 'ollama', short: 'Local LLM', solo: 'Written by the local LLM vision model.' },
+  { key: 'pixai', short: 'PixAI Tagger', solo: 'Written by PixAI Tagger.' },
 ];
 
 // Why this line is worth a glance, for the control's title/tooltip. States the
 // mechanism, then the lever — never "contact support".
 export const CAPTION_ENGINE_WHY =
   'The Auto backend uses JoyCaption first and falls back to the local LLM vision model, '
-  + 'and the two write in different styles. Pick one engine in ⚙️ Options to keep a '
+  + 'and the two write in different styles. PixAI Tagger is a separate booru choice; Auto does not use it. '
+  + 'Pick one engine in ⚙️ Options to keep a '
   + 'single voice across a dataset.';
 
 /** [{key, short, solo, n}] for the engines that actually wrote something, in

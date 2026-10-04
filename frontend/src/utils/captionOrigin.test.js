@@ -10,9 +10,9 @@ import {
 /* The values are STORED IN USER DATABASES (services/caption_origin.py says so in
    its header). This test is the alias rule, enforced: renaming one here without an
    alias would silently stop matching rows that already exist. */
-test('the three stored values are the three this module knows, by key', () => {
+test('stored caption origins keep their keys, including PixAI', () => {
   assert.deepEqual(CAPTION_ORIGINS.map((o) => o.key),
-                   ['asserted', 'joycaption', 'ollama']);
+                   ['asserted', 'joycaption', 'ollama', 'pixai']);
   for (const o of CAPTION_ORIGINS) {
     assert.equal(typeof o.chip, 'string');
     assert.ok(o.chip.length, o.key);
@@ -25,9 +25,17 @@ test('a human-written caption is never folded into the two engines', () => {
   assert.equal(captionIsAsserted('asserted'), true);
   assert.equal(captionIsAsserted('joycaption'), false);
   assert.equal(captionIsAsserted('ollama'), false);
+  assert.equal(captionIsAsserted('pixai'), false);
   assert.equal(captionIsAsserted(null), false);
   // …and its wording says WHO, not "manual" — the distinction the forced pass acts on.
   assert.match(captionOriginInfo('asserted').short, /you/i);
+});
+
+test('PixAI captions have a known origin with the tagger label', () => {
+  const info = captionOriginInfo('pixai');
+  assert.equal(info.known, true);
+  assert.equal(info.chip, 'PixAI Tagger');
+  assert.match(info.title, /local weights/);
 });
 
 test('the two engines are named apart, and neither answers for the other', () => {
