@@ -20,14 +20,13 @@ import { flagCandidateLabel, launchRejectNote } from './autoRejectReadiness.js'
  * The backend chains the EXISTING passes in this exact order; a pass whose extra
  * isn't installed is skipped (with a reason) at run time, never failing the launch.
  *
- * Defaults: the always-available passes (scan + auto-reject) plus every heavy
- * pass whose tool is actually ready are pre-checked; captioning stays OFF by
- * default — it's the slowest GPU pass and a "clean my bank" run rarely needs a
- * description on every shot, so we make the user opt in rather than silently add
- * hours to an overnight run. Auto-reject defaults to duplicate "keep best"
- * only; the quality flags (blurry, flat, …) stay off so an overnight run does
- * not bin shots the standalone sheet would still let you judge. That sheet
- * still starts on blurry + flat, because it has no duplicates control.
+ * Defaults: scan plus every heavy pass whose tool is ready are pre-checked.
+ * Auto-reject and captioning stay OFF. Rejection needs an explicit choice;
+ * captioning adds GPU work that a triage run may not need. When selected,
+ * auto-reject defaults to duplicate "keep best" only. The quality flags stay
+ * off so an overnight run does not reject shots without that choice. The
+ * standalone sheet still starts on blurry + flat because it has no duplicates
+ * control.
  */
 const QUALITY_FLAGS = [
   { key: 'blur', label: 'Blurry' },

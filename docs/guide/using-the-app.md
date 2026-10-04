@@ -705,15 +705,16 @@ its files are about to disappear.
 **🚀 Launch all** does the whole funnel for you in one go. Tick which passes
 run and how auto-reject behaves, hit Go, and walk away — it chains *scan →
 auto-reject → score → find watermarks → group by person → classify framing →
-(optional) caption* in that exact order. Auto-reject starts with only
+(optional) caption* in that exact order. Auto-reject is **off by default**.
+When you select it, it starts with only
 **≈ Duplicates** on (keep the best, reject the rest); Blurry / Noisy / Flat /
 Small are there, off, so an overnight run does not bin soft or plain shots
 unless you tick them. Two things make it safe to run overnight: a pass whose
 tool isn't installed, or a moment when the GPU is busy with a training run, is
 **skipped with a reason** instead of failing the whole run; and because
 auto-reject runs *before* the heavy passes, scoring/watermarks/person only ever
-process the survivors, never the images you just rejected. Captioning is the one
-pass left **off by default** (it's the slowest GPU pass and a clean-up run
+process the survivors, never the images you just rejected. Captioning also stays
+**off by default** (it's the slowest GPU pass and a clean-up run
 rarely needs a description on every shot). Stop it any time — and when you come
 back, a saved report at the top of the bank tells you exactly what ran, what was
 skipped and why, with the headline counts.
