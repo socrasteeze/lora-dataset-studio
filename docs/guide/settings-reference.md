@@ -644,6 +644,7 @@ fixed sizes on purpose.
 | `auto` *(default)* | Prefer JoyCaption (via ai-toolkit), fall back to the Ollama vision model. |
 | `joycaption` | JoyCaption only. |
 | `ollama` | Ollama vision model only. |
+| `pixai` | PixAI Tagger from local weights. Booru dataset captions only; refuses prose, Concept datasets and Bank captioning. Auto does not select it. |
 | `none` | No auto-captioning — you write them yourself. |
 
 `auto` is a **chain**, not a coin toss: JoyCaption captions the images it can in one
@@ -654,6 +655,13 @@ what — in the toast, and on a line under the caption buttons (Captions ▸ Gen
 captions), e.g. *“8 by JoyCaption · 4 by Ollama”*. That line describes the last pass
 of the current session only; nothing is stored per image. Pick a single value above
 (or per dataset, in Captions ▸ ⚙️ Options) if you want one voice across a set.
+
+### PixAI device
+
+- **Device** in the PixAI Tagger section maps to `pixai.device`. `auto` uses CUDA when available, otherwise CPU. `cuda` requires CUDA and refuses CPU fallback. `cpu` leaves the GPU free.
+- Prepare the model with **Setup > PixAI Tagger > Install**. This explicit action installs an isolated interpreter under `data/envs/pixai` and downloads the local snapshot. Captioning does not download files. Install everything does not include PixAI.
+- `pixai.models_root` is the parent folder for `pixai-tagger-v1.0`. When blank, the parent is `models` under the app data directory. Set the parent in the local configuration before Install to use an existing model library.
+- `pixai.python` can select an isolated interpreter. The app, WD14 and ai-toolkit interpreters are refused. The selected interpreter needs the same dependencies as the Setup environment.
 
 ### Tagging (WD14)
 

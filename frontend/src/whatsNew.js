@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-04-local-pixai-captions',
+    date: '2026-10-04',
+    title: 'Local Booru Captions',
+    blurb: 'Choose PixAI Tagger for booru dataset captions from local weights. Prepare it in Setup, then select it in Caption Options. Auto keeps its current engines. Concept datasets, prose and Bank captioning require JoyCaption or the local LLM.',
+    to: '/settings/captioning',
+  },
+  {
     id: '2026-10-04-bank-launch-reject-opt-in',
     date: '2026-10-04',
     title: 'Choose When to Reject',

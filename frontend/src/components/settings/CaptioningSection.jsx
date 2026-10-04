@@ -34,6 +34,7 @@ const INPUT_MAX_SIDE_OPTIONS = [
 const captioningOptions = (llm) => [
   { id: 'auto', label: 'Auto (best available)' },
   { id: 'joycaption', label: 'JoyCaption' },
+  { id: 'pixai', label: 'PixAI Tagger' },
   { id: 'ollama', label: `${llm} vision` },
   { id: 'none', label: 'None' },
 ]
@@ -224,6 +225,22 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
             {CAPTIONING_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
           </select>
           <ResetToDefault label="Captioning backend" section="captioning" field="backend"
+            config={config} configDefaults={configDefaults} setField={setField} />
+        </div>
+      </Card>
+      <Card
+        title="PixAI Tagger"
+        help="Writes booru dataset captions. Auto does not select it. Concept datasets and prose require JoyCaption or the local LLM. Install the local model in Setup."
+      >
+        <div>
+          <label htmlFor="pixai-device" className="block text-sm font-medium text-content">Device</label>
+          <select id="pixai-device" value={config.pixai?.device || defaultValueAt(configDefaults, 'pixai', 'device')}
+            onChange={(e) => setField('pixai', 'device', e.target.value)} className={INPUT_CLASS}>
+            <option value="auto">Auto (GPU when the PixAI Python has CUDA, otherwise CPU)</option>
+            <option value="cuda">GPU only (CUDA required; never the CPU)</option>
+            <option value="cpu">CPU (keeps the GPU free)</option>
+          </select>
+          <ResetToDefault label="PixAI Tagger Device" section="pixai" field="device"
             config={config} configDefaults={configDefaults} setField={setField} />
         </div>
       </Card>

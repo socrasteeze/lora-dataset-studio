@@ -2072,7 +2072,9 @@ const TOPICS = [
      'panorama', 'wide', 'too large', 'rejects images', '8192', '16384', 'no limit',
      'unlimited', 'oversized', 'caption', 'captioning', 'joycaption']),
   setting('captioning.backend', 'captioning', 'captioning-backend', 'Captioning backend',
-    ['caption', 'captioning', 'backend', 'joycaption', 'ollama', 'auto']),
+    ['caption', 'captioning', 'backend', 'joycaption', 'ollama', 'auto', 'pixai', 'pixai tagger']),
+  setting('pixai.device', 'captioning', 'pixai-device', 'PixAI Tagger device',
+    ['pixai', 'pixai tagger', 'device', 'gpu', 'cuda', 'cpu', 'booru', 'anima']),
   setting('wd14.device', 'captioning', 'wd14-device', 'Tagging device',
     ['tag', 'tagging', 'tagger', 'wd14', 'device', 'gpu', 'cuda', 'cpu', 'onnx']),
   setting('watermark.device', 'captioning', 'watermark-device', 'Watermark processing device',
@@ -2723,14 +2725,14 @@ const TOPICS = [
      'flip', 'bank', 'crop'],
     '/datasets', 'using-the-app', 'rotate-a-sideways-image'),
   action('action-caption-generate', 'Generate captions',
-    ['caption', 'generate', 'joycaption', 'ollama', 'text',
+    ['caption', 'generate', 'joycaption', 'ollama', 'pixai', 'pixai tagger', 'text',
      // Caption STYLE lives on this control: the prose/booru selector next to the
      // button. Anima accepts both forms, so a user searching "booru" or "anima"
      // must land here rather than conclude the app only does one of them.
      'prose', 'booru', 'tags', 'style', 'anima', 'hybrid'],
     '/datasets?section=captions&panel=generate', 'dataset-guide', '3-captions-the-make-or-break-step'),
   action('action-caption-options', 'Caption method options',
-    ['caption', 'options', 'engine', 'model', 'ollama', 'pull', 'instructions', 'prompt',
+    ['caption', 'options', 'engine', 'model', 'ollama', 'pixai', 'pixai tagger', 'pull', 'instructions', 'prompt',
      'method', 'vocabulary', 'explicit', 'clinical', 'nsfw', 'abliterated', 'uncensored'],
     '/datasets?section=captions&panel=generate', 'dataset-guide', '3-captions-the-make-or-break-step'),
   // DIVERGENCE 10 — hand-ported from upstream's help/topics/actions.js.

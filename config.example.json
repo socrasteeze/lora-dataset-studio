@@ -48,6 +48,11 @@
   "captioning": {
     "backend": "auto"
   },
+  "pixai": {
+    "python": "",
+    "models_root": "",
+    "device": "auto"
+  },
   "dataset_import": {
     "max_side": 1024,
     "encoding": "standard"

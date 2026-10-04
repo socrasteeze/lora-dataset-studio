@@ -68,6 +68,12 @@ export const CAPTION_ORIGINS = [
       + 'configured). With the Auto backend this is the '
       + 'second half of the run — the images JoyCaption did not caption.',
   },
+  {
+    key: 'pixai',
+    chip: 'PixAI Tagger',
+    short: 'Written by PixAI Tagger',
+    title: 'Booru dataset caption written by PixAI Tagger from local weights.',
+  },
 ];
 
 /* The absence, spelled out. Its `known` flag is false so a caller can choose
