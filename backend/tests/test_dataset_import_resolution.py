@@ -217,13 +217,9 @@ def test_import_header_budget_rejects_before_decode_for_every_ingress_lane(app, 
         ids, failed = svc.import_dataset_zip(LOCAL_USER, zipped.id, archive.getvalue())
         assert ids == [] and failed == 1
 
-        scraped = svc.create_dataset(LOCAL_USER, 'Scrape guarded', 'scrape_guarded',
-                                     kind='concept', concept_desc='a guarded concept')
-        monkeypatch.setattr(svc, '_download_scrape_item',
-                            lambda _item: ('ok', b'header-only'))
-        result = svc.scrape_import_urls(
-            LOCAL_USER, scraped.id, [{'url': 'https://example.invalid/unsafe.jpg'}])
-        assert result['imported'] == 0 and result['skipped']['errors'] == 1
+        with pytest.raises(ValueError, match='offline'):
+            svc.scrape_import_urls(
+                LOCAL_USER, 1, [{'url': 'https://example.invalid/unsafe.jpg'}])
 
         with pytest.raises(ValueError, match='reduce the image before import'):
             svc.normalize_to_webp(b'header-only')

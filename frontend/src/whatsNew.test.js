@@ -277,7 +277,7 @@ test('isValidTarget accepts good routes and rejects malformed ones', () => {
   for (const ok of [
     '/datasets', '/studio', '/cloud', '/gallery', '/guide', '/help', '/setup',
     '/settings/engines', '/settings/maintenance', '/guide/using-the-app',
-    '/datasets?section=scrape&panel=scan', '/datasets?section=add',
+    '/datasets?section=curation&panel=watermarks', '/datasets?section=add',
     '/setup?step=quality', '/setup?step=comfyui',
   ]) {
     assert.equal(isValidTarget(ok), true, ok);

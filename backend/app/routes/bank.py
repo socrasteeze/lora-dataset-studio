@@ -220,29 +220,8 @@ def bank_from_dataset():
 
 @bp.post('/bank/scrape-import')
 def bank_scrape_import():
-    """🕸 Scrape → BANK — the scraper's second destination, next to the dataset one.
-
-    Body: {items:[{url,title}], bank_id?} to APPEND to an existing bank (resume),
-    or {items, name} to create one. Synchronous like the dataset outlet (the same
-    per-request cap bounds it), and it stores what it downloaded: the resolution /
-    ratio / near-duplicate verdicts belong to the bank's own passes, not to the
-    download. 409 when a pass already owns the target bank."""
-    data = request.get_json(silent=True) or {}
-    raw_bank_id = data.get('bank_id')
-    bank_id = None
-    if raw_bank_id is not None:
-        try:
-            bank_id = int(raw_bank_id)
-        except (TypeError, ValueError):
-            return jsonify({'error': 'bank_id must be a number'}), 400
-    try:
-        res = banks.scrape_import_to_bank(LOCAL_USER, data.get('items'),
-                                          bank_id=bank_id, name=data.get('name'))
-    except bank_jobs.BankJobBusy as e:
-        return _busy(e)
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    return jsonify({'ok': True, **res})
+    """Retired online import. Local folder import stays on the other bank routes."""
+    return jsonify({'ok': False, 'error': 'Online media imports are disabled in this offline fork.'}), 403
 
 
 @bp.get('/bank/<int:bank_id>')

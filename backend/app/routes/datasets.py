@@ -1064,32 +1064,8 @@ def dataset_import(dataset_id):
 
 @bp.post('/dataset/<int:dataset_id>/scrape-import')
 def dataset_scrape_import(dataset_id):
-    """Scrape DIRECT → dataset: downloads the SELECTED scanned images
-    ({items:[{url,title}]}) straight into the dataset. Quality filters + dedup
-    live in the service. Open to ALL dataset kinds: images import full-frame
-    (aspect kept, no head-crop) and the user crops each tile manually — the old
-    concept-only gate dated from when character imports forced a GPU head-crop."""
-    ds = svc.get_dataset(LOCAL_USER, dataset_id)
-    if not ds:
-        return jsonify({'error': 'not found'}), 404
-    data = request.get_json(silent=True) or {}
-    items = data.get('items') or []
-    rescue_small = data.get('rescue_small', False)
-    if not isinstance(rescue_small, bool):
-        return jsonify({'error': 'rescue_small must be a boolean'}), 400
-    if not isinstance(items, list) or not items:
-        return jsonify({'error': 'no items'}), 400
-    if len(items) > svc.SCRAPE_IMPORT_MAX:
-        return jsonify({'error': f'max {svc.SCRAPE_IMPORT_MAX} images per import'}), 400
-    try:
-        res = svc.scrape_import_urls(LOCAL_USER, dataset_id, items,
-                                     rescue_small=rescue_small)
-    except Exception as e:
-        from ..services.klein_edit_helper import KleinModelsMissing
-        if isinstance(e, KleinModelsMissing):
-            return _klein_missing_response(e.missing)
-        return _map_error(e)
-    return jsonify({'ok': True, **res})
+    """Retired online import. Local file and folder import stay on the other routes."""
+    return jsonify({'ok': False, 'error': 'Online media imports are disabled in this offline fork.'}), 403
 
 
 @bp.post('/dataset/<int:dataset_id>/small-image-rescue/<int:candidate_id>/resolve')

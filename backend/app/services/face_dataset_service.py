@@ -7015,6 +7015,7 @@ def _download_scrape_item(item):
 
 
 def scrape_import_urls(user_id, dataset_id, items, rescue_small=False):
+    raise ValueError('Online media imports are disabled in this offline fork.')
     """Download selected scan items directly into a concept dataset. items
     contains url/title. Use bounded parallel downloads, sequential shared
     filter/dedup state, then aspect-preserving import_images(crop=False).
