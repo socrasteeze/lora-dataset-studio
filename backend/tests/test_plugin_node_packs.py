@@ -245,7 +245,8 @@ def test_facade_supplies_its_own_package_provenance_and_freezes_the_recipe(tmp_p
 
 @pytest.mark.parametrize('prefix', ['', 'package/', 'package\\'])
 @pytest.mark.parametrize('condition', ['valid', 'missing', 'hash'])
-def test_plugin_archive_must_carry_the_exact_declared_wheel(tmp_path, prefix, condition):
+def test_plugin_archive_must_carry_the_exact_declared_wheel(tmp_path, monkeypatch, prefix, condition):
+    monkeypatch.setenv('LDS_PLUGIN_DISTRIBUTION', 'development')
     from app.plugins.install import ArchiveError, inspect_plugin_zip
     data, body = with_wheel()
     path = tmp_path / 'plugin.zip'

@@ -11,7 +11,6 @@ import { readFileSync } from 'node:fs';
 const engines = readFileSync(new URL('./EnginesSection.jsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const improve = readFileSync(new URL('../../../../bundled/image_upscale/frontend/panels/KleinImproveSettings.jsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
 const settingsPage = readFileSync(new URL('../../pages/SettingsPage.jsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
-const scraping = readFileSync(new URL('../../../../bundled/scrape/frontend/panels/ScrapeSettingsGroup.jsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const field = readFileSync(new URL('../common/PromptOverrideField.jsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const modal = readFileSync(new URL('../dataset/IdentityPromptModal.jsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const refPanel = readFileSync(new URL('../dataset/ReferencePanel.jsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
@@ -61,7 +60,7 @@ test('the single box shows the default and normalises a copy of it back to ""', 
   assert.match(field, /Custom override/);
   // Reset clears back to '' (= follow the default), it does not re-type it
   assert.match(field, /onClick=\{\(\) => onChange\(''\)\}/);
-  assert.match(field, /Reset to Default/);
+  assert.match(field, /RESET_TO_DEFAULT_TEXT/);
 });
 
 test('the Extra refs row opens the identity-prompt modal', () => {
@@ -111,21 +110,6 @@ test('the modal shares the field and edits BOTH multi-reference prompts', () => 
   assert.match(modal, /used by your current engine/);
 });
 
-test('the two Klein cards cross-reference each other to remove the ambiguity', () => {
-  // engines card -> points at the scraping rescue card
+test('the Klein engine card does not point at the removed rescue prompt', () => {
   assert.doesNotMatch(engines, /identity-prompt-klein-improve/);
-  assert.match(scraping, /Plugins ▸ Klein Improve ▸ Settings/);
-  // scraping card renamed + points at the manual identity prompts card
-  assert.match(scraping, /title="Klein rescue — small scraped images"/);
-  assert.match(scraping, /Small-image rescue instruction/);
-  assert.match(scraping, /Manual improvement belongs to the optional Klein Improve plug-in/);
-});
-
-test('klein.small_image_prompt stays a genuinely optional EMPTY field', () => {
-  // It is NOT part of the single-box migration: its config default is '' with no
-  // shipped text behind it (backend reads klein.small_image_prompt, '') — empty
-  // means "no instruction at all", not "use a built-in one". Pre-filling it would
-  // invent a rescue prompt on the user's behalf.
-  assert.doesNotMatch(scraping, /PromptOverrideField/);
-  assert.match(scraping, /placeholder="Empty — reference image only"/);
 });

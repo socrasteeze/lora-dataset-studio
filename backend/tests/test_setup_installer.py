@@ -28,7 +28,7 @@ def test_manual_command_ml_extras_is_scoped_to_this_interpreter(app):
 def test_manual_command_quotes_paths_with_spaces(monkeypatch):
     from app import setup_installer
     monkeypatch.setattr(setup_installer.sys, 'executable', r'C:\LoRA Dataset Studio\python\python.exe')
-    cmd = setup_installer.manual_command('scrape_extras')
+    cmd = setup_installer.manual_command('video')
     assert '"C:\\LoRA Dataset Studio\\python\\python.exe"' in cmd
 
 
@@ -339,25 +339,6 @@ def test_every_action_has_a_worker_and_only_ollama_omits_manual_command(app):
                 assert setup_installer.manual_command(action) == ''
             else:
                 assert setup_installer.manual_command(action), f'no manual command for {action}'
-
-
-def test_run_scrape_extras_targets_scrape_requirements(monkeypatch):
-    """The shared pip worker must install the file matching THE ACTION — not
-    always requirements-ml.txt."""
-    from app import setup_installer
-    seen = {}
-    class FakeProc:
-        stdout = iter(())
-        returncode = 0
-        def wait(self): return 0
-    def fake_popen(cmd, **kw):
-        seen['cmd'] = cmd
-        return FakeProc()
-    monkeypatch.setattr(setup_installer.subprocess, 'Popen', fake_popen)
-    setup_installer._runs['scrape_extras'] = setup_installer._new_run()
-    rc = setup_installer._run_ml_extras('scrape_extras')
-    assert rc == 0
-    assert any('requirements-scrape.txt' in str(part) for part in seen['cmd'])
 
 
 def test_download_dest_path_under_validated_base(app, tmp_path):
@@ -1574,13 +1555,9 @@ def test_install_all_uses_managed_ml_support_independently_from_host_version():
     assert 'face_scoring' not in plan and 'masks' not in plan
 
 
-@pytest.mark.plugins('scrape')
-def test_install_all_plan_leaves_scrape_preparation_to_its_owner(app):
-    """A known plugin installer remains explicit, even when its dependency is absent."""
+def test_install_all_plan_does_not_offer_scrape_preparation(app):
     from app import setup_installer
-    assert setup_installer.known_action('scrape_extras')
-    assert setup_installer.install_all_plan(_caps(scrape_deps=False)) == []
-    assert setup_installer.install_all_plan(_caps(scrape_deps=True)) == []
+    assert not setup_installer.known_action('scrape_extras')
 
 
 def test_install_all_never_pulls_an_ollama_model_implicitly():

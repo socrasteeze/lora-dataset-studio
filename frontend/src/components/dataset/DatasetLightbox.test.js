@@ -9,7 +9,6 @@ const lightbox = readFileSync(new URL('./DatasetLightbox.jsx', import.meta.url),
 const workspace = readFileSync(new URL('./DatasetWorkspace.jsx', import.meta.url), 'utf8');
 const hook = readFileSync(new URL('../../hooks/useDataset.js', import.meta.url), 'utf8');
 const grid = readFileSync(new URL('./DatasetGrid.jsx', import.meta.url), 'utf8');
-const settings = readFileSync(new URL('../../../../bundled/scrape/frontend/panels/ScrapeSettingsGroup.jsx', import.meta.url), 'utf8');
 const attribution = readFileSync(new URL('./PexelsAttribution.jsx', import.meta.url), 'utf8');
 const sourceAttribution = readFileSync(new URL('./SourceAttribution.jsx', import.meta.url), 'utf8');
 
@@ -220,19 +219,6 @@ test('the bulk improvement is ONE call that starts a server job, not a per-image
   // 'improve', which left the button dead for every plain generation batch.
   assert.match(workspace, /pending > 0 \|\| act\?\.kind === 'improve'/);
   assert.match(workspace, /disabled=\{isStopGenerationBlocked\(\{[\s\S]{0,120}?busy: ds\.busy, activity: act/);
-});
-
-test('settings separates scraper rescue instructions from manual lightbox improvement', () => {
-  assert.match(settings, /title="Klein rescue — small scraped images"/);
-  assert.match(settings, /automatic rescue of scraped images under 768 px/);
-  // The point is that the two flows are distinct and the manual one is elsewhere —
-  // asserted on that meaning, not on a fixed sentence. The old wording claimed the
-  // manual pass had a fixed profile, which stopped being true once its strength and
-  // step count became editable.
-  assert.match(settings, /manual Upscale & improve is a different flow/);
-  assert.match(settings, /Plugins ▸ Klein Improve ▸ Settings/);
-  // the rescue card points at the separate manual "Identity, Klein & Krea 2 prompts" card
-  assert.match(settings, /Manual improvement belongs to the optional Klein Improve plug-in/i);
 });
 
 test('manual improvement candidates cannot use the unrelated generic regenerate path', () => {

@@ -24,8 +24,8 @@ from app.plugins import registry
 from app.plugins.loader import load_plugins
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCTS = ('camera_angles', 'canvas', 'hf_publish', 'image_upscale', 'live',
-            'model_tools', 'resource_monitor', 'scrape', 'seedvr2', 'video')
+PRODUCTS = ('camera_angles', 'canvas', 'image_upscale', 'live',
+            'model_tools', 'resource_monitor', 'seedvr2', 'video')
 
 
 @pytest.fixture(autouse=True)

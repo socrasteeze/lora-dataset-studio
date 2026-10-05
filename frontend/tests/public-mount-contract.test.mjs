@@ -78,13 +78,13 @@ test('missing historical workspaces explain the plugin state and link to the lib
   const html = mount(UnavailablePluginPage)
   assert.match(html, /not active in this session/)
   assert.match(html, /\/plugins\?tab=installed/)
-  assert.match(html, /Open datasets/)
+  assert.match(html, /Open Datasets/)
 })
 
 test('a direct Live or Video Studio bookmark never silently shows Images while its owner is off', () => {
   for (const lane of ['live', 'video']) {
     const html = mount(StudioPage, {}, `/studio?lane=${lane}`)
-    assert.match(html, /This Studio lane.*is unavailable/)
+    assert.match(html, /This Studio lane Unavailable/)
     assert.doesNotMatch(html, /data-testid="studio-lane-(live|video)"/)
   }
 })

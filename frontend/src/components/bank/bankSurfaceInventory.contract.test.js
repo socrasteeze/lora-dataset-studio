@@ -11,7 +11,7 @@ const FRONTEND = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 /** Read the whole Bank tree as it is NOW — discovered, not listed, so a file
  *  the redesign creates is scanned without anyone remembering to add it. */
 function bankTree() {
-  const dirs = ['src/components/bank', '../bundled/video/frontend/videobank', '../bundled/scrape/frontend/panels']
+  const dirs = ['src/components/bank', '../bundled/video/frontend/videobank']
   const files = [
     'src/pages/BankPage.jsx',
     '../bundled/video/frontend/pages/VideoBankPage.jsx',

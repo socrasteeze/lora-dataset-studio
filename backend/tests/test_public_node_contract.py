@@ -112,9 +112,11 @@ def test_authoring_validation_does_not_import_runtime_configuration(tmp_path, ki
     output, errors = tmp_path / 'stdout.txt', tmp_path / 'stderr.txt'
     # Windows PIPE communication starts reader threads; files keep the worker
     # prohibition intact while this bounded authoring subprocess runs.
+    env = subprocess_env()
+    env['LDS_PLUGIN_DISTRIBUTION'] = 'development'
     with output.open('w', encoding='utf-8') as stdout, errors.open('w', encoding='utf-8') as stderr:
         result = subprocess.run([sys.executable, '-I', '-c', script,
                                  str(Path(__file__).resolve().parents[1]), str(metadata), str(package), kind],
-                                stdout=stdout, stderr=stderr, timeout=30, env=subprocess_env())
+                                stdout=stdout, stderr=stderr, timeout=30, env=env)
     assert result.returncode == 0, errors.read_text(encoding='utf-8')
     assert output.read_text(encoding='utf-8').strip() == 'pure authoring passed'

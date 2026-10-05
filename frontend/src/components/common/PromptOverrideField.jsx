@@ -9,6 +9,7 @@
    merely looked at the default from silently persisting a frozen copy of it and
    never receiving a future improvement — see promptOverride.js. */
 import { normalizePromptOverride, promptBoxText } from './promptOverride.js';
+import { RESET_TO_DEFAULT_TEXT } from '../settings/settingDefaults.js';
 import { btnClass } from './controls.js';
 
 const RESET_BTN = btnClass({ size: 'sm', noShrink: true });
@@ -65,7 +66,7 @@ export default function PromptOverrideField({
         </span>
         {custom && !disabled && (
           <button type="button" onClick={() => onChange('')} className={RESET_BTN}>
-            Reset to Default
+            {RESET_TO_DEFAULT_TEXT}
           </button>
         )}
       </div>

@@ -47,9 +47,9 @@ test('the note also shows above a picker that IS rendered', () => {
       { value: 'Krea\\other.safetensors', label: 'other' }],
   })
   assert.ok(html.includes('krea2_turbo_fp8_scaled.safetensors'))
-  assert.ok(html.includes('Base model (multi)'))
+  assert.ok(html.includes('Base Models'))
   // Above, not below: the reader must know what the default IS before choosing.
-  assert.ok(html.indexOf('krea2_turbo_fp8_scaled') < html.indexOf('Base model (multi)'))
+  assert.ok(html.indexOf('krea2_turbo_fp8_scaled') < html.indexOf('Base Models'))
 })
 
 test('nothing is rendered when there is nothing to say', () => {

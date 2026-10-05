@@ -54,7 +54,6 @@ const SOURCES = [
 const PLUGIN_SETTINGS = {
   image_upscale: ['../bundled/image_upscale/frontend/panels/KleinImproveSettings.jsx',
     '../bundled/image_upscale/frontend/panels/ImproveFinishCard.jsx'],
-  scrape: ['../bundled/scrape/frontend/panels/ScrapeSettingsGroup.jsx'],
   qwen_dataset: ['src/pages/pluginSettingsGroups.jsx',
     '../bundled/qwen_dataset/frontend/panels/QwenPreparation.jsx',
     '../bundled/qwen_dataset/frontend/panels/QwenSettings.jsx'],

@@ -27,7 +27,6 @@ const SECTION_FILES = ['EnginesSection.jsx', 'CaptioningSection.jsx', 'TrainingS
   'LocalToolsSection.jsx', 'ServerSection.jsx', 'ScrapingSection.jsx', 'MaintenanceSection.jsx', 'StorageSection.jsx',
 ];
 const sources = Object.fromEntries(SECTION_FILES.map((f) => [f, read(`./${f}`)]));
-sources.ScrapeSettingsGroup = read('../../../../bundled/scrape/frontend/panels/ScrapeSettingsGroup.jsx');
 const button = read('./ResetToDefault.jsx');
 const settingsPage = read('../../pages/SettingsPage.jsx');
 
@@ -185,7 +184,6 @@ const COVERED = [
   ['LocalToolsSection.jsx', 'ollama', 'vision_concurrency'],
   ['LocalToolsSection.jsx', 'ollama', 'vision_keep_warm_seconds'],
   ['ServerSection.jsx', 'server', 'port'],
-  ['ScrapeSettingsGroup', 'klein', 'small_image_prompt'],
   ['StorageSection.jsx', 'paths', 'dataset_images_root'],
 ];
 
@@ -274,6 +272,6 @@ test('it is a real button, and its state is not carried by colour', () => {
 
 test('it uses the same words as the prompt boxes, which shipped first', () => {
   const promptField = read('../common/PromptOverrideField.jsx');
-  assert.ok(promptField.includes(RESET_TO_DEFAULT_TEXT),
+  assert.match(promptField, /\{RESET_TO_DEFAULT_TEXT\}/,
     'the prompt field owns the wording — do not grow a second vocabulary');
 });

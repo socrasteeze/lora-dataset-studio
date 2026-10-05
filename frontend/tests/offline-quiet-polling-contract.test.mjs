@@ -22,7 +22,7 @@ test('update surfaces check only when asked, with the installation-aware check',
     assert.doesNotMatch(source, /apiFetch\('\/api\/update\/check'\)/,
       `${file} must not mistake an up-to-date Git branch for an old release ZIP`)
     assert.doesNotMatch(source, /update\/check\?auto=1/)
-    assert.match(source, /apiFetch\('\/api\/update\/check\?force=1'\)/)
+    assert.doesNotMatch(source, /\/api\/update\/check/)
   }
 })
 

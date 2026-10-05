@@ -9,7 +9,7 @@ import test from 'node:test';
 const read = (p) => fs.readFileSync(new URL(p, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const link = read('./SettingsLink.jsx');
 const registry = read('../settings/registry.js');
-const pluginIds = new Set(['image_upscale', 'scrape', 'cloud_training']);
+const pluginIds = new Set(['image_upscale', 'cloud_training']);
 
 test('every section a link points at really exists in the settings registry', () => {
   const known = new Set([...registry.matchAll(/id: '([a-z0-9-]+)'/g)].map((m) => m[1]));
@@ -18,7 +18,7 @@ test('every section a link points at really exists in the settings registry', ()
     // The lightbox's own improve links moved into KleinImproveNote, which the
     // lightbox AND the grid's bulk toolbar both render — one note, two surfaces.
     '../../../../bundled/image_upscale/frontend/panels/KleinImproveNote.jsx', '../dataset/CaptionToolsBar.jsx',
-    '../dataset/TrainingPanel.jsx', "../../../../bundled/scrape/frontend/panels/ConceptSourcesPanel.jsx",
+    '../dataset/TrainingPanel.jsx',
   ];
   let found = 0;
   for (const f of files) {
@@ -34,7 +34,7 @@ test('every section a link points at really exists in the settings registry', ()
       } else assert.ok(known.has(section[1]), `${f}: unknown core settings section`);
     }
   }
-  assert.ok(found >= 4, `expected links in every surveyed surface, found ${found}`);
+  assert.ok(found >= 3, `expected links in every surveyed surface, found ${found}`);
 });
 
 test('a settings link never triggers the surface it sits on', () => {

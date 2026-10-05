@@ -28,7 +28,6 @@ const SURFACES = [
   ['src/components/bank/BankWatermarkPanel.jsx', 'the bank cleaner\'s Level-3 engine toggle'],
   ['src/components/dataset/DatasetWorkspace.jsx', 'the dataset watermark engine toggle'],
   ['src/components/dataset/WatermarkReviewLightbox.jsx', 'the per-image review engine toggle'],
-  ['../bundled/scrape/frontend/panels/ConceptSourcesPanel.jsx', 'the small-image Klein rescue checkbox'],
 ];
 
 for (const [file, what] of SURFACES) {
@@ -48,13 +47,6 @@ test('the bank cleaner passes the reason down to its JSX-free state helper', () 
   const helper = read('src/components/bank/bankWatermark.js');
   assert.match(helper, /kleinReason = null/);
   assert.match(helper, /kleinReason\s*\n?\s*\|\|/);
-});
-
-test('the concept rescue checkbox no longer states a verdict with no cause', () => {
-  const src = read('../bundled/scrape/frontend/panels/ConceptSourcesPanel.jsx');
-  assert.ok(!src.includes('Klein is not ready in this setup.'),
-    'that sentence named the verdict and hid the one thing the user needed');
-  assert.match(src, /kleinReason \?/);
 });
 
 /* The catch-alls may survive as a LAST-RESORT `||` fallback (a caller with no

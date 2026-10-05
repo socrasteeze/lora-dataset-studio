@@ -45,8 +45,9 @@ def test_fork_refuses_external_copies_even_without_bundled_directory(tmp_path, m
     _manifest(tmp_path, 'sample.feature', bundled=False)
     registry = PluginRegistry()
     _discover(registry, tmp_path, bundled=False)
-    assert set(registry.records) == {'sample.feature'}
-    assert {record['dir'] for record in registry.invalid} == fork_profile.RESERVED
+    assert registry.records == {}
+    assert {record['dir'] for record in registry.invalid} == (
+        (fork_profile.RESERVED - fork_profile.EXCLUDED) | {'sample.feature'})
 
 
 @pytest.mark.parametrize('plugin_id', sorted(fork_profile.RESERVED))
@@ -55,7 +56,7 @@ def test_fork_refuses_archive_replacement(tmp_path, monkeypatch, plugin_id):
     archive = tmp_path / 'plugin.zip'
     with zipfile.ZipFile(archive, 'w') as stream:
         stream.writestr('plugin.json', json.dumps({'id': plugin_id}))
-    with pytest.raises(ArchiveError, match='managed by the fork repository'):
+    with pytest.raises(ArchiveError, match='does not accept plugin archives'):
         inspect_plugin_zip(archive, official=True)
 
 

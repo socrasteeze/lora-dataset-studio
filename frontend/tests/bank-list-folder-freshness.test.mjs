@@ -29,7 +29,7 @@ const sync = (over = {}) => ({
 test('a never-walked list warns that its counts can lag AND offers the walk', () => {
   const html = render(FolderCheckLine, { banks: [sync(), sync()] })
   assert.match(html, /counts below are what the app knew last time/i)
-  assert.match(html, />Rescan folders/)
+  assert.match(html, />Rescan Folders/)
   assert.match(html, /<button[^>]*type="button"/)
 })
 
@@ -43,7 +43,7 @@ test('a freshly walked list states its age instead of crying stale', () => {
 
 test('the button says it is working and refuses a second click', () => {
   const html = render(FolderCheckLine, { banks: [sync()], busy: true })
-  assert.match(html, /Checking folders/)
+  assert.match(html, /Checking Folders/)
   assert.match(html, /<button[^>]*disabled/)
 })
 

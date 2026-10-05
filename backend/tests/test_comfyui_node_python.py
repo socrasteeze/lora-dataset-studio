@@ -73,7 +73,8 @@ def test_python_compatibility_is_part_of_plan_identity(sandbox):
 
 
 @pytest.mark.parametrize('value', ['>=3.12', '', ' ', '3.12', None])
-def test_manifest_and_archive_admission_validate_the_node_python_field(tmp_path, value):
+def test_manifest_and_archive_admission_validate_the_node_python_field(tmp_path, monkeypatch, value):
+    monkeypatch.setenv('LDS_PLUGIN_DISTRIBUTION', 'development')
     from app.plugins.install import ArchiveError, inspect_plugin_zip
     from app.plugins.node_packs import recipe
     data = manifest()

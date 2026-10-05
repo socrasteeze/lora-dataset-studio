@@ -443,7 +443,7 @@ _BUNDLED_STAMP = '.lds-version'
 # to all of them; only the FETCH differs between the two registries.
 _ALL_NODE_PACKS = tuple(_NODE_PACKS) + tuple(_BUNDLED_NODE_PACKS)
 
-INSTALL_ACTIONS = ('ml_extras', 'scrape_extras', 'ollama_model',
+INSTALL_ACTIONS = ('ml_extras', 'ollama_model',
                    'face_scoring', 'masks', 'watermark_inpaint',
                    'bank_scoring', 'bank_siglip2', 'wd14', 'pixai',
                    'watermark_detect',
@@ -454,10 +454,8 @@ INSTALL_ACTIONS = ('ml_extras', 'scrape_extras', 'ollama_model',
                    'dlss5nr_bridge') + tuple(_MODEL_DOWNLOADS) + _ALL_NODE_PACKS
 
 _ML_REQUIREMENTS = cfg.BACKEND_DIR / 'requirements-ml.txt'
-_SCRAPE_REQUIREMENTS = cfg.BACKEND_DIR / 'requirements-scrape.txt'
-# pip -r installers share one worker; both target THIS interpreter (the scrape
-# stack runs in-process, so any other environment would be invisible to the app).
-_PIP_REQUIREMENTS = {'ml_extras': _ML_REQUIREMENTS, 'scrape_extras': _SCRAPE_REQUIREMENTS}
+# pip -r installers share one worker and target THIS interpreter.
+_PIP_REQUIREMENTS = {'ml_extras': _ML_REQUIREMENTS}
 # The single package the watermark-inpaint scoped install adds. The NAME lives
 # here (an identifier), but the VERSION SPEC is parsed from requirements-ml.txt
 # so there's exactly one place a version floor is ever written.
@@ -1210,7 +1208,7 @@ def _check_download_precondition(action):
 # preconditions are already satisfiable. Firing order is grouped by capability area for
 # a coherent "X / N" progress display; the real scheduling still comes from start()
 # (pip serialized FIFO, model downloads parallel), so the order here is cosmetic.
-_INSTALL_ALL_ORDER = ('scrape_extras', 'face_scoring', 'masks', 'watermark_inpaint',
+_INSTALL_ALL_ORDER = ('face_scoring', 'masks', 'watermark_inpaint',
                       'wd14',
                       'klein_model', 'klein_text_encoder', 'klein_vae', 'klein_lora',
                       'klein_enhancement_lora')
@@ -1238,12 +1236,6 @@ def _action_needed(action, caps) -> bool:
         # Never part of "Install everything": a Windows-and-NVIDIA-only lane
         # whose model the user must bring is an opt-in card, not a default.
         return False
-    if action == 'scrape_extras':
-        # Pure-python wheels into THIS interpreter, so no ML-range gate: runnable on
-        # any Python the app itself starts on. scrape_deps is False as soon as ONE of
-        # the modules is absent, which is what makes a later-added package (instaloader)
-        # reachable from "Install everything" instead of only the per-tile Reinstall.
-        return not caps.get('scrape_deps')
     if action in ('face_scoring', 'masks'):
         runtime = (caps.get('python') or {}).get('managed_ml')
         if runtime is not None and not runtime.get('available', False):
@@ -1313,7 +1305,7 @@ def install_all_plan(caps) -> list:
     # Plugin preparation stays explicit on its owner's page. Keep this boundary even
     # if a future migration leaves a formerly core action in the global ordering.
     return [a for a in _INSTALL_ALL_ORDER
-            if a in INSTALL_ACTIONS and a not in (_PLUGIN_MANAGED_ACTIONS | {'scrape_extras', 'video', 'shot_detect'})
+            if a in INSTALL_ACTIONS and a not in (_PLUGIN_MANAGED_ACTIONS | {'video', 'shot_detect'})
             and plugin_action_spec(a) is None
             and not (model_download_spec(a) or {}).get('plugin')
             and known_action(a) and _action_needed(a, caps)]
@@ -3320,7 +3312,7 @@ def _run_dlss5nr_bridge(action) -> int:
     return neural_render.install_bridge(log=lambda line: _append(action, line))
 
 
-_WORKERS = {**{a: _run_ml_extras for a in _PIP_REQUIREMENTS},   # ml_extras + scrape_extras
+_WORKERS = {**{a: _run_ml_extras for a in _PIP_REQUIREMENTS},
             'dlss5nr_bridge': _run_dlss5nr_bridge,
             'ollama_model': _run_ollama_model,
             **{a: _run_ml_capability for a in _CAPABILITY_ML_ACTIONS},  # face_scoring + masks
