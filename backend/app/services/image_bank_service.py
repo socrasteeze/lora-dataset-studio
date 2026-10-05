@@ -13795,6 +13795,7 @@ def _scrape_blob_name(raw: bytes) -> str | None:
 
 def scrape_import_to_bank(user_id, items, bank_id=None, name=None, *,
                           _bank_lease=None, _created=False) -> dict:
+    raise ValueError('Online media imports are disabled in this offline fork.')
     """🕸 Scrape → BANK: the scraper's second destination.
 
     Downloads the SELECTED scanned images ({'url','title'}) into a bank's source

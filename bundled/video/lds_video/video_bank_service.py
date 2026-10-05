@@ -3986,6 +3986,7 @@ def _download_scrape_video(item, staging_dir) -> tuple:
 
 def scrape_import_to_video_bank(user_id, items, bank_id=None, name=None, *,
                                 _bank_lease=None, _created=False) -> dict:
+    raise ValueError('Online media imports are disabled in this offline fork.')
     """🕸 Scrape → VIDEO BANK: the scraper's third destination.
 
     Downloads the SELECTED scanned videos ({'url','title',}) into a bank's source

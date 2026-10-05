@@ -5,7 +5,7 @@
 // kind; only the CONTENT of a section branches on kind (e.g. "Add images" is
 // reference+generation for a character, scraping+import for a concept/style).
 
-import { ArrowLeftRight, Camera, Globe, GraduationCap, Images, Package, PenLine, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { ArrowLeftRight, Camera, GraduationCap, Images, Package, PenLine, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { contributions } from '../../plugins/registry.js';
 export const WORKSPACE_SECTIONS = [
   // "Add images" sits above "Images" on purpose: the rail mirrors the real
@@ -25,12 +25,6 @@ export const WORKSPACE_SECTIONS = [
     panels: [
       { id: 'review', title: 'Review images', targetId: 'ds-images-review', when: 'always' },
       { id: 'bulk', title: 'Bulk actions', targetId: 'ds-images-bulk', when: 'hasSelectableImages' },
-    ] },
-  { id: 'scrape', title: 'Scrape', icon: Globe, eyebrow: 'build', slot: 'sources.panel',
-    description: 'Scan a gallery URL, pick the images you want, and import them full-frame — crop each one afterwards on its tile.',
-    panels: [
-      { id: 'scan', title: 'Scan a gallery', targetId: 'ds-scrape-scan', when: 'always',
-        focusSelector: 'input[type="url"]' },
     ] },
   { id: 'curation', title: 'Curation', icon: Sparkles, eyebrow: 'quality',
     // "kept images" was true of every pass here until face resemblance started

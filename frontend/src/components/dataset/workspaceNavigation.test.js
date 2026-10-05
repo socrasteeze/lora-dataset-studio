@@ -51,12 +51,6 @@ test('character destinations expose real character-only panels', () => {
   assert.deepEqual(ids('captions'), ['generate', 'leak-review', 'lab', 'tools']);
 });
 
-test('scrape is a standalone destination for every dataset kind', () => {
-  assert.deepEqual(ids('scrape'), ['scan']);
-  assert.deepEqual(ids('scrape', { kind: 'concept' }), ['scan']);
-  assert.deepEqual(ids('scrape', { kind: 'style' }), ['scan']);
-});
-
 test('concept and style destinations omit character-only or inapplicable panels', () => {
   assert.deepEqual(ids('add', { kind: 'concept' }), ['import']);
   assert.deepEqual(ids('curation', { kind: 'concept' }), ['watermarks']);
@@ -130,8 +124,8 @@ test('a pending queue URL is preserved until training status resolves', () => {
 });
 
 test('query updates preserve unrelated keys and clear panel on parent navigation', () => {
-  const child = withWorkspaceLocation(new URLSearchParams('foo=bar&section=images'), 'scrape', 'scan');
-  assert.equal(child.toString(), 'foo=bar&section=scrape&panel=scan');
+  const child = withWorkspaceLocation(new URLSearchParams('foo=bar&section=images'), 'curation', 'watermarks');
+  assert.equal(child.toString(), 'foo=bar&section=curation&panel=watermarks');
   const parent = withWorkspaceLocation(child, 'captions', null);
   assert.equal(parent.toString(), 'foo=bar&section=captions');
 });

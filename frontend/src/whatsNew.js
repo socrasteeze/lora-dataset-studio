@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-05-no-web-import',
+    date: '2026-10-05',
+    title: 'Imports stay on this machine',
+    blurb: 'Bank and Dataset no longer download images or clips from a web address. Add files from a folder on this computer, or upload them from the device you are using.',
+    to: '/datasets?section=add&panel=import',
+  },
+  {
     id: '2026-10-05-no-external-plugins',
     date: '2026-10-05',
     title: 'Only the plugins that ship with the app',
