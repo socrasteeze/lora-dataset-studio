@@ -37,8 +37,8 @@ test('comparison displays its actual family and selected model defaults', () => 
     generationCapabilities: { negative_prompt: true },
   });
   assert.match(html, /Base model \(Qwen-Image 2\.1\)/);
-  assert.match(html, /CFG \(multi\) — default 4/);
-  assert.match(html, /Steps \(multi\) — default 30/);
+  assert.match(html, /CFG · Default 4\.0/);
+  assert.match(html, /Steps · Default 30/);
   assert.match(html, /Prompt \(optional\)/);
 });
 

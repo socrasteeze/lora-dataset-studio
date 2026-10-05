@@ -73,7 +73,7 @@ test('the box holds the SHIPPED text when nothing is overridden', () => {
   assert.equal(textareaValue(html), SHIPPED,
     'an empty box would be indistinguishable from "no instruction"')
   // Following the default is not an override, so there is nothing to reset TO.
-  assert.doesNotMatch(text(html), /Reset to Default/,
+  assert.doesNotMatch(text(html), /Reset to default/,
     'the reset button is itself the "you changed this" marker')
   assert.match(text(html), /Following the built-in default/)
 })
@@ -82,7 +82,7 @@ test('the box holds the OVERRIDE when there is one, and offers the way back', ()
   const html = render({ klein_improve: 'keep it a flat drawing, no skin texture' },
     { defaultEditorOpen: true })
   assert.equal(textareaValue(html), 'keep it a flat drawing, no skin texture')
-  assert.match(text(html), /Reset to Default/)
+  assert.match(text(html), /Reset to default/)
   assert.match(text(html), /Custom override/)
 })
 

@@ -116,7 +116,7 @@ test('popover height follows active contribution count on the actual surface', (
 test('shared H3 picker mounts with a Live endpoint and no Video plugin', () => {
   const html = mount(ui.H3LoraPicker, { apiBase: '/api/video-studio/live', lockKey: 'fixture.lora',
     value: null, onChange: () => {}, strength: 1, onStrength: () => {} })
-  assert.match(html, /LoRA under test/)
+  assert.match(html, /No LoRA applied/)
   assert.match(html, /No LoRA/)
   const records = [{ run_id: 4, filename: 'lds4_video_sample_000001000.safetensors' }]
   assert.deepEqual(groupTrained(records), sdkGroupTrained(records))

@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-05-no-external-plugins',
+    date: '2026-10-05',
+    title: 'Only the plugins that ship with the app',
+    blurb: 'Plugins adds nothing from a ZIP. The ten plugins installed with this app are the ones that can run. A downloaded archive cannot add a scraper, a publisher, or another tool.',
+    to: '/plugins',
+  },
+  {
     id: '2026-10-04-local-pixai-captions',
     date: '2026-10-04',
     title: 'Local Booru Captions',

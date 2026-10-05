@@ -37,5 +37,6 @@ test('the button only exists when a host offers the URL, and says it is working'
   assert.match(src, /disabled=\{exporting\}/)  // one click, not five
   assert.match(src, /role="alert"/)            // the failure is on screen
   // Finger-sized below lg, like every other control in this layer.
-  assert.ok(src.includes('min-h-10 rounded-md border border-border px-2 py-1 text-xs'))
+  assert.match(src, /controlHeight\('sm'\)/)
+  assert.match(src, /⬇ Export/)
 })

@@ -23,7 +23,7 @@
  * no frozen string could match a value built at runtime. Those stay covered by
  * the unit tests that own the helper building them. */
 
-const ATTRIBUTE = /\b(?:aria-label|title)="([^"{}]+)"/g
+const ATTRIBUTE = /\b(?:aria-label|title|label)="([^"{}]+)"/g
 
 /* Cut on a SENTINEL, never on whitespace. Splitting on spaces would turn one
    label into a list of separate words, and an inventory of words matches
@@ -68,21 +68,27 @@ function literalRuns(body) {
     .filter((run) => run && !SYNTAX_ONLY.test(run) && !CODE_COMMENT.test(run))
 }
 
-function buttonBodies(source) {
+function taggedBodies(source, openTag, closeTag) {
   const bodies = []
   let at = 0
   for (;;) {
-    const open = source.indexOf('<button', at)
+    const open = source.indexOf(openTag, at)
     if (open === -1) return bodies
-    const bodyStart = endOfOpeningTag(source, open + 7)
+    const bodyStart = endOfOpeningTag(source, open + openTag.length)
     if (bodyStart === -1) return bodies
-    // A self-closing <button /> has no body worth reading.
     if (source[bodyStart - 2] === '/') { at = bodyStart; continue }
-    const close = source.indexOf('</button>', bodyStart)
+    const close = source.indexOf(closeTag, bodyStart)
     if (close === -1) return bodies
     bodies.push(source.slice(bodyStart, close))
-    at = close + 9
+    at = close + closeTag.length
   }
+}
+
+function buttonBodies(source) {
+  return [
+    ...taggedBodies(source, '<button', '</button>'),
+    ...taggedBodies(source, '<Button', '</Button>'),
+  ]
 }
 
 export function surfaceStrings(source) {

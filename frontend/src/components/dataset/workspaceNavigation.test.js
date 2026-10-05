@@ -1,5 +1,3 @@
-import hfPublish from '../../../../bundled/hf_publish/frontend/index.js';
-import { installPublicOwners } from '../../../tests/support/publicOwners.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { WORKSPACE_SECTIONS } from './workspaceSections.js';
@@ -9,8 +7,6 @@ import {
   resolveWorkspaceLocation,
   withWorkspaceLocation,
 } from './workspaceNavigation.js';
-
-test.beforeEach(t => installPublicOwners(t, [hfPublish]));
 
 const BASE = Object.freeze({
   kind: 'character',
@@ -81,7 +77,7 @@ test('data and capability predicates expose only destinations that currently exi
     ['small-image-rescue', 'face-analysis', 'watermarks']);
   assert.deepEqual(ids('captions', { hasKeptImages: false, hasCaptionedKept: false }), ['generate']);
   assert.deepEqual(ids('export', { hfPublish: true, hasKeptImages: true }),
-    ['import', 'training-zip', 'to-bank', 'backup', 'hugging-face']);
+    ['import', 'training-zip', 'to-bank', 'backup']);
   assert.deepEqual(ids('training', { studioVisible: true }), ['launch', 'advanced']);
   assert.deepEqual(ids('checkpoints'), ['manager']);
   assert.deepEqual(ids('studio', { studioVisible: true }), ['launcher']);

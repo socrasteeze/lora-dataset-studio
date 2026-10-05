@@ -4,6 +4,16 @@ Repository guidance for any coding agent. This file applies to the whole tree.
 More specific AGENTS.md files refine it for their subtrees. Host instructions
 and the user's current authorization take precedence.
 
+## Change discipline
+
+These rules apply to every edit in this tree.
+
+- When a request has more than one reading, state the reading you are using before editing.
+- Change only the lines the request needs. Do not refactor, reformat, or clean up adjacent code.
+- Prefer the smallest change that meets a stated check. Do not add flexibility that was not requested.
+- Name the check before editing, then run it. A skipped check is not a pass.
+- Remove imports, variables, and helpers that the edit itself made unused. Leave older unused code unless the request names it.
+
 ## Communication and scope
 
 - Use short, complete sentences, active voice and precise technical terms.

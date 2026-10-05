@@ -58,7 +58,7 @@ test('the toast suffix concatenates cleanly, or vanishes', () => {
 
 test('the writer keys are the backend contract, and the copy is complete', () => {
   assert.deepEqual(CAPTION_WRITERS.map((w) => w.key),
-    ['joycaption', 'joycaption_refined', 'ollama']);
+    ['joycaption', 'joycaption_refined', 'ollama', 'pixai']);
   for (const w of CAPTION_WRITERS) {
     assert.ok(w.short && w.solo, `${w.key} needs both wordings`);
     assert.ok(w.solo.endsWith('.'), `${w.key} solo copy is a sentence`);

@@ -19,12 +19,13 @@ from pathlib import Path
 # moment a directory of that name appeared. bundled/api_engines and
 # bundled/cloud_training are deleted for the same reason; the pair is pinned by
 # frontend/tests/local-only-engines-contract.test.mjs, which fails on the
-# directory's mere presence. civitai_publish is absent too: this fork does not
-# publish to Civitai. The saved link tables and CIVITAI_API_KEY stay.
+# directory's mere presence. scrape, hf_publish and civitai_publish are absent
+# too: this fork does not scrape or publish. The saved link tables and
+# CIVITAI_API_KEY stay.
 # See FORK_NOTES.md.
 OFFICIAL_IDS = frozenset({
     'camera_angles',
-    'hf_publish', 'model_tools', 'scrape', 'video', 'canvas',
+    'model_tools', 'video', 'canvas',
     'image_upscale', 'resource_monitor', 'seedvr2', 'live',
     'manga', 'dlss5', 'creature_battle', 'qwen_dataset',
 })

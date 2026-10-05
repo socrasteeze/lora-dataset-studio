@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import fs from 'node:fs'
 import test from 'node:test'
 
 import {
@@ -59,14 +58,6 @@ test('with no store named, the helper finds the browser\'s — and survives one 
     if (had) Object.defineProperty(globalThis, 'localStorage', had)
     else delete globalThis.localStorage
   }
-})
-
-test('the dial keeps the range and step of the concept sources\u2019 \ud83d\udd0d, so the two feel like one', () => {
-  // The other side carries its numbers as literals in JSX; read both, or the
-  // two dials drift apart with every gate green and the docstring quietly false.
-  const concept = fs.readFileSync(new URL("../../../../../../bundled/scrape/frontend/panels/ConceptSourcesPanel.jsx", import.meta.url), 'utf8')
-  assert.match(concept, new RegExp(`<input type="range" min="${TILE_MIN}" max="${TILE_MAX}" step="${TILE_STEP}"`),
-    'the two Preview size dials must keep the same range and step')
 })
 
 test('the scrolling box grows with the tile, between the old 288 px and 640 px', () => {

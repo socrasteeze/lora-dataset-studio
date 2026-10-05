@@ -175,60 +175,6 @@ def test_put_settings_skip_persists_when_dir_empty(client):
     assert r.get_json()['config']['comfyui']['setup_skipped'] is True
 
 
-@pytest.mark.plugins('scrape')
-def test_put_settings_saves_scrape_credentials(client, monkeypatch):
-    """Scrape credentials are presence-only and effective without restart."""
-    import os
-    monkeypatch.setenv('PEXELS_API_KEY', '')
-    r = client.put('/api/settings?plugin=scrape', json={'secrets': {'REDDIT_CLIENT_ID': 'my-cid',
-                                                      'CIVITAI_API_KEY': 'civ-key',
-                                                      'PEXELS_API_KEY': 'pexels-key'}})
-    assert r.status_code == 200
-    secrets = r.get_json()['secrets']
-    assert secrets['REDDIT_CLIENT_ID'] is True and secrets['CIVITAI_API_KEY'] is True
-    assert secrets['PEXELS_API_KEY'] is True
-    payload = str(r.get_json())
-    assert 'my-cid' not in payload and 'pexels-key' not in payload  # presence only
-    assert os.environ['REDDIT_CLIENT_ID'] == 'my-cid'      # effective immediately
-    from lds_scrape.sources import reddit
-    from lds_scrape.sources.civitai import civitai_api_key
-    from lds_scrape.sources.pexels import pexels_api_key
-    assert reddit._client_id() == 'my-cid'
-    assert civitai_api_key() == 'civ-key'
-    assert pexels_api_key() == 'pexels-key'
-
-
-@pytest.mark.plugins('scrape')
-def test_delete_scrape_credential_falls_back_to_shared_id(client, monkeypatch):
-    """Removing the saved Reddit client id must drop it from the env too, so the
-    source falls back to the shared gallery-dl id instead of a stale value."""
-    import os
-    from lds_scrape.sources import reddit
-    monkeypatch.setattr(reddit, 'resolve_cookies', lambda key: None)  # ignore any local admin file
-    client.put('/api/settings?plugin=scrape', json={'secrets': {'REDDIT_CLIENT_ID': 'my-cid'}})
-    r = client.delete('/api/settings/secret/REDDIT_CLIENT_ID?plugin=scrape')
-    assert r.status_code == 200
-    assert r.get_json()['secrets']['REDDIT_CLIENT_ID'] is False
-    assert 'REDDIT_CLIENT_ID' not in os.environ
-    assert reddit._client_id() == reddit._GDL_CLIENT_ID
-
-
-@pytest.mark.plugins('scrape')
-def test_delete_pexels_api_key_clears_runtime_secret_without_leak(client):
-    import os
-    from lds_scrape.sources.pexels import pexels_api_key
-
-    client.put('/api/settings?plugin=scrape', json={'secrets': {'PEXELS_API_KEY': 'delete-me'}})
-    assert pexels_api_key() == 'delete-me'
-    r = client.delete('/api/settings/secret/PEXELS_API_KEY?plugin=scrape')
-
-    assert r.status_code == 200
-    assert r.get_json()['secrets']['PEXELS_API_KEY'] is False
-    assert 'delete-me' not in str(r.get_json())
-    assert 'PEXELS_API_KEY' not in os.environ
-    assert pexels_api_key() is None
-
-
 def test_put_tolerates_unknown_section(client):
     """Behavior change: an unknown config section used to 400 the whole Save
     (see test_put_settings_preserves_unknown_config_section_on_disk for why that

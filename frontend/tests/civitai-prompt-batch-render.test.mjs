@@ -33,13 +33,13 @@ const underRouter = (Component) => (props) =>
 
 test('the button renders without a batch, preserving the original state', () => {
   const html = render(underRouter(CivitaiBrowserButton), { prompt: '', onPrompt: noop })
-  assert.ok(html.includes('Civitai'), 'the button must render')
+  assert.equal(html.includes('Civitai'), false)
 })
 
-test('the button renders with a batch and executes the count branch', () => {
+test('the button stays absent when a batch is selected', () => {
   const html = render(underRouter(CivitaiBrowserButton),
     { prompt: '', onPrompt: noop, picks: ['a', 'b', 'c'], onTogglePick: noop })
-  assert.ok(html.includes('Civitai'))
+  assert.equal(html.includes('Civitai'), false)
 })
 
 test('the portaled modal is outside this harness, verified rather than assumed', async () => {

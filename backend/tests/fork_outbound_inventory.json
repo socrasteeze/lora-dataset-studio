@@ -385,71 +385,10 @@
     "github.com"
    ]
   },
-  "bundled/hf_publish/lds_hf_publish/publish.py": {
-   "calls": 4,
-   "hosts": [
-    "github.com",
-    "huggingface.co"
-   ]
-  },
   "bundled/qwen_dataset/lds_qwen_dataset/assets.py": {
    "calls": 0,
    "hosts": [
     "huggingface.co"
-   ]
-  },
-  "bundled/scrape/lds_scrape/sources/civitai.py": {
-   "calls": 1,
-   "hosts": [
-    "civitai.com",
-    "civitai.red"
-   ]
-  },
-  "bundled/scrape/lds_scrape/sources/erome.py": {
-   "calls": 0,
-   "hosts": [
-    "v22.erome.com",
-    "www.erome.com"
-   ]
-  },
-  "bundled/scrape/lds_scrape/sources/instagram.py": {
-   "calls": 0,
-   "hosts": [
-    "www.instagram.com"
-   ]
-  },
-  "bundled/scrape/lds_scrape/sources/pexels.py": {
-   "calls": 1,
-   "hosts": [
-    "api.pexels.com"
-   ]
-  },
-  "bundled/scrape/lds_scrape/sources/picazor.py": {
-   "calls": 0,
-   "hosts": [
-    "picazor.com"
-   ]
-  },
-  "bundled/scrape/lds_scrape/sources/reddit.py": {
-   "calls": 3,
-   "hosts": [
-    "github.com",
-    "oauth.reddit.com",
-    "www.reddit.com"
-   ]
-  },
-  "bundled/scrape/lds_scrape/sources/redgifs.py": {
-   "calls": 1,
-   "hosts": [
-    "api.redgifs.com",
-    "www.redgifs.com"
-   ]
-  },
-  "bundled/scrape/lds_scrape/sources/sexcom.py": {
-   "calls": 0,
-   "hosts": [
-    "imagex1.sx.cdn.live",
-    "www.sex.com"
    ]
   },
   "bundled/seedvr2/authoring/build_antlr.py": {

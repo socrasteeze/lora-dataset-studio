@@ -86,7 +86,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "↻ Rescan folder",
+    "↻ Rescan Folder",
     1
   ],
   [
@@ -215,10 +215,6 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "🕸",
-    1
-  ],
-  [
     "Delete rejected from disk",
     1
   ],
@@ -256,10 +252,6 @@ export const BANK_SURFACES = [
   ],
   [
     "Back to the grid",
-    1
-  ],
-  [
-    "Bank that receives the images",
     1
   ],
   [
@@ -512,16 +504,8 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Name of the new bank",
-    1
-  ],
-  [
     "Next →",
     3
-  ],
-  [
-    "no folder to prepare — the images land in a bank ready to triage",
-    1
   ],
   [
     "Not decided here",
@@ -580,7 +564,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Reject all",
+    "Reject All",
     1
   ],
   [
@@ -672,10 +656,6 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Scrape the web into a bank",
-    1
-  ],
-  [
     "Search the bank by caption or file name",
     1
   ],
@@ -688,7 +668,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Select page",
+    "Select Page",
     1
   ],
   [
@@ -729,10 +709,6 @@ export const BANK_SURFACES = [
   ],
   [
     "Video tools status",
-    1
-  ],
-  [
-    "Walk every bank's source folder now and pick up the images added to it",
     1
   ],
   [

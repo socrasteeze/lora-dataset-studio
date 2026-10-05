@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Puzzle, RefreshCw, Upload } from 'lucide-react'
-import { apiFetch, postForm, postJson, del } from '../api/fetchClient'
+import { Puzzle, RefreshCw } from 'lucide-react'
+import { apiFetch, postJson, del } from '../api/fetchClient'
 import { useToast } from '../components/common/Toast'
 import { Card, SectionHeader } from '../components/settings/primitives'
 import { waitForPluginBoot } from '../plugins/lifecycle.js'
@@ -76,20 +76,16 @@ export default function PluginsPage() {
   const [applying, setApplying] = useState(false)
   const [applyError, setApplyError] = useState('')
   const [applyWarning, setApplyWarning] = useState('')
-  const [consent, setConsent] = useState(null)
   const [adminToken, setAdminToken] = useState('')
   const [adminDraft, setAdminDraft] = useState('')
   const [checkingToken, setCheckingToken] = useState(false)
   const [tokenRejected, setTokenRejected] = useState(false)
-  const fileRef = useRef(null)
   const restartAbort = useRef(null)
   const scrolledPlugin = useRef('')
   const requestedPlugin = searchParams.get('plugin') || ''
 
   const adminOptions = { headers: adminToken ? { 'X-LDS-Plugin-Admin': adminToken } : {} }
   const mutation = (url, body) => postJson(url, body, adminOptions)
-  const upload = (form) => postForm('/api/plugins/install', form, adminOptions)
-
   const load = useCallback(async (token = adminToken) => {
     setCheckingToken(true)
     try {
@@ -176,48 +172,6 @@ export default function PluginsPage() {
     }
   }
 
-  const inspect = async (file) => {
-    if (!file) return
-    setBusy(true)
-    try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const res = await upload(fd)
-      setConsent({ file, manifest: res.manifest, install_dir: res.install_dir,
-        can_install: res.can_install === true,
-        compatibility_issues: Array.isArray(res.compatibility_issues) ? res.compatibility_issues : [] })
-    } catch (e) {
-      toast.error(e?.message || 'That archive is not a plugin.')
-    } finally {
-      setBusy(false)
-      if (fileRef.current) fileRef.current.value = ''
-    }
-  }
-
-  const confirmInstall = async (replace = false) => {
-    if (!consent?.can_install) return
-    setBusy(true)
-    try {
-      const fd = new FormData()
-      fd.append('file', consent.file)
-      fd.append('confirm', '1')
-      if (replace) fd.append('replace', '1')
-      await upload(fd)
-      toast.success(`${consent.manifest.name} is ready to apply. Restart LDS to use it.`)
-      setConsent(null)
-      setApplyError('')
-      await load()
-    } catch (e) {
-      if (/already installed/i.test(e?.message || '') && !replace) {
-        if (window.confirm(`${consent.manifest.name} is already installed. Replace it?`)) return confirmInstall(true)
-        return
-      }
-      toast.error(e?.message || 'Install failed.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
   const plugins = data?.plugins || []
   const restart = data?.restart
   const pendingRestart = Boolean(data?.pending_restart)
@@ -227,20 +181,11 @@ export default function PluginsPage() {
     <div className="mx-auto w-full space-y-4" data-probe-panel="plugins" data-probe-content="plugins">
       <div className="space-y-2">
         <SectionHeader eyebrow="Workspace" title="Plugins"
-          description="The plugins installed with this app, and any ZIP you add yourself." />
+          description="The plugins installed with this app." />
         <p className="flex flex-wrap items-center gap-2 text-xs text-content-muted">
           <Puzzle aria-hidden="true" className="h-3.5 w-3.5" />
           Your data stays with LDS when a plugin is updated or removed.
         </p>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <label className={BTN + ' inline-flex cursor-pointer items-center gap-1'}>
-          <Upload aria-hidden="true" className="h-3.5 w-3.5" /> Install from a ZIP
-          <input ref={fileRef} type="file" accept=".ldsplugin,.zip,application/zip" className="sr-only"
-            onChange={(e) => inspect(e.target.files && e.target.files[0])} disabled={busy || locked} />
-        </label>
-        <span className="text-xs text-content-muted">The archive is inspected first; nothing is written until you confirm.</span>
       </div>
 
       {locked && <PluginAdminLock value={adminDraft} onChange={setAdminDraft} onUnlock={unlock}
@@ -287,10 +232,6 @@ export default function PluginsPage() {
         </details>
       )}
 
-      {consent && (
-        <PluginInstallConsent consent={consent} busy={busy}
-          onInstall={() => confirmInstall(false)} onCancel={() => setConsent(null)} />
-      )}
     </div>
   )
 }

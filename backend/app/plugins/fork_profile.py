@@ -55,4 +55,5 @@ def offline_only():
 
 
 def refuses_archive(plugin_id):
-    return plugin_id in EXCLUDED or (active() and plugin_id in RESERVED)
+    """The fork accepts no plugin archives. Excluded ids stay refused in every profile."""
+    return active() or plugin_id in EXCLUDED

@@ -75,8 +75,8 @@ def _discover(registry: PluginRegistry, root: Path, *, bundled: bool) -> None:
         if fork_profile.active():
             if bundled and name not in fork_profile.ENABLED:
                 continue
-            if not bundled and name in fork_profile.RESERVED:
-                registry.invalid.append({'dir': name, 'reason': 'This plugin is managed by the fork repository.'})
+            if not bundled:
+                registry.invalid.append({'dir': name, 'reason': 'This install does not load external plugins.'})
                 continue
         if bundled:
             try:

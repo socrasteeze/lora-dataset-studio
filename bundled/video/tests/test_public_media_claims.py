@@ -31,7 +31,6 @@ def test_video_claims_its_product_settings_and_leaves_shared_decoders_to_host():
 
 @pytest.mark.parametrize(('pid', 'expected'), [
     ('video', {'video', 'video_detail', 'video_decode', 'video_detect', 'video_encode'}),
-    ('scrape', {'scrape_deps', 'scrape_deps_detail'}),
 ])
 def test_public_probes_are_declared_and_registered_by_their_product(host, pid, expected):
     loaded = activate(host, {pid})
@@ -102,34 +101,6 @@ def test_video_off_skips_all_previously_registered_probes(host, monkeypatch):
                        'comfyui.video_studio_reference': {},
                        'comfyui.h3_attention_nodes_installed': False,
                        'comfyui.h3_attention_nodes_missing': []}
-
-
-@pytest.mark.parametrize('missing', [None, 'curl_cffi', 'gallery_dl', 'bs4', 'cloudscraper', 'instaloader', 'ddgs', 'yt_dlp'])
-def test_scrape_package_presence_matches_public_main_without_import_or_network(host, monkeypatch, missing):
-    loaded = activate(host, {'scrape'})
-    seen = []
-
-    def find(name):
-        seen.append(name)
-        return None if name == missing else object()
-
-    # The product delegates presence checks to the real SDK; only its lookup
-    # transport is replaced so no optional package is imported.
-    monkeypatch.setattr(importlib.util, 'find_spec', find)
-    with host[0].app_context():
-        assert loaded.probes['scrape_deps'][1]() is (missing is None)
-        assert loaded.probes['scrape_deps_detail'][1]() == ('scrape deps OK' if missing is None else 'missing: ' + missing)
-    assert seen == ['curl_cffi', 'gallery_dl', 'bs4', 'cloudscraper', 'instaloader', 'ddgs', 'yt_dlp'] * 2
-
-
-def test_scrape_off_never_inspects_installed_packages(host, monkeypatch):
-    loaded = activate(host, {'scrape'})
-    from app import config
-    monkeypatch.setattr(importlib.util, 'find_spec', lambda *_a: pytest.fail('OFF Scrape inspected packages'))
-    config.save_config({'plugins': {'enabled': {'scrape': False}}})
-    with host[0].app_context():
-        assert loaded.probes['scrape_deps'][1]() is False
-        assert loaded.probes['scrape_deps_detail'][1]() == ''
 
 
 def test_live_readiness_is_independent_of_video_plugin(host, monkeypatch):

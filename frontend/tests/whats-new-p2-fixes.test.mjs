@@ -22,9 +22,10 @@ const ADDED = [
   },
 ]
 
-test('four benefit-first entries for these fixes are prepended and older ids stay', () => {
-  assert.deepEqual(WHATS_NEW.slice(0, 4).map((entry) => entry.id), ADDED.map((entry) => entry.id))
-  assert.equal(WHATS_NEW[4].id, '2026-10-01-zzzzzzzz-no-civitai-publish')
+test('four benefit-first entries for these fixes stay, and older ids stay', () => {
+  const ids = WHATS_NEW.map((entry) => entry.id)
+  for (const expected of ADDED) assert.ok(ids.includes(expected.id), expected.id)
+  assert.ok(ids.includes('2026-10-01-zzzzzzzz-no-civitai-publish'))
   for (const expected of ADDED) {
     const entry = WHATS_NEW.find((item) => item.id === expected.id)
     assert.equal(entry.title, expected.title)

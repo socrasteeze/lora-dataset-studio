@@ -4,12 +4,10 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import cameraAngles from '../../../bundled/camera_angles/frontend/index.js'
 import canvas from '../../../bundled/canvas/frontend/index.js'
-import hfPublish from '../../../bundled/hf_publish/frontend/index.js'
 import imageUpscale from '../../../bundled/image_upscale/frontend/index.js'
 import live from '../../../bundled/live/frontend/index.js'
 import modelTools from '../../../bundled/model_tools/frontend/index.js'
 import resourceMonitor from '../../../bundled/resource_monitor/frontend/index.js'
-import scrape from '../../../bundled/scrape/frontend/index.js'
 import seedvr2 from '../../../bundled/seedvr2/frontend/index.js'
 import video from '../../../bundled/video/frontend/index.js'
 import qwenDataset from '../../../bundled/qwen_dataset/frontend/index.js'
@@ -19,8 +17,8 @@ import qwenDataset from '../../../bundled/qwen_dataset/frontend/index.js'
    the fork deletes both directories outright (pinned by
    tests/local-only-engines-contract.test.mjs, which fails on their presence) and
    drops their ids from backend/app/plugins/official.OFFICIAL_IDS. */
-export const PUBLIC_DESCRIPTORS = [cameraAngles, canvas, hfPublish, imageUpscale,
-  live, modelTools, resourceMonitor, scrape, seedvr2, video, qwenDataset]
+export const PUBLIC_DESCRIPTORS = [cameraAngles, canvas, imageUpscale,
+  live, modelTools, resourceMonitor, seedvr2, video, qwenDataset]
 export const PUBLIC_PLUGIN_IDS = PUBLIC_DESCRIPTORS.map(descriptor => descriptor.id)
 
 export function mountPublicPlugins(enabled = PUBLIC_PLUGIN_IDS) {
