@@ -143,54 +143,51 @@ def test_validate_media_file_refuses_html_whatever_the_mode(tmp_path, allow_imag
     assert netfetch._validate_media_file(path, allow_image=allow_image) == (False, None)
 
 
-# 4) download_via_ytdlp: mock the subprocess, run REAL validation. Enter the function
-# body instead of replacing it so the nonexistent app.upload import cannot remain hidden
-# behind a full-function mock.
+# 4) download_via_ytdlp refuses before yt-dlp in this offline fork.
 
-def _fake_download(files):
-    """Create a fake _download_with_ytdlp that writes files ({extension: bytes})
-    where yt-dlp would write them."""
-    def _run(url, dest_template):
-        for ext, data in files.items():
-            with open(dest_template.replace('%(ext)s', ext), 'wb') as fh:
-                fh.write(data)
-        return True, None
-    return _run
+_OFFLINE = 'Online media imports are disabled in this offline fork.'
 
 
 def test_a_real_video_is_kept_and_named(tmp_path, monkeypatch):
-    monkeypatch.setattr(netfetch, '_download_with_ytdlp', _fake_download({'mp4': MP4}))
+    called = []
+    monkeypatch.setattr(netfetch, '_download_with_ytdlp',
+                        lambda *a, **k: called.append(1) or (True, None))
 
     ok, filename, err = netfetch.download_via_ytdlp(
         'https://example.invalid/watch', str(tmp_path / 'item'))
 
-    assert (ok, filename, err) == (True, 'item.mp4', None)
-    assert (tmp_path / 'item.mp4').exists()
+    assert (ok, filename, err) == (False, None, _OFFLINE)
+    assert called == []
+    assert not (tmp_path / 'item.mp4').exists()
 
 
 def test_an_html_page_saved_as_mp4_is_rejected_and_deleted(tmp_path, monkeypatch):
-    """yt-dlp exits successfully after saving a login page. Without validation it
-    would enter the bank as a video."""
-    monkeypatch.setattr(netfetch, '_download_with_ytdlp', _fake_download({'mp4': HTML}))
+    """The offline fork refuses before a saved login page can be kept as video."""
+    called = []
+    monkeypatch.setattr(netfetch, '_download_with_ytdlp',
+                        lambda *a, **k: called.append(1) or (True, None))
 
     ok, filename, err = netfetch.download_via_ytdlp(
         'https://example.invalid/watch', str(tmp_path / 'item'))
 
     assert (ok, filename) == (False, None)
-    assert err == "The downloaded file is not a valid video."
+    assert err == _OFFLINE
+    assert called == []
     assert not (tmp_path / 'item.mp4').exists()
 
 
 def test_side_files_are_cleaned_and_only_the_video_survives(tmp_path, monkeypatch):
-    """yt-dlp often saves a thumbnail and JSON alongside media."""
+    """yt-dlp is not started, so no thumbnail or sidecar is written."""
+    called = []
     monkeypatch.setattr(netfetch, '_download_with_ytdlp',
-                        _fake_download({'mp4': MP4, 'jpg': JPEG, 'info.json': b'{}'}))
+                        lambda *a, **k: called.append(1) or (True, None))
 
     ok, filename, err = netfetch.download_via_ytdlp(
         'https://example.invalid/watch', str(tmp_path / 'item'))
 
-    assert (ok, filename, err) == (True, 'item.mp4', None)
-    assert sorted(p.name for p in tmp_path.iterdir()) == ['item.mp4']
+    assert (ok, filename, err) == (False, None, _OFFLINE)
+    assert called == []
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_a_failed_download_reports_the_error_and_leaves_nothing_behind(tmp_path, monkeypatch):
@@ -204,7 +201,7 @@ def test_a_failed_download_reports_the_error_and_leaves_nothing_behind(tmp_path,
         'https://example.invalid/watch', str(tmp_path / 'item'))
 
     assert (ok, filename) == (False, None)
-    assert err == "Download failed (unsupported or unavailable URL)."
+    assert err == _OFFLINE
     assert list(tmp_path.iterdir()) == []
 
 

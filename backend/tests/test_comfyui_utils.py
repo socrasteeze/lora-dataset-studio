@@ -125,7 +125,7 @@ def test_comfyui_gpu_decisions_refuse_redirects(app):
             'app.utils.comfyui.requests.post',
             return_value=_response({'prompt_id': 'prompt-1'})) as post:
         queued, error = comfyui.queue_prompt_to_comfyui(
-            {'1': {}}, 'client-1', worker_url='http://comfy.local')
+            {'1': {}}, 'client-1', worker_url='http://10.0.0.50')
     assert error is None and queued['prompt_id'] == 'prompt-1'
     assert post.call_args.kwargs['allow_redirects'] is False
 
@@ -133,7 +133,7 @@ def test_comfyui_gpu_decisions_refuse_redirects(app):
             'app.utils.comfyui.requests.post',
             return_value=_response({'prompt_id': 'forged'}, status_code=302)) as post:
         queued, error = comfyui.queue_prompt_to_comfyui(
-            {'1': {}}, 'client-1', worker_url='http://comfy.local')
+            {'1': {}}, 'client-1', worker_url='http://10.0.0.50')
     assert queued is None
     assert error.startswith('ComfyUI /prompt returned unsafe HTTP status')
     assert post.call_args.kwargs['allow_redirects'] is False
@@ -142,7 +142,7 @@ def test_comfyui_gpu_decisions_refuse_redirects(app):
             'app.utils.comfyui.requests.get',
             return_value=_response({'prompt-1': {'outputs': {}}})) as get:
         probe = comfyui.get_comfyui_history_probe(
-            'prompt-1', worker_url='http://comfy.local')
+            'prompt-1', worker_url='http://10.0.0.50')
     assert probe.health is comfyui.ComfyHistoryHealth.READY
     assert get.call_args.kwargs['allow_redirects'] is False
 
@@ -154,14 +154,14 @@ def test_comfyui_gpu_decisions_refuse_redirects(app):
                return_value=_response(queue)) as get,          patch('app.utils.comfyui.requests.post',
                return_value=_response({})) as post:
         assert comfyui.cancel_comfyui_prompt(
-            'prompt-1', 'client-1', worker_url='http://comfy.local') is True
+            'prompt-1', 'client-1', worker_url='http://10.0.0.50') is True
     assert get.call_args.kwargs['allow_redirects'] is False
     assert post.call_args.kwargs['allow_redirects'] is False
 
     with app.app_context(), patch(
             'app.utils.comfyui.requests.post', return_value=_response({})) as post:
         assert comfyui.free_comfyui_vram(
-            worker_url='http://comfy.local').value == 'freed'
+            worker_url='http://10.0.0.50').value == 'freed'
     assert post.call_args.kwargs['allow_redirects'] is False
 
 

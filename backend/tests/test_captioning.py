@@ -265,7 +265,7 @@ def test_unload_vision_model_resolved_remote_targets_custom_model(app, monkeypat
     with app.app_context():
         config.save_config({
             'ollama': {
-                'url': 'http://remote-ollama:11434',
+                'url': 'http://10.0.0.9:11434',
                 'vision_model': 'global-vlm:latest',
             },
         })
@@ -273,7 +273,7 @@ def test_unload_vision_model_resolved_remote_targets_custom_model(app, monkeypat
             model='custom-vlm:latest') is True
 
     assert calls == [(
-        'http://remote-ollama:11434/api/generate',
+        'http://10.0.0.9:11434/api/generate',
         {
             'json': {'model': 'custom-vlm:latest', 'keep_alive': 0},
             'timeout': (10, 30),

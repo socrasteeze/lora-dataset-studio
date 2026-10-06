@@ -388,7 +388,7 @@ def test_local_files_runs_and_private_peers_stay_local(client, app, monkeypatch,
         'http://localhost:8188',
         'http://192.168.1.40:5050',
         'http://10.1.2.3:7860',
-        'http://100.64.0.8:8188',
+        'http://100.100.100.100:8188',
     ):
         assert local_api_url(address) == address
 

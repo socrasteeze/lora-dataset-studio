@@ -169,9 +169,9 @@ def test_runtime_readiness_http_probe_is_bounded_streamed_and_closed(monkeypatch
     monkeypatch.setattr(capabilities.requests, 'get', fake_get)
 
     assert capabilities._http_ok(
-        'http://ollama:11434/api/tags', timeout=99, readiness=True) is True
+        'http://10.0.0.52:11434/api/tags', timeout=99, readiness=True) is True
     assert seen == {
-        'url': 'http://ollama:11434/api/tags',
+        'url': 'http://10.0.0.52:11434/api/tags',
         'timeout': 1.0,
         'allow_redirects': False,
         'stream': True,

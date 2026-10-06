@@ -59,7 +59,7 @@ def test_media_recovers_only_after_the_correct_file_arrives(app, client, monkeyp
         '92': {'images': [{'filename': 'saved.mp4', 'type': 'output'}]}}}}
     monkeypatch.setattr(recovery.requests, 'get', lambda *a, **k: SimpleNamespace(
         raise_for_status=lambda: None, json=lambda: history))
-    monkeypatch.setattr(cfg, 'get', lambda *a, **k: 'http://comfy.test:8188')
+    monkeypatch.setattr(cfg, 'get', lambda *a, **k: 'http://10.0.0.70:8188')
     monkeypatch.setattr(vts, 'clips_dir', lambda: tmp_path)
     monkeypatch.setattr(vts, '_bring_clip_home', lambda name: None)
     with app.app_context():

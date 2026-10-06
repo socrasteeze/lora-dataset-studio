@@ -266,17 +266,15 @@ def test_route_lane_cloud_filters_the_machine_rows(app, client, tmp_path):
             patch.object(capabilities, 'probe',
                       return_value={'aitoolkit': {'valid': True}, 'cloud_training': True}), \
             vram_p, torch_p:
-        cloud = client.get(f'/api/dataset/{dsid}/train/preflight?lane=cloud').get_json()
+        cloud = client.get(f'/api/dataset/{dsid}/train/preflight?lane=cloud')
         local = client.get(f'/api/dataset/{dsid}/train/preflight').get_json()
+    assert cloud.status_code == 403
+    assert 'Cloud training was removed' in cloud.get_json()['error']
     assert {'vram', 'torch_arch'} & {c['id'] for c in local['checks']}
-    assert not ({'vram', 'torch_arch'} & {c['id'] for c in cloud['checks']})
 
 
 def test_cloud_only_install_still_gets_its_cloud_preflight(app, client, tmp_path):
-    """No ai-toolkit on this machine, a vast.ai key: the cloud preflight must
-    ANSWER. The historical gate 409'd, and the caller reads a non-200 as "no
-    objection" — which would have made the feature a silent no-op exactly where
-    money is at stake."""
+    """A machine with no ai-toolkit still gets an explicit refusal for the cloud lane."""
     from app import capabilities
     with app.app_context():
         ds = _dataset(tmp_path)
@@ -286,5 +284,6 @@ def test_cloud_only_install_still_gets_its_cloud_preflight(app, client, tmp_path
                       return_value={'aitoolkit': {'valid': False}, 'cloud_training': True}):
         cloud = client.get(f'/api/dataset/{dsid}/train/preflight?lane=cloud')
         local = client.get(f'/api/dataset/{dsid}/train/preflight')
-    assert cloud.status_code == 200 and cloud.get_json()['ok']
+    assert cloud.status_code == 403
+    assert 'Cloud training was removed' in cloud.get_json()['error']
     assert local.status_code == 409          # the local lane still says what's missing

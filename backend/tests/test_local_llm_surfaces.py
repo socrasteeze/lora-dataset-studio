@@ -112,7 +112,7 @@ def test_settings_lists_inactive_provider_at_draft_url_without_saving(
         return Response()
 
     monkeypatch.setattr(vision_lmstudio.requests, 'get', get)
-    draft = 'http://draft.invalid:1299'
+    draft = 'http://10.9.8.7:1299'
     typed = draft + ('/v1/' if provider == 'lmstudio' else '/')
     response = client.post('/api/local-llm/models',
                            json={'provider': provider, 'url': typed})
@@ -169,7 +169,7 @@ def test_settings_model_discovery_distinguishes_empty_from_unreachable(
 
     monkeypatch.setattr(vision_lmstudio.requests, 'get', get)
     response = client.post('/api/local-llm/models', json={
-        'provider': provider, 'url': 'http://draft.invalid:1299'})
+        'provider': provider, 'url': 'http://10.9.8.7:1299'})
     assert response.status_code == 200
     assert response.get_json() == {
         'ok': reachable, 'reachable': reachable, 'provider': provider, 'models': [],

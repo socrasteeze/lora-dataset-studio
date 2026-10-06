@@ -440,19 +440,8 @@ def test_dense_preflight_with_cloud_off_never_imports_the_product_or_reads_hf_se
         f'/api/dataset/{dataset_id}/train/preflight'
         '?lane=cloud&train_type=krea&variant=base&base_model='
         '&training_mode=full_transformer')
-    assert response.status_code == 200
-    payload = response.get_json()
-    token_status = payload['hf_cloud_token_status']
-    assert token_status['ok'] is False
-    assert token_status['configured'] is False
-    assert 'Install and enable Cloud training in Plugins' in token_status['error']
-    token_check = next(c for c in payload['checks'] if c['id'] == 'hf_cloud_token')
-    assert token_check['status'] == 'fail'
-    assert token_check['scope'] == 'cloud'
-    assert token_check['bypassable'] is False
-    assert 'Plugins' in token_check['hint']
-    assert token_status['error'] in payload['blockers']
-    assert payload['verdict'] == 'blocked'
+    assert response.status_code == 403
+    assert 'Cloud training was removed' in response.get_json()['error']
     assert not any(name.startswith('HF_') for name in secret_reads)
 
 
