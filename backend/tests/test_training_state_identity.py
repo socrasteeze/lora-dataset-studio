@@ -142,7 +142,7 @@ def test_runtime_fingerprint_requires_full_package_and_gpu_identity(
 
 def test_krea_hosted_inputs_are_commit_pinned_and_commit_change_changes_identity(
         tmp_path, monkeypatch):
-    """Base, assistant, implicit TE and implicit VAE all load local pinned bytes."""
+    """Hosted base pinning is refused before any download."""
     commits = {
         'krea/Krea-2-Raw': '1' * 40,
         'ostris/krea2_turbo_training_adapter': '2' * 40,
@@ -209,61 +209,6 @@ def test_krea_hosted_inputs_are_commit_pinned_and_commit_change_changes_identity
     with pytest.raises(identity.TrainingStateIdentityError, match='removed'):
         identity.pin_job_model_artifacts(
             first_job, cache_dir=tmp_path / 'hf', token='secret')
-    return
-    model = first_job['config']['process'][0]['model']
-    assert Path(model['name_or_path']).is_dir()
-    assert model['model_kwargs']['checkpoint_filename'] == 'raw.safetensors'
-    assert Path(model['assistant_lora_path']).is_file()
-    assert Path(model['model_kwargs']['text_encoder_path']).is_dir()
-    assert Path(model['model_kwargs']['vae_path']).is_dir()
-    assert {pin['repo'] for pin in pins} == set(commits)
-    assert len(calls) == 4
-
-    prepared = {
-        'manifest': [],
-        'snapshot': {'captions': {}, 'images': {}, 'dataset': {}},
-    }
-    toolkit = {'supported': True, 'aitoolkit_revision': 'a' * 40}
-    first_identity = identity.build_identity(
-        job_config=first_job,
-        prepared=prepared,
-        toolkit_probe=toolkit,
-        python_path=tmp_path / 'python.exe',
-    )
-    assert {
-        record['field'] for record in first_identity['model_artifacts']
-    } == {
-        'model.name_or_path',
-        'model.assistant_lora_path',
-        'model.model_kwargs.text_encoder_path',
-        'model.model_kwargs.vae_path',
-    }
-    assert all(
-        len(record['sha256']) == 64
-        and os.path.isabs(record['lexical_path'])
-        and record['repo']
-        and record['commit']
-        for record in first_identity['model_artifacts']
-    )
-
-    # Re-resolving the same mutable repo names to a new commit must produce a
-    # different compatibility identity even when a test serves identical bytes.
-    commits['krea/Krea-2-Raw'] = '5' * 40
-    second_job = _krea_job()
-    identity.pin_job_model_artifacts(
-        second_job, cache_dir=tmp_path / 'hf', token='secret')
-    second_identity = identity.build_identity(
-        job_config=second_job,
-        prepared=prepared,
-        toolkit_probe=toolkit,
-        python_path=tmp_path / 'python.exe',
-    )
-    assert first_identity['config_hash'] == second_identity['config_hash']
-    assert first_identity['base_hash'] != second_identity['base_hash']
-    assert (
-        identity.compatibility_spec(first_identity).base_model_hash
-        != identity.compatibility_spec(second_identity).base_model_hash
-    )
 
 
 def test_pre_resolved_model_pins_apply_without_resolving_again(

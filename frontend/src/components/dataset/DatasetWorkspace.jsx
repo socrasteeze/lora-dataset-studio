@@ -616,8 +616,6 @@ export default function DatasetWorkspace({ ds, onBack }) {
   // change the hook count between the Loading render and the loaded one
   // (React #310 crash — caught by runtime verification).
   const leakingCount = ((d && d.images) || []).filter((i) => i.leak).length;
-  useEffect(() => { if (d && section === 'add' && hasScrape) requestHelpTip('add-images-visit'); },
-    [d, section, hasScrape]);
   useEffect(() => { if (leakingCount >= 1) requestHelpTip('leak-panel-visible'); }, [leakingCount]);
   useEffect(() => { if (settingsOpen) requestHelpTip('dataset-settings-open'); }, [settingsOpen]);
 

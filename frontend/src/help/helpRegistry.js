@@ -1967,15 +1967,9 @@ const TOPICS = [
   setting('prompt-preview', 'engines', 'prompt-preview', 'See the prompt an engine actually receives',
     ['prompt', 'preview', 'composed', 'what is sent', 'debug', 'full prompt', 'inspect',
      'klein', 'krea', 'characters']),
-  // scraping
-  setting('REDDIT_CLIENT_ID', 'scraping', 'REDDIT_CLIENT_ID', 'Reddit client ID',
-    ['reddit', 'client id', 'scrape', '429', 'rate limit', 'quota', 'key']),
+  // scraping — only the download credential that still has a Settings field
   setting('CIVITAI_API_KEY', 'scraping', 'CIVITAI_API_KEY', 'Civitai API key',
-    ['civitai', 'api key', 'nsfw', 'adult', 'scrape', 'key']),
-  setting('PEXELS_API_KEY', 'scraping', 'PEXELS_API_KEY', 'Pexels API key',
-    ['pexels', 'api key', 'scrape', 'stock', 'key']),
-  setting('klein.small_image_prompt', 'scraping', 'klein-small-image-prompt', 'Klein rescue — small scraped images',
-    ['klein', 'small image', 'rescue', 'upscale', 'improve', 'prompt', 'scrape']),
+    ['civitai', 'api key', 'download', 'setup', 'key']),
   // local-tools
   setting('comfyui.api_url', 'local-tools', 'comfyui-api-url', 'ComfyUI API URL',
     ['comfyui', 'api', 'url', 'klein', 'studio', 'local']),
