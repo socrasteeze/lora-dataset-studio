@@ -63,6 +63,11 @@ checked out in other worktrees.
 2. Cloud Gates, responsive probes and the full local suite were not run.
 3. Do not restore excluded online features to satisfy an old test or an
    upstream issue.
+4. (2026-10-06): `frontend/src/index.css` forces 16px form controls on
+   `(pointer: coarse)` as well as below 640px, so iOS stops zooming into the
+   type-DELETE field on a phone held sideways or an iPad, and clips sideways
+   overflow on `html`/`body` with `overflow-x: clip`. The mobile-input-zoom
+   contract test follows. `frontend/dist` is rebuilt in a separate commit.
 
 ## Traps
 
