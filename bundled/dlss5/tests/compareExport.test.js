@@ -9,6 +9,8 @@ test('the button only exists when a host offers the URL, and says it is working'
   assert.match(src, /exporting \? 'Building' : '⬇ Export'/)
   assert.match(src, /disabled=\{exporting\}/)  // one click, not five
   assert.match(src, /role="alert"/)            // the failure is on screen
-  // Finger-sized below lg, like every other control in this layer.
-  assert.ok(src.includes('min-h-10 rounded-md border border-border px-2 py-1 text-xs'))
+  // Finger-sized below lg through the shared control height.
+  assert.match(src, /\$\{controlHeight\('sm'\)\} rounded-md border border-border px-2 py-0 text-xs/)
+  const height = read('../../../frontend/src/components/common/controls.js')
+  assert.match(height, /sm: 'h-10 min-h-10 lg:min-h-0 lg:h-7'/)
 })
