@@ -241,6 +241,21 @@ def put_settings():
         return jsonify({'error': "'secrets' must be an object"}), 400
     config_partial = body.get('config') or {}
     secrets_partial = body.get('secrets') or {}
+    if secrets_partial.get('HF_CLOUD_TOKEN'):
+        # The old save asked Hugging Face who the token was. This install
+        # does not. Refuse before the scope check so the token is not stored.
+        refused = {
+            'ok': False,
+            'detail': 'Cloud training was removed from this install.',
+            'code': 'offline',
+            'configured': True,
+            'severity': 'error',
+            'settings_focus': 'HF_CLOUD_TOKEN',
+        }
+        return jsonify({
+            'error': refused['detail'],
+            'secret_checks': {'HF_CLOUD_TOKEN': refused},
+        }), 400
     if 'plugins' in config_partial:
         return jsonify({'error': 'Plugin enablement is changed through the Plugins API.'}), 400
     scope = request.args.get('plugin') or None
@@ -310,17 +325,6 @@ def put_settings():
         node = config_partial.get(_managed)
         if isinstance(node, dict) and 'python' in node and not str(node.get('python') or '').strip():
             node.pop('python')
-    hf_cloud_check = None
-    hf_cloud_candidate = secrets_partial.get('HF_CLOUD_TOKEN')
-    if hf_cloud_candidate:
-        from ..services import cloud_training
-        hf_cloud_check = _hf_cloud_secret_check(
-            cloud_training.full_transformer_token_status(hf_cloud_candidate))
-        if not hf_cloud_check['ok']:
-            return jsonify({
-                'error': hf_cloud_check['detail'],
-                'secret_checks': {'HF_CLOUD_TOKEN': hf_cloud_check},
-            }), 400
     cfg.save_config(config_partial, plugin_id=scope)
     cfg.set_secrets(secrets_partial)
     # A changed ComfyUI location must take effect NOW: the base/model listers cache
@@ -335,8 +339,6 @@ def put_settings():
         # asked again before the next vision pass, not answered from memory.
         comfyui.forget_comfyui_refused()
     payload = _settings_payload()
-    if hf_cloud_check is not None:
-        payload['secret_checks'] = {'HF_CLOUD_TOKEN': hf_cloud_check}
     if preserved_unknown_sections:
         payload['preserved_unknown_sections'] = preserved_unknown_sections
     return jsonify(payload)

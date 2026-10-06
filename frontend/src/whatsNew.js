@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-05-zzz-training-stays-local',
+    date: '2026-10-05',
+    title: 'Training stays on this machine',
+    blurb: 'Runs and Train no longer rent a GPU or publish a dataset. Start a local training run, then open Runs to watch it and pick a checkpoint.',
+    to: '/cloud',
+  },
+  {
     id: '2026-10-05-no-web-import',
     date: '2026-10-05',
     title: 'Imports stay on this machine',

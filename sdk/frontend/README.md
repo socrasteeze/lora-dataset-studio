@@ -124,10 +124,9 @@ must use this version. Its third argument preserves multipart submissions.
 `@lds/plugin-sdk/training` supplies the existing host training progress, run
 identity chips and history controller. `RunsHub({endpoint, continuation, render})`
 owns polling and local history; the render callback receives its host controller.
-`RunsHubContent({host, cloud})` renders that history and only offers cloud actions
-when the plugin passes their callbacks. Installing Cloud adds the real rented-GPU
-workflow, dense-model recipe, delivery panels, settings, help and update feed.
-Disabling it retains readable previously saved runs and local continuation.
+`RunsHubContent({host, cloud})` renders that history. This fork does not ship
+the Cloud plugin, so those callbacks are unused. Previously saved local runs
+stay readable, and continuation stays on this machine.
 
 The same module exposes `postWithConfirmations` and
 `retryConfirmableRefusals()` from the host's single refusal policy. Plugins must
@@ -135,16 +134,14 @@ not copy that admission loop or its marker list. The general `PluginSlot` and
 `LocationEditor` controls are in `/ui`; a nested slot lets a complete product
 accept another product's contribution without importing it.
 
-Cloud owns its recipe selection, paid-launch estimates, billing-silence messages,
-staging cleanup policy and launch display under its own `frontend/lib` and
-`frontend/shared` directories. These do not enter the public SDK. Existing host
-helpers for persisted history remain compatible; the plugin imports none of
-their private files. `/data` provides small formatters for persisted paths,
+Upstream's Cloud package keeps its recipe selection, paid-launch estimates and
+launch display in its own directories. Those directories are not part of this
+fork and do not enter the public SDK. Existing host helpers for persisted
+history remain compatible. `/data` provides small formatters for persisted paths,
 sizes, run anchors and default values.
 
-`@lds/plugin-sdk/links` exposes the host's outbound-link builders and disclosure.
-Cloud asks `vastReferralId()` at render time, so forks can change the host's
-single referral configuration without rebuilding a plugin or duplicating an ID.
+`@lds/plugin-sdk/links` exposes the host's outbound-link builders. This fork
+does not ask a rental host for a referral id.
 
 ## Video and shared workspace services
 

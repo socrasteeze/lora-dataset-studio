@@ -10,15 +10,20 @@ The landing gate is `scripts/gates.ps1 -Phase Gates`.
 ## Distribution
 
 `fork-plugins.json` owns which plugins ship.
+The ten that ship are Camera Angles, Canvas, DLSS 5, Image Upscale, Live,
+Model Tools, Qwen Dataset, Resource Monitor, SeedVR2 and Video.
 Packaged images, compose files, and their launchers are not part of this fork.
-Install on the machine that runs the app. Remote ComfyUI stays.
+Install on the machine that runs the app. Remote ComfyUI on a private address stays.
 Runtime APIs must use localhost, private LAN addresses or the operator's tailnet.
-Hugging Face publishing and the web scraper are excluded. The ten remaining
-plugins run locally; explicit Setup downloads are preparation, not a runtime API.
-The Civitai publisher is not included. Saved link tables and the shared API key stay.
-API image engines and rented-GPU training stay excluded.
+External plugin archives are refused. Plugins does not install a ZIP, offer a
+catalog, or load anything outside those ten.
+Hugging Face publishing, the Civitai publisher and the web scraper are excluded.
+Saved link tables and stored download credentials stay. They do not turn those
+features back on.
+API image engines and rented-GPU training stay excluded. Saving a cloud-training
+token is refused before any account check, and the token is not stored.
 Plugins that ship with the app are installed with it.
-There is no plugin catalog.
+There is no plugin catalog and no in-app update check.
 `npm run build` writes the curated fork marker in
 `frontend/dist/plugin-build.json`. The backend reads that marker
 unless a test sets a distribution override.
@@ -55,6 +60,9 @@ The CPU fp8 quantize tool stays in the local Training panel.
 Do not restore dense rental recipes, pod delivery, or Hub storage controls.
 A new Continue host must stay behind `caps.cloud_training`.
 Do not open a rental lane from a `configured` flag alone.
+Rental routes refuse before a provider call. Local run history, checkpoints
+and the gallery still read local files in `cloud_training.py`. That module
+does not call Hugging Face or a rental host.
 
 ## Divergence 5: tests
 
@@ -130,11 +138,15 @@ What stays off:
 
 - In-app online update checks and apply operations are unavailable. Maintain
   the checkout or replace the local release outside the app, then restart.
-- Civitai browsing and online media imports are unavailable, even with a saved key.
+- Civitai browsing, Hugging Face publishing and online media imports are
+  unavailable, even with a saved key. The scrape blueprint is not registered.
+- External plugin ZIPs and any plugin outside the ten bundled ids are refused.
+- There is no plugin catalog and no usage-statistics collector. Installed
+  plugins are listed by `GET /api/plugins/`, which also reports `can_manage`.
 - The "upstream is N commits ahead" check is deleted.
-- There is no plugin catalog. Installed plugins are listed by
-  `GET /api/plugins/`, which also reports `can_manage`.
 - Fonts load from the bundled `@fontsource` packages.
+- `run.py` starts Flask with `load_dotenv=False`. Credentials come from the
+  explicit env file. Boot does not resume a rental, check for updates, or run pip.
 
 `backend/tests/test_fork_outbound_gate.py` fails when the outbound
 inventory changes, when the test app connects out during page-load

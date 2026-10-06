@@ -55,7 +55,7 @@ This fork generates exclusively on **local** engines, both running through your 
 
 The variation catalog fans out expression, angle, lighting, framing, outfit and background. Each subject type has its own catalog, catalogs import/export as JSON, and a one-off custom shot can be kept permanently.
 
-You can tick both engines for one batch. **Split across engines** sends each shot to a single engine, so the batch costs what one engine would cost but the dataset gains variety; **All engines** renders every shot on every engine for a side-by-side comparison, and doubles the cost accordingly. The same panel imports real photos, opens the scraper and pulls keepers out of an Image Bank.
+You can tick both engines for one batch. **Split across engines** sends each shot to a single engine, so the batch costs what one engine would cost but the dataset gains variety; **All engines** renders every shot on every engine for a side-by-side comparison, and doubles the cost accordingly. The same panel imports real photos and pulls keepers out of an Image Bank. Online scraping is excluded.
 
 Every generated tile reopens the exact prompt used to make it. The separate reference editor also supports **Retry**, which repeats the exact prompt, engine and temporary references of that candidate; choose **Try another prompt** only when changing the instruction.
 

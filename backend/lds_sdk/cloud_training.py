@@ -7,7 +7,7 @@ from app.services.cloud_training import (
     ACTIVE_STATES, _run_param, cfg, checkpoint_store_dir, latest_run_for,
     run_checkpoint_files, run_checkpoint_path,
 )
-from lds_sdk.lifecycle import is_available, state_change_lock
+from lds_sdk.lifecycle import state_change_lock
 
 __all__ = ['ACTIVE_STATES', '_run_param', 'cfg', 'checkpoint_store_dir',
            'delete_cloud_checkpoint', 'get_active_runs', 'latest_run_for',
@@ -33,11 +33,7 @@ def get_run(user_id, run_id, *, dataset_id, dataset_table):
 
 
 def _active_product():
-    if not is_available('cloud_training'):
-        raise RuntimeError('Cloud training is disabled or unavailable')
-    # Resolve only after admission; importing this SDK never imports a product.
-    from lds_cloud_training import cloud_training
-    return cloud_training
+    raise RuntimeError('Cloud training was removed from this install.')
 
 
 def delete_cloud_checkpoint(*args, **kwargs):
@@ -59,5 +55,10 @@ def month_spend_usd(*args, **kwargs):
 
 
 def full_transformer_token_preflight(*args, **kwargs):
-    with state_change_lock:
-        return _active_product().full_transformer_token_preflight(*args, **kwargs)
+    return {
+        'ok': False,
+        'code': 'offline',
+        'configured': False,
+        'namespace': None,
+        'error': 'Cloud training was removed from this install.',
+    }

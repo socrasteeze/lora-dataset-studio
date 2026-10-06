@@ -9,7 +9,7 @@ This fork runs local workflows. Online publishing, scraping, Civitai browsing an
 
 **A complete, self-hosted LoRA workflow in one browser tab:** source or generate a Character, Concept or Style dataset, curate it, caption it, clean watermarks, train it on your own GPU, then compare checkpoints before export.
 
-The core and public plugins are free under the [PolyForm Noncommercial license](LICENSE). The core needs no account; optional usage statistics are off by default. External APIs and rented GPUs have their own charges. Additional paid plugins may be offered later.
+The core and the ten bundled plugins are free under the [PolyForm Noncommercial license](LICENSE). The core needs no account. This fork does not send usage statistics, rent a GPU, or install extra plugins.
 
 <table>
   <tr>
@@ -67,7 +67,7 @@ Four ways to fill a dataset, and one choice at creation that rewires everything 
 
 *Details: [1. Decide what you're teaching](#1-decide-what-youre-teaching) · [2. Fill it with images](#2-fill-it-with-images)*
 
-Optional features that ship with the app are already installed. Open **Plugins** to turn one off, or install a ZIP you trust. Each plugin has its own settings and preparation steps. Model downloads, hardware and provider credentials depend on the feature.
+The ten optional features that ship with the app are already installed. Open **Plugins** to turn one off. An external ZIP is refused. Each plugin has its own settings and preparation steps. Model downloads start only when you ask Setup for them.
 
 Point a bank at a local folder. It reads what is there **in place**: your files are never modified, moved or renamed, and the single action that does touch the source folder announces itself in capitals before it runs. Then **one pass measures the whole pile**, and every question afterwards is answered against those measurements instead of against your eyes — what is blurry, what is a duplicate of what, who is in it, how it is framed, whether it is a photograph or a render, and what it actually shows. You keep, reject and shortlist; a kept selection graduates into a dataset with its analysis attached, and can come back the other way.
 
@@ -707,8 +707,8 @@ Click **Train** and [ai-toolkit](https://github.com/ostris/ai-toolkit) runs unde
 
 Training runs on this machine's own GPU, through ai-toolkit. **This fork has no
 rented-GPU lane** — no vast.ai key, no pod, no per-run bill, and no cloud button
-in the Training panel. Upstream ships one; it is removed here on purpose, and the
-backend that would drive it stays dormant and unreachable from the UI.
+in the Training panel. A saved rental token is refused and is not stored. Local
+run history, checkpoints and the gallery stay on this machine.
 
 What you *can* do without a local GPU:
 
@@ -875,7 +875,7 @@ Missing dependencies are shown in Setup/Settings and gated features stay unavail
 | Video Bank — reading and triaging | `backend/requirements-ml.txt` (PyAV). Shot detection additionally needs `transnetv2-pytorch` (weights bundled, nothing to download), which rides the bank-scoring environment because it pulls torch. The three pieces install and fail **apart**, and Setup reports them as three separate rows |
 | Video Bank — cutting clips into a dataset | An ffmpeg binary: `imageio-ffmpeg` ships one, or any ffmpeg on PATH. Needed **only to promote** — without it you can still scan, detect shots, watch and triage a whole bank |
 | Video Bank — shot captions and scene search | The Bank scoring extra's environment (torch + `transformers` ≥ 4.57) plus a Qwen3-VL checkpoint downloaded at first use; the model is a setting, and the same environment serves ✨ Score, SigLIP 2 and the watermark detector |
-| 🌐 Civitai top prompts (Studio/Canvas) | Browsing needs nothing; reading the prompts needs `CIVITAI_API_KEY` (free account) — the same key Civitai scanning uses |
+| 🌐 Civitai top prompts (Studio/Canvas) | **Not available in this fork.** Browsing and the scraper are refused. A saved `CIVITAI_API_KEY` can still be used for a Setup model download |
 | 📷 Camera angles | ComfyUI reachable + the Qwen-Image-Edit stack Setup's Camera card downloads (the VAE is shared with Krea 2 Edit) |
 | 🔤 Find text (bank & dataset) | The same small CPU OCR package the Video Bank's text pass uses, installed from Setup |
 | Local LoRA training: Z-Image / Krea 2 / FLUX.1 / FLUX.2 Klein / Anima | ai-toolkit; no ComfyUI is needed for official Hugging Face bases. Krea 2 can start from any Krea 2 checkpoint already on your disk instead — including one a full-model run delivered — discovered through ComfyUI's model tree; an ordinary fp8 build trains (the trainer up-casts it, and the app says with numbers how much precision that cast dropped), while a packed ComfyUI export is refused because it carries decompression tables a trainer cannot load |
@@ -893,22 +893,22 @@ Missing dependencies are shown in Setup/Settings and gated features stay unavail
 |---|---|---|
 | **Full local** | Local engines, ML helpers, ai-toolkit training, Canvas generation and Test Studio | Install/connect only the tools you need; each capability degrades independently |
 
-This fork is **local-only end to end**: no Nano Banana / ChatGPT / OpenRouter API engines (Klein/ComfyUI is the only generation path) and no rented-GPU training. Without a GPU on this machine you get everything except generation and training — see [No local GPU? Then no training here](#no-local-gpu-then-no-training-here).
+This fork is **local-only end to end**: no Nano Banana / ChatGPT / OpenRouter API engines. Generation stays on local ComfyUI engines (Klein and Krea 2 Edit). There is no rented-GPU training. Without a GPU on this machine you get everything except generation and training — see [No local GPU? Then no training here](#no-local-gpu-then-no-training-here).
 
 ---
 
 ## Setup & install
 
-**Windows:** download `LoRA-Dataset-Studio-windows.zip` from the [latest release](https://github.com/perfectgf/lora-dataset-studio/releases/latest), extract it into a new folder and run `start.bat`. The launcher prepares Python and opens LDS in your browser.
+**Windows:** clone `https://github.com/socrasteeze/lora-dataset-studio.git` and run `start.bat`. The launcher prepares Python and opens LDS in your browser. The upstream release zip is a different product.
 
-Complete **Setup**, then create a dataset or install the plugins you need. Importing, organizing and manually captioning images require no GPU or API key.
+Complete **Setup**, then create a dataset. The ten bundled plugins are already installed. Importing, organizing and manually captioning images require no GPU or API key.
 
 | Installation | Instructions |
 |---|---|
 | Git checkout or manual Python environment | [Native installation](docs/guide/installation.md#windows) |
 | Pinokio | [One-click installation](docs/guide/installation.md#pinokio) |
 
-Download **`LoRA-Dataset-Studio-windows.zip`** from the [latest release](https://github.com/socrasteeze/lora-dataset-studio/releases/latest) when that asset is present; otherwise use GitHub's **Source code (zip)**. Extract the entire archive, then double-click:
+Clone the fork, or download **Source code (zip)** from this repository. Extract the entire archive, then double-click `start.bat`.
 
 ### Minimum requirements
 
@@ -941,8 +941,8 @@ console.
 
 - [Getting started](docs/guide/getting-started.md) and [end-to-end workflow](docs/guide/workflow.md)
 - [Task instructions](docs/guide/using-the-app.md) and [dataset quality](docs/DATASET_GUIDE.md)
-- [Settings, models and paths](docs/guide/settings-reference.md), [external tools and API keys](docs/guide/installation.md#external-tools)
-- [Troubleshooting](docs/guide/troubleshooting.md) and [known limitations](docs/guide/known-limitations.md)
+- [Settings, models and paths](docs/guide/settings-reference.md), [external tools](docs/guide/installation.md#external-tools)
+- [Troubleshooting](docs/guide/troubleshooting.md), [known limitations](docs/guide/known-limitations.md) and [where this fork differs](FORK_NOTES.md)
 
 ```bash
 git clone https://github.com/socrasteeze/lora-dataset-studio.git
@@ -950,21 +950,11 @@ cd lora-dataset-studio
 start.bat
 ```
 
-The former `main` branch is now [`v1`](https://github.com/perfectgf/lora-dataset-studio/tree/v1). It is read-only and no longer maintained; updates and contributions go to `v2`.
-
-**Want a guided migration?** [Download the V2 migration helper](https://github.com/perfectgf/lora-dataset-studio/releases/download/v2026.09.14.4/LDS-Migrate-to-V2.zip), extract it outside your installation and run `migrate-to-v2.bat`. It checks the Git installation, backs up the database/settings and switches branches while leaving media in place. [Instructions, backup scope and supported installations](docs/guide/migrate-to-v2.md).
-
-For an existing git installation still on `main`, stop LDS and run these commands from its folder, then start LDS again:
-
-```bash
-git fetch origin
-git switch v2
-git branch --set-upstream-to=origin/v2 v2
-```
+Stay on this fork's `main`. Upstream's `v2` is a different product. Do not run upstream's migrate-to-v2 helper on this checkout.
 
 ### Option 2 — manual venv (any OS)
 
-Clone the default branch as above or download its [source archive](https://github.com/perfectgf/lora-dataset-studio/archive/refs/heads/v2.zip), open a terminal in its root, then run:
+Clone this repository as above, open a terminal in its root, then run:
 
 ```bash
 python -m venv .venv
@@ -1035,7 +1025,7 @@ Use **Settings** for normal configuration. Native installs bind to `127.0.0.1` b
 The short version:
 
 - **Ordinary settings** are written to `config.json` (git-ignored, in your data directory). Copy `config.example.json` to `config.json` to edit by hand — but almost everything has a UI control in **Settings**.
-- **Secrets** (`HF_TOKEN`, optional scraper keys) live in `.env`, never in `config.json` or a commit — copy `.env.example` to `.env`, or paste keys into Settings and let the app write them. (This fork removed the cloud image-generation engines and the rented-GPU training lane, so there are no `GEMINI_API_KEY` / `OPENAI_API_KEY` / `VAST_API_KEY` secrets to set.)
+- **Secrets** (`HF_TOKEN` for a gated Setup download, and `CIVITAI_API_KEY` for a Civitai model download) live in `.env`, never in `config.json` or a commit — copy `.env.example` to `.env`. They do not enable publishing, browsing or scraping. This fork has no `GEMINI_API_KEY`, `OPENAI_API_KEY` or `VAST_API_KEY` to set. Saving `HF_CLOUD_TOKEN` is refused.
 - **A handful of environment variables** override paths: `LDS_DATA_DIR` (runtime data), `LDS_CONFIG` (path to `config.json`), `LDS_ENV` (path to `.env`), `LDS_HOST` (bind host, beats `server.host`), `FLASK_DEBUG` (`1` for Flask debug).
 - **The keys you most often touch** — `server.port` (default `5050`), `comfyui.api_url`, `ollama.vision_model`, `aitoolkit.dir`, `training.default_family` — are all in the [full reference](docs/guide/settings-reference.md#configjson-key-reference-all-keys).
 
@@ -1088,12 +1078,11 @@ Still stuck? Open the app's **Guide → Getting help** for the one-click **diagn
 
 ## Support the project
 
-[GitHub Sponsors](https://github.com/sponsors/perfectgf) supports development, API testing and rented test GPUs. Bug reports, contributions and sharing the project also help. For support, generate a diagnostic report under **Guide → Getting help**, then use [Discord](https://discord.gg/j6hnJBFtXE) or [GitHub issues](https://github.com/perfectgf/lora-dataset-studio/issues).
+[GitHub Sponsors](https://github.com/sponsors/perfectgf) supports upstream development. Bug reports, contributions and sharing the project also help. For support, generate a diagnostic report under **Guide → Getting help**, then use [Discord](https://discord.gg/j6hnJBFtXE) or [GitHub issues](https://github.com/socrasteeze/lora-dataset-studio/issues).
 
-The LDS core and the public plugins in this release have public source and are available at no charge under the project's PolyForm Noncommercial license,
-with usage statistics off by default. Additional optional paid plugins may be offered later;
-the core and these public plugins remain free. Voluntary donations help fund
-development; this build carries no referral or affiliate link of any kind. The project is
+The LDS core and the ten plugins in this fork have public source and are available at no charge under the project's PolyForm Noncommercial license.
+This build does not collect usage statistics and does not offer paid plugins.
+Voluntary donations help fund development; this build carries no referral or affiliate link of any kind. The upstream project is
 built and maintained by one person, on personal time — every feature in the
 list above came out of somebody's evenings.
 
@@ -1102,11 +1091,10 @@ trainings, consider giving a little of that time back through
 [**GitHub Sponsors**](https://github.com/sponsors/perfectgf) — one-off or monthly,
 and 100% reaches the project (GitHub takes no platform fee).
 
-**Where it goes.** Not into anyone's pocket: upstream's own API credits and rented
-GPUs, which is how the lanes this fork keeps are verified on hardware most people
-actually have before they reach it, and the hours that turn a working script
-into something you can hand to a stranger — the docs, the guard-rails, the error
-messages that tell you what to do next.
+**Where it goes.** Sponsorship on the upstream project pays for the hours that
+turn a working script into something you can hand to a stranger — the docs, the
+guard-rails, the error messages that tell you what to do next. This fork does
+not spend that money on API credits or rented GPUs.
 
 **Not able to chip in? These help just as much**, honestly:
 

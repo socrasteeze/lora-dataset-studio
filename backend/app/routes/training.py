@@ -71,11 +71,9 @@ def _require_aitoolkit():
 
 
 def _require_cloud():
-    """None if cloud training is configured, else the (body, status) 409 to return."""
-    if not capabilities.probe().get('cloud_training'):
-        return jsonify({'error': 'Cloud training is not configured',
-                        'hint': 'Add your vast.ai API key in Settings'}), 409
-    return None
+    """This install trains on the local machine only."""
+    return jsonify({'error': 'Cloud training was removed from this install.',
+                    'hint': 'Train on this machine.'}), 403
 
 
 def _full_transformer_artifact_response(run):

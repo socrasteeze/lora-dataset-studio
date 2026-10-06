@@ -148,7 +148,8 @@ def _hf_token_value(token):
 
 
 def _resolve_hf_commit(repo_id: str, *, token=None) -> str:
-    """Bounded resolution of one mutable repo name to an immutable commit."""
+    """This install does not ask Hugging Face for a commit."""
+    raise TrainingStateIdentityError('Cloud training was removed from this install.')
     try:
         from huggingface_hub import HfApi
     except ImportError as exc:
@@ -175,7 +176,8 @@ def _materialize_hf_snapshot(
         token=None,
         allow_patterns=None,
 ) -> tuple[str, str]:
-    """Resolve a mutable repo id once, then download that exact commit locally."""
+    """This install does not download a hosted model snapshot."""
+    raise TrainingStateIdentityError('Cloud training was removed from this install.')
     try:
         from huggingface_hub import snapshot_download
     except ImportError as exc:
@@ -211,6 +213,7 @@ def _materialize_hf_file(
         cache_dir,
         token=None,
 ) -> str:
+    raise TrainingStateIdentityError('Cloud training was removed from this install.')
     try:
         from huggingface_hub import hf_hub_download
     except ImportError as exc:

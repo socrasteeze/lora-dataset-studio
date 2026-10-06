@@ -22,11 +22,11 @@ test('the scan is the current guide directory and not history or specs', () => {
   assert.equal(files.some((name) => name.includes('history') || name.includes('specs')), false)
 })
 
-test('installation.md describes the installed-plugin and trusted-ZIP workflow', () => {
+test('installation.md describes the bundled plugins and refuses an external archive', () => {
   const text = read('installation.md')
   assert.match(text, /features that ship with the app are already installed/i)
-  assert.match(text, /ZIP you trust/)
-  assert.match(text, /one restart applies it/i)
+  assert.match(text, /External plugin archives are refused/i)
+  assert.doesNotMatch(text, /ZIP you trust/)
   assert.doesNotMatch(text, /\bthe Store\b/i)
   assert.doesNotMatch(text, STORE)
   assert.doesNotMatch(text, UPDATES)

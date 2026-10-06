@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import { createElement, renderToStaticMarkup } from './support/mountJsx.mjs'
@@ -59,4 +60,10 @@ test('an installable archive shows neither issue messages nor the generic refusa
   assert.doesNotMatch(markup, /plugin API major/)
   assert.doesNotMatch(markup, /This plugin cannot be installed in the current app configuration\./)
   assert.equal(installIsDisabled(markup), false)
+})
+
+test('the Plugins page does not offer an archive install', () => {
+  const page = readFileSync(new URL('../src/pages/PluginsPage.jsx', import.meta.url), 'utf8')
+  assert.equal(page.includes('Install from a ZIP'), false)
+  assert.equal(page.includes('accept=".ldsplugin,.zip'), false)
 })

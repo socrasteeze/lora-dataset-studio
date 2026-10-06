@@ -575,7 +575,6 @@ def training_preflight(user_id, video_dataset_id, lane='local') -> dict:
     guard-rails a user may waive; they are either facts about the set or about
     the machine that will run it.
     """
-    from . import cloud_training as ct
     from . import gpu_speed
     from . import video_bank_service as _vbs
     ds = VideoDataset.query.filter_by(id=int(video_dataset_id),
@@ -654,31 +653,10 @@ def training_preflight(user_id, video_dataset_id, lane='local') -> dict:
                             f'{report["repo"]} on the first run — the launch asks first',
                        scope='machine')
 
-    # ---- the account (cloud lane only) -----------------------------------------
     if lane == 'cloud':
-        configured = bool(ct.cfg.secret('VAST_API_KEY'))
-        _check('vast', 'vast.ai account',
-               'ok' if configured else 'fail',
-               'API key configured' if configured
-               else 'no vast.ai API key — add it in Settings before renting a GPU',
+        _check('cloud', 'Cloud training', 'fail',
+               'Cloud training was removed from this install.',
                scope='cloud')
-        c = ct.cfg.get('cloud') or {}
-        limit = max(1, int((c.get('max_concurrent_runs') or 1)))
-        actives = ct.get_active_runs()
-        _check('fleet', 'Cloud run limit',
-               'warn' if len(actives) >= limit else 'ok',
-               f'{len(actives)} of {limit} allowed run(s) already on a pod — '
-               'the launch will be refused until one finishes'
-               if len(actives) >= limit else f'{len(actives)} of {limit} run(s) active',
-               scope='cloud')
-        budget = float(c.get('monthly_budget_usd') or 0)
-        if budget > 0:
-            spent = ct.month_spend_usd()
-            _check('budget', 'Monthly budget',
-                   'warn' if spent >= budget else 'ok',
-                   f'${spent:.2f} of ${budget:.2f} spent this month'
-                   + (' — the launch will be refused' if spent >= budget else ''),
-                   scope='cloud')
 
     statuses = {c['status'] for c in checks}
     verdict = ('blocked' if 'fail' in statuses

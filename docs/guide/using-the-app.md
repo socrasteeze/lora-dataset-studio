@@ -321,8 +321,8 @@ body and back cards. A square reference therefore no longer forces a full-body o
 sitting card into a tight bust crop.
 
 This is deliberately limited to Krea dataset variations. The separate **Edit
-reference** action keeps the source layout for a free-form edit, while Klein and
-the API engines keep their existing, separate generation paths.
+reference** action keeps the source layout for a free-form edit. Klein keeps
+its own local path. This fork has no API engines.
 
 You can still crop a reference when you want a different identity anchor or
 composition, but you no longer need to crop it merely to give a selected body
@@ -4433,10 +4433,8 @@ stays visible, greyed, with its reason:
 
 - *"Local training needs ai-toolkit"* / *"A training is already running on this
   machine"* — local training is single-flight for the whole machine.
-- *"Cloud training needs a rental key set up in Settings"* — **this build trains
-  locally only**, so the cloud lane is always closed here, on this board exactly
-  as in the dataset's own Continue dialog. It is shown rather than removed so the
-  two screens never disagree about why an option is unavailable.
+- *"This build trains on your own machine only — rented-GPU training was removed."*
+  The closed lane stays visible with that reason. Setting a key does not open it.
 - *"This save is no longer on this machine"* — there is no copy anywhere, so the
   lane that needs the file says so instead of failing at launch.
 

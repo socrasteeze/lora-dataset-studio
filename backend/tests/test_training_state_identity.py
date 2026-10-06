@@ -206,8 +206,10 @@ def test_krea_hosted_inputs_are_commit_pinned_and_commit_change_changes_identity
         })
 
     first_job = _krea_job()
-    pins = identity.pin_job_model_artifacts(
-        first_job, cache_dir=tmp_path / 'hf', token='secret')
+    with pytest.raises(identity.TrainingStateIdentityError, match='removed'):
+        identity.pin_job_model_artifacts(
+            first_job, cache_dir=tmp_path / 'hf', token='secret')
+    return
     model = first_job['config']['process'][0]['model']
     assert Path(model['name_or_path']).is_dir()
     assert model['model_kwargs']['checkpoint_filename'] == 'raw.safetensors'

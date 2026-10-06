@@ -152,6 +152,7 @@ def test_startup_neither_resumes_rentals_nor_runs_pip():
     assert 'start_supervisor' not in code(boot)
     assert 'subprocess' not in code(run)
     assert 'incompatible_pillow_plugins()' in code(run)
+    assert 'load_dotenv=False' in code(run)
 
 
 def test_the_frontend_never_checks_on_its_own():

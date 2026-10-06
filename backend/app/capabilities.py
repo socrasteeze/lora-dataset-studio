@@ -964,28 +964,9 @@ def probe_joycaption(aitoolkit: dict | None = None) -> dict:
                        f'"{venv_python}" -m pip install {_JOYCAPTION_INSTALL}')}
 
 
-VAST_API_BASE = 'https://console.vast.ai/api/v0'
-
-
 def probe_vast() -> dict:
-    """Live check of the vast.ai API key (used by the Settings 'Test' button).
-    The capability gate itself is key-presence only — probe() must stay
-    network-free for this entry (it runs on every /api/capabilities call)."""
-    from .plugins.fork_profile import offline_only
-    if offline_only():
-        return {'ok': False, 'detail': 'Online rental APIs are disabled in this offline fork.'}
-    key = cfg.secret('VAST_API_KEY')
-    if not key:
-        return {'ok': False, 'detail': 'API key missing'}
-    try:
-        r = requests.get(f'{VAST_API_BASE}/users/current/',
-                         headers={'Authorization': f'Bearer {key}'}, timeout=network_timeout(8))
-        if r.status_code == 200:
-            email = (r.json() or {}).get('email') or 'account'
-            return {'ok': True, 'detail': f'connected as {email}'}
-        return {'ok': False, 'detail': f'vast.ai returned HTTP {r.status_code}'}
-    except Exception as e:
-        return {'ok': False, 'detail': f'unreachable: {e}'}
+    """Settings Test for a stored rental key. This install does not call the host."""
+    return {'ok': False, 'detail': 'Online rental APIs are disabled in this offline fork.'}
 
 
 # The EXACT import expression each ML capability's probe runs, keyed by the

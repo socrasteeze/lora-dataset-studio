@@ -7,7 +7,7 @@ Thanks for wanting to make LoRA Dataset Studio better. This is a small, self-hos
 For anything bigger than a typo or a one-line fix, **talk about it first**. It saves you from building something that's already in progress or that doesn't fit the direction.
 
 - **Discord** ([join](https://discord.gg/j6hnJBFtXE)) — usually the fastest way. Ask in **#help**; float feature ideas in **#feature-requests**; talk implementation in **#dev-chat**. The curated **#community-ideas** board shows what people voted for.
-- **[GitHub issues](https://github.com/perfectgf/lora-dataset-studio/issues)** — bug reports and feature requests. There are templates for both; for a bug, the app can write most of the report for you (**Guide → Getting help → Copy diagnostic report** — it includes version, OS and a log tail, no keys, no paths).
+- **[GitHub issues](https://github.com/socrasteeze/lora-dataset-studio/issues)** — bug reports and feature requests for this fork. For a bug, the app can write most of the report for you (**Guide → Getting help → Copy diagnostic report** — it includes version, OS and a log tail, no keys, no paths). Upstream issues stay on `perfectgf/lora-dataset-studio`.
 
 A quick "I'm going to look at X" in an issue or on Discord means nobody duplicates your work.
 
@@ -20,7 +20,7 @@ You only need the backend to work on backend code. You only need Node to change 
 Use **CPython 3.10–3.12**. This matters: the optional ML extras (`insightface`, `onnxruntime`, `numpy<2`, …) publish no wheels for 3.13+, so a venv built on a newer Python (a bare `python`/`py -3` often grabs 3.13/3.14) can't install them. Pick the version explicitly.
 
 ```bash
-git clone https://github.com/perfectgf/lora-dataset-studio.git
+git clone https://github.com/socrasteeze/lora-dataset-studio.git
 cd lora-dataset-studio
 
 python -m venv .venv                 # on Windows: py -3.12 -m venv .venv
@@ -29,11 +29,11 @@ pip install -r backend/requirements.txt
 
 # optional, only if you're touching face scoring / masks / watermark inpainting:
 pip install -r backend/requirements-ml.txt
-# optional, only if you're touching the scraper:
-pip install -r backend/requirements-scrape.txt
 
 python backend/run.py
 ```
+
+This fork refuses online scraping, publishing, rented GPUs and external plugin archives. Do not restore them to match an upstream issue. The current boundaries are in [FORK_NOTES.md](FORK_NOTES.md).
 
 `run.py` re-execs itself into `.venv` if it exists, so every launch method converges on the same interpreter. On Windows you can instead just double-click **`start.bat`**, which finds (or downloads) a suitable Python, builds the venv, and starts the server on port **5050**.
 

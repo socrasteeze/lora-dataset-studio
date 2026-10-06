@@ -2,8 +2,11 @@
 
 A plugin is a complete feature package: its Python backend, screens, settings,
 help and runtime assets travel together. The host provides the plugin API,
-shared UI runtime, installation workers and lifecycle. Installable archives
-contain the built browser interface and the plugin's own Python package.
+shared UI runtime, installation workers and lifecycle.
+
+This fork ships ten bundled plugins and refuses an archive that is not one of
+them. The authoring notes below describe the package contract. They do not
+add an install path.
 
 ## Shared source layout
 

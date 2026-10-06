@@ -193,6 +193,10 @@ def base_push_state(user_id, dataset_id, family, variant, base_model, token,
     'reuse the pushed base': local artifact presence/size, the deterministic
     repo id, remote readiness, and the background push job's state. Degrades
     to ready=False + reason instead of raising (poll-friendly)."""
+    return {'supported': False, 'family': family, 'variant': variant, 'ready': False,
+            'reason': 'offline', 'repo_id': None, 'repo_name': None,
+            'local_size_bytes': None, 'local_available': False,
+            'remote_size_bytes': None, 'job': {'state': 'idle'}}
     family = fds.normalize_train_type(family)
     variant = normalized_variant(family, variant)
     out = {'supported': family in CLOUD_CUSTOM_BASE_FAMILIES,
@@ -238,7 +242,7 @@ def base_push_state(user_id, dataset_id, family, variant, base_model, token,
         return out
     api = _api or _make_api(token)
     try:
-        who = api.whoami()
+        who = None
     except Exception:
         out['reason'] = 'token_invalid'
         return out
@@ -262,11 +266,8 @@ def base_push_state(user_id, dataset_id, family, variant, base_model, token,
 # --- launch-time guard (cloud_training calls this before renting anything) -----
 
 def require_base_repo(ds, family, variant, base_model, token) -> dict:
-    """The pre-rent guard: raises an ACTIONABLE ValueError unless the custom
-    base is fully downloadable by the pod (repo exists on the user's account,
-    expected files present, size matching the local copy when it still
-    exists). Returns {'repo_id', 'size_bytes'} on success — size_bytes is the
-    REMOTE weight size (what the pod will actually pull), for disk sizing."""
+    """This install does not check a custom base against Hugging Face."""
+    raise ValueError('Cloud training was removed from this install.')
     family = fds.normalize_train_type(family)
     variant = normalized_variant(family, variant)
     if family not in CLOUD_CUSTOM_BASE_FAMILIES:
@@ -290,7 +291,7 @@ def require_base_repo(ds, family, variant, base_model, token) -> dict:
         pass                       # pushed repo works even without the local file
     try:
         api = _make_api(token)
-        who = api.whoami()
+        who = None
     except HfPublishError:
         raise
     except Exception as e:
@@ -335,10 +336,8 @@ def require_base_repo(ds, family, variant, base_model, token) -> dict:
 def push_base_to_hf(dataset_id, family, variant, base_model, token,
                     user_id=LOCAL_USER, allow_unverified_weights=False,
                     _api=None) -> dict:
-    """Full synchronous push: validate -> arch sniff (confirmable) -> write-scope
-    preflight -> create PRIVATE repo (repair to private if it drifted public) ->
-    upload file/folder -> verify what the pod would download. Cache-hit (repo
-    already carries the exact files) skips the upload entirely."""
+    """This install does not upload a custom base."""
+    raise HfPublishError('offline', 'Publishing was removed from this install.')
     family = fds.normalize_train_type(family)
     variant = normalized_variant(family, variant)
     if not token:
@@ -381,8 +380,7 @@ def push_base_to_hf(dataset_id, family, variant, base_model, token,
     try:
         # private=True is FORCED — never a parameter, never a toggle: these are
         # the user's personal model weights.
-        api.create_repo(repo_id=repo_id, repo_type='model', private=True,
-                        exist_ok=True)
+        raise HfPublishError('offline', 'Publishing was removed from this install.')
     except Exception as e:
         status = _http_status(e)
         if status in (401, 403):
@@ -392,16 +390,8 @@ def push_base_to_hf(dataset_id, family, variant, base_model, token,
         raise HfPublishError('network', f'could not create the repo: {e}') from e
     _ensure_private(api, repo_id, None)
 
-    commit_message = f'Push custom {family} base (LoRA Dataset Studio)'
     try:
-        if payload['kind'] == 'folder':
-            api.upload_folder(folder_path=payload['path'], repo_id=repo_id,
-                              repo_type='model', commit_message=commit_message)
-        else:
-            api.upload_file(path_or_fileobj=payload['path'],
-                            path_in_repo=weight_filename(family, variant, repo_name),
-                            repo_id=repo_id, repo_type='model',
-                            commit_message=commit_message)
+        raise HfPublishError('offline', 'Publishing was removed from this install.')
     except Exception as e:
         status = _http_status(e)
         if status in (401, 403):
@@ -466,6 +456,7 @@ def start_push(app, dataset_id, family, variant, base_model, token,
                user_id=LOCAL_USER, allow_unverified_weights=False) -> dict:
     """Launch the push in the background (daemon thread, hf_publish shape).
     Returns the initial status; a second call while one runs is a no-op."""
+    raise HfPublishError('offline', 'Publishing was removed from this install.')
     ds = fds.get_dataset(user_id, dataset_id)
     if not ds:
         raise HfPublishError('dataset_not_found', 'dataset not found')

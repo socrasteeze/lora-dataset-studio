@@ -25,10 +25,8 @@
  },
  "python": {
   "backend/app/capabilities.py": {
-   "calls": 6,
-   "hosts": [
-    "console.vast.ai"
-   ]
+   "calls": 5,
+   "hosts": []
   },
   "backend/app/plugins/environment.py": {
    "calls": 0,
@@ -61,58 +59,6 @@
    "calls": 1,
    "hosts": []
   },
-  "backend/app/scrape/sources/civitai.py": {
-   "calls": 1,
-   "hosts": [
-    "civitai.red"
-   ]
-  },
-  "backend/app/scrape/sources/erome.py": {
-   "calls": 0,
-   "hosts": [
-    "www.erome.com"
-   ]
-  },
-  "backend/app/scrape/sources/instagram.py": {
-   "calls": 0,
-   "hosts": [
-    "www.instagram.com"
-   ]
-  },
-  "backend/app/scrape/sources/pexels.py": {
-   "calls": 1,
-   "hosts": [
-    "api.pexels.com"
-   ]
-  },
-  "backend/app/scrape/sources/picazor.py": {
-   "calls": 0,
-   "hosts": [
-    "picazor.com"
-   ]
-  },
-  "backend/app/scrape/sources/reddit.py": {
-   "calls": 3,
-   "hosts": [
-    "github.com",
-    "oauth.reddit.com",
-    "www.reddit.com"
-   ]
-  },
-  "backend/app/scrape/sources/redgifs.py": {
-   "calls": 1,
-   "hosts": [
-    "api.redgifs.com",
-    "www.redgifs.com"
-   ]
-  },
-  "backend/app/scrape/sources/sexcom.py": {
-   "calls": 0,
-   "hosts": [
-    "imagex1.sx.cdn.live",
-    "www.sex.com"
-   ]
-  },
   "backend/app/services/aitoolkit_remote.py": {
    "calls": 1,
    "hosts": []
@@ -120,19 +66,6 @@
   "backend/app/services/backend_worker.py": {
    "calls": 1,
    "hosts": []
-  },
-  "backend/app/services/civitai_browser.py": {
-   "calls": 1,
-   "hosts": [
-    "civitai.com"
-   ]
-  },
-  "backend/app/services/cloud_training.py": {
-   "calls": 6,
-   "hosts": [
-    "huggingface.co",
-    "krea.ai"
-   ]
   },
   "backend/app/services/cluster.py": {
    "calls": 1,
@@ -163,13 +96,13 @@
    "hosts": []
   },
   "backend/app/services/hf_base_push.py": {
-   "calls": 3,
+   "calls": 0,
    "hosts": [
     "huggingface.co"
    ]
   },
   "backend/app/services/hf_publish.py": {
-   "calls": 5,
+   "calls": 0,
    "hosts": [
     "github.com",
     "huggingface.co"
@@ -281,12 +214,6 @@
    "hosts": [
     "api.github.com",
     "github.com"
-   ]
-  },
-  "backend/app/services/vast_client.py": {
-   "calls": 1,
-   "hosts": [
-    "console.vast.ai"
    ]
   },
   "backend/app/services/video_test_studio.py": {

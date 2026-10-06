@@ -10,7 +10,6 @@ failure keeps the pod recoverable until its direct Hugging Face delivery and
 licence metadata are verified; only then may completion destroy it. The local
 training path is untouched: a cloud run never sets 'training_in_progress', so
 local generation/captioning stay available."""
-from ..timeout_settings import network_timeout
 import json
 from ..utils.timestamps import naive_utcnow
 import logging
@@ -321,55 +320,20 @@ def active_runs_for(dataset_id):
 
 
 def _assert_official_base_reachable(repo_id, token, timeout=8):
-    """Fail the launch when the account cannot actually download `repo_id`.
-
-    Hugging Face answers **200 on the model's metadata** for a gated repo you have
-    not been granted — only fetching a FILE returns 403. So this asks for the file
-    listing under auth, which is subject to the same gate, and reads the status.
-
-    FAIL-OPEN on anything that is not an outright refusal: a timeout, DNS failure or
-    HF outage must never block a launch that would have worked. The pod remains the
-    real authority; this only converts the ONE failure we can predict — a gate the
-    user has never accepted — into a message that arrives before the bill."""
-    if not repo_id:
-        return
-    import urllib.error
-    import urllib.request
-    req = urllib.request.Request(
-        f'https://huggingface.co/api/models/{repo_id}/tree/main',
-        headers={'Authorization': f'Bearer {token}'} if token else {})
-    try:
-        urllib.request.urlopen(req, timeout=network_timeout(timeout)).read(1)
-    except urllib.error.HTTPError as e:
-        if e.code not in (401, 403):
-            return                          # 404 / 5xx: not our call to make
-        raise ValueError(
-            f'Hugging Face refuses access to {repo_id}, which the rented GPU has to '
-            f'download. Open https://huggingface.co/{repo_id} while signed in with '
-            'the account your HF token belongs to, accept the licence ("Agree and '
-            'access repository"), then launch again. Approval is usually instant. '
-            'Nothing was rented, so this run cost nothing.') from None
-    except Exception:                        # noqa: BLE001 — offline/outage: fail open
-        return
+    """This install does not ask Hugging Face whether a base can be downloaded."""
+    return
 
 
 def _make_hf_api(token):
-    """Small Hugging Face seam kept injectable for offline unit tests."""
-    try:
-        from huggingface_hub import HfApi
-    except ImportError as e:
-        raise RuntimeError('huggingface-hub is required for full_transformer '
-                           'cloud delivery') from e
-    return HfApi(token=token)
+    """This install does not build a Hugging Face client."""
+    raise RuntimeError('Cloud training was removed from this install.')
 
 
 _KREA_BASE_REPO = 'krea/Krea-2-Raw'
 _KREA_LICENSE_FILENAME = 'LICENSE.pdf'
-_KREA_LICENSE_LINK = (
-    'https://huggingface.co/krea/Krea-2-Raw/blob/main/LICENSE.pdf')
+_KREA_LICENSE_LINK = 'krea/Krea-2-Raw LICENSE.pdf'
 _KREA_REQUIRED_ATTRIBUTION = (
-    'Krea 2 is licensed under the Krea 2 Community License Agreement. '
-    'For more information, visit https://krea.ai/krea-2-licensing.')
+    'Krea 2 is licensed under the Krea 2 Community License Agreement.')
 _KREA_NOTICE = (
     f'{_KREA_REQUIRED_ATTRIBUTION}\n\n'
     'This repository contains a modified derivative of Krea 2. The training '
@@ -524,97 +488,36 @@ _BROAD_HF_TOKEN_WARNING = (
 
 
 def _validate_full_transformer_token(token, _api=None):
-    """Require real Krea read rights and usable delivery write rights.
-
-    ``whoami`` proves the token type and advertised scopes; listing the gated
-    official base proves that the token/account can actually read it.  Private
-    repository creation and compliance uploads later provide the real write
-    check before a GPU is ever rented.
-    """
-    if not token:
-        raise ValueError(
-            'full_transformer cloud training requires HF_CLOUD_TOKEN with '
-            'repository write access (fine-grained recommended; global write '
-            'accepted with a warning)')
-    api = _api or _make_hf_api(token)
-    try:
-        who = api.whoami() or {}
-    except Exception:
-        raise ValueError(
-            'HF_CLOUD_TOKEN could not be authenticated; verify the token and '
-            'try again (fine-grained recommended; global write accepted)') from None
-    access = ((who.get('auth') or {}).get('accessToken') or {})
-    role = re.sub(r'[^a-z]', '', str(access.get('role') or '').lower())
-    if role == 'finegrained':
-        namespace = _full_transformer_delivery_namespace(who)
-        broad_access = False
-    elif role == 'write':
-        namespace = str((who or {}).get('name') or '').strip()
-        if not namespace:
-            raise ValueError(
-                'HF_CLOUD_TOKEN authenticated identity has no usable delivery namespace')
-        broad_access = True
-    else:
-        raise ValueError(
-            'HF_CLOUD_TOKEN requires write access to create and upload the '
-            'private delivery repository; read-only tokens cannot be used')
-    try:
-        api.list_repo_files(repo_id=_KREA_BASE_REPO, repo_type='model')
-    except Exception:
-        raise ValueError(
-            'HF_CLOUD_TOKEN cannot read krea/Krea-2-Raw; accept its licence '
-            'with the same Hugging Face account and grant this token access') from None
-    return api, str(namespace), broad_access
+    """A cloud token is not checked against Hugging Face."""
+    raise ValueError('Cloud training was removed from this install.')
 
 
 def full_transformer_token_status(token, _api=None) -> dict:
-    """Return a secret-free readiness state for one prospective cloud token.
-
-    This intentionally performs the same authenticated scope/read checks as
-    launch.  Launch calls the validator again as the authoritative TOCTOU-safe
-    gate; callers may cache this serializable advisory response if desired.
-    """
-    base = {
+    """A prospective cloud token is not sent to Hugging Face."""
+    return {
         'configured': bool(token),
         'namespace': None,
         'settings_focus': 'HF_CLOUD_TOKEN',
         'warning': None,
-    }
-    if not token:
-        return {
-            **base, 'ok': False, 'code': 'missing', 'severity': 'error',
-            'error': ('Full-model Krea 2 cloud training requires a dedicated '
-                      'HF_CLOUD_TOKEN.'),
-        }
-    try:
-        _api_obj, namespace, broad_access = _validate_full_transformer_token(
-            token, _api=_api)
-    except Exception as exc:
-        # The validator deliberately raises only generic, token-free messages.
-        # Still scrub both the exact candidate and common token forms in case a
-        # future local seam regresses.
-        error = str(exc).replace(str(token), '[redacted]')
-        error = re.sub(r'\bhf_[A-Za-z0-9_-]{8,}\b', '[redacted]', error)
-        return {
-            **base, 'ok': False, 'code': 'invalid', 'severity': 'error',
-            'error': error,
-        }
-    if broad_access:
-        return {
-            **base, 'ok': True, 'code': 'broad_access',
-            'severity': 'warning', 'namespace': namespace, 'error': None,
-            'warning': _BROAD_HF_TOKEN_WARNING,
-        }
-    return {
-        **base, 'ok': True, 'code': 'ready', 'namespace': namespace,
-        'severity': 'success', 'warning': None, 'error': None,
+        'ok': False,
+        'code': 'offline',
+        'severity': 'error',
+        'error': 'Cloud training was removed from this install.',
     }
 
 
 def full_transformer_token_preflight(_api=None) -> dict:
-    """Check the saved dense-training token without exposing its value."""
-    return full_transformer_token_status(
-        cfg.secret('HF_CLOUD_TOKEN'), _api=_api)
+    """Settings Test for a stored cloud token. This install does not call the host."""
+    return {
+        'configured': bool(cfg.secret('HF_CLOUD_TOKEN')),
+        'namespace': None,
+        'settings_focus': 'HF_CLOUD_TOKEN',
+        'warning': None,
+        'ok': False,
+        'code': 'offline',
+        'severity': 'error',
+        'error': 'Cloud training was removed from this install.',
+    }
 
 
 def _full_transformer_repo_name(run) -> str:
@@ -654,9 +557,7 @@ def _full_transformer_readme(repo_id: str) -> str:
 
 
 def _download_hf_file(api, repo_id: str, filename: str) -> bytes:
-    path = api.hf_hub_download(
-        repo_id=repo_id, filename=filename, repo_type='model')
-    return Path(path).read_bytes()
+    raise RuntimeError('Cloud training was removed from this install.')
 
 
 def _full_transformer_compliance_files(api, repo_id: str) -> dict:
@@ -670,66 +571,13 @@ def _full_transformer_compliance_files(api, repo_id: str) -> dict:
 
 
 def _apply_full_transformer_compliance(api, repo_id: str, *, validate=True):
-    """(Re)apply files ai-toolkit may overwrite, then optionally read back."""
-    expected = _full_transformer_compliance_files(api, repo_id)
-    for filename, payload in expected.items():
-        api.upload_file(
-            path_or_fileobj=payload, path_in_repo=filename, repo_id=repo_id,
-            repo_type='model',
-            commit_message=f'Apply Krea 2 derivative compliance: {filename}')
-    if validate:
-        for filename, payload in expected.items():
-            if _download_hf_file(api, repo_id, filename) != payload:
-                raise RuntimeError(f'compliance validation failed for {filename}')
+    """This install does not upload compliance files."""
+    raise RuntimeError('Cloud training was removed from this install.')
 
 
 def _create_full_transformer_repo(run, token, _api=None) -> dict:
-    """Create the private direct-delivery repository before a pod is rented.
-
-    No exception text from the SDK is persisted: authentication/network
-    errors can include request diagnostics, and secrets never belong in the
-    run JSON or application log.
-    """
-    api, namespace, _broad_access = _validate_full_transformer_token(
-        token, _api=_api)
-    repo_id = f'{namespace}/{_full_transformer_repo_name(run)}'
-    try:
-        api.create_repo(repo_id=repo_id, repo_type='model', private=True,
-                        exist_ok=False)
-    except Exception:
-        raise RuntimeError('could not create the private Hugging Face repository '
-                           'for full_transformer delivery; verify HF_CLOUD_TOKEN has '
-                           'write access and try again') from None
-    hf_url = f'https://huggingface.co/{repo_id}'
-    try:
-        # Persist immediately: if this process dies between creation and the
-        # completed launch params, the repository is still discoverable.
-        _persist_artifact_state(
-            run, 'preparing_metadata', hf_repo_id=repo_id, hf_url=hf_url,
-            artifact_status_detail='Preparing Krea 2 licence and model card')
-        _apply_full_transformer_compliance(api, repo_id, validate=True)
-    except Exception:
-        cleaned = False
-        try:
-            api.delete_repo(repo_id=repo_id, repo_type='model')
-            cleaned = True
-        except Exception:
-            pass   # deleting the just-created empty repo is courtesy; the status below tells the truth
-        try:
-            _persist_artifact_state(
-                run, 'repository_preparation_failed', hf_repo_id=repo_id,
-                hf_url=hf_url,
-                artifact_status_detail=(
-                    'Repository preparation failed; empty repository was deleted'
-                    if cleaned else
-                    'Repository preparation failed; repository cleanup must be checked'))
-        except Exception:
-            pass   # stamping the failure detail must not mask the original error on its way up
-        raise RuntimeError(
-            'could not prepare the Krea 2 licence and model card in the private '
-            'Hugging Face repository; no GPU was rented') from None
-    return {'hf_repo_id': repo_id,
-            'hf_url': hf_url}
+    """This install does not create a Hugging Face delivery repository."""
+    raise RuntimeError('Cloud training was removed from this install.')
 
 
 def _updated_artifact_params(run, status, **extra) -> dict:
@@ -813,6 +661,10 @@ def _verify_full_transformer_artifact(run, _api=None) -> str:
             run, 'verification_pending',
             artifact_status_detail='HF_CLOUD_TOKEN is unavailable; delivery is not verified')
         return 'verification_pending'
+    _persist_artifact_state(
+        run, 'verification_pending',
+        artifact_status_detail='Cloud training was removed from this install.')
+    return 'verification_pending'
     try:
         api = _api or _make_hf_api(token)
         info = api.repo_info(
@@ -1286,6 +1138,7 @@ def retry_cloud_run(user_id, run_id) -> dict:
     train_params. This is a real launch_cloud_training on a fresh pod with
     normal active-run, budget and family-uniqueness safeguards, not revival
     of a dead pod. Replay confirmations only when originally recorded."""
+    raise RuntimeError('Cloud training was removed from this install.')
     run = db.session.get(CloudTrainingRun, int(run_id))
     if not run:
         raise ValueError('unknown cloud run')
@@ -1510,6 +1363,7 @@ def continue_cloud_run(user_id, run_id, extra_steps=1000, from_step=None,
     run. Safe overrides match local continuation (cadence/preview prompts)
     and merge into the run snapshot, never the dataset. register_launch
     remains an ordinary cloud launch; resume is an execution detail."""
+    raise RuntimeError('Cloud training was removed from this install.')
     _require_cloud_weights_only(resume_mode, state_bundle_id)
     run = db.session.get(CloudTrainingRun, int(run_id))
     if not run:
@@ -1656,6 +1510,7 @@ def continue_local_run_in_cloud(user_id, dataset_id, extra_steps=1000,
     lr_factor), merged into THIS run's settings snapshot — the dataset's own
     persisted settings are never touched (the local lane's update_train_settings
     is a local-lane behaviour, not something to replicate on a cloud launch)."""
+    raise RuntimeError('Cloud training was removed from this install.')
     _require_cloud_weights_only(resume_mode, state_bundle_id)
     ds = fds.get_dataset(user_id, dataset_id)
     if not ds:
@@ -2254,6 +2109,7 @@ def launch_cloud_training(user_id, dataset_id, steps=None, base_model=_UNSET,
                           train_slider_snapshot=_UNSET, resume_topology=None,
                           parent_record_id=None, resumed_from=None,
                           training_mode='lora') -> dict:
+    raise RuntimeError('Cloud training was removed from this install.')
     (ds, mode, fam, base_model,
      variant) = _lct_resolve_and_refuse(
         user_id, dataset_id, train_type, base_model, variant, training_mode)
@@ -7936,6 +7792,7 @@ def gpu_tiers(user_id, dataset_id, train_type=None, steps=None,
     an approximate training time and total run cost. Read-only: rents nothing.
     The launch then re-searches and rents the cheapest live offer of the chosen
     class. Raises the same guards as launch (no key / dataset / SDXL)."""
+    raise RuntimeError('Cloud training was removed from this install.')
     if not cfg.secret('VAST_API_KEY'):
         raise RuntimeError('vast.ai API key is not configured — add it in Settings')
     ds = fds.get_dataset(user_id, dataset_id)
