@@ -1,6 +1,6 @@
 # HANDOFF
 
-**Updated:** 2026-10-05 | **Branch:** noble/drop-external-plugins, landing on main | **Base:** fe6a7822d
+**Updated:** 2026-10-05 | **Branch:** main | **Base:** fe6a7822d
 
 ## State
 
@@ -27,10 +27,23 @@ not load the repository `.env` on startup.
 
 On 2026-10-03, `upstream` `v2` was still `ba403227b`
 (`build(frontend): include H3 plugin startup fix`, 2026-09-29). `v1` was
-`3fe3d4f0e`. Decision recorded then: adopt nothing through `ba403227b`.
-That review was not repeated for this push. A later review starts after
-`ba403227b` and checks fork equivalents before proposing an adoption.
-Do not merge `upstream/v1` or `upstream/v2`.
+`3fe3d4f0e`. The review used fork commit `8eb52792b` and merge base
+`d13337cc3`. Git counted 656 fork-only and 16 upstream-only commits. The
+latter count is an ancestry difference, not 16 missing features.
+
+| Upstream commits | Decision and evidence |
+| --- | --- |
+| `19f13edaa`, `fbeecb7f7`, `3658f9766` | Bank edit history and undo already ported as `91e508c0a`; feed ordering carried as `83326b3ea`; fork bundle already rebuilt. |
+| `1e520ab1f`, `f73ba6dc9` | Persistent dataset comparison already ported as `be3ffd25f`, with the fork bundle rebuilt. |
+| `16510a496`, `7df8eaf8b`, `ba403227b` | Model-download revision and H3 startup recovery already ported as `e5f831b0f`, with release note `5a49ca2b0`. The model fix is patch-equivalent. |
+| `af799647d` | Worker test doubles and watermark polling assertions are already covered by fork-specific adaptations. Preserve those adaptations. |
+| `4b902f150`, `fe4697e40` | Unlimited API batches do not apply. Keep the local queue limits. |
+| `bd0c3c8b9`, `4bdddc855`, `95d8702a7`, `4bfbf7c48` | Skip the optional support banner and its Patreon wording. The banner is absent here. |
+| `d61fa0af1` | Keep the fork version `2026.10.01+fork`. |
+
+Decision: adopt nothing through `ba403227b`. That review was not repeated
+for this push. A later review starts after `ba403227b`. Do not merge
+`upstream/v1` or `upstream/v2`.
 
 ## Branches
 
