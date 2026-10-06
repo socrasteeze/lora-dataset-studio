@@ -218,8 +218,18 @@
      every target clear of the bar; a per-element `scroll-mt-*` only adds to it. */
   html {
     scroll-padding-top: var(--app-header-h);
+    /* The app reads top to bottom; only its own rails and tables scroll
+       sideways, inside their own overflow-x-auto boxes. One element that
+       slips past the right edge (a min-width row, a popover, a negative
+       margin) used to widen the whole document: the page panned sideways
+       and iOS shrank it to fit. `clip`, not `hidden`: it makes no scroll
+       container, so the sticky app bar and window scroll listeners keep
+       working. Applied to html AND body because html's value goes to the
+       viewport, while body's stays on body and stops overflow there too. */
+    overflow-x: clip;
   }
   body {
+    overflow-x: clip;
     background-color: rgb(var(--bg-app));
     color: rgb(var(--text-base));
     /* viewport-fit=cover (index.html) lets the page run under the notch on a
@@ -296,9 +306,13 @@
    `text-xs` / `text-sm` class (0,1,0) on the input, so nearly every field in
    the app kept its small size on a phone and still triggered the zoom. Source
    order alone cannot fix that (specificity comes first), hence `!important`.
-   It only applies below 640px: from `sm` up, every text-xs/text-sm control is
-   exactly as it was. */
-@media (max-width: 639px) {
+   It applies below 640px AND on any touch-first screen (`pointer: coarse`).
+   The width bound alone missed a phone held sideways (844 px) and every
+   iPad, where the type-DELETE field in Delete rejected was still 14px. iOS
+   zoomed in on focus and an installed (standalone) app has no browser chrome
+   to zoom back out. A desktop with a mouse keeps every text-xs/text-sm
+   control exactly as it was. */
+@media (max-width: 639px), (pointer: coarse) {
   input, select, textarea {
     font-size: 16px !important;
   }
