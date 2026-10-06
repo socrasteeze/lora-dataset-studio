@@ -100,7 +100,7 @@ def test_the_backend_worker_runs_a_job_end_to_end(app, tmp_path, monkeypatch):
     from app.models import ImageGenerationQueue
     from app.services import backend_worker as bw
 
-    entry = _add_backend(app)
+    entry = _add_backend(app, url='http://10.0.0.60:8188')
     src = tmp_path / 'ref.png'
     src.write_bytes(b'PNG')
     out_dir = tmp_path / 'comfy-out'

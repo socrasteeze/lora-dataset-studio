@@ -254,7 +254,7 @@ def test_comfyui_runtime_parses_system_stats_and_queue(app, monkeypatch):
         raise AssertionError(url)
 
     with app.app_context():
-        config.save_config({'comfyui': {'api_url': 'http://comfy'}})
+        config.save_config({'comfyui': {'api_url': 'http://10.0.0.51'}})
         monkeypatch.setattr(capabilities.requests, 'get', fake_get)
         rt = capabilities.comfyui_runtime()
     assert rt['version'] == '0.3.30'

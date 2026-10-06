@@ -29,7 +29,7 @@ import pathlib
 INFER = pathlib.Path(__file__).resolve().parents[1] / 'infer'
 
 # Simple stdlib names only: anything outside this set is a doctrine break.
-ALLOWED_IMPORTS = {'json', 'os', 'sys', 'typing'}
+ALLOWED_IMPORTS = {'json', 'os', 'runpy', 'sys', 'typing'}
 
 # The factored map, file -> names it must import from _harness and not redefine.
 # `_emit` is deliberately absent from every entry — see the module docstring.

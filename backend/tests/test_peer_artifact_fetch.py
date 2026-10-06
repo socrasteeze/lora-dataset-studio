@@ -43,14 +43,14 @@ def fake_get(monkeypatch):
     lock = threading.Lock()
     failing = set()
 
-    def _get(url, headers=None, timeout=None, stream=False):
+    def _get(url, headers=None, timeout=None, stream=False, **kwargs):
         name = url.rsplit('/', 1)[-1]
         with lock:
             seen.append(name)
         return _FakeResponse(name, fail=name in failing)
 
     monkeypatch.setattr('app.services.peer_worker.requests.get', _get)
-    monkeypatch.setattr(peer_worker, '_url', lambda path: f'http://primary{path}')
+    monkeypatch.setattr(peer_worker, '_url', lambda path: f'http://10.0.0.5{path}')
     monkeypatch.setattr(peer_worker, '_headers', lambda: {})
     return seen, failing
 

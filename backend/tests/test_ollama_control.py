@@ -132,7 +132,7 @@ def test_caption_ready_never_starts_local_process_for_remote_url(app, monkeypatc
     from app.services import ollama_control
     from app import config
     with app.app_context():
-        config.save_config({'ollama': {'url': 'http://remote-box:11434'}})
+        config.save_config({'ollama': {'url': 'http://10.0.0.8:11434'}})
         monkeypatch.setattr(ollama_control, '_reachable', lambda url: False)
         monkeypatch.setattr(ollama_control, 'start_ollama',
                             lambda: (_ for _ in ()).throw(AssertionError('must not spawn')))

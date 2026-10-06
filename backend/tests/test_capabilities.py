@@ -1106,7 +1106,7 @@ def test_ollama_tags_reads_name_and_model_fields(app, monkeypatch):
             {'name': '', 'model': _ABLIT},
         ]}
         monkeypatch.setattr(capabilities.requests, 'get', lambda *a, **k: _FakeResp(payload))
-        tags = capabilities._ollama_tags('http://o')
+        tags = capabilities._ollama_tags('http://10.0.0.2')
     assert _ABLIT in tags
     assert capabilities._model_present(_ABLIT, tags) is True
 
