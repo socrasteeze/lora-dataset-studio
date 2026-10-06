@@ -10,10 +10,13 @@ The curated build includes Camera Angles, Canvas, DLSS 5, Image Upscale, Live,
 Model Tools, Qwen Dataset, Resource Monitor, SeedVR2 and Video. Their local
 operations remain available. `fork-plugins.json` owns this list.
 
-Hugging Face publishing and web scraping are excluded. API image generators,
-GPU rentals and the Civitai publisher remain excluded. Distribution overrides
-cannot load a plugin in the excluded list. Civitai browsing, online image/video
-imports and in-app online updates return a refusal without contacting a service.
+Hugging Face publishing, web scraping, Civitai browsing and the Civitai
+publisher are excluded. API image generators and GPU rentals are excluded.
+Distribution overrides cannot load a plugin in the excluded list, and an
+archive outside the ten bundled plugins is refused. Online image and video
+imports and in-app update checks return a refusal without contacting a service.
+Saving a cloud-training token is refused before any account check. The server
+does not load a repository `.env` through Flask on startup.
 
 ## Preparation
 
@@ -34,12 +37,10 @@ tools and their model files before running an offline workflow.
 ## Saved Data and Validation
 
 Existing datasets, banks, prompts, credentials and historical publication/link
-records are retained. Excluding a plugin does not delete its data. Credentials
-can still support operator-started model downloads; they cannot enable online
-runtime features.
+records are retained. Excluding a plugin does not delete its data. A Hugging
+Face or Civitai token can still support an operator-started Setup download.
+It cannot enable publishing, browsing, scraping or a rental.
 
-Regression coverage is in `backend/tests/test_offline_workflows.py`. Tests and
-rendered checks are deferred under the current instruction. Lint and compilation
-are source checks. User-authorized startup confirmed health and all ten local
-plugins on API 1.24. It did not qualify inference, training or network behavior.
-The backend and its matching curated frontend bundle were activated together.
+Regression coverage is in `backend/tests/test_offline_workflows.py` and
+`backend/tests/test_fork_outbound_gate.py`. The current product description
+is [FORK_NOTES.md](../FORK_NOTES.md), Divergences 1, 4 and 12.

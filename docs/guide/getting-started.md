@@ -16,21 +16,21 @@ pipeline behind one UI.
 
 | | Curation-only | Full local |
 |---|---|---|
-| **What works** | Create datasets, import/scrape, curate, caption manually, export ZIP | Everything — plus local (Klein) generation, JoyCaption, face scoring, masks, training, Test Studio |
+| **What works** | Create datasets, import local files, curate, caption manually, export ZIP | Everything — plus local (Klein) generation, JoyCaption, face scoring, masks, training, Test Studio |
 | **Needs** | Python 3.10–3.12 | ComfyUI and/or ai-toolkit + an NVIDIA GPU (12 GB+ for local generation) |
 | **Good for** | Laptops, a first try, curating away from your GPU box | The full pipeline on a training rig |
 
-You can start **curation-only** (import/scrape your own photos) and add the
+You can start **curation-only** (import your own photos) and add the
 local tools later — features light up automatically when their tool is
 detected. This fork has no cloud API engines and no rented-GPU training: generation
 and training both run on hardware you control.
 
 ## First launch
 
-**Windows (one command):** download `LoRA-Dataset-Studio-windows.zip` from the
-[latest release](https://github.com/perfectgf/lora-dataset-studio/releases/latest),
-extract it, then double-click `start.bat`. Releases contain an archive/source, not
-a prebuilt executable launcher. `start.bat` finds or downloads a compatible Python
+**Windows (this fork):** clone `https://github.com/socrasteeze/lora-dataset-studio.git`
+and double-click `start.bat`. The upstream release zip is a different product
+and is not this fork. The launcher is a script, not a prebuilt executable.
+`start.bat` finds or downloads a compatible Python
 (3.10–3.12), creates `.venv`, installs the requirements, starts the server, and
 opens the app in your browser at the address it is actually serving on (default
 `http://127.0.0.1:5050/`; a LAN/Tailscale `server.host` opens that address
@@ -49,13 +49,10 @@ python backend/run.py
 **Discover → Download from URL** with
 `https://github.com/socrasteeze/lora-dataset-studio.git`, then **Install** and
 **Start**. Pinokio creates the environment (`env/`), installs the core
-requirements and opens Studio on the port it really bound. Two things to know:
-the optional tools are still connected from **Setup**, and updates go through
-Pinokio's **Update** tab — it runs the same `git pull --ff-only` as the in-app
-updater. You do not have to remember that last part: the app recognises a
-Pinokio launch and its Updates card shows *Stop → Update → Start* (with how many
-commits behind you are) instead of the **Update & restart** button, which would
-relaunch the server in a window Pinokio no longer tracks.
+requirements and opens Studio on the port it really bound. Optional tools are
+still connected from **Setup**. This fork does not check upstream or apply an
+update from inside the app. Update from Pinokio's **Update** tab or with git,
+then start the app again.
 
 Image *generation* on this fork always needs ComfyUI on a machine you control —
 there are no Gemini/OpenAI generation keys.
@@ -142,10 +139,9 @@ vision tools; local generation prepares ComfyUI and its selected models;
 **Plugins** opens the features that ship with this install. Nothing is downloaded
 by choosing a goal or visiting a plugin page.
 
-**Plugins** lists the features that ship with this install. Each card offers
-**Settings**, and **Turn on** or **Turn off**. **More actions** contains
-**Remove plugin** for a plugin you added. A ZIP you trust is inspected on that
-page before anything is written, and one restart applies it.
+**Plugins** lists the ten features that ship with this install. Each card offers
+**Settings**, and **Turn on** or **Turn off**. An external plugin archive is
+refused. There is no catalog and no ZIP install.
 
 For preparation, open **Settings** on the plugin's card. Select the components
 you want, then prepare that selection. The server checks the whole plan before

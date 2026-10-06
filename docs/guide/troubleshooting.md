@@ -553,7 +553,7 @@ Closing the browser tab **never** stops the server — there is no
 client. To stop the server on Windows:
 
 1. **Ctrl+C** in the `start.bat` console — works on a fresh launch, and now
-   also **after Settings ▸ Restart / Update & restart**. Those used to spawn
+   also **after Settings ▸ Restart**. A restart used to spawn
    the relaunched server in a *new* console window, leaving the original
    `start.bat` window holding a dead process; Ctrl+C there did nothing useful.
    `start.bat` is now a supervisor: a restart exits with code 3 and the same

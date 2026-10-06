@@ -224,6 +224,9 @@ if __name__ == '__main__':
         and os.environ.get('LDS_NO_BROWSER') != '1')
     _announce_when_ready(host, port, os.environ.get('LDS_ACCESS_TOKEN'),
                          open_browser=_open)
+    # Flask's default load reads the nearest .env and would put repo cloud keys
+    # into this process even when LDS_ENV points at an empty file. Credentials
+    # come only from that explicit file, via app.config.
     app.run(debug=os.environ.get('FLASK_DEBUG', '0') == '1',
             host=host,
-            port=port, threaded=True, use_reloader=False)
+            port=port, threaded=True, use_reloader=False, load_dotenv=False)

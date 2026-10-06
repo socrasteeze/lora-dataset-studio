@@ -1,7 +1,11 @@
 # Move an existing installation to V2
 
-The maintained Git branch is now `v2`. The former `main` is named `v1` and is
-read-only. You can keep your current installation, datasets and settings.
+This page describes upstream's move from `main` to `v2`. Do not run it on
+this fork. This fork's branch is `main` on `socrasteeze/lora-dataset-studio`.
+The helper switches a checkout onto upstream `v2` and leaves the fork.
+
+The maintained upstream Git branch is `v2`. Upstream's former `main` is named
+`v1` and is read-only.
 
 ## Windows: guided tool for Git installations
 

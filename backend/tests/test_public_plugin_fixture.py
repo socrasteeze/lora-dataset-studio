@@ -154,16 +154,12 @@ def test_hf_guard_covers_core_local_training(app, monkeypatch):
 @pytest.mark.hf_gate
 def test_hf_gate_opt_in_keeps_refusal_logic_for_core_local_training(app, monkeypatch):
     from app.services import cloud_training as historical
-    calls = []
 
     def refused(request, **kwargs):
-        calls.append(request.full_url)
-        raise urllib.error.HTTPError(request.full_url, 403, 'fixture refusal', None, None)
+        pytest.fail('the base check reached Hugging Face')
 
     monkeypatch.setattr(urllib.request, 'urlopen', refused)
-    with pytest.raises(ValueError, match='Hugging Face refuses access'):
-        historical._assert_official_base_reachable('fixture/model', 'fake-token')
-    assert len(calls) == 1
+    assert historical._assert_official_base_reachable('fixture/model', 'fake-token') is None
 
 
 @pytest.mark.hf_gate

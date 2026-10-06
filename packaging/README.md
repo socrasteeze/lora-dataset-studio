@@ -5,9 +5,9 @@ The supported Windows release is a source archive named
 backend, `start.bat`, and the small Python bootstrap script. It does not ship a
 prebuilt launcher or an embedded runtime.
 
-The archive contains the core, the plugin SDK, and the curated plugins
+The archive contains the core, the plugin SDK, and the ten curated plugins
 that ship with this fork. Open **Plugins** after the first launch to turn
-one off, or to add a ZIP you trust.
+one off. An external ZIP is refused.
 
 Users extract the archive and double-click **`start.bat`**. The launcher finds a
 compatible Python already installed or downloads a standalone CPython into the

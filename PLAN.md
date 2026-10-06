@@ -1,5 +1,9 @@
 # PLAN.md - remove scrapers, hosted APIs and cloud code
 
+The shipped fork is described in [FORK_NOTES.md](FORK_NOTES.md) and
+[docs/OFFLINE_WORKFLOWS.md](docs/OFFLINE_WORKFLOWS.md). This file is the
+2026-10-04 plan. Where it still says the work has not begun, the notes win.
+
 Current plan: 2026-10-04. Requested by the operator after branch integration.
 Inventory reviewed against source at `87804276b` (source matches fork main
 `9536f5257`; the additional commits merge and document the upstream review).

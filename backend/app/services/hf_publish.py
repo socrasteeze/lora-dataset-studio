@@ -12,8 +12,7 @@ three deliberate differences from the ZIP export:
     **`README.md`** dataset card are generated so the repo is readable by the HF
     Dataset Viewer and `load_dataset("imagefolder")`.
 
-Upload goes through `huggingface_hub.HfApi`. A write-scope preflight (`whoami`)
-refuses a read-only token BEFORE any upload. NOTHING secret is ever written into
+Publishing was removed from this install. NOTHING secret is ever written into
 the repo, and every line of the README passes through `redact_user_paths` so no
 local `C:\\Users\\<name>\\…` path can leak. The HF token is the app's existing
 `HF_TOKEN` secret (same one cloud training / model downloads read).
@@ -27,15 +26,12 @@ runs the whole flow in a daemon thread (mirroring `setup_installer`) and
 import json
 import os
 import re
-import shutil
-import tempfile
 import threading
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from ..config import LOCAL_USER
 from ..utils.redact import redact_user_paths
-from ..version import APP_VERSION
 from . import face_dataset_service as fds
 
 # Licence choices offered in the modal — the usual dataset licences plus a
@@ -94,14 +90,7 @@ def _valid_repo_id(repo_id) -> bool:
 # --- huggingface_hub seam ----------------------------------------------------
 
 def _make_api(token):
-    try:
-        from huggingface_hub import HfApi
-    except ImportError as e:
-        raise HfPublishError(
-            'hub_missing',
-            'the huggingface-hub package is not installed — run '
-            'pip install -r backend/requirements.txt') from e
-    return HfApi(token=token)
+    raise HfPublishError('offline', 'Publishing was removed from this install.')
 
 
 def _http_status(e):
@@ -120,13 +109,7 @@ def hf_namespace(token):
     """The token owner's username (for the default repo id), or None if the token
     is missing/invalid/unreachable. Never raises — the modal degrades to a free
     text field with a placeholder."""
-    if not token:
-        return None
-    try:
-        who = _make_api(token).whoami()
-    except Exception:
-        return None
-    return (who or {}).get('name') or None
+    return None
 
 
 # --- write-scope preflight ---------------------------------------------------
@@ -144,24 +127,8 @@ def _fine_grained_can_write(who) -> bool:
 
 
 def _require_write_scope(api):
-    """whoami() then inspect auth.accessToken.role: 'write' passes, 'fineGrained'
-    passes only with a write permission, 'read'/missing is refused BEFORE any
-    upload. Returns the whoami dict on success."""
-    try:
-        who = api.whoami()
-    except Exception as e:
-        status = _http_status(e)
-        if status in (401, 403):
-            raise HfPublishError(
-                'auth', 'your Hugging Face token was rejected (invalid or expired).') from e
-        raise HfPublishError(
-            'network', f'could not reach Hugging Face to verify the token: {e}') from e
-    role = (((who or {}).get('auth') or {}).get('accessToken') or {}).get('role')
-    if role == 'write':
-        return who
-    if role == 'fineGrained' and _fine_grained_can_write(who):
-        return who
-    raise HfPublishError('read_only_token', READ_ONLY_MSG)
+    """This install does not ask Hugging Face who a token is."""
+    raise HfPublishError('offline', 'Publishing was removed from this install.')
 
 
 # --- dataset folder build ----------------------------------------------------
@@ -322,60 +289,8 @@ def build_publish_dir(user_id, dataset_id, dest_dir, include_ref, license, nfaa)
 
 def publish_to_hf(dataset_id, repo_id, private, nfaa, license, include_ref, token,
                   user_id=LOCAL_USER, _api=None):
-    """Full synchronous publish: validate -> write-scope preflight -> build temp
-    folder -> create_repo(exist_ok=False) -> upload_folder. Returns
-    {ok, repo_url, repo_id, count} or raises HfPublishError. `_api` lets tests
-    inject a mocked HfApi (no real network ever)."""
-    if not token:
-        raise HfPublishError('no_token', 'no Hugging Face token configured — '
-                             'paste an HF_TOKEN in Settings ▸ API keys')
-    repo_id = (repo_id or '').strip()
-    if not _valid_repo_id(repo_id):
-        raise HfPublishError('invalid_repo_id',
-                             'invalid repo id — use the form "<username>/<name>"')
-    license = (license or '').strip().lower()
-    if license not in LICENSE_CHOICES:
-        raise HfPublishError('invalid_license', f'unsupported license: {license or "(empty)"}')
-
-    api = _api or _make_api(token)
-    _require_write_scope(api)                      # refuse read-only BEFORE upload
-
-    tmp = tempfile.mkdtemp(prefix='lds-hf-')
-    try:
-        info = build_publish_dir(user_id, dataset_id, tmp, include_ref, license, nfaa)
-        try:
-            api.create_repo(repo_id=repo_id, repo_type='dataset',
-                            private=bool(private), exist_ok=False)
-        except HfPublishError:
-            raise
-        except Exception as e:
-            status = _http_status(e)
-            if status == 409:
-                raise HfPublishError(
-                    'repo_exists',
-                    f'the dataset repo "{repo_id}" already exists — pick a new '
-                    'name (this tool never overwrites an existing repo)') from e
-            if status in (401, 403):
-                raise HfPublishError(
-                    'auth', 'Hugging Face refused to create the repo (401/403) — '
-                    'check the token has write access') from e
-            raise HfPublishError('network', f'could not create the repo: {e}') from e
-
-        try:
-            api.upload_folder(folder_path=tmp, repo_id=repo_id, repo_type='dataset',
-                              commit_message=f'Add dataset (LoRA Dataset Studio v{APP_VERSION})')
-        except Exception as e:
-            status = _http_status(e)
-            if status in (401, 403):
-                raise HfPublishError(
-                    'auth', 'Hugging Face rejected the upload (401/403) — '
-                    'check the token has write access') from e
-            raise HfPublishError('network', f'the upload to Hugging Face failed: {e}') from e
-
-        return {'ok': True, 'repo_id': repo_id, 'count': info['count'],
-                'repo_url': f'https://huggingface.co/datasets/{repo_id}'}
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+    """This install does not upload a dataset repository."""
+    raise HfPublishError('offline', 'Publishing was removed from this install.')
 
 
 # --- background job (route seam; upload can exceed a request's window) --------
@@ -404,6 +319,7 @@ def start_publish(app, dataset_id, repo_id, private, nfaa, license, include_ref,
                   token, user_id=LOCAL_USER):
     """Launch the publish in the background. Returns the initial status; a second
     call while one is running is a no-op (`already=True`)."""
+    raise HfPublishError('offline', 'Publishing was removed from this install.')
     with _lock:
         cur = _jobs.get(dataset_id)
         if cur and cur.get('state') == 'running':

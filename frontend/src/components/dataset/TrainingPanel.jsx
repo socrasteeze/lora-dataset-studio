@@ -3193,7 +3193,6 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
         <GraduationCap aria-hidden="true" className="h-4 w-4 shrink-0" />
         <div className="min-w-0 space-y-2">
           <p>To train on this computer, <a href="#/settings/local-tools?focus=aitoolkit-python" className="text-accent underline">set up ai-toolkit</a>.</p>
-          {cloudEnabled && <p>To train on a rented GPU, <a href="#/plugins/cloud_training/settings" className="text-accent underline">add your provider key in Cloud training settings</a>. Provider charges apply.</p>}
         </div>
       </div>}
 

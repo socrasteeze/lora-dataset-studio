@@ -43,9 +43,9 @@ For scripted setups, a handful of environment variables override paths and binds
 
 The Overview section has **no settings of its own**. Its capabilities grid shows the shared tools that LDS can currently use. Optional product controls and their preparation belong to each plugin's **Settings** button in **Plugins**.
 
-**Plugins** lists what is installed. Turn a plugin off from its card.
-To uninstall one you added, open **More actions → Remove plugin**.
-A ZIP you trust is installed from the same page.
+**Plugins** lists the ten features that ship with this install. Turn one off
+from its card. An external ZIP is refused, and there is no catalog to install
+anything else.
 
 Every row is a **link to the control that turns that capability on**, not just to the right screen: picking *Person masks* opens the Setup wizard step that installs it. Use the grid as your first stop to answer "why is this feature greyed out?" — the answer is one click away on the row itself.
 
@@ -464,7 +464,7 @@ Changes apply to new waits, without restarting LDS. For example, a processing mu
 
 **Where a deployed LoRA lands.** Reading a LoRA can span every root; installing one has to pick exactly one folder, and the app picks it in this order: the **`comfyui.loras_dir` override** if you filled it (you said where your files go — the yaml cannot take that back), otherwise **the first LoRA root in ComfyUI's own priority order**, otherwise `<install>/models/loras`. In yaml terms that first root is a declared `loras:` folder **only when its profile carries `is_default: true`** — that flag is exactly how ComfyUI is told *look here first*, and a plain extra root stays a secondary location for ComfyUI, so it stays secondary here too. The **open LoRA folder** button opens that same folder, by construction. Reported by Geekswordsman (GitHub #25), whose deploys were landing in `<install>/models/loras` while his yaml declared another folder. LoRAs deployed **before** this changed are still listed, still loadable and still deletable where they are — nothing on disk is moved.
 
-**Continuing without ComfyUI.** Leaving the install directory empty in the Setup wizard is a deliberate choice: it shows what turns off (local Klein generation including the NSFW lane, Klein watermark cleaning, the Test Studio, training on your own ComfyUI base models, and the on-disk LoRA preset picker) versus what stays on (local imports, curation, captioning, the API image engines, ai-toolkit/cloud training, Hugging Face publishing), then remembers the skip (`comfyui.setup_skipped`) so it stops nagging. Entering a directory at any point cancels the skip automatically and turns those features back on — the flag never hides a real problem with a ComfyUI you *have* configured.
+**Continuing without ComfyUI.** Leaving the install directory empty in the Setup wizard is a deliberate choice: it shows what turns off (local Klein and Krea generation, Klein watermark cleaning, the Test Studio, training on your own ComfyUI base models, and the on-disk LoRA preset picker) versus what stays on (local imports, curation, captioning and local ai-toolkit training from weights already on disk), then remembers the skip (`comfyui.setup_skipped`) so it stops nagging. This fork has no API image engines, no rented-GPU training and no Hugging Face publishing to keep on. Entering a directory at any point cancels the skip automatically and turns the local features back on — the flag never hides a real problem with a ComfyUI you *have* configured.
 
 **Models outside `models/`?** If your ComfyUI uses an `extra_model_paths.yaml` (portable builds and Stability Matrix installs commonly do), the app reads it the same way ComfyUI does, so bases that live elsewhere are found. This isn't a setting — it follows automatically from your install directory. Without such a file, nothing changes.
 
@@ -764,13 +764,13 @@ The **✨ Score** pass (aesthetic · NSFW · style) needs the **Bank scoring** e
 
 ## Training
 
-Defaults for new local runs. Cloud training settings belong to its plugin under **Plugins**.
+Defaults for new local runs. This fork has no cloud-training plugin.
 
 ### Defaults
 
-- **Default training family** → `training.default_family`. The model family preselected when you start a new run. One of `zimage`, `sdxl`, `krea`, `flux`, `flux2klein`, `anima`. Default **`zimage`**. Purely a starting point — you can switch family per run. `anima` trains the open [Anima](https://huggingface.co/circlestone-labs/Anima-Base-v1.0-Diffusers) anime model on its public base (no gated download); it is **local-only** for now (needs an up-to-date ai-toolkit + diffusers — cloud training arrives once the GPU pod image is verified). **Anima is the one family with hybrid prompting:** booru tags *and* natural language are both first-class on it, so the caption-style guard says nothing there — prose is merely the preselected default, and a booru-captioned Anima dataset trains without being flagged or forced. Every other family keeps its single expected form (SDXL = booru tags, the rest = prose).
+- **Default training family** → `training.default_family`. The model family preselected when you start a new run. One of `zimage`, `sdxl`, `krea`, `flux`, `flux2klein`, `anima`. Default **`zimage`**. Purely a starting point — you can switch family per run. `anima` trains the open [Anima](https://huggingface.co/circlestone-labs/Anima-Base-v1.0-Diffusers) anime model on its public base (no gated download). It is local-only and needs an up-to-date ai-toolkit + diffusers. **Anima is the one family with hybrid prompting:** booru tags *and* natural language are both first-class on it, so the caption-style guard says nothing there — prose is merely the preselected default, and a booru-captioned Anima dataset trains without being flagged or forced. Every other family keeps its single expected form (SDXL = booru tags, the rest = prose).
 
-This fork's Settings → Training keeps **Defaults** and **Train on another machine** — there is no rental-GPU card here (no key field, no cost/budget knobs). Cloud training (vast.ai) still runs underneath for any dataset that already has a cloud run in its history — see **Cloud training (vast.ai)** under [Config-file-only settings](#config-file-only-settings) for the `VAST_API_KEY` secret and the `cloud.*` guard-rails, all of which are edited by hand in `config.json`/`.env` rather than through a Settings card.
+This fork's Settings → Training keeps **Defaults** and **Train on another machine**. There is no rental-GPU card (no key field, no cost/budget knobs). A dataset that already has a cloud run in its history can still show the local checkpoint files. Nothing in this install resumes, continues or retries that run on a rented GPU. See **Cloud training (vast.ai)** under [Config-file-only settings](#config-file-only-settings).
 
 ### Speed: what a step costs, and what it costs you to make it cheaper
 
@@ -1167,57 +1167,10 @@ Keeping the **app itself** healthy: updating it, and getting a bug report out of
 
 ## Usage statistics
 
-**Settings → Maintenance → Optional usage statistics.** This is entirely optional
-and **off by default**, including on existing installations. LDS sends no usage
-statistics until you choose **Share usage statistics**. Choose **No thanks** to
-save a refusal and dismiss the invitation; LDS remains fully usable either way.
-If sharing is unavailable on your installation, the settings card says so and no
-invitation appears.
-
-The statistics help the LDS maintainer understand which features people return
-to and which operations fail. When enabled, the allowed information is:
-
-| Information | Purpose |
-|---|---|
-| Random installation ID and days of activity | Count participating installations and returns over time. |
-| Event timestamps and first active day | Group activity by date and measure returns. |
-| Coarse feature names, such as Datasets, Bank or Training | See where development effort is useful. |
-| Supported operation outcomes and error categories | Find reliability problems without uploading an error message or log. |
-| LDS version and operating-system family | Identify version or platform differences. |
-| Approximate duration ranges | Spot slow operations without recording their contents. |
-| Production or test environment | Exclude the maintainer's synthetic tests from product statistics. |
-
-**Not collected:** images or videos, prompts, captions, dataset names or IDs,
-file names or paths, account names, tokens or API keys, log contents, key presses,
-screen recordings or complete page addresses. Plugin names and private routes
-are not sent. The browser only reports a coarse feature after a real pointer or
-keyboard interaction in the visible app; leaving a tab open does not create
-an activity heartbeat. The action or text entered is never reported.
-
-These are **pseudonymous installation statistics**, not a count or directory of
-individual people: one person can use several installations, several people can
-share an installation, and people who decline are absent from the figures.
-The choice applies to the whole LDS server installation, including other
-browsers connected to it.
-
-Statistics are sent in the background by the LDS server to **PostHog Cloud EU**
-for the maintainer's private product dashboard. There is no browser analytics
-SDK, automatic click capture or session replay. A network request necessarily
-exposes the sending server's network address to the receiving service; LDS does
-not add an IP address or location to the event properties. Loss of connectivity
-does not block your work.
-
-**Retention:** PostHog's free plan lists **one year** of event retention.
-The provider is rolling enforcement out by project; while it is not enforced,
-older events remain stored. LDS therefore does not guarantee an automatic
-deletion date. See [PostHog's retention policy](https://posthog.com/docs/data/events-retention).
-Pending local events expire after seven days and are limited to 500 entries.
-
-**Turn off sharing** takes effect as soon as the choice is successfully saved:
-it stops new collection and clears statistics waiting to be sent. It does not
-recall data already delivered. The buttons save independently of the general
-Settings **Save** bar, and a failed save is shown so you can retry. You can change
-your choice here at any time; returning to an open browser tab rechecks it.
+This fork does not collect or send usage statistics. There is no Settings card
+for them, no invitation, and no collector. Images, prompts, captions, paths and
+credentials are not reported by a statistics feature because that feature is
+absent. See [Network access and privacy](network-access.md).
 
 ## Per-dataset settings
 
@@ -1391,23 +1344,23 @@ Set one of these **only** to override that search — for instance if your Comfy
 |---|---|---|
 | `provenance.archive_max_gb` | `5` | Ceiling of the **run image archive** (Settings → Storage): the deduplicated copies that let a two-run comparison still show an image you deleted afterwards. Copies are content-addressed, so a whole training history usually costs well under a gigabyte — on a real 20-dataset, 1471-image library, every distinct version of every image ever trained came to about **0.5 GB**. Past the ceiling nothing more is stored and the compare panel says so. Set it to `0` to turn archiving off entirely; the run records, settings and caption text are kept either way. |
 
-**Cloud training (vast.ai) — dormant in this fork.** These keys are upstream's and are documented for completeness only. There is **no rented-GPU lane here**: no rental card in Settings → Training, no ☁ launch button, and the **Runs** hub filters cloud rows out entirely, so a cloud run cannot be started, continued, retried or even listed. Setting `VAST_API_KEY` does **not** switch any of it back on — the capability is forced off in the UI. The backend module is kept only so the fork does not diverge from upstream on a file it never runs.
+**Cloud training (vast.ai) — refused in this fork.** These keys can still sit in an old `config.json` or `.env`. None of them start, continue, retry or bill a rental. There is no rental card in Settings → Training and no cloud launch button. Saving `HF_CLOUD_TOKEN` returns an offline refusal and does not store the token. Local run history, checkpoint files and the gallery remain. The module that reads those local files does not call a rental host.
 
 | Key | Default | Role |
 |---|---|---|
-| `VAST_API_KEY` | *(unset)* | Secret, in `.env`. Upstream requires it for cloud training; setting it here enables nothing. |
-| `cloud.max_concurrent_runs` | `1` | Simultaneous cloud pods allowed (1–10). |
-| `cloud.max_price_per_hour` | `0.80` | Safety cap on the hourly offer price in $; pricier hosts are skipped before launch. |
-| `cloud.monthly_budget_usd` | `0` | Hard monthly spend ceiling in $ (`0` = unlimited); launches are blocked past it. |
-| `cloud.stall_timeout_minutes` | `30` | Kill + rescue a cloud run after this many minutes without step progress. |
-| `cloud.unreachable_grace_minutes` | `6` | How long a running pod may stay unreachable (a vast.ai network blackout, measured as real consecutive silence) before the run is given up and auto-retried on a fresh host. Raise it if healthy runs die with *pod unreachable*. It also bounds the **reconnection after an app restart**: a run whose job was already training is given this long to answer again — asked directly, not through the vast.ai listing — before it is given up, and the pod is never told to stop on a verdict reached without reaching it. |
-| `cloud.min_reliability` | `0.98` | vast.ai host-reliability floor (0.9–0.999); lower surfaces cheaper, riskier hosts. |
-| `cloud.verified_only` | `true` | Restrict to vast.ai verified hosts. |
-| `cloud.secure_cloud_only` | `false` | Restrict to vast.ai's Secure Cloud (datacenter) tier (narrows the market, raises price). |
+| `VAST_API_KEY` | *(unset)* | Secret, in `.env`. Unused. Setting it enables nothing. |
+| `cloud.max_concurrent_runs` | `1` | Unused. A stored value does not rent a GPU. |
+| `cloud.max_price_per_hour` | `0.80` | Unused. A stored value does not rent a GPU. |
+| `cloud.monthly_budget_usd` | `0` | Unused. A stored value does not rent a GPU. |
+| `cloud.stall_timeout_minutes` | `30` | Unused. A stored value does not rent a GPU. |
+| `cloud.unreachable_grace_minutes` | `6` | Unused. A stored value does not rent a GPU. |
+| `cloud.min_reliability` | `0.98` | Unused. A stored value does not rent a GPU. |
+| `cloud.verified_only` | `true` | Unused. A stored value does not rent a GPU. |
+| `cloud.secure_cloud_only` | `false` | Unused. A stored value does not rent a GPU. |
 
 ## config.json key reference (all keys)
 
-A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-editing (copy `config.example.json` to `config.json` first — it's git-ignored, in your data directory). Every key here is documented in full, with defaults and traps, in the sections above; this table is the index. **Secrets** (`HF_TOKEN`, `VAST_API_KEY`, optional scraper credentials) live in `.env`, not here. This fork has no `GEMINI_API_KEY` / `OPENAI_API_KEY` — the cloud image-generation engines were removed; Klein/ComfyUI is the only generation path.
+A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-editing (copy `config.example.json` to `config.json` first — it's git-ignored, in your data directory). Every key here is documented in full, with defaults and traps, in the sections above; this table is the index. **Secrets** (`HF_TOKEN` for a gated Setup download, `CIVITAI_API_KEY` for a Civitai model download) live in `.env`, not here. `VAST_API_KEY`, scraper keys and `HF_CLOUD_TOKEN` are unused or refused. This fork has no `GEMINI_API_KEY` / `OPENAI_API_KEY`. Generation stays on local ComfyUI engines.
 
 | Key | Meaning |
 |---|---|
@@ -1460,18 +1413,18 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `krea.identity_lora` | Krea 2 Edit identity LoRA, relative to `models/loras`. |
 | `captioning.backend` | Caption backend: `auto` (prefer JoyCaption, fall back to Ollama), `joycaption`, `ollama`, or `none`. |
 | `training.default_family` | Default model family preselected for new training runs (`zimage`, `sdxl`, `krea`, `flux`, `flux2klein`, or `anima`). |
-| `cloud.max_concurrent_runs` | Simultaneous cloud pods allowed (default `1`, 1–10). Also in Settings → Storage. |
-| `cloud.max_price_per_hour` | Safety cap on the hourly offer price in $ (default `0.80`); pricier hosts are skipped before launch. |
-| `cloud.monthly_budget_usd` | Hard monthly spend ceiling in $ (default `0` = unlimited); launches are blocked past it. |
-| `cloud.stall_timeout_minutes` | Kill + rescue a cloud run after this many minutes without step progress (default `30`, 5–240). |
-| `cloud.first_step_timeout_minutes` | Kill a run that reaches no training step **and** reports no new downloaded bytes for this long (default `45`, 5–240). Also in Settings → Storage. |
-| `cloud.first_step_download_budget_minutes` | Absolute ceiling on the pre-training base-model download, even while it is progressing (default `180`; `0` = no ceiling). Also in Settings → Storage. |
-| `cloud.max_runtime_minutes` | Hard stop on the whole run (default `480`, 30–1440); the newest checkpoint is rescued first. Enforced by the out-of-run supervisor too. Also in Settings → Storage. |
-| `cloud.freeze_watchdog_minutes` | Terminate a training run whose **pod** shows no progress for this long (step, download bytes or a new checkpoint), from outside the run's own supervision; the clock is durable and survives an app restart (default `45`; `0` = warn on the card only). |
-| `cloud.upload_stall_minutes` | Give up a run whose dataset upload has had **no byte at all** reach the pod for this long, and release the machine (default `25`; `0` = never cut). Not a ceiling on the transfer's duration — a slow upload that keeps moving is never cut. Also in Settings → Storage. |
-| `cloud.min_reliability` | vast.ai host-reliability floor (default `0.98`, 0.9–0.999); lower surfaces cheaper, riskier hosts. |
-| `cloud.verified_only` | Restrict to vast.ai verified hosts (default `true`). |
-| `cloud.secure_cloud_only` | Restrict to vast.ai's Secure Cloud (datacenter) tier (default `false`; narrows the market, raises price). |
+| `cloud.max_concurrent_runs` | Unused on this fork. A stored value does not rent a GPU. |
+| `cloud.max_price_per_hour` | Unused on this fork. A stored value does not rent a GPU. |
+| `cloud.monthly_budget_usd` | Unused on this fork. A stored value does not rent a GPU. |
+| `cloud.stall_timeout_minutes` | Unused on this fork. A stored value does not rent a GPU. |
+| `cloud.first_step_timeout_minutes` | Unused on this fork. A stored value does not rent a GPU. |
+| `cloud.first_step_download_budget_minutes` | Unused on this fork. A stored value does not rent a GPU. |
+| `cloud.max_runtime_minutes` | Unused on this fork. A stored value does not rent a GPU. |
+| `cloud.freeze_watchdog_minutes` | Unused on this fork. A stored value does not rent a GPU. |
+| `cloud.upload_stall_minutes` | Unused on this fork. A stored value does not rent a GPU. |
+| `cloud.min_reliability` | Unused on this fork. A stored value does not rent a GPU. |
+| `cloud.verified_only` | Unused on this fork. A stored value does not rent a GPU. |
+| `cloud.secure_cloud_only` | Unused on this fork. A stored value does not rent a GPU. |
 | `face_scoring.python` | Python interpreter used to run the InsightFace subprocess (empty = current interpreter). |
 | `face_scoring.models_root` | Directory where InsightFace model weights are stored/downloaded. Empty resolves to `data/models/insightface` (~350 MB downloaded, ~750 MB on disk — InsightFace keeps the zip next to what it extracted). |
 | `face_scoring.green` | Similarity score threshold (0–1) above which an image is flagged "green" (strong match). |

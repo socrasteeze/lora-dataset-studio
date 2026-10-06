@@ -6761,76 +6761,19 @@ def _pf_dense_mode(ds, ttype, mode, lane, slider, blockers, _check):
     """Dense/full-transformer compatibility + the dedicated HF cloud token.
     Returns hf_cloud_token_status (None outside full_transformer mode)."""
     hf_cloud_token_status = None
-    # Dense Krea is intentionally a separate, cloud-only lane. Surface every
-    # physical incompatibility in the normal structured preflight instead of
-    # letting a paid pod discover it after provisioning.
     if mode == 'full_transformer':
-        dense_issues = []
-        if (lane or 'local') != 'cloud':
-            dense_issues.append('full_transformer training is cloud-only')
-        if ttype != 'krea':
-            dense_issues.append('it is supported only for Krea 2')
-        elif not _krea_is_raw(ds):
-            dense_issues.append('Krea-2-Raw is required (Turbo not tested yet for dense runs)')
-        if str(getattr(ds, 'train_base_model', None) or '').strip():
-            dense_issues.append('custom base models are not supported')
-        if slider:
-            dense_issues.append('Slider LoRA mode must be disabled')
-        if dense_issues:
-            message = '; '.join(dense_issues)
-            blockers.append(message)
-            _check('training_mode', 'Dense training compatibility', 'fail',
-                   message, 'gf-training', bypassable=False)
-        else:
-            _check('training_mode', 'Dense training compatibility', 'ok',
-                   'Krea-2-Raw full transformer training will run in the cloud')
-
-        # Reuse the launch's definitive credential validator.  This may contact
-        # Hugging Face, but it never reserves a pod/GPU; a paid run must not be
-        # the first place an absent token, wrong token type/scope, or unaccepted
-        # Krea licence is discovered.
-        try:
-            from lds_sdk import cloud_training as cloud
-            with cloud.state_change_lock:
-                if not cloud.is_available('cloud_training'):
-                    hf_cloud_token_status = {
-                        'ok': False, 'configured': False,
-                        'error': 'Install and enable Cloud training in Plugins before preparing a cloud run.',
-                    }
-                else:
-                    hf_cloud_token_status = cloud.full_transformer_token_preflight(
-                        required_base_repo=official_base_repo(ds, ttype))
-            if not isinstance(hf_cloud_token_status, dict):
-                raise RuntimeError('invalid token preflight response')
-        except Exception:
-            hf_cloud_token_status = {
-                'ok': False,
-                'configured': bool(cfg.secret('HF_CLOUD_TOKEN')),
-                'error': ('HF_CLOUD_TOKEN could not be validated. Configure a '
-                          'Hugging Face token with Krea read and repository '
-                          'write access; fine-grained is recommended and global '
-                          'write is accepted with a warning.'),
-            }
-        if hf_cloud_token_status.get('ok'):
-            namespace = hf_cloud_token_status.get('namespace')
-            warning = hf_cloud_token_status.get('warning')
-            detail = warning or ('Dedicated HF_CLOUD_TOKEN validated'
-                                 + (f' for {namespace}' if namespace else ''))
-            _check('hf_cloud_token', 'Hugging Face cloud token',
-                   'warn' if warning else 'ok',
-                   detail, scope='cloud')
-        else:
-            detail = (hf_cloud_token_status.get('error')
-                      or 'HF_CLOUD_TOKEN is missing or invalid')
-            blockers.append(detail)
-            _check(
-                'hf_cloud_token', 'Hugging Face cloud token', 'fail',
-                detail, 'gf-training', bypassable=False,
-                hint=('Open Plugins → Cloud training → Settings and add HF_CLOUD_TOKEN with read access to '
-                      'krea/Krea-2-Raw and repository write access. A '
-                      'fine-grained token is recommended; global write is '
-                      'accepted with a warning.'),
-                scope='cloud')
+        message = 'Cloud training was removed from this install.'
+        blockers.append(message)
+        _check('training_mode', 'Dense training compatibility', 'fail',
+               message, 'gf-training', bypassable=False)
+        hf_cloud_token_status = {
+            'ok': False,
+            'configured': bool(cfg.secret('HF_CLOUD_TOKEN')),
+            'code': 'offline',
+            'error': message,
+        }
+        _check('hf_cloud_token', 'Hugging Face cloud token', 'fail',
+               message, 'gf-training', bypassable=False, scope='cloud')
     return hf_cloud_token_status
 
 

@@ -121,7 +121,7 @@ export function stopButtonLabel(status) {
    take tens of seconds, and a static 'Launching…' is exactly how a working
    request gets mistaken for a hung one. */
 export function launchButtonLabel({ launching, elapsedSeconds, fullMode }) {
-  if (!launching) return fullMode ? '☁️ Rent GPU & train full model' : '☁️ Rent & train';
+  if (!launching) return fullMode ? 'Train full model' : 'Train';
   const s = Math.max(0, Math.round(Number(elapsedSeconds) || 0));
   return s < 3 ? 'Launching' : `Launching ${formatElapsed(s)}`;
 }

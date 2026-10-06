@@ -2,39 +2,23 @@
 
 [Documentation](../README.md) · [Requirements](requirements.md) · [First launch](getting-started.md)
 
-On first launch, **Setup** prepares the core. No plugin is needed to import and organise images. Afterwards, open **Plugins**. The features that ship with the app are already installed. A ZIP you trust can be added from that page, and one restart applies it. Each plugin has its own settings and preparation steps; required ComfyUI custom nodes are installed through that plugin's preparation flow.
+On first launch, **Setup** prepares the core. No plugin is needed to import and organise images. Afterwards, open **Plugins**. The features that ship with the app are already installed. External plugin archives are refused. Each bundled plugin has its own settings and preparation steps; required ComfyUI custom nodes are installed through that plugin's preparation flow.
 
 ## Windows
 
-Download **`LoRA-Dataset-Studio-windows.zip`** from the [latest release](https://github.com/perfectgf/lora-dataset-studio/releases/latest). For a new installation, extract the entire archive into a new folder, then double-click:
+Clone this fork and double-click `start.bat`. The upstream release zip is a different product.
 
-```text
+```bash
+git clone https://github.com/socrasteeze/lora-dataset-studio.git
+cd lora-dataset-studio
 start.bat
 ```
 
 `start.bat` uses Python 3.10–3.12 if available. If none is installed, it downloads a self-contained CPython 3.12 into `.python\`, creates `.venv`, installs the core requirements, opens `http://127.0.0.1:5050/`, and starts the server. It requires no admin rights and changes no system PATH.
 
-On an existing ZIP installation, **Update & restart** downloads the next release and swaps the core in, keeping `data/`, `config.json`, `.env`, `.venv` and `.python` untouched. Features that ship with the app stay installed. Add a ZIP you trust from **Plugins**; one restart applies it. A git checkout follows its configured branch instead and needs `git` on your PATH, which an install made through a desktop Git client does not always provide.
+Update the checkout with git, then restart. The app does not fetch or apply that update itself. `data/`, `config.json`, `.env`, `.venv` and `.python` stay in place. Features that ship with the app stay installed. External plugin archives are refused. A git checkout needs `git` on your PATH, which an install made through a desktop Git client does not always provide.
 
-The default `v2` branch carries the maintained version of LDS. Clone it to follow its commits with **Update & restart**:
-
-```bash
-git clone https://github.com/perfectgf/lora-dataset-studio.git
-cd lora-dataset-studio
-start.bat
-```
-
-The former `main` branch is now [`v1`](https://github.com/perfectgf/lora-dataset-studio/tree/v1). It is read-only and no longer maintained; updates and contributions go to `v2`.
-
-**Want a guided migration?** [Download the V2 migration helper](https://github.com/perfectgf/lora-dataset-studio/releases/download/v2026.09.14.4/LDS-Migrate-to-V2.zip), extract it outside your installation and run `migrate-to-v2.bat`. It checks the Git installation, backs up the database/settings and switches branches while leaving media in place. [Instructions, backup scope and supported installations](migrate-to-v2.md).
-
-For an existing git installation still on `main`, stop LDS and run these commands from its folder, then start LDS again:
-
-```bash
-git fetch origin
-git switch v2
-git branch --set-upstream-to=origin/v2 v2
-```
+This fork's maintained branch is `main`. Upstream `perfectgf/lora-dataset-studio` keeps `v2` as its default and `v1` as a read-only archive. This fork does not follow either branch. Do not run upstream's migrate-to-v2 helper on this checkout: it switches the install onto upstream `v2`. See [FORK_NOTES.md](../../FORK_NOTES.md).
 
 ## Manual installation
 

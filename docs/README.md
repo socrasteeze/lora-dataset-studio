@@ -16,12 +16,12 @@
 
 | Guide | Covers |
 |---|---|
-| [Installation](guide/installation.md) | Windows, manual Python, Pinokio, updates, external tools and API keys |
+| [Installation](guide/installation.md) | Windows, manual Python, Pinokio, updates and external tools |
 | [Requirements](guide/requirements.md) | Hardware, disk space and dependencies by feature |
 | [Migrate to V2](guide/migrate-to-v2.md) | Upgrade a V1 Git installation while preserving data |
 | [Extensions guide](guide/extensions.md) | Optional local packages under `backend/extensions/`: the `register(app, csrf)` contract, the manifest, the trust model and why the folder can never ship |
 | [Settings reference](guide/settings-reference.md) | Every UI setting, dependency, model location, environment override and `config.json` key |
-| [Network access and privacy](guide/network-access.md) | External connections, optional usage statistics and public-access configuration |
+| [Network access and privacy](guide/network-access.md) | What this fork still downloads, what it refuses, and public-access configuration |
 | [Security policy](../SECURITY.md) | Threat model, safe network exposure and private vulnerability reporting |
 
 ## Diagnose and recover
@@ -36,7 +36,7 @@
 
 | Document | Covers |
 |---|---|
-| [Releases](https://github.com/perfectgf/lora-dataset-studio/releases) and [changelog](../CHANGELOG.md) | Current release notes and historical improvements |
+| [Changelog](../CHANGELOG.md) and [fork notes](../FORK_NOTES.md) | Historical upstream notes, and where this fork differs |
 | [Plugin authoring](plugins/README.md) | SDK, package layout, compatibility and building plugins |
 | [Contributing](../CONTRIBUTING.md) | Development setup, tests and pull-request conventions |
 | [Landing gate](../scripts/gates.ps1) | **Fork maintainers only** — `scripts/gates.ps1 -Phase Gates` qualifies a change before it lands on main |
