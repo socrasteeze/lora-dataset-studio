@@ -4,7 +4,7 @@
 
 ## State
 
-The offline fork is the tree being committed and pushed to `origin/main`.
+The offline fork source and rebuilt frontend are in local `origin/main` through `ff9623f34`.
 Source and `frontend/dist` stay in separate commits. Local Gates were not run.
 GitHub CI on the pushed `main` is the check for this delivery.
 
@@ -47,7 +47,7 @@ for this push. A later review starts after `ba403227b`. Do not merge
 
 ## Branches
 
-`noble/drop-external-plugins` is the line that lands on `main`.
+The offline fork has landed on `main`; preserve the excluded-feature boundaries below.
 Local branches already contained in `main` can be deleted after the push.
 `noble/confident-hodgkin-8c729a` still contains the plugin store this fork
 removed. Merging it would put that store back. Its useful intent, a catalog
@@ -59,8 +59,8 @@ checked out in other worktrees.
 
 ## Open
 
-1. GitHub CI on the pushed `main` must pass. Fix failures with new commits.
-2. Cloud Gates, responsive probes and the full local suite were not run.
+1. The supplied audit reports CI 37475417406 green at `ff9623f34`. Preserve its exact-commit evidence; do not reopen delivered source/bundle work.
+2. Reconcile exact-commit cloud Gates and responsive evidence. Green CI alone does not close missing optional coverage or physical acceptance. Local tests remain permission-gated.
 3. Do not restore excluded online features to satisfy an old test or an
    upstream issue.
 4. (2026-10-06): `frontend/src/index.css` forces 16px form controls on
@@ -78,3 +78,15 @@ checked out in other worktrees.
 - Keep `backend/app/scrape/netfetch.py`. Local video uploads use its size cap.
 - Keep `cloud_training.py` for local run history, checkpoints and the gallery.
 - Source and `frontend/dist` remain separate commits.
+
+## Agent-ready follow-up - October 6, 2026 PDT
+
+**Reviewed:** `main` at `ff9623f347`. This review used local source and the supplied audit.
+
+1. Record the exact `ff9623f34` cloud Gates and responsive receipts before claiming complete qualification. The audit reports CI 37475417406 green for heavy tests/build/lint, with the CPU torch overlay skipped.
+2. Preserve the shipped iOS input/overflow source and rebuilt frontend. Separate code delivery from physical-device proof.
+3. Use `FORK_NOTES.md` and `docs/OFFLINE_WORKFLOWS.md` as current authority. Do not revive excluded features from the older `PLAN.md`.
+
+**Evidence/source:** Local source/bundle commits `1324dceac` and `ff9623f34`; supplied CI snapshot; `AGENTS.md`, `scripts/gates.ps1`, and `frontend/scripts/responsiveProbe.mjs`.
+**Operator gates:** Local tests, responsive probes, fixtures, and test-bearing Gates phases require explicit permission. Missing overlay coverage must remain visible.
+**Runtime gates:** GPU quality, real data, physical phone/PWA, and live deployment remain separate. No tests, probes, build, or install ran here.
