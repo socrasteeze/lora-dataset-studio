@@ -2086,19 +2086,22 @@ def _framing_counts(bank_id, extra_crit=None) -> dict:
     return {k: int(got.get(k, 0)) for k in _FRAMING_KEYS}
 
 
-# A filter may narrow on at most this many tags at once. Not a safety limit —
-# each one is another LIKE over the same column, and past a handful the query is
-# slower than the answer is useful. The UI offers one value per facet group.
+# How many tag LIKEs one request may add. Not a safety limit — each one is
+# another LIKE over the same column. A facet may contribute several OR
+# alternatives, and the ten menus together must still fit.
 _MAX_TAG_FILTERS = 8
+_MAX_TAG_GROUPS = 12
+_MAX_TAGS_IN_GROUP = 32
+_MAX_TAG_ATOMS = 64
 
 
 def _clean_tag_filter(tags) -> list:
     """Whatever the client sent -> a short list of canonical tag names.
 
     Canonical means what the tagger itself writes: lowercase, underscores, no
-    commas. A comma would be read as a SENTINEL by the LIKE pattern built from
-    this and could match across two different tags, so it is stripped here — at
-    the one place every caller goes through — rather than trusted not to arrive.
+    commas. A comma would be read as a SENTINEL by a LIKE pattern and could
+    match across two different tags, so it is stripped here. The live query
+    goes through ``_clean_tag_groups``, which keeps this rule and adds OR groups.
     """
     if isinstance(tags, str):
         tags = tags.split(',')
@@ -2110,6 +2113,54 @@ def _clean_tag_filter(tags) -> list:
         if len(out) >= _MAX_TAG_FILTERS:
             break
     return out
+
+
+def _clean_tag_groups(tags) -> list:
+    """``wd14_tags`` -> a list of OR groups. The groups themselves are ANDed.
+
+    A comma separates groups (``blonde_hair,shirt`` is blonde AND a shirt).
+    A pipe inside a group is alternatives (``blonde_hair|brown_hair`` is
+    blonde OR brown). A comma inside one list item is stripped, same as
+    ``_clean_tag_filter``, so it cannot become a second group or a LIKE
+    sentinel. Names are the tagger's own: lowercase, no commas, no pipes.
+    """
+    if tags is None:
+        return []
+    if isinstance(tags, str):
+        chunks = tags.split(',')
+    elif isinstance(tags, (list, tuple)):
+        chunks = [str(item or '').replace(',', '') for item in tags]
+    else:
+        return []
+    groups = []
+    total = 0
+    seen = set()
+    for chunk in chunks:
+        alts = []
+        for part in str(chunk).split('|'):
+            name = part.strip().lower().replace(',', '').replace('|', '')
+            if name and name not in alts:
+                alts.append(name)
+            if len(alts) >= _MAX_TAGS_IN_GROUP:
+                break
+        if not alts:
+            continue
+        key = tuple(alts)
+        if key in seen:
+            continue
+        if len(groups) >= _MAX_TAG_GROUPS or total + len(alts) > _MAX_TAG_ATOMS:
+            break
+        seen.add(key)
+        groups.append(alts)
+        total += len(alts)
+    return groups
+
+
+def _wd14_tag_clause(tag):
+    """One whole tag against ``tags_text``. The sentinel commas stop
+    ``blonde_hair`` matching ``blonde_hair_ribbon``."""
+    esc = tag.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+    return BankImage.tags_text.ilike(f'%,{esc},%', escape='\\')
 
 
 def tag_facets_payload(user_id, bank_id, limit=400) -> dict | None:
@@ -3556,12 +3607,14 @@ def list_images(user_id, bank_id, status=None, reason=None, flag=None,
     I not done yet", which is how a captioned bank gets worked through as a
     checklist. Uncaptioned rows are never hidden by it (see _text_match).
     ``tags`` is the 🏷️ chip filter, matching a WORD of the caption or path.
-    ``wd14_tags`` is the separate 🔖 facet filter: a list of WHOLE WD14 tag names,
-    ANDed, matched against `tags_text` only. Two filters, two parameters, on
-    purpose — the chips come from a caption's own words and the facets come from
-    the tagger's vocabulary, so folding them into one key would make each one
-    silently answer the other's question. Facet matching is whole-tag only —
-    `blonde_hair` never matches `blonde_hair_ribbon`.
+    ``wd14_tags`` is the separate 🔖 facet filter: WHOLE WD14 tag names matched
+    against `tags_text` only. Comma-separated groups are ANDed (a hair colour
+    and a shirt both have to match). A ``|`` inside a group is OR (blonde or
+    brown). Two filters, two parameters, on purpose — the chips come from a
+    caption's own words and the facets come from the tagger's vocabulary, so
+    folding them into one key would make each one silently answer the other's
+    question. Facet matching is whole-tag only — `blonde_hair` never matches
+    `blonde_hair_ribbon`.
     Flag filters sort by the relevant score (worst first) so the review reads
     top-down. ``sort`` (a GRID_SORTS id) overrides that order and covers EVERY
     quantity the passes persist — resolution (megapixels, so 900×900 outranks
@@ -3625,14 +3678,12 @@ def list_images(user_id, bank_id, status=None, reason=None, flag=None,
         semantic_group=semantic_group, style=style, subfolder=subfolder,
         search=search, exclude=exclude, tags=tags, res_bucket=res_bucket,
         framing=framing, origin=origin, medium=medium, angle=angle)
-    for tag in _clean_tag_filter(wd14_tags):
-        # One WHOLE tag per facet, ANDed: the facet dropdowns are independent
-        # questions ("blonde hair" AND "wearing a shirt"), so narrowing on a
-        # second one must narrow, not widen. The sentinel commas around both
-        # sides are what keep 'blonde_hair' from matching 'blonde_hair_ribbon'
-        # — see models.BankImage.tags_text and services/wd14_tagger.tags_text.
-        esc = tag.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
-        q = q.filter(BankImage.tags_text.ilike(f'%,{esc},%', escape='\\'))
+    for group in _clean_tag_groups(wd14_tags):
+        # Groups AND, names inside a group OR. A second hair colour widens
+        # that question; a shirt on top of it still narrows. Whole-tag match
+        # only — see _wd14_tag_clause.
+        clauses = [_wd14_tag_clause(tag) for tag in group]
+        q = q.filter(clauses[0] if len(clauses) == 1 else or_(*clauses))
     explicit = _sort_order(sort)
     if explicit is not None:
         # An explicit sort (resolution / aesthetic / sharpness) wins over the flag

@@ -539,10 +539,11 @@ The funnel itself:
 5. **🔖 Tags** — the cheap way to slice the pile. A small local model (WD14,
    ~400 MB, installed from *Setup ▸ Quality tools*) labels every non-rejected
    image with **booru tags** — `blonde_hair`, `red_dress`, `outdoors` — and the
-   filter bar gains tidy dropdowns for hair, clothing, headwear, setting, pose
-   and how many people, plus an **All other tags** list so nothing the model
-   found is hidden. They compose with every other filter, and the **search box
-   matches them too**, so `red dress` works before you have captioned anything.
+   filter bar gains menus for hair, clothing, headwear, setting, pose and how
+   many people. Each menu keeps every value you tick: two hair colours match
+   pictures with either, and a hair colour plus a top still has to match both.
+   They compose with every other filter, and the **search box matches them
+   too**, so `red dress` works before you have captioned anything.
    The point is the order of operations: captioning a 9 000-image dump costs
    hours of GPU time, and you would be paying it *before* knowing which images
    you want. Tag first, throw most of it away, caption the survivors. It runs
@@ -550,8 +551,8 @@ The funnel itself:
    model, and it **never writes a caption** — the tags live in their own place
    and the captioner below is untouched. **Limits, plainly:** it is a
    *classifier*, not a describer — it names things it was trained on and will
-   miss the rest; the facet dropdowns are curated shortcuts over a partial list
-   of known tags, which is why All other tags exists; it is available in the
+   miss the rest; the menus are curated shortcuts over a partial list of known
+   tags, and search still finds a tag they do not list; it is available in the
    **bank only**, not in the dataset workspace; and unlike the other heavy
    passes it **cannot run on a compute peer** — Launch all will refuse it there
    rather than fail an hour in.

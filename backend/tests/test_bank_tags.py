@@ -312,7 +312,7 @@ def test_the_tag_filter_matches_whole_tags_only(app, client, tmp_path, monkeypat
 
 
 def test_two_tag_filters_narrow_rather_than_widen(app, client, tmp_path, monkeypatch):
-    """Each facet dropdown is an independent question, so they AND."""
+    """Each facet is an independent question, so different facets AND."""
     bank_id = _tagged_bank(app, client, tmp_path, monkeypatch, {
         'i0.png': {'blonde_hair': 0.9, 'shirt': 0.8},
         'i1.png': {'blonde_hair': 0.9},
@@ -321,6 +321,27 @@ def test_two_tag_filters_narrow_rather_than_widen(app, client, tmp_path, monkeyp
     r = client.get(f'/api/bank/{bank_id}/images?wd14_tags=blonde_hair,shirt')
     got = [i['relpath'] for i in r.get_json()['images']]
     assert got == ['i0.png']
+
+
+def test_two_values_in_one_facet_match_either(app, client, tmp_path, monkeypatch):
+    """A menu can hold several values. Those widen that question. A second
+    facet on top of them still narrows."""
+    bank_id = _tagged_bank(app, client, tmp_path, monkeypatch, {
+        'i0.png': {'blonde_hair': 0.9, 'shirt': 0.8},
+        'i1.png': {'brown_hair': 0.9, 'shirt': 0.8},
+        'i2.png': {'blonde_hair': 0.9},
+        'i3.png': {'red_hair': 0.9, 'shirt': 0.8},
+    })
+    either = client.get(
+        f'/api/bank/{bank_id}/images',
+        query_string={'wd14_tags': 'blonde_hair|brown_hair'})
+    assert sorted(i['relpath'] for i in either.get_json()['images']) == [
+        'i0.png', 'i1.png', 'i2.png']
+    both = client.get(
+        f'/api/bank/{bank_id}/images',
+        query_string={'wd14_tags': 'blonde_hair|brown_hair,shirt'})
+    assert sorted(i['relpath'] for i in both.get_json()['images']) == [
+        'i0.png', 'i1.png']
 
 
 def test_an_untagged_image_matches_no_tag_filter(app, client, tmp_path, monkeypatch):
@@ -380,3 +401,16 @@ def test_a_comma_inside_one_tag_cannot_span_two(app):
     place every caller goes through."""
     from app.services.image_bank_service import _clean_tag_filter
     assert _clean_tag_filter(['blonde_hair,shirt']) == ['blonde_hairshirt']
+
+
+def test_tag_groups_or_within_a_facet_and_and_across(app):
+    from app.services.image_bank_service import _clean_tag_groups
+    assert _clean_tag_groups('blonde_hair|brown_hair,shirt') == [
+        ['blonde_hair', 'brown_hair'], ['shirt']]
+    assert _clean_tag_groups('blonde_hair,shirt') == [['blonde_hair'], ['shirt']]
+    assert _clean_tag_groups('  Blonde_Hair | BROWN_hair ') == [
+        ['blonde_hair', 'brown_hair']]
+    assert _clean_tag_groups('') == []
+    assert _clean_tag_groups(None) == []
+    # A comma inside one list item is stripped, not turned into a second group.
+    assert _clean_tag_groups(['blonde_hair|shirt,hat']) == [['blonde_hair', 'shirthat']]

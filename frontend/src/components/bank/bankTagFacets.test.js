@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  TAG_FACETS, facetOf, groupTags, label, selectedTags, tagsParam,
+  TAG_FACETS, facetMenuState, facetOf, groupTags, label, selectedTags, tagsParam,
+  toggleWd14Tag, wd14TagsParam,
 } from './bankTagFacets.js';
 
 const counts = (pairs) => pairs.map(([name, count]) => ({ name, count }));
@@ -91,4 +92,35 @@ test('selectedTags: empty picks are dropped, values are canonical and deduped', 
 test('tagsParam: nothing picked is an empty string, so the caller can omit it', () => {
   assert.equal(tagsParam({ hair_color: '' }), '');
   assert.equal(tagsParam({ hair_color: 'blonde_hair', top: 'shirt' }), 'blonde_hair,shirt');
+});
+
+test('wd14TagsParam ORs one facet and ANDs different facets', () => {
+  assert.equal(wd14TagsParam([]), '');
+  assert.equal(wd14TagsParam(null), '');
+  // Hair is declared before Top, so the group order does not follow the clicks.
+  assert.equal(wd14TagsParam(['shirt', 'blonde_hair']), 'blonde_hair,shirt');
+  // Inside one facet the click order is the OR order.
+  assert.equal(wd14TagsParam(['brown_hair', 'blonde_hair']), 'brown_hair|blonde_hair');
+  assert.equal(
+    wd14TagsParam(['shirt', 'brown_hair', 'blonde_hair']),
+    'brown_hair|blonde_hair,shirt');
+  // A tag no facet claims stays its own AND term.
+  assert.equal(wd14TagsParam(['blonde_hair', 'A_Custom']), 'blonde_hair,a_custom');
+  assert.equal(wd14TagsParam(['blonde_hair', 'Blonde_Hair']), 'blonde_hair');
+});
+
+test('toggleWd14Tag adds a second value in the same facet and removes on the next click', () => {
+  assert.deepEqual(toggleWd14Tag(['blonde_hair'], 'brown_hair'), ['blonde_hair', 'brown_hair']);
+  assert.deepEqual(toggleWd14Tag(['blonde_hair', 'brown_hair'], 'blonde_hair'), ['brown_hair']);
+  assert.deepEqual(toggleWd14Tag(['shirt'], 'blonde_hair'), ['shirt', 'blonde_hair']);
+});
+
+test('facetMenuState counts picks in menu order', () => {
+  const facet = groupTags(counts([
+    ['brown_hair', 2], ['blonde_hair', 9],
+  ])).facets[0];
+  assert.deepEqual(facetMenuState(facet, []), { count: 0, title: '' });
+  assert.deepEqual(facetMenuState(facet, ['brown_hair', 'blonde_hair']), {
+    count: 2, title: 'blonde hair, brown hair',
+  });
 });

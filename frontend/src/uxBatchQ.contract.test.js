@@ -18,6 +18,11 @@ test('the phone input font-size rule sits outside @layer base and beats text-xs/
   assert.match(css.slice(rule, rule + 80), /font-size: 16px !important/)
   const media = css.lastIndexOf('@media', rule)
   assert.match(css.slice(media, rule), /max-width: 639px/)
+  assert.match(css.slice(media, rule), /pointer:\s*coarse/)
+  assert.match(css, /html \{[\s\S]*?overflow-x: clip;/)
+  assert.match(css, /body \{[\s\S]*?overflow-x: clip;/)
+  const html = readFileSync(path.join(SRC, '..', 'index.html'), 'utf8')
+  assert.doesNotMatch(html, /maximum-scale|user-scalable/)
 })
 
 test('anchors clear the sticky app bar', () => {

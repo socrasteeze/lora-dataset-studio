@@ -17,7 +17,7 @@
  * cursor with the error visible, so a decision is never silently dropped.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Flag as FlagIcon, PartyPopper, Shuffle } from 'lucide-react';
+import { PartyPopper, Shuffle } from 'lucide-react';
 import PluginSlot from '../../plugins/PluginSlot.jsx'
 import { contributionKey, createLayerTracker } from '../../plugins/layerTracker.js'
 import { apiFetch, postJson } from '../../api/fetchClient'
@@ -31,11 +31,11 @@ import {
 import BankWatermarkMaskDialog from './BankWatermarkMaskDialog'
 import CropModal from '../dataset/CropModal.jsx'
 import SourceAttribution from '../dataset/SourceAttribution'
-import { canEditMask, maskButtonLabel } from './bankWatermarkMask.js'
+import { canEditMask } from './bankWatermarkMask.js'
 import { dupStateSuffix } from './bankDupBadge.js'
 import { cropOutcomeMessage, imageVersionQuery } from './bankEdits.js'
 import {
-  REVIEW_SHORTCUT_HINT, ownsTypedKeys, reviewKeyAction,
+  ownsTypedKeys, reviewKeyAction,
 } from '../shared/reviewShortcuts.js'
 import ShortcutKey from '../shared/ShortcutKey'
 import BankEditComparison from './BankEditComparison.jsx'
@@ -429,29 +429,29 @@ export default function BankReviewLightbox({
             <p role="status" className="text-center text-sm text-sky-200">✂ {notice}</p>
           )}
           <Facts img={img} />
-          <div className="flex flex-wrap items-center justify-center gap-2">
+          <div className="flex w-full gap-2">
             <button type="button" onClick={goBack} disabled={session.pos === 0}
               title="Previous image (←) — navigation only, decides nothing"
-              className="min-h-10 lg:min-h-0 rounded-lg border border-white/20 px-3 py-2 text-sm text-white disabled:opacity-35 hover:bg-white/10">
-              ←
+              className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-white/20 px-3 py-2 text-sm text-white disabled:opacity-35 hover:bg-white/10">
+              Back
             </button>
             <button type="button" onClick={() => rotateCurrent(-90)} disabled={busy}
               aria-label="Rotate this image 90 degrees left"
               title="Rotate 90° left ([) — decides nothing. Your own file is never modified: the turn is stored and applied to what you see and to what gets promoted."
-              className="min-h-10 lg:min-h-0 rounded-lg border border-white/20 px-3 py-2 text-sm text-white disabled:opacity-35 hover:bg-white/10">
+              className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-white/20 px-3 py-2 text-sm text-white disabled:opacity-35 hover:bg-white/10 lg:min-h-0">
               <span aria-hidden="true">↺</span><span className="sr-only">Rotate left</span>
             </button>
             <button type="button" onClick={() => rotateCurrent(90)} disabled={busy}
               aria-label="Rotate this image 90 degrees right"
               title="Rotate 90° right (]) — decides nothing. Your own file is never modified: the turn is stored and applied to what you see and to what gets promoted."
-              className="min-h-10 lg:min-h-0 rounded-lg border border-white/20 px-3 py-2 text-sm text-white disabled:opacity-35 hover:bg-white/10">
+              className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-white/20 px-3 py-2 text-sm text-white disabled:opacity-35 hover:bg-white/10 lg:min-h-0">
               <span aria-hidden="true">↻</span><span className="sr-only">Rotate right</span>
             </button>
-            {/* ✂ and ↩ sit with the rotate pair, not with ✓/✕/⏭: everything left
-                of the decisions CHANGES THE IMAGE and advances nothing. */}
+            {/* ✂ and ↩ sit with the rotate pair, not with the decisions: everything
+                on this row CHANGES THE IMAGE and advances nothing. */}
             <button type="button" onClick={() => setCropId(id)} disabled={busy || id == null}
               title="Crop this image (C) — decides nothing. Nothing is resampled: a Bank sits upstream of the training resolution, so the cut keeps its pixels and a dataset decides the size when it imports. Your own file is never modified, and ↩ Revert brings the original framing back."
-              className="min-h-10 lg:min-h-0 rounded-lg border border-sky-400/60 bg-sky-500/20 px-4 py-2 text-sm font-semibold text-sky-100 disabled:opacity-50 hover:bg-sky-500/30">
+              className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-sky-400/60 bg-sky-500/20 px-3 py-2 text-sm font-semibold text-sky-100 disabled:opacity-50 hover:bg-sky-500/30 lg:min-h-0">
               ✂ Crop{shortcut('C')}
             </button>
             {img?.edit_method && (
@@ -459,54 +459,45 @@ export default function BankReviewLightbox({
               {img.edit_history_count > 0 && <>
                 <button type="button" onClick={undoCurrent} disabled={busy}
                   title="Undo only the last crop or upscale, keeping earlier edits."
-                  className="min-h-10 lg:min-h-0 rounded-lg border border-white/25 px-3 py-2 text-sm text-white disabled:opacity-50 hover:bg-white/10">
+                  className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-white/25 px-3 py-2 text-sm text-white disabled:opacity-50 hover:bg-white/10 lg:min-h-0">
                   ↩ Undo last edit
                 </button>
                 <button type="button" onClick={() => setCompareKey(comparing ? null : editKey)}
                   disabled={busy} aria-pressed={!!comparing}
                   title="Compare the current result with the image just before its last edit."
-                  className="min-h-10 lg:min-h-0 rounded-lg border border-white/25 px-3 py-2 text-sm text-white disabled:opacity-50 hover:bg-white/10">
+                  className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-white/25 px-3 py-2 text-sm text-white disabled:opacity-50 hover:bg-white/10 lg:min-h-0">
                   {comparing ? 'Close comparison' : 'Compare before / after'}
                 </button>
               </>}
               <button type="button" onClick={revertCurrent} disabled={busy}
                 title="Throw away the ✂ crop / upscale made in this bank and go back to the image it started from. Only a copy made by the app is deleted — your own file was never modified."
-                className="min-h-10 lg:min-h-0 rounded-lg border border-white/25 px-4 py-2 text-sm text-white disabled:opacity-50 hover:bg-white/10">
+                className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-white/25 px-3 py-2 text-sm text-white disabled:opacity-50 hover:bg-white/10 lg:min-h-0">
                 Revert all edits
               </button>
               </>
-            )}
-            {canEditMask(img) && (
-              <button type="button" onClick={() => setMaskId(id)} disabled={busy}
-                title="Draw the watermark zones on this image (M) — decides nothing. Works even when the scan found nothing: what you draw becomes the flag, and Inpaint then repaints exactly that."
-                className="min-h-10 lg:min-h-0 rounded-lg border border-amber-400/60 bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-100 disabled:opacity-50 hover:bg-amber-500/30">
-                <FlagIcon aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{maskButtonLabel(img)}{shortcut('M')}
-              </button>
             )}
             {/* Verbs the plugins contribute (lightbox.action, bank surface). */}
             <PluginSlot slot="lightbox.action" surface="bank" img={img} bankId={bankId}
               disabled={busy}
               itemProps={(item) => ({ onLayer: pluginLayersRef.current.onLayerFor(contributionKey(item)) })} />
-            <button type="button" onClick={() => sendDecision('keep')} disabled={busy}
-              title="Keep this image and move on (K)"
-              className="min-h-10 lg:min-h-0 rounded-lg border border-emerald-400/60 bg-emerald-500/20 px-5 py-2 text-sm font-semibold text-emerald-100 disabled:opacity-50 hover:bg-emerald-500/30">
-              ✓ Keep{shortcut('K')}
-            </button>
+          </div>
+          <div className="flex w-full gap-2">
             <button type="button" onClick={() => sendDecision('reject')} disabled={busy}
               title="Reject this image and move on (R) — reversible, nothing is deleted from disk"
-              className="min-h-10 lg:min-h-0 rounded-lg border border-rose-400/60 bg-rose-500/20 px-5 py-2 text-sm font-semibold text-rose-100 disabled:opacity-50 hover:bg-rose-500/30">
+              className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-rose-400/60 bg-rose-500/20 px-3 py-2 text-sm font-semibold text-rose-100 disabled:opacity-50 hover:bg-rose-500/30 lg:min-h-0">
               ✕ Reject{shortcut('R')}
             </button>
             <button type="button" onClick={doSkip}
               title="Decide later (S) — stays undecided and is not shown again in this review"
-              className="min-h-10 lg:min-h-0 rounded-lg border border-white/25 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-white/10">
+              className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-white/25 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-white/10 lg:min-h-0">
               ⏭ Skip{shortcut('S')}
             </button>
+            <button type="button" onClick={() => sendDecision('keep')} disabled={busy}
+              title="Keep this image and move on (K)"
+              className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-emerald-400/60 bg-emerald-500/20 px-3 py-2 text-sm font-semibold text-emerald-100 disabled:opacity-50 hover:bg-emerald-500/30 lg:min-h-0">
+              ✓ Keep{shortcut('K')}
+            </button>
           </div>
-          <p className="text-center text-2xs text-white/45">
-            {REVIEW_SHORTCUT_HINT} · [ ] rotate · C crop · M watermark mask · ← → move
-            without deciding · Esc close. Decisions are saved one by one — closing loses nothing.
-          </p>
         </div>
       )}
 

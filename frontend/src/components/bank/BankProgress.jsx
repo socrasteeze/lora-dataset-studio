@@ -1,5 +1,5 @@
 /**
- * The Bank's two status bars: what a running pass is doing (⏳ ProgressBar) and
+ * The Bank's two status bars: what a running pass is doing (ProgressBar) and
  * the net under the last bulk gesture (↩ UndoBar).
  *
  * Moved out of BankWorkspace.jsx by the Encre redesign. In structure B both of
@@ -70,6 +70,14 @@ export function UndoBar({ offer, busy, onUndo, onDismiss }) {
   )
 }
 
+// Chip text is the pass name only. STEP_SHORT still carries glyphs for the
+// buttons and the report; this row does not.
+function plainStepLabel(step) {
+  const raw = String(STEP_SHORT[step] || step || '')
+  const label = raw.replace(/^[^\p{L}\p{N}]+/u, '').trim()
+  return label || raw
+}
+
 // Exported for the render test: what this bar says during a step with no
 // per-image counter is the whole fix for "the pass looks frozen", and a source
 // regex cannot see what the renderer produces.
@@ -83,7 +91,7 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
   if (presence === PROGRESS_HIDDEN) return null
   if (presence === PROGRESS_UNKNOWN) return <ProgressUnknown />
   const stale = presence === PROGRESS_STALE
-  const { kind, done, total, detail } = activity
+  const { kind, done, total } = activity
   const pct = total > 0 ? Math.round((100 * done) / total) : null
   // "12939 / 37800" says where the pass is; it never said how long that leaves.
   // On a bank this size the difference between twenty minutes and four hours is
@@ -92,15 +100,16 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
   const asked = stopRequested(activity, stopAskedFor)
   const note = stopNote(activity, asked)
   const pipe = kind === 'pipeline' ? activity.pipeline : null
+  const chips = pipe && Array.isArray(pipe.results) ? pipe.results : []
   return (
-    <div className="space-y-2 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm">
+    <div className="space-y-2">
+    <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm">
       {/* flex-wrap: at 400 px the label, the bar and Stop cannot share one row —
           they used to squash the label to a sliver. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <span aria-hidden>⏳</span>
-        <span className={`text-content ${stale ? 'opacity-60' : ''}`}>
+        <span className={`min-w-0 text-content ${stale ? 'opacity-60' : ''}`}>
           {pipe
-            ? `🚀 Launch all — step ${(pipe.index ?? 0) + 1}/${pipe.total_steps} · ${STEP_SHORT[pipe.current] || pipe.current}`
+            ? `Launch all — step ${(pipe.index ?? 0) + 1}/${pipe.total_steps} · ${plainStepLabel(pipe.current) || pipe.current}`
             : ({ scan: 'Quality scan', faces: 'Face pass', score: 'Scoring pass',
               semantic_index: 'Semantic index',
               semantic_dedup: 'Crops & variants', watermark: 'Watermark scan',
@@ -113,14 +122,12 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
               // The one destructive pass: it must NAME itself in the bar, not
               // ride under the anonymous "Job running" fallback.
               delete_rejected: 'Deleting rejected files' }[kind] || 'Job') + ' running'}
-          {/* A step with no per-image counter publishes done=total=0 and says
-              what it is doing in words (the cache write, the style grouping).
-              Printing a bare "0" next to that sentence would read as "0 done"
-              on work that is running — so the figure only appears when there
-              is one. */}
+          {/* A step with no per-image counter publishes done=total=0. Printing
+              a bare "0" would read as "0 done" on work that is running — so
+              the figure only appears when there is one. The phase sentence
+              (loading the model, grouping styles) stays off this line. */}
           {(done || total) ? <>{' — '}{done}{total ? ` / ${total}` : ''}</> : null}
           {eta ? `${(done || total) ? ' · ' : ' — '}${eta}` : ''}
-          {detail ? `${(done || total || eta) ? ' · ' : ' — '}${detail}` : ''}
         </span>
         {pct != null && (
           <div className="h-1.5 w-40 overflow-hidden rounded bg-surface-raised" role="progressbar"
@@ -138,27 +145,23 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
           {stopLabel(asked)}
         </button>
       </div>
-      {/* One line, xs, muted — and it REPLACES the Stop sentence that used to
-          ride inside the style-grouping phase label, where everyone read it all
-          the time and it wrapped the counter off its row at 400 px.
-          aria-live so the answer to the click reaches a screen reader too. */}
-      {note && (
-        <p className="m-0 pl-6 text-xs text-content-muted" aria-live="polite">{note}</p>
-      )}
       {stale && <ProgressUnknown stale />}
-      {pipe && Array.isArray(pipe.results) && pipe.results.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5 pl-6 text-xs">
-          {pipe.results.map((r, i) => (
-            <li key={`${r.step}-${i}`}
-              className={`rounded px-1.5 py-px ${r.status === 'done' ? 'bg-emerald-500/15 text-emerald-300'
-                : r.status === 'error' ? 'bg-rose-500/15 text-rose-300'
-                : 'bg-black/20 text-content-subtle'}`}
-              title={r.reason || r.detail || ''}>
-              {r.status === 'done' ? '✅' : r.status === 'error' ? '⚠️' : '⏭️'} {STEP_SHORT[r.step] || r.step}
-            </li>
-          ))}
-        </ul>
-      )}
+    </div>
+    {/* Outside the live box on purpose. Scan belongs in this row; it does not
+        also sit inside the running line. Colour is the status. */}
+    {chips.length > 0 && (
+      <ul className="flex flex-wrap gap-1.5 text-xs">
+        {chips.map((r, i) => (
+          <li key={`${r.step}-${i}`}
+            className={`rounded px-1.5 py-px ${r.status === 'done' ? 'bg-emerald-500/15 text-emerald-300'
+              : r.status === 'error' ? 'bg-rose-500/15 text-rose-300'
+              : 'bg-black/20 text-content-subtle'}`}
+            title={r.reason || r.detail || ''}>
+            {plainStepLabel(r.step)}
+          </li>
+        ))}
+      </ul>
+    )}
     </div>
   )
 }

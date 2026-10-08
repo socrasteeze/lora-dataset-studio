@@ -108,7 +108,17 @@ test('the bank review lightbox rotates without deciding, and updates the tile be
   assert.match(bankReview, /aria-label="Rotate this image 90 degrees right"/);
   // Shortcuts that cannot be confused with a decision key.
   assert.match(bankReview, /e\.key === '\[' \) \{ e\.preventDefault\(\); rotateCurrent\(-90\)|e\.key === '\['/);
-  assert.match(bankReview, /\[ \] rotate/);
+  // The footer line that used to say "[ ] rotate" is gone. The keys stay on
+  // the button titles, which is what a reviewer can still read.
+  assert.match(bankReview, /Rotate 90° left \(\[\)/);
+  assert.match(bankReview, /Rotate 90° right \(\]\)/);
+  assert.doesNotMatch(bankReview, /\[ \] rotate/);
+  assert.match(bankReview, />\s*Back\s*</);
+  assert.doesNotMatch(bankReview, /Mark a watermark/);
+  assert.doesNotMatch(bankReview, /REVIEW_SHORTCUT_HINT/);
+  const decisions = bankReview.slice(bankReview.indexOf('Reject this image and move on'));
+  assert.ok(decisions.indexOf('✕ Reject') < decisions.indexOf('⏭ Skip'));
+  assert.ok(decisions.indexOf('⏭ Skip') < decisions.indexOf('✓ Keep'));
   assert.match(bankWorkspace, /onRotated=\{onReviewRotated\}/);
   assert.match(bankWorkspace, /const onReviewRotated = \(imageId, rotation\)/);
 });
