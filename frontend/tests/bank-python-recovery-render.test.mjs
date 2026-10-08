@@ -22,7 +22,7 @@ function panel(overrides = {}) {
     semanticState: semanticEngineState(payload, { bank_siglip2: true }),
     semanticReady: true, semanticSwitching: false, semanticOperationBusy: false,
     passGate: readyPassGate, tagsState: { disabled: false, title: '' },
-    scoreGpuPresent: true, scoreDevice: { device: 'cuda', gpu: true }, scoreNote: null,
+    scoreGpuPresent: true, scoreDevice: { device: 'cuda', gpu: true },
     selected: new Set(), captionScope: '', captionVocab: 'neutral',
     onPickPython: noop, onPassOpen: noop, onPassRedo: noop,
     onSemanticEngineChange: noop, onChanged: noop, ...overrides,

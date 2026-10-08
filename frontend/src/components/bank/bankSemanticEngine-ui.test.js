@@ -29,11 +29,11 @@ test('the accessible Bank selector persists only the requested engine with PATCH
     'switching engines must not delete either cache')
 })
 
-test('the selector keeps the ownership and cache-conservation copy visible', () => {
-  assert.match(panel, /semanticPurposeSentence\(state\.engine\)/)
-  assert.match(panel, /SCORE_STAYS_CLIP_SENTENCE/)
-  assert.match(panel, /SEMANTIC_CACHE_SENTENCE/)
-  assert.match(panel, /Run ✨ Score to build the CLIP index/)
+test('the selector shows the engine choice without the standing essays', () => {
+  assert.match(panel, /option\.label/)
+  assert.doesNotMatch(panel, /semanticPurposeSentence|SCORE_STAYS_CLIP_SENTENCE|SEMANTIC_CACHE_SENTENCE/)
+  assert.doesNotMatch(panel, /Run ✨ Score to build the CLIP index/)
+  assert.doesNotMatch(panel, /option\.hint/)
 })
 
 test('switching and unmount release the text encoder that actually owns memory', () => {

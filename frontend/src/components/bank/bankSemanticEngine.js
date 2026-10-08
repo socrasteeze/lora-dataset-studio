@@ -6,8 +6,8 @@
  */
 
 export const SEMANTIC_ENGINE_OPTIONS = [
-  { id: 'clip', label: 'CLIP', hint: 'Default · produced by ✨ Score' },
-  { id: 'siglip2', label: 'SigLIP 2', hint: 'Optional · its own semantic index' },
+  { id: 'clip', label: 'CLIP' },
+  { id: 'siglip2', label: 'SigLIP 2' },
 ]
 
 const PIPELINE_BASE_STEPS = [
@@ -157,17 +157,6 @@ export function semanticIndexActionLabel(state) {
   if (state.indexed > 0) return 'Complete SigLIP 2 index'
   return 'Build SigLIP 2 index'
 }
-
-export function semanticPurposeSentence(engine) {
-  return `${semanticEngineLabel(engine)} powers semantic search, reference similarity, `
-    + 'diversity, balanced sampling and crops/variants for this Bank.'
-}
-
-export const SCORE_STAYS_CLIP_SENTENCE = '✨ Score stays on CLIP for aesthetic, NSFW, '
-  + 'visual style and Medium.'
-
-export const SEMANTIC_CACHE_SENTENCE = 'Switching engines keeps both caches and both '
-  + 'same-shot groupings; it starts nothing automatically and deletes nothing.'
 
 /** The backend pipeline order, with no new step at all for legacy/default CLIP. */
 export function pipelineStepKeys(engine) {

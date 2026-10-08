@@ -2,11 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
-  SEMANTIC_CACHE_SENTENCE, SCORE_STAYS_CLIP_SENTENCE,
   defaultPipelineStepKeys, normalizeSemanticEngine, pipelineStepKeys,
   offersSemanticGpuPython, semanticDeviceNote,
   semanticEnginePatchBody, semanticEngineState, semanticIndexActionLabel,
-  semanticPrerequisite, semanticPurposeSentence,
+  semanticPrerequisite,
 } from './bankSemanticEngine.js'
 
 test('old and partial payloads default to CLIP', () => {
@@ -95,17 +94,6 @@ test('default pipeline checks semantic index only for a ready SigLIP2 install', 
     .includes('semantic_index'), false)
   assert.equal(defaultPipelineStepKeys('siglip2', ready).includes('caption'), false)
 })
-
-test('visible copy preserves Score ownership, both caches and both groupings', () => {
-  assert.match(semanticPurposeSentence('clip'), /^CLIP powers semantic search/)
-  assert.match(semanticPurposeSentence('siglip2'), /^SigLIP 2 powers semantic search/)
-  assert.match(SCORE_STAYS_CLIP_SENTENCE, /aesthetic, NSFW, visual style and Medium/)
-  assert.match(SEMANTIC_CACHE_SENTENCE, /keeps both caches/)
-  assert.match(SEMANTIC_CACHE_SENTENCE, /both same-shot groupings/)
-  assert.match(SEMANTIC_CACHE_SENTENCE, /starts nothing automatically/)
-  assert.match(SEMANTIC_CACHE_SENTENCE, /deletes nothing/)
-})
-
 
 // ── Which device the index really uses, and the way out ──────────────────────
 

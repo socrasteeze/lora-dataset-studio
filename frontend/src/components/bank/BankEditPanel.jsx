@@ -31,7 +31,7 @@ import { useCapabilities } from '../../context/CapabilitiesContext'
 import { useToast } from '../common/Toast'
 import { HelpBadge } from '../../help/HelpMode'
 import {
-  BANK_IMPROVE_PROMISE, bankImproveEngines, editCounts, editSummary,
+  bankImproveEngines, editCounts, editSummary,
   revertConfirmMessage, revertOutcomeMessage,
 } from './bankEdits.js'
 import { passScopeCount } from './bankPassScope.js'
@@ -143,21 +143,6 @@ export default function BankEditPanel({
       </button>
       {open && (
         <div className="space-y-2 pb-3">
-          <p className="text-2xs text-content-subtle">
-            crop and upscale here, re-analyse, then promote — your original files are
-            never modified
-          </p>
-
-          {/* ✂ WHERE THE CROP IS. Not a button that opens nothing: it names the
-              gesture and the key, because the crop needs a full-size image and
-              the grid tile is 96 px tall. */}
-          <p className="text-xs text-content-muted">
-            ✂ <b>Crop</b> is per image: open <b>▶ Review</b> (or the ▶ on a tile) and
-            press <b>C</b>. Nothing is resampled — a Bank sits upstream of the training
-            resolution, so the cut keeps its pixels and the dataset decides the size
-            when it imports.
-          </p>
-
           <div className="lds-section py-2.5 space-y-1.5">
             <div className="flex items-baseline gap-1.5">
               <span className="text-sm font-semibold text-content">✨ Upscale &amp; improve</span>
@@ -167,9 +152,6 @@ export default function BankEditPanel({
                   : (todo ? `${todo} image(s) in this scope` : 'nothing left in this scope')}
               </span>
             </div>
-            <p className="text-2xs leading-snug text-content-subtle">
-              Re-renders each image at a higher resolution. {BANK_IMPROVE_PROMISE}
-            </p>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">
                 Engine
@@ -196,12 +178,9 @@ export default function BankEditPanel({
               className="min-h-10 rounded-lg border border-sky-400/40 bg-sky-500/15 px-3 py-1.5 text-sm font-semibold text-sky-200 disabled:opacity-40 lg:min-h-0">
               ✨ Upscale &amp; improve
             </button>
-            <p className="text-2xs text-content-subtle">
-              {picked?.disabled
-                ? picked.reason
-                : 'One ComfyUI round-trip per image — minutes apiece on a modest card. '
-                  + '⏹ Stop ends the run between two images and keeps what is done.'}
-            </p>
+            {picked?.disabled && picked.reason && (
+              <p className="text-2xs text-content-subtle">{picked.reason}</p>
+            )}
           </div>
 
           {/* ↩ Only when there is something to take back. A revert button on a
@@ -220,11 +199,6 @@ export default function BankEditPanel({
                 className="rounded-md border border-border px-2 py-1 text-xs font-medium text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-40">
                 ↩ Revert {selectedIds.length ? `selection (${selectedIds.length})` : `all (${counts.total})`}
               </button>
-              <span className="text-2xs text-content-subtle">
-                Undo keeps earlier edits. Revert removes every edit and the measurements
-                taken from those pixels, so those images are analysed again. Open Review
-                to compare before and after. History starts with edits made after this update.
-              </span>
             </div>
           )}
         </div>

@@ -117,9 +117,8 @@ test('the GPU cost is shown on the row, next to the button that commits to it', 
   assert.match(dialog, /\{cost\.comfyui && \(/);
 });
 
-test('the workspace states the GPU hold while it is in force, not only before', () => {
-  // A user who picked the interpreter last week and hit "GPU busy" today needs
-  // the sentence on the panel, not in a dialog they will not reopen.
-  assert.match(ws, /const scoreHoldNote = scoreGpuHoldNote\(scoreDevice, Boolean\(caps\.bank_scoring\)\)/);
-  assert.match(ws, /\{scoreHoldNote && \(/);
+test('the passes panel does not keep a standing Score device essay', () => {
+  // The cost stays on the interpreter row, where the choice is made.
+  assert.doesNotMatch(ws, /scoreHoldNote|scoreNote/);
+  assert.doesNotMatch(ws, /scoreDeviceNote|scoreGpuHoldNote/);
 });
