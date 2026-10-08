@@ -87,6 +87,12 @@ test('wd14 facet tags underscore-strip for display', () => {
     ['🔖 blonde hair', '🔖 outdoors'])
 })
 
+test('several values in one tag facet read as or, and count as one part', () => {
+  assert.deepEqual(bankFilterParts({ wd14Tags: ['brown_hair', 'blonde_hair'] }, { labels: LABELS }),
+    ['🔖 blonde hair or brown hair'])
+  assert.equal(bankFilterCount({ wd14Tags: ['brown_hair', 'blonde_hair'] }), 1)
+})
+
 test('caption tags (comma-joined) split into one part each', () => {
   assert.deepEqual(bankFilterParts({ tags: 'red,dress' }, { labels: LABELS }),
     ['🏷️ red', '🏷️ dress'])

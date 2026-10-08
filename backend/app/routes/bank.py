@@ -542,8 +542,8 @@ def bank_images(bank_id):
         res_bucket=args.get('res_bucket') or None,
         framing=args.get('framing') or None,
         origin=args.get('origin') or None,
-        # Comma-separated WHOLE WD14 tag names, ANDed. Sanitised service-side
-        # (_clean_tag_filter) so there is one definition of a canonical tag.
+        # WHOLE WD14 tag names. Commas AND groups; a pipe inside a group is OR.
+        # Sanitised service-side (_clean_tag_groups).
         # A SEPARATE key from `tags` above for the reason that comment gives:
         # the 🏷️ chips read a caption's words, the 🔖 facets read the tagger's
         # vocabulary, and one key answering both questions is a filter that lies.

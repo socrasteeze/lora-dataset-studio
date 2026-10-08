@@ -57,7 +57,8 @@ test('the tag filter is part of filterParams, so it reaches Select-all and Revie
   // reached the grid would make "Select all in filter" hand back rows the user
   // cannot see — the bug the dups chip shipped once. Its own key (wd14_tags),
   // separate from the 🏷️ caption-chip `tags` param upstream added in the same wave.
-  assert.match(workspace, /if \(f\.wd14Tags\?\.length\) params\.wd14_tags = f\.wd14Tags\.join\(','\)/);
+  assert.match(workspace, /const packed = wd14TagsParam\(f\.wd14Tags\)/);
+  assert.match(workspace, /if \(packed\) params\.wd14_tags = packed/);
 });
 
 test('an active tag filter counts as "filtered" in the N-shown readout', () => {
@@ -70,11 +71,12 @@ test('an active tag filter counts as "filtered" in the N-shown readout', () => {
   assert.equal(bankFilterCount({ wd14Tags: ['blonde_hair'] }), 1);
 });
 
-test('picking a facet value replaces that facet, not appends to it', () => {
-  // Appending would turn "blonde, no wait, brown" into a filter for images that
-  // are both — which match nothing and look like a broken grid.
+test('a facet keeps every ticked value instead of replacing the previous one', () => {
+  // Two hair colours are alternatives. Replacing the first would put the menu
+  // back to a single choice.
   assert.match(workspace,
-    /setFacetTag[\s\S]{0,300}?filter\.wd14Tags\.filter\(\(t\) => !facet\.options\.some/);
+    /toggleFacetTag = \(name\) => setF\(\{ wd14Tags: toggleWd14Tag\(filter\.wd14Tags, name\) \}\)/);
+  assert.doesNotMatch(workspace, /setFacetTag/);
 });
 
 test('the Setup tile explains WHICH half of the install is missing', () => {

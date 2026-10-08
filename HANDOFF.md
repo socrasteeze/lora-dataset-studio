@@ -1,6 +1,6 @@
 # HANDOFF
 
-**Updated:** 2026-10-05 | **Branch:** main | **Base:** fe6a7822d
+**Updated:** 2026-10-08 | **Branch:** main | **Base:** c54ad0a51
 
 ## State
 
@@ -68,6 +68,11 @@ checked out in other worktrees.
    type-DELETE field on a phone held sideways or an iPad, and clips sideways
    overflow on `html`/`body` with `overflow-x: clip`. The mobile-input-zoom
    contract test follows. `frontend/dist` is rebuilt in a separate commit.
+5. (2026-10-08): Bank progress, Curate, and Review cleanup is uncommitted on
+   `main`. Next, when a local run is allowed: the Bank review, curation, and
+   `uxBatchQ` source tests, then a browser pass of Bank and Review at phone
+   and desktop widths. Do not commit, push, run Gates, or rebuild
+   `frontend/dist` with this source. No browser pass was run.
 
 ## Traps
 

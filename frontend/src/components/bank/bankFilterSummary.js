@@ -23,8 +23,33 @@
  * reads it.
  */
 
+import { TAG_FACETS } from './bankTagFacets.js'
+
 /** Facet parts shown before the header falls back to "+N more". */
 export const SUMMARY_MAX_PARTS = 4
+
+/** One summary part per tag facet. Several values in one facet read as "or"
+ *  because that is how the filter matches them. Facet order follows the menus. */
+function wd14Parts(names) {
+  const wanted = new Set((names || []).filter(Boolean).map((tag) => String(tag)))
+  const out = []
+  const claimed = new Set()
+  for (const facet of TAG_FACETS) {
+    const words = []
+    for (const tag of facet.tags) {
+      if (!wanted.has(tag)) continue
+      words.push(tag.replace(/_/g, ' '))
+      claimed.add(tag)
+    }
+    if (words.length === 1) out.push(`🔖 ${words[0]}`)
+    else if (words.length > 1) out.push(`🔖 ${words.join(' or ')}`)
+  }
+  for (const raw of names || []) {
+    const name = String(raw || '')
+    if (name && !claimed.has(name)) out.push(`🔖 ${name.replace(/_/g, ' ')}`)
+  }
+  return out
+}
 
 const quote = (s) => `“${String(s)}”`
 
@@ -80,7 +105,7 @@ export function bankFilterParts(filter, { labels = {} } = {}) {
   // Subfolder: '' is a MEANINGFUL value (the bank root itself), so this must
   // stay a `!= null` test — a truthiness check would silently stop naming it.
   if (f.subfolder != null) out.push(`📁 ${f.subfolder === '' ? '(bank root)' : f.subfolder}`)
-  for (const t of (f.wd14Tags || [])) out.push(`🔖 ${String(t).replace(/_/g, ' ')}`)
+  out.push(...wd14Parts(f.wd14Tags))
   // 🏷️ caption tags ride as one comma-joined string (bankTags.tagsParam).
   for (const t of String(f.tags || '').split(',').map((s) => s.trim()).filter(Boolean)) {
     out.push(`🏷️ ${t}`)

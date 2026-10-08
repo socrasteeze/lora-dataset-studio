@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Archive, BarChart3, FolderInput, FolderOpen, Lightbulb, Palette, Rocket, Search, Target, Trash2, Type, Undo2, Wand2 } from 'lucide-react';
+import { AlertTriangle, Archive, BarChart3, FolderInput, FolderOpen, Lightbulb, Palette, Rocket, Search, Target, Trash2, Type, Undo2 } from 'lucide-react';
 import { apiFetch, patchJson, postJson, putJson } from '../../api/fetchClient'
 import { useFolderPersons } from './useFolderPersons'
 import { useReviewLightbox } from './useReviewLightbox'
@@ -19,7 +19,7 @@ import { idsFromResponse } from './bankIds.js'
 import { scoreGpuHoldNote } from './bankScoreDevice.js'
 import { bankFilterSummary, bankFilterCount } from './bankFilterSummary.js'
 import { showTagFilters, tagsButtonLabel, tagsButtonState } from './wd14Gate.js'
-import { groupTags } from './bankTagFacets.js'
+import { groupTags, toggleWd14Tag, wd14TagsParam } from './bankTagFacets.js'
 import DupGroupsPanel from './DupGroupsPanel'
 /* 🧪 The Caption Lab, shared with the Dataset side. Lazy for the same reason the
    dataset lazies it: both only exist behind a click, and the bank entry chunk already
@@ -147,6 +147,10 @@ const CURATE_BTN = 'inline-flex w-full min-w-0 items-center justify-center '
   + 'rounded-md border border-indigo-400/60 bg-indigo-500/20 '
   + 'px-3 py-1.5 text-center text-sm font-semibold text-indigo-200 '
   + 'disabled:opacity-50 hover:bg-indigo-500/30'
+/* Shown / Review / selected / Select all / Auto-reject. One full-width row;
+   each cell is the same width. Labels wrap below lg instead of widening the page. */
+const TOOLBAR_CELL = 'inline-flex h-full min-h-10 w-full min-w-0 items-center justify-center '
+  + 'rounded-md px-1.5 text-center text-xs leading-tight lg:min-h-0 lg:h-7'
 /* The header's own buttons are inlined rather than shared through a constant:
    they sit in two horizontally-scrolling rows now (upstream's measured layout),
    not in even grid cells, so there is no shared box left for a constant to
@@ -212,10 +216,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     style: null, subfolder: null, search: null, exclude: null, tags: null,
     sort: loadBankSort(bankId), resBucket: null,
     origin: null,
-    // 🔖 WD14 facet filter: an ARRAY of whole tag names, ANDed server-side. An
-    // array and not one value, because each facet dropdown is an independent
-    // question ("blonde hair" AND "wearing a shirt"). Its own key beside the
-    // 🏷️ `tags` chips above — same reasoning as the route's two parameters.
+    // 🔖 WD14 facet filter: whole tag names. Several in one facet match any of
+    // them; tags from different facets all have to match. Own key beside the
+    // 🏷️ `tags` chips — same reasoning as the route's two parameters.
     wd14Tags: [],
     framing: null,
     // Dedicated keys, never folded into `flag` or the text lane.
@@ -456,12 +459,16 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     if (f.framing) params.framing = f.framing
     // Origin state (ai/camera/unknown) — a facet like the flags.
     if (f.origin) params.origin = f.origin
-    // 🔖 WD14 facet filter — comma-separated whole tag names, ANDed server-side.
+    // 🔖 WD14 facet filter. A comma separates facets (AND). A pipe inside one
+    // facet is OR, so several hair colours match images with any of them.
     // Its OWN key (`wd14_tags`), separate from the 🏷️ chip `tags` above — same
     // reasoning: two features, one payload key, is how a filter silently eats
     // its sibling's field. Also flows to fetchAllIds, so "Select all in filter"
     // and ▶ Review stay scoped to the tags the user is actually looking at.
-    if (f.wd14Tags?.length) params.wd14_tags = f.wd14Tags.join(',')
+    if (f.wd14Tags?.length) {
+      const packed = wd14TagsParam(f.wd14Tags)
+      if (packed) params.wd14_tags = packed
+    }
     // 🎨 what the picture is made of, and ⤢ where the head points. Their OWN
     // query keys, so they compose with search/exclude/sort instead of fighting
     // them for one.
@@ -1665,22 +1672,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   })
   const grouped = useMemo(() => groupTags(tagFacets?.tags), [tagFacets])
   const tagFiltersShown = showTagFilters({ tagged: taggedCount, activeTags: filter.wd14Tags })
-  // Which tag (if any) each facet is currently narrowing on, so a <select> can
-  // show it. A tag can only be in one facet, so this is unambiguous.
-  const facetValue = (facet) =>
-    facet.options.find((o) => filter.wd14Tags.includes(o.name))?.name || ''
-  // Picking a value REPLACES this facet's previous pick and leaves the others
-  // alone — the alternative (append) turns "blonde, no wait, brown" into a
-  // filter for images that are both, which match nothing and look broken.
-  const setFacetTag = (facet, name) => {
-    const others = filter.wd14Tags.filter((t) => !facet.options.some((o) => o.name === t))
-    setF({ wd14Tags: name ? [...others, name] : others })
-  }
-  const toggleWd14Tag = (name) => setF({
-    wd14Tags: filter.wd14Tags.includes(name)
-      ? filter.wd14Tags.filter((t) => t !== name)
-      : [...filter.wd14Tags, name],
-  })
+  // A tick adds that tag. A second tick removes it. Several values in one
+  // facet stay selected; the query ORs them.
+  const toggleFacetTag = (name) => setF({ wd14Tags: toggleWd14Tag(filter.wd14Tags, name) })
   // Rendered twice: in the header from sm up, and at the top of ⚙ Passes below
   // it (see the header's counter row for why).
   const counterStats = counts && (
@@ -1956,9 +1950,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               isDrawer={!railIsColumnNow} onClose={closeRail}
               onBrowseStyles={() => setStyleBrowserOpen(true)}
               tagFiltersShown={tagFiltersShown} tagGroups={grouped}
-              tagTruncated={!!tagFacets?.truncated} wd14Tags={filter.wd14Tags}
-              facetValue={facetValue} setFacetTag={setFacetTag}
-              toggleWd14Tag={toggleWd14Tag} clearWd14Tags={() => setF({ wd14Tags: [] })}
+              wd14Tags={filter.wd14Tags}
+              toggleFacetTag={toggleFacetTag} clearWd14Tags={() => setF({ wd14Tags: [] })}
               filterSummary={filterSummary} clearAllFilters={clearAllFilters}
               shownReasons={shownReasons} reasonCounts={reasonCounts} reasonHint={reasonHint} />
           </div>
@@ -1977,38 +1970,37 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         {/* ── The grid, full height ── with everything that acts on a SELECTION
             directly above it, where the effect of the click is visible. */}
         <main className="min-w-0 space-y-3">
-        {/* Results readout + selection actions */}
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-content-muted">
-            <span className="font-semibold tabular-nums text-content">{(page.total ?? 0).toLocaleString()}</span> shown
+        {/* Results readout + selection actions. Five equal cells across the row. */}
+        <div className="space-y-1.5">
+        <div className="grid w-full grid-cols-5 items-stretch gap-1.5">
+          <span className={`${TOOLBAR_CELL} text-content-muted`}>
+            <span className="font-semibold tabular-nums text-content">{(page.total ?? 0).toLocaleString()}</span>&nbsp;shown
             {isFiltered && (
-              <span className="text-content-subtle"> of {(counts?.total ?? 0).toLocaleString()}</span>
+              <span className="text-content-subtle">&nbsp;of {(counts?.total ?? 0).toLocaleString()}</span>
             )}
           </span>
-          <span aria-hidden className="h-4 w-px bg-border" />
           {/* The fast lane: full-size, one image at a time, Keep/Reject/Skip with
               K/R/S. Deliberately a button of its own rather than a tile gesture —
               the tile click stays the bulk-selection gesture it has always been. */}
           <button type="button" onClick={() => openReview(null)} disabled={reviewLoading}
             title="Review the images of this filter one at a time, full size: ✓ Keep / ✕ Reject / ⏭ Skip (K/R/S) each move to the next. Optional random order."
-            className="inline-flex min-h-10 lg:min-h-0 lg:h-7 items-center whitespace-nowrap rounded-md border border-indigo-400/60 bg-indigo-500/20 px-2.5 text-xs font-semibold text-indigo-200 disabled:opacity-50 hover:bg-indigo-500/30">
-            {reviewLoading ? '▶ Preparing' : '▶ Review'}
+            className={`${TOOLBAR_CELL} border border-indigo-400/60 bg-indigo-500/20 font-semibold text-indigo-200 disabled:opacity-50 hover:bg-indigo-500/30`}>
+            {reviewLoading ? 'Preparing' : 'Review'}
           </button>
-          <span aria-hidden className="h-4 w-px bg-border" />
-          <span className="text-content-muted">{selected.size} selected</span>
+          <span className={`${TOOLBAR_CELL} text-content-muted`}>{selected.size} selected</span>
           <button type="button" onClick={selectAllCurrent}
             title="Selects every image the current filters show — all pages, not just the tiles on screen"
-            className="inline-flex min-h-10 lg:min-h-0 lg:h-7 items-center whitespace-nowrap rounded-md border border-border px-2 text-xs text-content-muted hover:text-content hover:bg-surface-raised">
+            className={`${TOOLBAR_CELL} border border-border text-content-muted hover:text-content hover:bg-surface-raised`}>
             Select all
           </button>
           {/* Bulk-reject undecided images by quality flag — a triage shortcut that
               leaves your manual ✓/✕ untouched and deletes nothing off disk. */}
-          <div className="relative">
+          <div className="relative min-w-0">
             <button type="button" onClick={() => setShowAutoReject((v) => !v)} disabled={live}
               aria-expanded={showAutoReject}
               title="Bulk-reject the still-undecided images carrying the chosen quality flags"
-              className="inline-flex min-h-10 lg:min-h-0 lg:h-7 items-center whitespace-nowrap rounded-md border border-border bg-surface-raised px-2 text-xs text-content disabled:opacity-50 hover:bg-surface">
-              <Wand2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Auto-reject
+              className={`${TOOLBAR_CELL} border border-border bg-surface-raised text-content disabled:opacity-50 hover:bg-surface`}>
+              Auto-reject
             </button>
             {showAutoReject && (
               <>
@@ -2021,7 +2013,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                     scroll so "Reject them" is reachable however long the caveats
                     get. */}
                 <div data-probe-chrome="auto-reject" data-probe-panel="auto-reject" data-probe-layer
-                  className="fixed inset-x-3 bottom-3 z-50 max-h-[70vh] overflow-y-auto rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:mt-1 sm:w-72">
+                  className="fixed inset-x-3 bottom-3 z-50 max-h-[70vh] overflow-y-auto rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2 sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:mt-1 sm:w-72">
                   <p className="text-xs text-content-muted">
                     Undecided only — nothing deleted.
                   </p>
@@ -2086,13 +2078,14 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               </>
             )}
           </div>
+        </div>
           {(selected.size > 0 || showSelected) && (
             <button type="button" onClick={toggleSelectionView}
               aria-pressed={showSelected}
               title={showSelected
                 ? 'Back to the full grid with its filters'
                 : 'Show only the selected images (as their own view), so a scattered curation/similarity result is visible in one place'}
-              className={`inline-flex min-h-10 lg:min-h-0 lg:h-7 items-center whitespace-nowrap rounded-md border px-2 text-xs font-medium ${showSelected
+              className={`inline-flex min-h-10 w-full items-center justify-center rounded-md border px-2 text-xs font-medium lg:min-h-0 lg:h-7 ${showSelected
                 ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-200'
                 : 'border-border text-content-muted hover:text-content hover:bg-surface-raised'}`}>
               {showSelected ? <><Undo2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Show all</> : <><Search aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Show selected ({selected.size})</>}
@@ -2127,7 +2120,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 ? `Pick the N images that best COVER the visual variety of the current filter (varied angles/outfits/scenes) using the ${semanticState.label} semantic index.`
                 : semanticBlocked}
               className={CURATE_BTN}>
-              <Palette aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Pick diverse{!semanticReady && ` (needs ${semanticState.label})`}{diverseBusy && ' (sampling)'}
+              <Palette aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Pick diverse{diverseBusy && ' (sampling)'}
             </button>
             {curateOpen === 'diverse' && (
               <>
@@ -2312,7 +2305,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 ? `Describe what you are looking for in words ("brunette outdoors, wide shot") and rank the current filter with ${semanticState.label}.`
                 : semanticBlocked}
               className={CURATE_BTN}>
-              <Type aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Find by text{!semanticReady && ` (needs ${semanticState.label})`}
+              <Type aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Find by text
             </button>
             {curateOpen === 'text' && (
               <>
@@ -2413,9 +2406,6 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             <BarChart3 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Coverage advice{coverageOpen ? ' ▲' : ' ▼'}
           </button>
           </div>
-          )}
-          {curateShown && !semanticReady && (
-            <span className="text-xs text-content-subtle">{semanticBlocked}</span>
           )}
         </div>
 

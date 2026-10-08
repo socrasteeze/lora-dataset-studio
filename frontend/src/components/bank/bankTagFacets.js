@@ -6,15 +6,14 @@
  * wearing", "inside or outside" — a handful of small closed questions, not one
  * enormous open one.
  *
- * So the known tags are grouped into FACETS below, and everything else falls
- * through to an "All tags" list ranked by frequency. Nothing is hidden by this
- * grouping — that distinction matters, and the UI says so: a facet is a shortcut
- * to the common questions, never a filter on what the model found.
+ * So the known tags are grouped into FACETS below. Everything else is returned
+ * as `other`, ranked by frequency. The filter menus show the facets only; a
+ * tag they do not list is still found by the bank search, which matches the
+ * tagger's words. A facet is a shortcut to the common questions, never a
+ * claim that the model found nothing else.
  *
  * The lists are deliberately partial and will always be. Booru vocabulary is
- * open-ended and a curated map that pretended to be exhaustive would quietly
- * drop the long tail into invisibility; instead the tail stays visible in All
- * tags, and adding a name here only promotes it into a dropdown.
+ * open-ended. Adding a name here only promotes it into a menu.
  *
  * Tag NAMES are the tagger's own (lowercase, underscores). They are stored in
  * user databases, so they are matched, never rewritten — `label()` only changes
@@ -179,4 +178,69 @@ export function selectedTags(selected, extra = []) {
  *  omit the parameter entirely rather than send an empty filter). */
 export function tagsParam(selected, extra = []) {
   return selectedTags(selected, extra).join(',');
+}
+
+/** How many of this facet's options are on, and their labels in menu order. */
+export function facetMenuState(facet, selected) {
+  const on = new Set(selected || []);
+  const picked = [];
+  for (const option of facet?.options || []) {
+    if (on.has(option.name)) picked.push(option.label);
+  }
+  return { count: picked.length, title: picked.join(', ') };
+}
+
+/** Toggle one tag. A second click removes it. Other picks stay, including
+ *  another value in the same facet. */
+export function toggleWd14Tag(selected, name) {
+  const key = String(name || '').trim().toLowerCase();
+  const list = [];
+  let removed = false;
+  for (const raw of selected || []) {
+    const item = String(raw || '').trim().toLowerCase();
+    if (!item || list.includes(item)) continue;
+    if (key && item === key) {
+      removed = true;
+      continue;
+    }
+    list.push(item);
+  }
+  if (key && !removed) list.push(key);
+  return list;
+}
+
+/**
+ * The `wd14_tags` query value.
+ * Tags that share a facet are one OR group (`blonde_hair|brown_hair`), in the
+ * order they were selected. Groups are emitted in facet order and joined with
+ * commas, which the server ANDs. A tag no facet claims is its own AND group
+ * at the end. '' means nothing is picked, so the caller can omit the parameter.
+ */
+export function wd14TagsParam(selected) {
+  const wanted = [];
+  const seen = new Set();
+  for (const raw of selected || []) {
+    const name = String(raw || '').trim().toLowerCase();
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    wanted.push(name);
+  }
+  const byFacet = new Map();
+  const loose = [];
+  for (const name of wanted) {
+    const id = facetOf(name);
+    if (!id) {
+      loose.push(name);
+      continue;
+    }
+    if (!byFacet.has(id)) byFacet.set(id, []);
+    byFacet.get(id).push(name);
+  }
+  const groups = [];
+  for (const facet of TAG_FACETS) {
+    const alts = byFacet.get(facet.id);
+    if (alts?.length) groups.push(alts.join('|'));
+  }
+  for (const name of loose) groups.push(name);
+  return groups.join(',');
 }

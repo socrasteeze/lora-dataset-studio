@@ -26,17 +26,84 @@
  * DELETED button, but nothing catches a filter silently wired to the wrong
  * prop — so the safest rewrite is the one that rewrites nothing.
  */
+import { useEffect, useRef, useState } from 'react'
 import BankThresholdsPanel from './BankThresholdsPanel.jsx'
 import { Ban, Palette, Search, SlidersHorizontal, SlidersVertical, UserX } from 'lucide-react';
 import DescribeFilterBar from './DescribeFilterBar.jsx'
 import SelectionTagsPanel from './SelectionTagsPanel.jsx'
 import SubfolderPersonPanel from './SubfolderPersonPanel'
-import { Button, Input, Select, btnClass, controlHeight } from '../common/Controls.jsx'
+import { Button, Input, Select, btnClass, controlHeight, fieldClass } from '../common/Controls.jsx'
 import { Chip, FilterGroup, GroupLabel } from './BankAtoms.jsx'
+import { facetMenuState } from './bankTagFacets.js'
 import { FLAG_HINT, FLAG_LABEL, ORIGIN_BUCKETS } from './bankFacets.js'
 import { foldedCount } from './bankLayout.js'
 import { angleTitle, mediumTitle } from './bankMedium.js'
 import { assertionFor, folderMarker, scanOffer, suggestionFor } from './folderPerson.js'
+
+/** One category menu. Closed, it stays a single compact row and shows how many
+ *  values are on. Open, the checkboxes under the grid keep every tick. */
+function TagFacetMenus({ facets, selected, onToggle }) {
+  const [openId, setOpenId] = useState(null)
+  const rootRef = useRef(null)
+  useEffect(() => {
+    if (!openId) return undefined
+    const close = (event) => {
+      if (!rootRef.current?.contains(event.target)) setOpenId(null)
+    }
+    const onKey = (event) => {
+      if (event.key === 'Escape') setOpenId(null)
+    }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [openId])
+  const open = facets.find((facet) => facet.id === openId) || null
+  return (
+    <div ref={rootRef} className="mt-1.5 grid grid-cols-2 gap-1.5">
+      {facets.map((facet) => {
+        const { count, title } = facetMenuState(facet, selected)
+        const expanded = openId === facet.id
+        return (
+          <button
+            key={facet.id}
+            type="button"
+            aria-expanded={expanded}
+            aria-controls={expanded ? `tag-facet-${facet.id}` : undefined}
+            aria-label={count ? `${facet.label}, ${count} selected: ${title}` : facet.label}
+            title={count ? title : undefined}
+            onClick={() => setOpenId(expanded ? null : facet.id)}
+            className={`${fieldClass({ size: 'md' })} flex w-full min-w-0 items-center gap-1 text-left ${(count || expanded) ? 'border-indigo-400/60' : ''} ${count ? 'text-indigo-200' : ''}`}>
+            <span className="min-w-0 flex-1 truncate">{facet.label}</span>
+            {count > 0 && (
+              <span className="shrink-0 rounded bg-indigo-500/20 px-1 text-xs tabular-nums">{count}</span>
+            )}
+            <span aria-hidden="true" className="shrink-0 text-xs text-content-subtle">{expanded ? '▲' : '▼'}</span>
+          </button>
+        )
+      })}
+      {open && (
+        <div id={`tag-facet-${open.id}`} role="group" aria-label={open.label}
+          className="col-span-2 max-h-56 overflow-y-auto rounded-md border border-border bg-surface p-1">
+          {open.options.map((option) => {
+            const checked = selected.includes(option.name)
+            return (
+              <label key={option.name}
+                className={`flex min-h-10 lg:min-h-0 lg:h-7 cursor-pointer items-center gap-2 rounded px-1.5 text-xs ${checked ? 'bg-indigo-500/15 text-indigo-200' : 'text-content hover:bg-surface-raised'}`}>
+                <input type="checkbox" className="shrink-0" checked={checked}
+                  onChange={() => onToggle(option.name)} />
+                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                <span className="shrink-0 tabular-nums text-content-subtle">{option.count}</span>
+              </label>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function BankFilterRail({
   bankId, filter, setF,
@@ -53,8 +120,7 @@ export default function BankFilterRail({
   thresholdsOpen, setThresholdsOpen, connection, refreshPayload, refreshImages, onRunPass,
   sortGroups, setSort, tileSize, setTileSize,
   moreOpen, setMoreOpen, isDrawer, onClose, onBrowseStyles,
-  tagFiltersShown, tagGroups, tagTruncated, wd14Tags, facetValue, setFacetTag,
-  toggleWd14Tag, clearWd14Tags,
+  tagFiltersShown, tagGroups, wd14Tags, toggleFacetTag, clearWd14Tags,
   filterSummary, clearAllFilters, shownReasons, reasonCounts, reasonHint,
 }) {
   // Which measured axes have data. The conditions are the ones the workspace
@@ -373,11 +439,8 @@ export default function BankFilterRail({
         </FilterGroup>
       </div>
 
-      {/* 🔖 WD14 tags. Restored: the Encre merge (f7543f826) moved every other
-          filter into this rail and dropped this block, leaving the server filter
-          and the workspace's handlers wired to nothing. Every facet is one
-          <select> of the same size, two to a row, so the block reads as a grid;
-          picking a value REPLACES that facet's previous pick (setFacetTag). */}
+      {/* 🔖 WD14 tags. One compact menu per category, two to a row. A menu keeps
+          every ticked value. The checkboxes open under the row. */}
       {tagFiltersShown && (
         <section aria-label="Tag filters" className="border-t border-border pt-2">
           <div className="flex items-center gap-2">
@@ -388,36 +451,7 @@ export default function BankFilterRail({
               </Button>
             )}
           </div>
-          <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-            {tagGroups.facets.map((facet) => (
-              <Select key={facet.id} size="md" value={facetValue(facet)} aria-label={facet.label}
-                onChange={(e) => setFacetTag(facet, e.target.value)}
-                className={`w-full min-w-0 truncate ${facetValue(facet) ? 'border-indigo-400/60 text-indigo-200' : ''}`}>
-                <option value="">{facet.label}</option>
-                {facet.options.map((o) => (
-                  <option key={o.name} value={o.name}>{o.label} ({o.count})</option>
-                ))}
-              </Select>
-            ))}
-          </div>
-          {/* Every tag the facets above do NOT claim — the curated groups are
-              partial by design, and this is where nothing is seen to be dropped. */}
-          {tagGroups.other.length > 0 && (
-            <details className="mt-1.5">
-              <summary className="min-h-10 lg:min-h-0 flex cursor-pointer items-center text-xs text-content-subtle hover:text-content">
-                All other tags ({tagGroups.other.length}{tagTruncated ? '+, long tail trimmed' : ''})
-              </summary>
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                {tagGroups.other.slice(0, 120).map((o) => (
-                  <Chip key={o.name} active={wd14Tags.includes(o.name)}
-                    onClick={() => toggleWd14Tag(o.name)}
-                    title={`Filter the grid to images tagged "${o.name}"`}>
-                    {o.label} {o.count}
-                  </Chip>
-                ))}
-              </div>
-            </details>
-          )}
+          <TagFacetMenus facets={tagGroups.facets} selected={wd14Tags} onToggle={toggleFacetTag} />
         </section>
       )}
 

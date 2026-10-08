@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-08-tag-menus-keep-every-pick',
+    date: '2026-10-08',
+    title: 'Tick more than one tag in a category',
+    blurb: 'Hair colour, clothing, setting and the other tag menus each keep every value you tick. Two hair colours show pictures with either. A hair colour and a top still have to both match. Search still finds a tag the menus do not list.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-05-zzz-training-stays-local',
     date: '2026-10-05',
     title: 'Training stays on this machine',
