@@ -2856,8 +2856,7 @@ it finishes, and every other GPU pass â€” including banks waiting in the queue â
 answers *"GPU busy"* meanwhile. On the CPU-only default, Score holds nothing and
 happily runs alongside your generation. So a fast pass costs you the card while
 it runs; a slow one costs you time but nothing else. The dialog states this on
-every CUDA row, and once a GPU interpreter is in use the bank panel keeps saying
-it.
+every CUDA row before you pick that interpreter.
 
 **If you borrow ComfyUI's own Python**, one extra thing to know: Score frees
 ComfyUI's VRAM, but it does not close ComfyUI, and CUDA start-up in the borrowed

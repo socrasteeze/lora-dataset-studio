@@ -47,7 +47,7 @@ function Fold({ compact, title, children }) {
 export default function BankPassesPanel({
   bankId, payload, counts, live, caps, capsLoading, compact = false,
   semanticState, semanticReady, semanticBlocked, semanticSwitching, semanticOperationBusy,
-  scoreGpuPresent, scoreDevice, scoreNote,
+  scoreGpuPresent, scoreDevice,
   selected, captionScope,
   captionVocab, visionModel, visionModelLooksUncensored,
   onPassOpen, onPassRedo, onPickPython, onSemanticEngineChange, onChanged,
@@ -55,7 +55,7 @@ export default function BankPassesPanel({
   // gates on caps.* directly and has no device concept; here a pass can be aimed
   // at another machine, so the gate is passGate (which folds the peer's own
   // readiness in) and the picker rides with the buttons it governs.
-  passGate, passDevice, scoreHoldNote, tagsState, tagsLabel,
+  passGate, passDevice, tagsState, tagsLabel,
   onPassDevice, onPassDeviceObj, onStartTags,
 }) {
   // Which Settings field this warning opens depends on the configured provider:
@@ -179,12 +179,6 @@ export default function BankPassesPanel({
             gpuPresent={scoreGpuPresent} onPickPython={onPickPython}
             onChanged={onChanged} />
           </Fold>
-          {/* Divergence 6: OUTSIDE the fold on purpose. A hold notice explains
-              why a pass will not start; folded away below lg it would be silent
-              exactly where the button it explains is greyed out. */}
-          {scoreHoldNote && (
-            <p className="text-xs text-content-subtle">{scoreHoldNote.text}</p>
-          )}
           {/* ✂ Edits — the crop and the upscale made in the Bank itself, next to
               the watermark cleaning because they are the same KIND of thing: the
               three actions that produce new pixels, each undone by throwing away
@@ -194,12 +188,6 @@ export default function BankPassesPanel({
             payload={payload} selectedIds={[...selected]}
             onChanged={onChanged} />
           </Fold>
-          {scoreNote && (
-            <p className={`text-xs ${scoreNote.tone === 'warn'
-              ? 'text-amber-400/90' : 'text-content-subtle'}`}>
-              {scoreNote.text}
-            </p>
-          )}
           {!capsLoading && !caps.bank_scoring && (
             <p className="text-xs text-content-muted">
               Score needs its own packages (Setup ▸ Quality tools) — or an interpreter

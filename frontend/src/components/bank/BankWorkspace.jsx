@@ -16,7 +16,6 @@ import BankDecisionBar from './BankDecisionBar.jsx'
 // this fork's (peer dispatch, the 🔖 Tags pass, the filter summary) and it did not
 // move into upstream's new components, so its imports belong here still.
 import { idsFromResponse } from './bankIds.js'
-import { scoreGpuHoldNote } from './bankScoreDevice.js'
 import { bankFilterSummary, bankFilterCount } from './bankFilterSummary.js'
 import { showTagFilters, tagsButtonLabel, tagsButtonState } from './wd14Gate.js'
 import { groupTags, toggleWd14Tag, wd14TagsParam } from './bankTagFacets.js'
@@ -67,7 +66,6 @@ import { folderSyncToast } from './bankSync.js'
 import { undoOffer, undoResultMessage } from './bankUndo.js'
 // An occupied bank refuses in OUR words, never in the server's (pure/testable).
 import { busyRefusalLive } from './bankPassRun.js'
-import { scoreDeviceNote } from './bankScoreDevice.js'
 // Wording that adapts to the machine (a card-less box is never sold CUDA).
 import { PICKER_PROFILES } from './scoringPython.js'
 // Reuse the dataset's register list so the Bank lane never drifts from it — and the
@@ -1626,15 +1624,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     semanticReady, coverage, engineLabel: semanticState.label,
     prerequisite: semanticBlocked,
   })
-  // What ✨ Score will really run on — the pass no longer holds the GPU when it
-  // computes on the CPU, and the UI must say which of the two is happening.
   const scoreDevice = payload?.score_device
-  const scoreNote = scoreDeviceNote(scoreDevice, Boolean(caps.bank_scoring))
-  // …and the other half: a GPU pass is fast, but it TAKES the card for its whole
-  // duration. Borrowing an interpreter reaches that state in two clicks sold on
-  // speed alone, so the consequence has to stand on the panel, not only in a
-  // button tooltip nobody hovers.
-  const scoreHoldNote = scoreGpuHoldNote(scoreDevice, Boolean(caps.bank_scoring))
   // Does this machine have an NVIDIA card AT ALL? Reported by the same
   // score_device probe, and only meaningful while the pass would run on the
   // CPU (a GPU pass answers gpu:true and stops looking). Undefined until the
@@ -1873,7 +1863,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             semanticBlocked={semanticBlocked} semanticSwitching={semanticSwitching}
             semanticOperationBusy={semanticOperationBusy}
             scoreGpuPresent={scoreGpuPresent} scoreDevice={scoreDevice}
-            scoreNote={scoreNote} visionReady={visionReady}
+            visionReady={visionReady}
             selected={selected} captionScope={captionScope}
             captionVocab={captionVocab} visionModel={visionModel}
             visionModelLooksUncensored={visionModelLooksUncensored}
@@ -1882,7 +1872,6 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             onSemanticEngineChange={changeSemanticEngine}
             onChanged={async () => { await refreshPayload(); await refreshImages() }}
             passGate={passGate} passDevice={passDevice}
-            scoreHoldNote={scoreHoldNote}
             tagsState={tagsState} tagsLabel={tagsButtonLabel(counts)}
             onPassDevice={setPassDevice} onPassDeviceObj={setPassDeviceObj}
             onStartTags={startTags} />

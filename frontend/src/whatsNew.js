@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-08-zzz-bank-passes-drop-essays',
+    date: '2026-10-08',
+    title: 'The Bank passes panel is the controls',
+    blurb: 'Semantic engine, Score, and Edits no longer sit under paragraphs. The radios, pass buttons, counts, and warnings stay.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-08-tag-menus-keep-every-pick',
     date: '2026-10-08',
     title: 'Tick more than one tag in a category',

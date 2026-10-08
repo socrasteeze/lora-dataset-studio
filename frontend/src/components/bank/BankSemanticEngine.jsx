@@ -1,7 +1,6 @@
 import {
-  SCORE_STAYS_CLIP_SENTENCE, SEMANTIC_CACHE_SENTENCE,
   SEMANTIC_ENGINE_OPTIONS, semanticDeviceNote, semanticIndexActionLabel,
-  semanticPrerequisite, semanticPurposeSentence,
+  semanticPrerequisite,
 } from './bankSemanticEngine.js'
 
 /** A deliberately small Bank-local choice. Changing it only selects the
@@ -32,22 +31,13 @@ export default function BankSemanticEngine({ state, disabled = false,
       </legend>
       <div className="flex flex-wrap gap-x-4 gap-y-2">
         {SEMANTIC_ENGINE_OPTIONS.map((option) => (
-          <label key={option.id} className="flex items-start gap-2 text-sm text-content">
+          <label key={option.id} className="flex items-center gap-2 text-sm text-content">
             <input type="radio" name="bank-semantic-engine" value={option.id}
               checked={state.engine === option.id}
-              onChange={() => onChange(option.id)} className="mt-0.5 accent-primary" />
-            <span>
-              <span className="font-medium">{option.label}</span>
-              <span className="block text-2xs text-content-subtle">{option.hint}</span>
-            </span>
+              onChange={() => onChange(option.id)} className="accent-primary" />
+            <span className="font-medium">{option.label}</span>
           </label>
         ))}
-      </div>
-
-      <div className="space-y-1 text-xs text-content-muted">
-        <p className="m-0">{semanticPurposeSentence(state.engine)}</p>
-        <p className="m-0">{SCORE_STAYS_CLIP_SENTENCE}</p>
-        <p className="m-0">{SEMANTIC_CACHE_SENTENCE}</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-t border-indigo-400/20 pt-2 text-xs">
@@ -55,9 +45,6 @@ export default function BankSemanticEngine({ state, disabled = false,
           {ready ? '✓' : '○'} {state.label}:{' '}
           {state.engine === 'siglip2' && capsLoading ? 'checking the Quality tool' : status}
         </span>
-        {state.engine === 'clip' && (
-          <span className="text-content-subtle">Run ✨ Score to build the CLIP index.</span>
-        )}
         {state.engine === 'siglip2' && !capsLoading && action && (
           <button type="button" onClick={onIndex} disabled={disabled || switching || live}
             title={state.complete
