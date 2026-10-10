@@ -227,7 +227,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
                 the selection, and that one is decided by the grid, which
                 withholds `onToggleSelect` entirely. */}
             <input type="checkbox" checked={selected}
-              onChange={() => onToggleSelect(img.id)}
+              onChange={(e) => onToggleSelect(img.id, e.nativeEvent)}
               aria-label={`Select ${displayLabel(img.variation_label) || 'this image'} for bulk actions`}
               className="w-4 h-4 accent-indigo-500 cursor-pointer" />
           </label>
@@ -235,7 +235,13 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
         {url ? (
           // A pure read: it opens the same bytes the tile is already showing.
           // No `disabled={busy}` — that is the whole point of this change.
-          <button type="button" onClick={() => onView?.(img)}
+          <button type="button"
+            onClick={(e) => {
+              // A Shift- or Ctrl-click on the picture SELECTS, the way a file
+              // manager does it; a plain click still inspects.
+              if (onToggleSelect && (e.shiftKey || e.ctrlKey || e.metaKey)) { onToggleSelect(img.id, e); return; }
+              onView?.(img);
+            }}
             title="Inspect (zoom)"
             aria-label={`Inspect ${displayLabel(img.variation_label) || 'the image'} full screen`}
             className="block w-full h-full cursor-zoom-in disabled:cursor-not-allowed">

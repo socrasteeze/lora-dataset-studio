@@ -101,7 +101,7 @@ test('the workspace opens the review over a SNAPSHOT of the current filter', () 
 
 test('the tile click still (de)selects — review is its own ▶ hit target', () => {
   assert.match(workspace, /onReview=\{\(\) => openReview\(img\.id\)\}/)
-  assert.match(workspace, /onToggle=\{\(\) => setSelected\(/)
+  assert.match(workspace, /onToggle=\{\(e\) => \{ const anchor = selectAnchor\.current; setSelected\(/)
   assert.match(tile, /<button type="button" onClick=\{onReview\}/)
   assert.match(tile, /<button type="button" onClick=\{onToggle\}/)
 })

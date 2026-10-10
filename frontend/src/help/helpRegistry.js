@@ -717,7 +717,10 @@ const TOPICS = [
     ['selection bar', 'bottom bar', 'pinned', 'sticky', 'floating', 'keep reject',
      'scroll up', 'scrolling', 'scroll back up', 'phone', 'mobile', 'small screen',
      'undo', 'clear selection', 'clr', 'skip', 'undecided',
-     'rotate selection', 'bank', 'triage'],
+     'rotate selection', 'bank', 'triage',
+     // The file-manager gesture: a run of tiles in one Shift-click.
+     'shift click', 'shift-click', 'ctrl click', 'multi select', 'multi-select',
+     'select range', 'range', 'select several', 'select many', 'select a run'],
     '/bank', 'using-the-app', 'filter-a-bank-on-a-small-screen'),
   { id: 'page-setup', kind: 'page', title: 'Setup wizard',
     keywords: ['setup', 'wizard', 'onboarding', 'install', 'install everything',
