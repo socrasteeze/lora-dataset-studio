@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Target, Trash2 } from 'lucide-react';
 import DatasetGridItem from './DatasetGridItem';
 import TileSizeControl from '../shared/TileSizeControl';
+import { nextSelection } from '../shared/rangeSelect.js';
 import KleinImproveNote from './KleinImproveNote';
 import { isSmallImageRescueRow } from '../../utils/smallImageRescue';
 import { partitionKleinImproveSelection } from '../../utils/kleinBulkImprove';
@@ -282,6 +283,9 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
   const toast = useToast();
   const { caps } = useCapabilities();
   const [selected, setSelected] = useState(() => new Set());
+  // The last tile ticked without Shift — where a Shift-click range starts. A
+  // ref: moving it must not redraw the grid.
+  const selectAnchor = useRef(null);
   const bulkActionGateRef = useRef(null);
   if (!bulkActionGateRef.current) bulkActionGateRef.current = createBulkActionGate();
   const [bulkAction, setBulkAction] = useState(null);
@@ -422,12 +426,17 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
     counts.set(item.reason, (counts.get(item.reason) || 0) + 1);
     return counts;
   }, new Map())].map(([reason, count]) => `${count} ${reason}`).join(' · ');
-  const toggle = (id) => {
+  // Shift-click ticks the run from the last ticked tile to this one, over the
+  // page on screen; see shared/rangeSelect.js.
+  const toggle = (id, e) => {
     if (selectionLocked) return;
+    // Read before the updater, which StrictMode runs twice.
+    const anchor = selectAnchor.current;
     setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
+      const order = view.items.filter((i) => i.filename && !isSmallImageRescueRow(i)).map((i) => i.id);
+      const r = nextSelection(prev, order, id, anchor, { shift: Boolean(e && e.shiftKey) });
+      selectAnchor.current = r.anchor;
+      return r.selected;
     });
   };
   const act = async (action) => {

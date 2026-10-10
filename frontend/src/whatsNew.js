@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-09-shift-click-range-select',
+    date: '2026-10-09',
+    title: 'Shift-click to select a run of images',
+    blurb: 'In the Bank and the Dataset grid, click one image, then Shift-click another: everything between them is selected, the way a file manager does it. Ctrl-click still picks one at a time.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-09-bank-launch-all-honest-progress',
     date: '2026-10-09',
     title: 'Launch all no longer looks frozen or falsely green',

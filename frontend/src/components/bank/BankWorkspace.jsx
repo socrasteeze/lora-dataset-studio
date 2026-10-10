@@ -132,6 +132,7 @@ import { reasonBuckets, reasonHint } from './bankRejectReasons.js'
 import { activeLocalLlm, localLlmLabel } from '../../utils/localLlm'
 import { Button, Select } from '../common/Controls.jsx'
 import WatermarkEngineChoice from '../shared/WatermarkEngineChoice'
+import { nextSelection } from '../shared/rangeSelect.js'
 import { watermarkEngineStatus } from '../../utils/watermarkEngine.js'
 
 
@@ -256,6 +257,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const [offset, setOffset] = useState(0)
   const [page, setPage] = useState({ images: [], total: 0 })
   const [selected, setSelected] = useState(() => new Set())
+  const selectAnchor = useRef(null)
   const [promoteOpen, setPromoteOpen] = useState(false)
   const [deleteRejectedOpen, setDeleteRejectedOpen] = useState(false)
   // ↩ one step back over the last bulk decision. `undoDismissedAt` remembers the
@@ -2500,11 +2502,16 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                   selected={selected.has(img.id)}
                   onReview={() => openReview(img.id)}
                   onTags={() => openTagPicker(img)}
-                  onToggle={() => setSelected((prev) => {
-                    const next = new Set(prev)
-                    if (next.has(img.id)) next.delete(img.id); else next.add(img.id)
-                    return next
-                  })} />
+                  onToggle={(e) => { const anchor = selectAnchor.current; setSelected((prev) => {
+                    // Shift-click selects the run from the last clicked tile to
+                    // this one; see shared/rangeSelect.js. The anchor is a ref:
+                    // moving it must not redraw the grid. Read BEFORE the
+                    // updater, which StrictMode runs twice.
+                    const r = nextSelection(prev, page.images.map((i) => i.id), img.id,
+                      anchor, { shift: e.shiftKey })
+                    selectAnchor.current = r.anchor
+                    return r.selected
+                  }) }} />
               ))}
             </ul>
             {page.total === 0 && (
