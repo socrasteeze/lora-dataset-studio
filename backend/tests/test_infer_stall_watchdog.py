@@ -85,6 +85,7 @@ def test_a_silent_child_is_stopped_instead_of_hanging_forever(app, tmp_path, mon
     monkeypatch.setattr(banks, '_INFER_STALL_POLL', 0.05)
     monkeypatch.setattr(banks, '_INFER_CANCEL_GRACE', 0.1)
     monkeypatch.setattr(banks.bank_jobs, 'set_cancel_hook', lambda job, hook: None)
+    monkeypatch.setattr(banks.bank_jobs, 'cancelled', lambda job: False)
 
     started = time.monotonic()
     with pytest.raises(banks.InferStalled) as exc:
@@ -108,6 +109,7 @@ def test_the_gpu_window_is_released_when_the_child_is_killed(app, tmp_path, monk
     monkeypatch.setattr(banks, '_INFER_STALL_POLL', 0.05)
     monkeypatch.setattr(banks, '_INFER_CANCEL_GRACE', 0.1)
     monkeypatch.setattr(banks.bank_jobs, 'set_cancel_hook', lambda job, hook: None)
+    monkeypatch.setattr(banks.bank_jobs, 'cancelled', lambda job: False)
 
     state = {}
     with pytest.raises(banks.InferStalled):
@@ -126,6 +128,7 @@ def test_a_stall_is_not_reported_as_the_user_stopping_it(app, tmp_path, monkeypa
     monkeypatch.setattr(banks, '_INFER_STALL_POLL', 0.05)
     monkeypatch.setattr(banks, '_INFER_CANCEL_GRACE', 0.1)
     monkeypatch.setattr(banks.bank_jobs, 'set_cancel_hook', lambda job, hook: None)
+    monkeypatch.setattr(banks.bank_jobs, 'cancelled', lambda job: False)
 
     with pytest.raises(banks.InferStalled):
         _drive(banks, tmp_path, _tracking_window({}))
@@ -157,6 +160,7 @@ def test_a_talking_child_is_never_killed_for_being_slow(app, tmp_path, monkeypat
     monkeypatch.setattr(banks.subprocess, 'Popen', lambda *a, **k: proc)
     monkeypatch.setattr(banks, '_INFER_STALL_POLL', 0.02)
     monkeypatch.setattr(banks.bank_jobs, 'set_cancel_hook', lambda job, hook: None)
+    monkeypatch.setattr(banks.bank_jobs, 'cancelled', lambda job: False)
     monkeypatch.setattr(banks.bank_jobs, 'progress', lambda job, **kw: None)
 
     data, _tail, rc = _drive(banks, tmp_path, _tracking_window({}), stall_timeout=0.2)
