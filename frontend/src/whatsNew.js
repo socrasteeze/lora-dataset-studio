@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-09-bank-stop-before-helper-starts',
+    date: '2026-10-09',
+    title: 'Stop works while a pass is still getting ready',
+    blurb: 'Pressing Stop while a Bank pass was still reading its images left it on "Stopping" while it kept working. It now stops as soon as it starts. Faces, Score and Watermark all had this.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-08-zzz-bank-passes-drop-essays',
     date: '2026-10-08',
     title: 'The Bank passes panel is the controls',

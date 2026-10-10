@@ -7721,6 +7721,8 @@ def _drive_infer_subprocess(job, python, script, payload, cache_path,
         def _cancel():
             # Ask for a clean stop (the child flushes + exits), and arm a watchdog
             # that hard-kills ONLY if it doesn't stop within the grace period.
+            if killer['timer']:
+                return   # already asked (Stop + the late check below can both fire)
             try:
                 with open(cancel_file, 'w', encoding='utf-8') as f:
                     f.write('1')
@@ -7732,6 +7734,12 @@ def _drive_infer_subprocess(job, python, script, payload, cache_path,
             killer['timer'] = t
 
         bank_jobs.set_cancel_hook(job, _cancel)
+        # A Stop that landed BEFORE this hook existed (while the pass was still
+        # reading its rows) fired the previous step's hook, not this child's.
+        # Checked after registering, so a Stop racing this line is caught by one
+        # side or the other.
+        if bank_jobs.cancelled(job):
+            _cancel()
         stderr_tail = deque(maxlen=5)
         # Liveness is "the child said ANYTHING", not "the child made progress":
         # a pass that logs per-image warnings while getting nowhere is a
