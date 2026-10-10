@@ -4422,6 +4422,23 @@ def _scan_pool(bank_id, rescan, statuses=None, ids=None):
     return q
 
 
+def _folder_holds_scanned_images(bank, bank_id) -> bool:
+    """Is a run of missing files a moved folder, or just files deleted from it?
+
+    The scan pool is the UNSCANNED rows, so files deleted from the folder can
+    make up most of it while the folder is exactly where it was. A moved folder
+    loses the images the bank has already scanned too; a folder with deleted
+    files keeps them. No scanned image to check means no evidence either way,
+    and the abort stands."""
+    sample = (BankImage.query
+              .filter(BankImage.bank_id == bank_id,
+                      BankImage.quality_state.isnot(None))
+              .order_by(BankImage.id.desc()).limit(_MISSING_ABORT_AT).all())
+    found = sum(1 for row in sample
+                if (path := abs_image_path(bank, row)) and os.path.isfile(path))
+    return bool(sample) and found * 2 > len(sample)
+
+
 def _scan_job(bank_id, rescan, regroup=False, statuses=None, ids=None):
     def run(job):
         bank = db.session.get(ImageBank, bank_id)
@@ -4444,6 +4461,7 @@ def _scan_job(bank_id, rescan, regroup=False, statuses=None, ids=None):
         workers = min(8, os.cpu_count() or 4)
         done = 0
         missing = 0
+        folder_ok = False   # set once the folder is shown to hold scanned images
         vanished = 0
         pending = {}
         unreadable_ids = []
@@ -4470,10 +4488,13 @@ def _scan_job(bank_id, rescan, regroup=False, statuses=None, ids=None):
                     missing += 1
                     done += 1
                     bank_jobs.bump(job)
-                    if missing >= _MISSING_ABORT_AT and missing * 2 >= done:
-                        _flush_scan_batch(pending, unreadable_ids)
-                        bank_jobs.fail(job, MOVED_FOLDER_MSG)
-                        return
+                    if (missing >= _MISSING_ABORT_AT and missing * 2 >= done
+                            and not folder_ok):
+                        folder_ok = _folder_holds_scanned_images(bank, bank_id)
+                        if not folder_ok:
+                            _flush_scan_batch(pending, unreadable_ids)
+                            bank_jobs.fail(job, MOVED_FOLDER_MSG)
+                            return
                     if not bank_jobs.cancelled(job):
                         submit_next()
                     continue
@@ -13071,6 +13092,14 @@ def _pipeline_job(user_id, bank_id, steps, reject_flags, resolve_dups,
                 entry['status'] = 'error'
                 entry['reason'] = f'{type(e).__name__}: {e}'
                 db.session.rollback()
+            # A pass refuses itself with bank_jobs.fail and a plain return, not
+            # an exception. Inside the chain that read as a clean 'done' and
+            # left the error on the job for every later step.
+            step_error = job.get('error')
+            if step_error:
+                if entry['status'] == 'done':
+                    entry['status'], entry['reason'] = 'error', str(step_error)
+                bank_jobs.clear_error(job)
             # A step that executed stays 'done' even if a cancel landed at its
             # tail (its inner run already returned early); only steps we never
             # reach are recorded as cancelled, below.

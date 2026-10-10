@@ -351,6 +351,46 @@ def test_pipeline_cancel_midway_records_remaining_as_cancelled(client, tmp_path,
     assert steps['watermark']['status'] == 'cancelled'
 
 
+def test_a_step_that_refused_itself_is_an_error_and_does_not_poison_the_run(
+        client, tmp_path, monkeypatch):
+    """A pass that stops with bank_jobs.fail and a plain return used to read as
+    'done' (a green Scan chip over a scan that aborted), and its error stayed on
+    the job: every later step ran with no Stop estimate and the whole run was
+    logged as failed."""
+    from app.services import image_bank_service as svc
+    from app.services import bank_jobs
+    log, seen = [], {}
+
+    def scan_factory(*_a, **_k):
+        def run(job):
+            bank_jobs.fail(job, 'the folder went away')
+        return run
+
+    def score_factory(*_a, **_k):
+        def run(job):
+            log.append('score')
+            seen['error_during_score'] = job.get('error')
+        return run
+
+    monkeypatch.setattr(svc, '_score_prereq', lambda: None)
+    monkeypatch.setattr(svc, '_gpu_busy_reason', lambda: None)
+    monkeypatch.setattr(svc, '_scan_job', scan_factory)
+    monkeypatch.setattr(svc, '_score_job', score_factory)
+
+    bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': _photo()})
+    r = client.post(f'/api/bank/{bank_id}/pipeline', json={
+        'steps': ['scan', 'score'], 'reject_flags': [], 'resolve_dups': False})
+    assert r.status_code == 202
+
+    steps = {s['step']: s for s in _report(client, bank_id)['steps']}
+    assert steps['scan']['status'] == 'error'
+    assert steps['scan']['reason'] == 'the folder went away'
+    assert log == ['score']
+    assert seen['error_during_score'] is None
+    assert steps['score']['status'] == 'done'
+    snap = client.get(f'/api/bank/{bank_id}/activity').get_json()['activity']
+    assert snap is None or snap['error'] is None
+
 # --- validation --------------------------------------------------------------
 def test_pipeline_empty_steps_is_400(client, tmp_path):
     bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': _photo()})
