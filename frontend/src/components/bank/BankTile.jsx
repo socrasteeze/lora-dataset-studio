@@ -85,7 +85,10 @@ export default function Tile({ img, bankId, selected, onToggle, onReview, onTags
           <SelectionMark />
         </>
       )}
-      <span className="absolute left-1 top-1 flex flex-wrap gap-0.5 max-w-[85%]">
+      {/* Selected: the badges step right of the mark, which shares this corner
+          and was painted over by them. */}
+      <span className={`absolute top-1 flex flex-wrap gap-0.5 ${selected
+        ? 'left-8 max-w-[calc(85%_-_1.75rem)]' : 'left-1 max-w-[85%]'}`}>
         {shown.map(badge)}
         {more && badge(more)}
       </span>

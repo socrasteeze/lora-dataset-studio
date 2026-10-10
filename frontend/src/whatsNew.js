@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-09-bank-tile-selection-mark-visible',
+    date: '2026-10-09',
+    title: 'See the checkmark on selected Bank images',
+    blurb: 'The badges at the top of a Bank thumbnail covered the selection checkmark. They now move aside while the image is selected.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-09-bank-stop-before-helper-starts',
     date: '2026-10-09',
     title: 'Stop works while a pass is still getting ready',
