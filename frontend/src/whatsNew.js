@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-09-bank-launch-all-honest-progress',
+    date: '2026-10-09',
+    title: 'Launch all no longer looks frozen or falsely green',
+    blurb: 'A Bank step with no image count now shows a moving bar instead of nothing. A scan no longer says the folder moved when only some files were deleted from it, and a step that stops early shows red instead of done.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-09-bank-tile-selection-mark-visible',
     date: '2026-10-09',
     title: 'See the checkmark on selected Bank images',

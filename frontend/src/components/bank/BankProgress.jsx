@@ -135,6 +135,15 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
             <div className="h-full bg-amber-400" style={{ width: `${pct}%` }} />
           </div>
         )}
+        {/* No counter (loading a model, grouping styles): an indeterminate bar,
+            so a phase that is working never looks like a pass that stopped. The
+            phase sentence stays off the line and rides on hover instead. */}
+        {pct == null && !stale && (
+          <div className="h-1.5 w-40 overflow-hidden rounded bg-surface-raised" role="progressbar"
+            aria-valuetext={activity.detail || undefined} title={activity.detail || undefined}>
+            <div className="h-full w-full animate-pulse bg-amber-400/70 motion-reduce:animate-none" />
+          </div>
+        )}
         {/* `disabled` is the whole of requirement one: seven POSTs in 20 ms is
             what an enabled button that looks identical after the click buys.
             `title` carries the promise for the pointer that hovers before it

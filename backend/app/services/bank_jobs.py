@@ -424,6 +424,15 @@ def fail(job, message):
         job['_touched'] = time.time()
 
 
+def clear_error(job):
+    """Launch all only: a step that refused itself with fail() is recorded in
+    its own report row. The chain carries on, so the job must not keep that
+    error — it hid the Stop estimate and logged the whole run as failed."""
+    with _lock:
+        job['error'] = None
+        job['_touched'] = time.time()
+
+
 def bump(job, n=1):
     with _lock:
         job['done'] += n
