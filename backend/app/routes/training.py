@@ -2213,10 +2213,13 @@ def dataset_train_cloud_status():
     return jsonify(ct.cloud_status())
 
 
+@bp.get('/dataset/train/runs')
 @bp.get('/dataset/train/cloud/runs')
-def dataset_train_cloud_runs():
-    """Active + recent cloud runs for the dedicated Cloud-runs hub page.
-    Open like status (no gate): an unconfigured backend just returns empties."""
+def dataset_train_runs():
+    """The Runs page's history and live local run. The fork ships no plugin
+    for the Runs hub, so the core page polls /dataset/train/runs; the
+    /cloud/runs path stays for existing callers. Open like the other
+    Runs-hub reads: an unconfigured backend just returns empties."""
     return jsonify(ct.all_runs(limit=request.args.get('limit', default=20, type=int)))
 
 

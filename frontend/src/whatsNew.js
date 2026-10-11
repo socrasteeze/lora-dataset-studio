@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-11-runs-page-local-training',
+    date: '2026-10-11',
+    title: 'Follow local training on the Runs page again',
+    blurb: 'The Runs page showed HTTP 404 instead of your runs. It now shows your local training in progress and your saved runs. Thanks to somedude1001 for reporting this.',
+    to: '/cloud',
+  },
+  {
     id: '2026-10-11-hide-folders-inside-a-bank',
     date: '2026-10-11',
     title: 'Hide folders inside a bank',
