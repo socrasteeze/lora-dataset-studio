@@ -21,11 +21,6 @@ jobs:
       OMP_NUM_THREADS: '1'
       MKL_NUM_THREADS: '1'
       OPENBLAS_NUM_THREADS: '1'
-      LDS_DATA_DIR: ${{ runner.temp }}/lds-gates-data
-      LDS_CONFIG: ${{ runner.temp }}/lds-gates-config.json
-      LDS_ENV: ${{ runner.temp }}/lds-gates.env
-      LDS_PLUGINS_DIR: ${{ runner.temp }}/lds-gates-plugins
-      LDS_EXTENSIONS_DIR: ${{ runner.temp }}/lds-gates-extensions
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,6 +53,12 @@ jobs:
 
       - name: Run Fork Gates
         shell: pwsh
+        env:
+          LDS_DATA_DIR: ${{ runner.temp }}/lds-gates-data
+          LDS_CONFIG: ${{ runner.temp }}/lds-gates-config.json
+          LDS_ENV: ${{ runner.temp }}/lds-gates.env
+          LDS_PLUGINS_DIR: ${{ runner.temp }}/lds-gates-plugins
+          LDS_EXTENSIONS_DIR: ${{ runner.temp }}/lds-gates-extensions
         run: ./scripts/gates.ps1 -Phase Gates -ScratchRoot D:/lds-gates
 
       - name: Save Gate Receipts
