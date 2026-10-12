@@ -128,12 +128,18 @@ def test_never_runs_wider_than_configured():
 
 
 def test_calls_actually_overlap():
-    """The whole point: waiting overlaps. Six 0.1 s calls at 3 wide must finish
-    closer to two rounds than to six."""
-    started = time.perf_counter()
-    list(map_vision(range(6), lambda i: time.sleep(0.1), workers=3))
-    elapsed = time.perf_counter() - started
-    assert elapsed < 0.4, f'no overlap: {elapsed:.2f}s for what should take ~0.2s'
+    """Three calls must reach the same barrier in each of two rounds.
+
+    A serial pool breaks the barrier instead of merely taking longer on a
+    loaded host. The timeout only bounds a broken pool's wait."""
+    rendezvous = threading.Barrier(3)
+
+    def work(item):
+        rendezvous.wait(timeout=5)
+        return item
+
+    assert list(map_vision(range(6), work, workers=3)) == [
+        (item, item, None) for item in range(6)]
 
 
 # --- cancellation ------------------------------------------------------------

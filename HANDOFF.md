@@ -30,6 +30,7 @@ Earlier delivery:
 1. Qualification is recorded by `.github/workflows/fork-gates.yml`, which runs the existing Gates script with pinned dev/CPU Torch dependencies on the exact PR head. Check the cloud receipt for the delivered commit; laptop receipts alone do not qualify a later landing.
 2. The user authorized clean push, main merge and stale-branch deletion. Preserve the declared skips. Merge only after cloud Gates passes; delete only branches contained in main and absent from other worktrees.
 3. Desktop tests remain restricted. Laptop tests were explicitly authorized and isolated; the cloud workflow uses a fresh test environment. Preserve the original snapshot invocation's exit 1 receipt and its attribution replay as separate evidence.
+   Cloud CI passed all suites on `5bb5cb35b`; Fork Gates exposed one vision-pool wall-clock assertion at 0.47 s versus its 0.4 s limit. Its replacement uses a three-party barrier across two rounds to prove actual overlap; a serial pool fails rather than merely running slower. Requalify the updated commit before main delivery.
 4. The operator must restart Studio to register collection routes and create the two additive tables. Production data and the live runtime were not exercised.
 5. Physical phone/PWA acceptance remains open. Browser validation used synthetic component fixtures and the actual Bank workspace against an isolated test backend.
 6. Source and the consolidated build(frontend) bundle remain separate commits. Remove only task branches whose tips are contained in main and which have no other worktree.
