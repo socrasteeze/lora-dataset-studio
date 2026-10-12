@@ -19,6 +19,24 @@ export function ancestorExcluded(path, excluded) {
   return null
 }
 
+/** Parent, then that folder's children, then the next sibling. Comparing the
+ *  whole path as one string puts "anima-cn-test" between "anima" and the
+ *  folders inside anima, because "-" sorts before "/". */
+export function sortFolders(folders) {
+  return [...(folders || [])].sort((a, b) => {
+    const ap = String(a.path || '').split('/')
+    const bp = String(b.path || '').split('/')
+    const n = Math.min(ap.length, bp.length)
+    for (let i = 0; i < n; i += 1) {
+      const av = ap[i].toLocaleLowerCase()
+      const bv = bp[i].toLocaleLowerCase()
+      if (av < bv) return -1
+      if (av > bv) return 1
+    }
+    return ap.length - bp.length
+  })
+}
+
 /** Next stored list after checking or unchecking `path`. Unchecking a parent
  *  drops nested entries, because the parent already hides them. */
 export function toggleExcluded(path, excluded, include) {

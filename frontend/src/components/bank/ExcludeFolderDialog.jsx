@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { apiFetch, putJson } from '../../api/fetchClient'
 import { Button } from '../common/Controls.jsx'
-import { ancestorExcluded, toggleExcluded } from './bankFolderExclude.js'
+import { ancestorExcluded, sortFolders, toggleExcluded } from './bankFolderExclude.js'
 
 /** Exclude folder — hide nested folders from this open bank.
  *
@@ -38,7 +38,7 @@ export default function ExcludeFolderDialog({ bankId, onClose, onChanged }) {
     }
   }
 
-  const folders = data?.folders || []
+  const folders = sortFolders(data?.folders || [])
   const excluded = data?.excluded || []
   const rootImages = Number(data?.root_images) || 0
 
@@ -81,7 +81,7 @@ export default function ExcludeFolderDialog({ bankId, onClose, onChanged }) {
                     <input
                       type="checkbox"
                       className="h-5 w-5 shrink-0"
-                      checked={!!folder.included}
+                      checked={!!folder.included && !ancestor}
                       disabled={disabled}
                       aria-label={folder.path}
                       onChange={(e) => save(toggleExcluded(folder.path, excluded, e.target.checked))}
