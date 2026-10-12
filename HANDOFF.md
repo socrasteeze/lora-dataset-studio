@@ -27,8 +27,8 @@ Earlier delivery:
 
 ## Open
 
-1. For a future main landing, run the exact-commit cloud gate. Current evidence combines passing laptop test phases with a final attribution replay on the committed mirror; the original Gates invocation retains its exit 1 receipt. Do not delete functional cursor text to appease the matcher.
-2. Preserve the declared skips and keep main unchanged. The current npm test chain passes; main publication is not authorized.
+1. Run the exact-commit cloud gate before the authorized main delivery. `.github/workflows/fork-gates.yml` runs the existing Gates script with pinned dev/CPU Torch dependencies on the exact PR head. Current laptop evidence combines passing test phases with a final attribution replay; the original invocation retains its exit 1 receipt.
+2. The user authorized clean push, main merge and stale-branch deletion. Preserve the declared skips. Merge only after cloud Gates passes; delete only branches contained in main and absent from other worktrees.
 3. The earlier main delivery waived new test runs and used [skip ci]. Current tests run on the laptop only, with isolated data and pinned dev/CPU Torch dependencies. Main landing still requires the repository's exact-commit cloud gate.
 4. The operator must restart Studio to register collection routes and create the two additive tables. Production data and the live runtime were not exercised.
 5. Physical phone/PWA acceptance remains open. Browser validation used synthetic component fixtures and the actual Bank workspace against an isolated test backend.
