@@ -107,6 +107,23 @@ def test_unchecking_a_parent_hides_its_children_and_keeps_the_files(client, tmp_
     assert client.get(f'/api/bank/{bank_id}').get_json()['counts']['total'] == 4
 
 
+def test_a_longer_sibling_name_does_not_split_a_folder_from_its_children(client):
+    """'anima-cn-test' must not render between 'anima' and the folders inside it."""
+    from app.services.image_bank_service import _folder_tree
+    folders, root = _folder_tree([
+        '_trash/anima/a.jpg',
+        '_trash/anima/child/b.jpg',
+        '_trash/anima-cn-test/c.jpg',
+    ], set())
+    assert root == 0
+    assert [f['path'] for f in folders] == [
+        '_trash',
+        '_trash/anima',
+        '_trash/anima/child',
+        '_trash/anima-cn-test',
+    ]
+
+
 def test_a_folder_that_is_not_in_the_bank_is_refused(client, tmp_path):
     bank_id, _src = _bank(client, tmp_path)
     missing = client.put(f'/api/bank/{bank_id}/folder-exclusions',

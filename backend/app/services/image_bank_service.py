@@ -2396,12 +2396,16 @@ def _folder_tree(rels, excluded: set) -> tuple:
                 return False
         return True
 
+    # Order by path parts, not the whole string. A sibling named
+    # "anima-cn-test" would otherwise land between "anima" and "anima/child",
+    # because "-" sorts before "/".
     folders = [{'path': path,
                 'name': path.rsplit('/', 1)[-1],
                 'depth': path.count('/'),
                 'images': counts[path],
                 'included': included(path)}
-               for path in sorted(counts, key=str.casefold)]
+               for path in sorted(
+                   counts, key=lambda path: tuple(part.casefold() for part in path.split('/')))]
     return folders, root
 
 
