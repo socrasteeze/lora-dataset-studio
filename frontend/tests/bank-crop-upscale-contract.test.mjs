@@ -114,7 +114,7 @@ test('✂ Crop is offered in Review, decides nothing, and can be reverted there'
   const start = lightbox.indexOf('const applyEdit')
   const lane = lightbox.slice(start, lightbox.indexOf('// Moving forward without judging'))
   assert.ok(!/setSession/.test(lane), 'an edit must never advance the review')
-  assert.match(lightbox, /C crop/)                  // printed, not folklore
+  assert.match(lightbox, /✂ Crop\{shortcut\('C'\)\}/) // printed on the action
 })
 
 /* --- ✨ Upscale & improve is a pass, and says what it really does --------- */

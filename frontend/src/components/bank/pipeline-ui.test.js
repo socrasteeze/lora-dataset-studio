@@ -80,7 +80,8 @@ test('Launch all only offers the SigLIP2 index step on a Bank actually using it'
 test('the progress bar understands the pipeline kind (step X/N + per-step chips)', () => {
   assert.match(ws, /kind === 'pipeline' \? activity\.pipeline/);
   assert.match(ws, /step \$\{\(pipe\.index \?\? 0\) \+ 1\}\/\$\{pipe\.total_steps\}/);
-  assert.match(ws, /pipe\.results\.map/);
+  assert.match(ws, /const chips = pipe && Array\.isArray\(pipe\.results\) \? pipe\.results : \[\]/);
+  assert.match(ws, /chips\.map/);
 });
 
 test('the report renders per-step status and is fed from the persisted payload field', () => {

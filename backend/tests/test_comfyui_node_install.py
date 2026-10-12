@@ -133,7 +133,10 @@ def sandbox(tmp_path, monkeypatch):
         return Response(state.wheel_bodies.get(name, wheel_bytes(name, version)))
 
     monkeypatch.setattr(nodes, '_run', run)
-    monkeypatch.setattr(nodes.requests, 'get', get)
+    # Keep this HTTP recorder local to the node installer. Patching the shared
+    # requests module lets an unrelated Setup worker contaminate state.gets.
+    monkeypatch.setattr(nodes, 'requests', SimpleNamespace(
+        get=get, RequestException=nodes.requests.RequestException))
     return state
 
 

@@ -79,6 +79,7 @@ export const CORE_GUIDE_ANCHORS = {
     "manage-several-banks",
     "two-banks-one-card-banks-that-share-a-name",
     "move-a-bank-folder-to-another-disk",
+    "hide-a-folder-inside-a-bank",
     "images-you-deleted-from-the-folder-yourself",
     "make-score-use-a-gpu-python-you-already-have",
     "build-the-siglip-2-index-on-a-gpu-python-you-already-have",

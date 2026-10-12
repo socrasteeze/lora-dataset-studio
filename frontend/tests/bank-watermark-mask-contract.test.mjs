@@ -56,7 +56,7 @@ test('the review lightbox offers the editor on any image it can still act on', (
   // grammar (K/R/S, ← , Esc) has declined it — and still behind the same
   // "does this field own the keystroke?" guard.
   assert.match(lightbox, /toLowerCase\(\) === 'm' && canEditMask\(img\)/)
-  assert.match(lightbox, /M watermark mask/)       // printed, not folklore
+  assert.match(lightbox, /maskButtonLabel\(img\)\}\{shortcut\('M'\)\}/) // printed on the action
 })
 
 test('the keyboard cannot decide on an image while an editor is open', () => {

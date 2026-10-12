@@ -36,7 +36,7 @@ test('the in-flight delete is announced and every bulk action is disabled', () =
   // selection. See tests/dataset-tile-reads-stay-live.test.mjs.
   assert.match(grid, /const selectionLocked = launchingImprove \|\| !!bulkAction \|\| autoTriageApplying/)
   assert.match(grid, /onBatch && !selectionLocked && !isSmallImageRescueRow/)
-  assert.match(grid, /const toggle = \(id\) => \{\s*\n\s*if \(selectionLocked\) return;/)
+  assert.match(grid, /const toggle = \(id, e\) => \{\s*\n\s*if \(selectionLocked\) return;/)
 })
 
 test('delete completion gets a delete-specific toast', () => {
