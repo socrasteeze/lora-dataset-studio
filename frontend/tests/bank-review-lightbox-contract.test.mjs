@@ -64,13 +64,13 @@ test('the shortcuts survive the focus trap landing on the 🎲 checkbox', () => 
 })
 
 test('each decision is one immediate POST for one image', () => {
-  assert.match(lightbox, /postJson\(`\/api\/bank\/\$\{bankId\}\/images\/status`, \{ ids: \[target\], status \}\)/)
+  assert.match(lightbox, /postJson\(`\/api\/bank\/\$\{bankId\}\/images\/status`, \{\s*ids: \[target\], status/)
 })
 
 test('a failed decision surfaces an error and does NOT advance', () => {
   const send = lightbox.match(/const sendDecision = useCallback\(([\s\S]*?)\n  \}, \[/)[1]
   const [tryPart, catchPart] = send.split('} catch (e) {')
-  assert.match(tryPart, /setSession\(\(s\) => decide\(s, status\)\)/)
+  assert.match(tryPart, /setSession\(\(s\) => decide\(s, status, target\)\)/)
   assert.doesNotMatch(catchPart, /setSession/)
   assert.match(catchPart, /setError\(/)
 })

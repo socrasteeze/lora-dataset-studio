@@ -45,6 +45,8 @@ export const CORE_GUIDE_ANCHORS = {
     "why-the-first-search-takes-a-moment",
     "choose-who-captions-a-bank-and-which-pile",
     "redo-the-captions-of-a-bank-with-a-different-model",
+    "compare-bank-groups",
+    "bank-saved-collections",
     "review-a-bank-one-image-at-a-time",
     "compare-the-copies-of-a-duplicate-group",
     "say-these-are-not-duplicates",

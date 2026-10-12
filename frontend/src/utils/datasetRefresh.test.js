@@ -9,6 +9,38 @@ function deferred() {
   return { promise, resolve };
 }
 
+test('an older refresh for the same dataset cannot overwrite the latest verdict', async () => {
+  const old = deferred();
+  let sequence = 1;
+  let data = null;
+  const options = {
+    datasetId: 7, getActiveDatasetId: () => 7,
+    commitData: (next) => { data = next; }, clearActiveDataset: () => {},
+  };
+  const first = refreshDatasetIfActive({ ...options, request: () => old.promise,
+    isCurrentRequest: () => sequence === 1 });
+  sequence = 2;
+  await refreshDatasetIfActive({ ...options,
+    request: async () => ({ ok: true, json: async () => ({ status: 'keep' }) }),
+    isCurrentRequest: () => sequence === 2 });
+  old.resolve({ ok: true, json: async () => ({ status: 'pending' }) });
+  assert.equal((await first).status, 'stale');
+  assert.deepEqual(data, { status: 'keep' });
+});
+
+test('an older same-dataset 404 cannot close a newer successful refresh', async () => {
+  const old = deferred();
+  let current = true;
+  let clears = 0;
+  const pending = refreshDatasetIfActive({ datasetId: 7, getActiveDatasetId: () => 7,
+    request: () => old.promise, commitData: () => { clears += 1; },
+    clearActiveDataset: () => { clears += 1; }, isCurrentRequest: () => current });
+  current = false;
+  old.resolve({ ok: false, status: 404 });
+  assert.equal((await pending).status, 'stale');
+  assert.equal(clears, 0);
+});
+
 test('pending refresh A is ignored after opening dataset B', async () => {
   const response = deferred();
   let activeId = 1;

@@ -115,7 +115,7 @@ test('the bank review lightbox rotates without deciding, and updates the tile be
   assert.doesNotMatch(bankReview, /\[ \] rotate/);
   assert.match(bankReview, />\s*Back\s*</);
   assert.doesNotMatch(bankReview, /Mark a watermark/);
-  assert.doesNotMatch(bankReview, /REVIEW_SHORTCUT_HINT/);
+  assert.match(bankReview, /REVIEW_SHORTCUT_HINT/);
   const decisions = bankReview.slice(bankReview.indexOf('Reject this image and move on'));
   assert.ok(decisions.indexOf('✕ Reject') < decisions.indexOf('⏭ Skip'));
   assert.ok(decisions.indexOf('⏭ Skip') < decisions.indexOf('✓ Keep'));

@@ -250,11 +250,15 @@ export function useDataset() {
     }
   }, []);
 
+  const refreshSequence = useRef(0);
   const refresh = useCallback(async (id) => {
     const dsId = id ?? currentIdRef.current;
+    if (dsId && dsId !== currentIdRef.current) return { status: 'stale' };
+    const sequence = ++refreshSequence.current;
     return refreshDatasetIfActive({
       datasetId: dsId,
       getActiveDatasetId: () => currentIdRef.current,
+      isCurrentRequest: () => sequence === refreshSequence.current,
       request: (requestedId) => fetch(`/api/dataset/${requestedId}`, { credentials: 'include' }),
       commitData: setData,
       // Only an ACTIVE dataset's definitive 404 ejects back to the list.
@@ -1075,10 +1079,15 @@ export function useDataset() {
     return d;
   }, [currentId, refresh]);
 
-  const setStatus = useCallback(async (imageId, status) => {
+  const setStatus = useCallback(async (imageId, status, { onAccepted } = {}) => {
+    const datasetId = currentIdRef.current;
     const d = await postJson(`/api/dataset/image/${imageId}/status`, { status });
-    if (!d.ok) { toast.error(d.error || 'Unexpected error'); return; }
-    await refresh();
+    if (!d.ok) { toast.error(d.error || 'Unexpected error'); return d; }
+    // Review can show the next image as soon as the write is accepted. Keep the
+    // authoritative refresh for watermark and improvement-parent side effects.
+    onAccepted?.();
+    await refresh(datasetId);
+    return d;
   }, [refresh, toast]);
 
   /* Returns {ok, error} — the expanded caption editor keeps the text the user

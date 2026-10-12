@@ -17,7 +17,7 @@
 // Every facet key of the workspace's filter state. `cluster`, `style` and
 // `subfolder` are meaningful at 0 / '' (cluster 0 is a cluster, '' is the bank
 // root), so they are tested against null, not for truthiness.
-const NULLABLE = ['cluster', 'style', 'subfolder']
+const NULLABLE = ['cluster', 'style', 'subfolder', 'collectionId']
 const TRUTHY = ['status', 'reason', 'flag', 'search', 'exclude', 'tags',
   'resBucket', 'framing', 'origin', 'medium', 'angle']
 

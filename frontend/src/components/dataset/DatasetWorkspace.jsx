@@ -2383,6 +2383,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
           // reference's own cache buster (a crop or a re-upload bumps it).
           refFilename={d.ref_filename || ''}
           refNonce={ds.refNonce || 0}
+          imageNonces={ds.nonces}
           onClose={() => setViewImg(null)}
           onMirror={viewImgLive._rescueReviewPreview ? undefined : ds.mirrorImage}
           onRotate={viewImgLive._rescueReviewPreview ? undefined : ds.rotateImage}

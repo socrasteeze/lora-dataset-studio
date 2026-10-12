@@ -2604,6 +2604,12 @@ const TOPICS = [
   // on the same K/R/S. Its own topic because the questions it raises are not the
   // arrows': does K delete anything, is it the same ✓ as the tile's, and why did
   // the picture move on by itself.
+  action('action-bank-group-comparison', 'Compare Bank Groups',
+    ['bank', 'compare', 'group', 'style', 'similar', 'duplicates', 'keepers', 'multiple', 'selection', 'full resolution'],
+    '/bank', 'using-the-app', 'compare-bank-groups'),
+  action('action-bank-collections', 'Saved Collections',
+    ['bank', 'collection', 'collections', 'membership', 'save', 'merge', 'split', 'undo', 'promote kept', 'missing source'],
+    '/bank', 'using-the-app', 'bank-saved-collections'),
   action('action-lightbox-keep-reject', 'Keep or reject an image without leaving the picture',
     ['keep', 'reject', 'skip', 'verdict', 'decide', 'decision', 'judge', 'triage',
      'curate', 'curation', 'review', 'review one by one', 'one by one', 'fast',

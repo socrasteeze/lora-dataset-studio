@@ -1577,6 +1577,8 @@ def delete_bank(user_id, bank_id, *, _allow_busy=False,
         raise BankQueued('bank is queued')
     imported_source = bank.source_path if _is_imported_source(bank.source_path) else None
     from . import folder_person
+    from . import bank_collections
+    bank_collections.drop_for_bank(bank_id)
     folder_person.drop_for_bank(bank_id)   # children first — no relationship()
     folder_person.drop_probes_for_bank(bank_id)
     BankDupDistinct.query.filter_by(bank_id=bank_id).delete(synchronize_session=False)
@@ -3451,7 +3453,7 @@ def _apply_facets(q, th, skip=None, *, bank_id=None, status=None, reason=None,
                   flag=None, cluster=None, group=None, semantic_group=None,
                   style=None, subfolder=None, search=None, exclude=None,
                   tags=None, res_bucket=None, framing=None, origin=None,
-                  medium=None, angle=None):
+                  medium=None, angle=None, collection_id=None):
     """Narrow ``q`` by the composing facets and return ``(q, order)``.
 
     ONE place, because the grid and the chip counters ask the same question and
@@ -3464,6 +3466,9 @@ def _apply_facets(q, th, skip=None, *, bank_id=None, status=None, reason=None,
     counting rule: a facet's own value must never narrow its own counts, or
     picking "blur" would show its neighbours at 0 and the user could no longer
     change their mind without clearing everything first."""
+    if collection_id is not None:
+        from . import bank_collections
+        q = bank_collections.scope_query(bank_id, collection_id, q)
     if status in ('pending', 'keep', 'reject') and skip != 'status':
         q = q.filter(BankImage.status == status)
     if reason in REASON_KEYS and skip != 'reason':
@@ -3593,7 +3598,7 @@ def list_images(user_id, bank_id, status=None, reason=None, flag=None,
                 semantic_group=None, sort=None, res_bucket=None, framing=None,
                 origin=None, medium=None, angle=None, ids=None, exclude=None,
                 tags=None, wd14_tags=None,
-                ids_only=False, offset=0, limit=200) -> dict | None:
+                ids_only=False, offset=0, limit=200, collection_id=None) -> dict | None:
     """One PAGE of the bank grid (a 9 000-image bank must never ship whole).
     Filters compose: status ∩ flag ∩ cluster ∩ dup-group ∩ style ∩ subfolder ∩ tags ∩ search.
     ``search`` is a plain full-text term matched (case-insensitive LIKE) against the
@@ -3659,9 +3664,11 @@ def list_images(user_id, bank_id, status=None, reason=None, flag=None,
         # variable limit (default 999); the curation cap is 2 000 ids.
         for start in range(0, len(ordered), 500):
             chunk = ordered[start:start + 500]
-            for r in (BankImage.query
-                      .filter(BankImage.bank_id == bank_id,
-                              BankImage.id.in_(chunk)).all()):
+            scoped = BankImage.query.filter(BankImage.bank_id == bank_id, BankImage.id.in_(chunk))
+            if collection_id is not None:
+                from . import bank_collections
+                scoped = bank_collections.image_query(user_id, bank_id, collection_id, scoped)
+            for r in scoped.all():
                 by_id[r.id] = r
         ordered_rows = [by_id[i] for i in ordered if i in by_id]
         if ids_only:
@@ -3672,8 +3679,12 @@ def list_images(user_id, bank_id, status=None, reason=None, flag=None,
         off = max(0, int(offset))
         page = ordered_rows[off:off + max(1, min(500, int(limit)))]
         return {'images': _page_images(page, th, bank_id), 'total': total, 'offset': off}
+    scoped = BankImage.query.filter_by(bank_id=bank_id)
+    if collection_id is not None:
+        from . import bank_collections
+        scoped = bank_collections.image_query(user_id, bank_id, collection_id, scoped)
     q, order = _apply_facets(
-        BankImage.query.filter_by(bank_id=bank_id), th, bank_id=bank_id,
+        scoped, th, bank_id=bank_id,
         status=status, reason=reason, flag=flag, cluster=cluster, group=group,
         semantic_group=semantic_group, style=style, subfolder=subfolder,
         search=search, exclude=exclude, tags=tags, res_bucket=res_bucket,
@@ -3742,6 +3753,7 @@ def facet_counts(user_id, bank_id, **f) -> dict | None:
         return None
     th = thresholds()
     facets = {k: f.get(k) for k in FACETS}
+    facets['collection_id'] = f.get('collection_id')
 
     def pool(skip, extra=None):
         q, _order = _apply_facets(BankImage.query.filter_by(bank_id=bank_id), th,
@@ -5715,11 +5727,26 @@ def _best_of(rows):
     return max(rows, key=key)
 
 
+def _validate_group_snapshot(bank_id, col, group, expected_ids, keep_ids=None):
+    if expected_ids is None:
+        return
+    from . import bank_collections
+    expected = set(bank_collections._ids(expected_ids))
+    if isinstance(group, bool) or not isinstance(group, int) or group < 0:
+        raise ValueError('group must be an integer for comparison decisions')
+    current = {image_id for (image_id,) in db.session.query(BankImage.id).filter(
+        BankImage.bank_id == bank_id, col == group)}
+    if current != expected:
+        raise ValueError('Group changed. Reload comparison before resolving copies.')
+    if keep_ids is not None and set(bank_collections._ids(keep_ids)) - expected:
+        raise ValueError('Selected keepers must belong to the compared group.')
+
+
 @_serialized_bank_mutation('resolve_dups')
 def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
                  col=BankImage.dup_group, attr='dup_group', reason='duplicate',
                  respect_existing_keep=True, snapshot=None, *,
-                 _bank_lease=None):
+                 _bank_lease=None, expected_ids=None):
     """Resolve duplicate groups: keep one member, REJECT the others (a status,
     never a file deletion, so it's reversible). strategy 'best'|'first' applies to
     one group or, when ``group`` is None, to every unresolved group at once;
@@ -5751,19 +5778,22 @@ def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
     published = {}
 
     def _apply():
+        _validate_group_snapshot(bank_id, col, group, expected_ids, keep_ids)
         snap = bank_undo.Snapshot(
             'Resolve same-shot groups' if reason == 'semantic_dup'
             else 'Resolve duplicate groups') if own_snapshot else snapshot
         published['snapshot'] = snap
         keep_by_group = {}
         if keep_ids:
-            rows = BankImage.query.filter(
-                BankImage.bank_id == bank_id,
-                BankImage.id.in_(list(keep_ids)[:_SQL_IN_CHUNK])).all()
-            for r in rows:
-                g = getattr(r, attr)
-                if g:
-                    keep_by_group.setdefault(g, set()).add(r.id)
+            wanted = list(keep_ids)
+            for start in range(0, len(wanted), _SQL_IN_CHUNK):
+                rows = BankImage.query.filter(
+                    BankImage.bank_id == bank_id,
+                    BankImage.id.in_(wanted[start:start + _SQL_IN_CHUNK])).all()
+                for r in rows:
+                    g = getattr(r, attr)
+                    if g is not None:
+                        keep_by_group.setdefault(g, set()).add(r.id)
             gids = list(keep_by_group)
         elif group is not None:
             gids = [int(group)]
@@ -5790,7 +5820,7 @@ def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
             for r in (BankImage.query
                       .filter(BankImage.bank_id == bank_id,
                               col.in_(gids[i:i + _SQL_IN_CHUNK]),
-                              BankImage.status != 'reject')
+                              (BankImage.status != 'reject') if expected_ids is None else col == group)
                       .order_by(BankImage.id.asc()).all()):
                 by_group.setdefault(getattr(r, attr), []).append(r)
 
@@ -5807,7 +5837,15 @@ def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
                 keep = {_best_of(rows).id}
             changed = False
             for r in rows:
-                if r.id in keep or (respect_existing_keep and r.status == 'keep'):
+                if r.id in keep:
+                    if expected_ids is not None:
+                        # The comparison's explicit keeper choice is a Keep
+                        # decision. Legacy automatic resolves leave its status alone.
+                        changed = changed or r.status != 'keep'
+                        snap.note(r, 'keep', None)
+                        r.status, r.reject_reason = 'keep', None
+                    continue
+                if (respect_existing_keep and r.status == 'keep') or (expected_ids is not None and r.status == 'reject'):
                     continue
                 snap.note(r, 'reject', reason)
                 r.status, r.reject_reason = 'reject', reason
@@ -5827,19 +5865,19 @@ def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
 
 def resolve_semantic_dups(user_id, bank_id, strategy='best', group=None,
                           keep_ids=None, respect_existing_keep=True,
-                          snapshot=None, *, _bank_lease=None):
+                          snapshot=None, *, _bank_lease=None, expected_ids=None):
     """resolve_dups for stage 2 (semantic_dup_group, reject reason
     'semantic_dup')."""
     return resolve_dups(user_id, bank_id, strategy=strategy, group=group,
                         keep_ids=keep_ids, col=BankImage.semantic_dup_group,
                         attr='semantic_dup_group', reason='semantic_dup',
                         respect_existing_keep=respect_existing_keep,
-                        snapshot=snapshot, _bank_lease=_bank_lease)
+                        snapshot=snapshot, _bank_lease=_bank_lease, expected_ids=expected_ids)
 
 
 @_serialized_bank_mutation('dup_distinct')
 def mark_group_distinct(user_id, bank_id, group, col=BankImage.dup_group, *,
-                        _bank_lease=None) -> dict:
+                        _bank_lease=None, expected_ids=None) -> dict:
     """≠ — "these are not the same shot". Records every pair among the group's
     live members, so the group stops being proposed and NOTHING is rejected.
 
@@ -5860,6 +5898,7 @@ def mark_group_distinct(user_id, bank_id, group, col=BankImage.dup_group, *,
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
+    _validate_group_snapshot(bank_id, col, group, expected_ids)
     members = _group_live_members(bank_id, col, [int(group)]).get(int(group), [])
     if len(members) < 2:
         # Nothing to declare distinct FROM. Answered as a no-op rather than an
@@ -5887,11 +5926,11 @@ def mark_group_distinct(user_id, bank_id, group, col=BankImage.dup_group, *,
     return {'group': int(group), 'pairs': len(fresh), 'members': len(members)}
 
 
-def mark_semantic_group_distinct(user_id, bank_id, group, *, _bank_lease=None) -> dict:
+def mark_semantic_group_distinct(user_id, bank_id, group, *, _bank_lease=None, expected_ids=None) -> dict:
     """mark_group_distinct for stage 2 (semantic_dup_group)."""
     return mark_group_distinct(user_id, bank_id, group,
                                col=BankImage.semantic_dup_group,
-                               _bank_lease=_bank_lease)
+                               _bank_lease=_bank_lease, expected_ids=expected_ids)
 
 
 @_serialized_bank_mutation('dup_distinct_restore')
@@ -5976,7 +6015,7 @@ _STATUS_UNDO_LABEL = {'keep': 'Keep images', 'reject': 'Reject images',
 
 
 @_serialized_bank_mutation('status')
-def set_status(user_id, bank_id, ids, status, *, _bank_lease=None) -> int:
+def set_status(user_id, bank_id, ids, status, *, _bank_lease=None, collection_id=None) -> int:
     """Manual keep/reject/pending on a selection. Returns rows changed.
 
     Wrapped in write_with_retry: this is THE click a user makes while a pass is
@@ -5997,6 +6036,16 @@ def set_status(user_id, bank_id, ids, status, *, _bank_lease=None) -> int:
 
     def _apply():
         # Rebuilt per attempt: write_with_retry replays the whole unit of work.
+        if collection_id is not None:
+            from . import bank_collections
+            available = set()
+            for start in range(0, len(ids), _SQL_IN_CHUNK):
+                query = bank_collections.image_query(user_id, bank_id, collection_id,
+                    BankImage.query.filter(BankImage.bank_id == bank_id,
+                                           BankImage.id.in_(ids[start:start + _SQL_IN_CHUNK])))
+                available.update(image_id for (image_id,) in query.with_entities(BankImage.id))
+            if set(ids) != available:
+                raise ValueError('Collection membership changed. Reload comparison before saving decisions.')
         snap = bank_undo.Snapshot(_STATUS_UNDO_LABEL[status])
         published['snapshot'] = snap
         n = 0
@@ -6364,7 +6413,7 @@ _CURATION_MAX_N = 2000       # a curated LoRA set is 20–200 images; this is ge
 
 def _pool_query(bank_id, th, *, status=None, flag=None, cluster=None,
                 style=None, subfolder=None, search=None, exclude=None, tags=None,
-                medium=None, angle=None):
+                medium=None, angle=None, collection_id=None):
     """The candidate-pool query for the curation selectors — the SAME filter
     composition as list_images (status ∩ flag ∩ cluster ∩ style ∩ subfolder ∩
     search ∩ NOT exclude), minus the ordering/pagination, so "give me 60 diverse
@@ -6377,6 +6426,9 @@ def _pool_query(bank_id, th, *, status=None, flag=None, cluster=None,
     the list_images hot path would collide. When NO status is chosen the reject
     pile is excluded — you curate from what you might keep, never from the bin."""
     q = BankImage.query.filter_by(bank_id=bank_id)
+    if collection_id is not None:
+        from . import bank_collections
+        q = bank_collections.scope_query(bank_id, collection_id, q)
     if status in ('pending', 'keep', 'reject'):
         q = q.filter(BankImage.status == status)
     else:

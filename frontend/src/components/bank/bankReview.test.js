@@ -12,6 +12,22 @@ const lcg = (seed = 42) => () => {
 };
 const IDS = [1, 2, 3, 4, 5];
 
+test('a late save records its target without deciding or advancing the new image', () => {
+  const moved = skip(createSession(IDS));
+  const saved = decide(moved, 'keep', 1);
+  assert.equal(currentId(saved), 2);
+  assert.deepEqual(saved.decisions, { 1: 'keep' });
+  assert.equal(progress(saved).kept, 1);
+});
+
+test('a late save after navigating to the end records only the saved image', () => {
+  const end = { ...createSession(IDS), pos: IDS.length };
+  const saved = decide(end, 'reject', 1);
+  assert.equal(saved.pos, IDS.length);
+  assert.deepEqual(saved.decisions, { 1: 'reject' });
+  assert.equal(decide(end, 'keep', 99), end);
+});
+
 // Walk a session to the end, always deciding, and return the ids in the order
 // they were proposed.
 const walkAll = (s, act = (x) => decide(x, 'keep')) => {

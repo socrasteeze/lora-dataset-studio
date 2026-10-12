@@ -85,6 +85,20 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-11-group-comparison-collections',
+    date: '2026-10-11',
+    title: 'Compare & Collect',
+    blurb: 'Compare Bank groups together, keep several useful candidates, and save named collections without moving source files. Merge, split, and undo membership changes, then promote only the available kept members.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-11-fluid-image-review',
+    date: '2026-10-11',
+    title: 'Review with fewer pauses',
+    blurb: 'Bank and Dataset preload nearby images and use the same Reject, Skip, Keep order. Dataset keeps the decisions visible on phones and moves on when a save is accepted, before the full refresh. Failed saves stay visible, and holding a shortcut cannot decide unseen images.',
+    to: '/datasets',
+  },
+  {
     id: '2026-10-09-shift-click-range-select',
     date: '2026-10-09',
     title: 'Shift-click to select a run of images',

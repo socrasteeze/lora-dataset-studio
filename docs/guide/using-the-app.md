@@ -1479,6 +1479,66 @@ app cannot count how many of them already have a caption — and it will not run
 destructive pass on a number it cannot state. Clear the selection to re-caption a
 pile. 🏷️ **Caption** still honours selections as it always did.
 
+## Compare Bank groups
+
+Open **Compare** above the Bank grid to compare the selection or the current
+filtered group. A **Similar to selected** result retains its ranking. Style
+group cards and duplicate group cards also offer comparison entry points.
+
+The view loads 24 previews per page. Each image fits its own frame, preserves
+its orientation, and shows its dimensions. Different framings are not aligned.
+Open an image for full-resolution inspection with the existing Review controls.
+That inspection walks the available candidates on the current comparison page.
+
+Select several candidates, then use **Keep**, **Reject**, or **Undecide**.
+These actions apply to the selection. Style and similarity groups can retain
+several useful examples. **Resolve Copies** is an explicit duplicate decision:
+it keeps the selected copies and rejects the other copies of that group.
+**Mark Distinct** records that the group is distinct and preserves image decisions.
+If a duplicate group changes, reload comparison before resolving it.
+
+**K** keeps the selection, **R** rejects it, and **U** sets it to undecided.
+**Left/Right** moves between pages. **Esc** closes comparison. Decisions remain
+visible on phones. During a save, navigation is disabled. A failed save retains
+the page and selection and shows the error. Missing sources remain visible.
+
+## Bank saved collections
+
+Collections are named Bank records that organize candidates before promotion.
+Use **Save Collection** from comparison or a group card, or select images in the
+grid and open **Collections**. Enter a name, then select **Create**. With no
+incoming images, Create makes an empty collection. Save Collection uses the
+current comparison selection when one exists, or the whole group otherwise.
+
+Membership uses image IDs and their instance IDs. It survives analysis reruns,
+reclustering, and app restarts. An image can belong to several collections.
+Membership changes preserve Keep/Reject status, captions, source metadata, and
+source bytes. Collection names are manual labels and carry no verified artist
+or source attribution. Creating or changing a collection does not move files.
+
+In Collections, choose a collection to **Rename**, **Open Grid**, **Compare**, or
+**Promote Kept**. **Add Incoming** adds the selection supplied when the dialog
+opened. Select members to **Remove Selected**. Open **Merge & Split** to choose a
+destination. **Merge Into** combines membership and removes the source collection
+from the active list. **Split Selected** transfers those members to another
+collection. For a new split, enter its name in the New collection name field.
+
+**Delete Collection** removes the collection from the active list. Images and
+other collections remain intact. **Undo** reverses the last available collection
+change, including deletion, merge, and split. It survives a restart. A newer edit
+to a collection involved in that change can make the old undo unavailable.
+Failed changes retain typed names and member selections. Reload after a conflict
+before retrying. Closing with unsaved names requires a discard confirmation.
+
+Missing files and forgotten image records retain their membership and show as
+unavailable. A reused image ID cannot replace a missing member. **Promote Kept**
+uses the existing promotion destinations and rechecks available kept members on
+the server. An empty eligible set cannot expand promotion to the whole Bank.
+
+These collection tools have Bank scope because they organize source candidates
+before promotion. Dataset keeps its existing original/reference comparison and
+review workflow after promotion.
+
 ## Review a bank one image at a time
 
 Filter chips and bulk actions clear the obvious trash, but the last call —
@@ -1949,6 +2009,12 @@ trip to the grid. **Skip is nothing but "next"**: the image keeps whatever it
 already had, undecided included. **←** goes back the same way — navigation only,
 it decides nothing.
 
+On phones, **Reject**, **Skip**, and **Keep** stay below the image. You do not
+need to reopen **Actions** after each decision. Nearby images preload, and the
+next image appears when the server accepts the save, before the full dataset
+refresh. A failed save shows an error. Holding a shortcut does not judge the
+remaining images.
+
 It is the *same* verdict as the ✓ / ✕ on the tile behind the overlay, not a
 second one: only kept images are captioned, exported and trained on, and the
 grid, the counters and the ⬇ Export all read that one status. The chip beside
@@ -1970,11 +2036,12 @@ Below a phone-sized window the lightbox changes shape, and it is the same
 picture, the same actions and the same keys — only their arrangement moves.
 
 - **The image takes the screen.** In a side-by-side comparison, both panes do.
-- **Every action moves behind one button**, the **☰ Actions** pill floating at
+- **Reject, Skip, and Keep stay below the image.** The decision row remains
+  visible after each save. Editing and comparison use the **☰ Actions** pill floating at
   the bottom of the picture: compare with the original, compare with the
   reference, crop, mirror, rotate left and right, improve, upscale, the Klein
   instruction with its editor and its model, and the links to Settings. Nothing
-  is dropped and nothing is renamed — it is the same list, in the same order,
+  is dropped and nothing is renamed. The editing controls keep the same order,
   in a panel instead of a strip.
 - **The panel is a drawer, not a new screen.** It covers the bottom of the
   picture and leaves the top of it visible, so you can see what you are about to

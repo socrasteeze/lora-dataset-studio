@@ -12,6 +12,7 @@ export async function refreshDatasetIfActive({
   request,
   commitData,
   clearActiveDataset,
+  isCurrentRequest = () => true,
 }) {
   if (!datasetId) return { status: 'skipped' };
 
@@ -20,14 +21,14 @@ export async function refreshDatasetIfActive({
 
     if (response.ok) {
       const payload = await response.json();
-      if (getActiveDatasetId() !== datasetId) return { status: 'stale' };
+      if (!isCurrentRequest() || getActiveDatasetId() !== datasetId) return { status: 'stale' };
       commitData(payload);
       return { status: 'applied', data: payload };
     }
 
     // A late 404 for dataset A must not close dataset B after navigation.
     if (response.status === 404) {
-      if (getActiveDatasetId() !== datasetId) return { status: 'stale' };
+      if (!isCurrentRequest() || getActiveDatasetId() !== datasetId) return { status: 'stale' };
       commitData(null);
       clearActiveDataset();
       return { status: 'not_found' };

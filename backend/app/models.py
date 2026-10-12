@@ -663,6 +663,40 @@ class BankImage(db.Model):
         return f'<BankImage {self.id} bank={self.bank_id} {self.status}>'
 
 
+class BankCollection(db.Model):
+    """Manual Bank membership, independent of analysis groups and image status.
+
+    New tables are installed by create_all. No source files are changed.
+    A one-step undo snapshot survives restarts; deleted records remain undoable.
+    """
+    __tablename__ = 'bank_collection'
+    __table_args__ = {'sqlite_autoincrement': True}
+    id = db.Column(Integer, primary_key=True)
+    bank_id = db.Column(Integer, db.ForeignKey('image_bank.id', ondelete='CASCADE'),
+                        nullable=False, index=True)
+    name = db.Column(String(128), nullable=False)
+    revision = db.Column(Integer, nullable=False, default=1)
+    deleted = db.Column(db.Boolean, nullable=False, default=False)
+    undo_state = db.Column(Text, nullable=True)
+    created_at = db.Column(DateTime, default=db.func.current_timestamp())
+    updated_at = db.Column(DateTime, default=db.func.current_timestamp())
+
+
+class BankCollectionMember(db.Model):
+    """An image ID and its instance guard. Missing image rows retain membership.
+
+    No image foreign key: forgetting a missing source must not erase membership
+    or bind a reused numeric ID to an unrelated image.
+    """
+    __tablename__ = 'bank_collection_member'
+    collection_id = db.Column(Integer, db.ForeignKey('bank_collection.id', ondelete='CASCADE'),
+                              primary_key=True)
+    image_id = db.Column(Integer, primary_key=True)
+    image_instance_id = db.Column(String(32), nullable=False)
+    label = db.Column(Text, nullable=False)
+    position = db.Column(Integer, nullable=False)
+
+
 class BankDupDistinct(db.Model):
     """"These two are NOT the same shot" — the user's veto over a duplicate group.
 

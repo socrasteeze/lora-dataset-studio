@@ -5,6 +5,13 @@ import { REVIEW_SHORTCUT_HINT, ownsTypedKeys, reviewKeyAction } from './reviewSh
 
 const press = (key, extra = {}) => ({ key, target: null, ...extra });
 
+test('held keys cannot decide or navigate through unseen images', () => {
+  for (const key of ['k', 'r', 's', 'ArrowLeft', 'ArrowRight']) {
+    assert.equal(reviewKeyAction(press(key, { repeat: true })), null);
+  }
+  assert.equal(reviewKeyAction(press('Escape', { repeat: true })), 'close');
+});
+
 test('the three verdicts are on K, R and S', () => {
   assert.equal(reviewKeyAction(press('k')), 'keep');
   assert.equal(reviewKeyAction(press('r')), 'reject');

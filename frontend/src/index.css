@@ -532,6 +532,15 @@
 }
 
 /* Toast slide-in animation */
+.review-decision-button {
+  transition: background-color 100ms ease-out, opacity 100ms ease-out;
+}
+
+.review-decision-button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
 @keyframes slideIn {
   from { transform: translateX(100%); opacity: 0; }
   to   { transform: translateX(0);    opacity: 1; }
@@ -586,6 +595,10 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  .review-decision-button {
+    /* Colour and opacity feedback do not move the image or controls. */
+    transition-duration: 100ms !important;
   }
 }
 

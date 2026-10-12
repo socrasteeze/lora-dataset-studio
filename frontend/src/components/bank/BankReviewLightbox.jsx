@@ -35,8 +35,9 @@ import { canEditMask } from './bankWatermarkMask.js'
 import { dupStateSuffix } from './bankDupBadge.js'
 import { cropOutcomeMessage, imageVersionQuery } from './bankEdits.js'
 import {
-  ownsTypedKeys, reviewKeyAction,
+  ownsTypedKeys, reviewKeyAction, REVIEW_SHORTCUT_HINT,
 } from '../shared/reviewShortcuts.js'
+import { useReviewImagePreload } from '../shared/useReviewImagePreload.js'
 import ShortcutKey from '../shared/ShortcutKey'
 import BankEditComparison from './BankEditComparison.jsx'
 
@@ -119,7 +120,7 @@ function Facts({ img }) {
 }
 
 export default function BankReviewLightbox({
-  bankId, ids, startId = null, seedImages = [], onDecided, onRotated, onEdited, onClose,
+  bankId, ids, startId = null, seedImages = [], onDecided, onRotated, onEdited, onClose, collectionId = null,
 }) {
   const [session, setSession] = useState(() => createSession(ids, { startId }))
   const [meta, setMeta] = useState(() => {
@@ -153,6 +154,7 @@ export default function BankReviewLightbox({
   const [compareKey, setCompareKey] = useState(null)
   const dialogRef = useRef(null)
   const requested = useRef(new Set())
+  const decisionInFlight = useRef(false)
 
   // Hand the trap over while the mask or crop editor is open — two live traps
   // fight over the focus and the editor's own controls become unreachable.
@@ -164,6 +166,9 @@ export default function BankReviewLightbox({
   const img = id == null ? null : meta[id]
   const editKey = `${id}:${img?.edit_generation || 0}:${img?.edit_sequence || 0}`
   const comparing = compareKey === editKey && img?.edit_history_count > 0
+  useReviewImagePreload(session.order.slice(Math.max(0, session.pos - 1), session.pos + 3)
+    .filter((target) => meta[target])
+    .map((target) => `/api/bank/${bankId}/file/${target}${imageVersionQuery(meta[target])}`))
 
   // Pull metadata for the current image and the ones just behind it, in one
   // request. Ids already asked for are never re-asked (an image deleted from the
@@ -174,33 +179,38 @@ export default function BankReviewLightbox({
       .filter((x) => meta[x] === undefined && !requested.current.has(x))
     if (!window.length) return
     window.forEach((x) => requested.current.add(x))
-    apiFetch(`/api/bank/${bankId}/images?ids=${window.join(',')}&limit=${window.length}`)
+    apiFetch(`/api/bank/${bankId}/images?ids=${window.join(',')}&limit=${window.length}${collectionId != null ? `&collection_id=${collectionId}` : ''}`)
       .then((d) => setMeta((prev) => {
         const next = { ...prev }
         for (const row of d.images || []) next[row.id] = row
         return next
       }))
       .catch(() => { /* facts are an aid, not a gate — the image still shows */ })
-  }, [bankId, id, session.order, session.pos, meta])
+  }, [bankId, collectionId, id, session.order, session.pos, meta])
 
   const sendDecision = useCallback(async (status) => {
     const target = currentId(session)
-    if (target == null || busy) return
+    if (target == null || busy || decisionInFlight.current) return
+    decisionInFlight.current = true
     setBusy(true)
     setError(null)
     setNotice(null)
     try {
-      await postJson(`/api/bank/${bankId}/images/status`, { ids: [target], status })
+      const result = await postJson(`/api/bank/${bankId}/images/status`, {
+        ids: [target], status, ...(collectionId != null ? { collection_id: collectionId } : {}),
+      })
+      if (result?.ok === false) throw new Error(result.error || 'Could not save this decision.')
       setMeta((prev) => (prev[target] ? { ...prev, [target]: { ...prev[target], status } } : prev))
-      setSession((s) => decide(s, status))
+      setSession((s) => decide(s, status, target))
       onDecided?.(target, status)
     } catch (e) {
       // Stay on this image: a lost decision is worse than a stalled one.
-      setError(e?.message || 'Could not save that decision — it was NOT recorded.')
+      setError(`Image ${target}: ${e?.message || 'Could not save this decision.'} Go back if you moved on.`)
     } finally {
+      decisionInFlight.current = false
       setBusy(false)
     }
-  }, [bankId, busy, onDecided, session])
+  }, [bankId, busy, collectionId, onDecided, session])
 
   // 🔄 Quarter turn of the image under the cursor (idea by 1Tomber, GitHub #17).
   // It does NOT advance — a sideways photo is fixed and then judged, which is the
@@ -393,6 +403,8 @@ export default function BankReviewLightbox({
             {p.kept} kept · {p.rejected} rejected
             {p.skipped ? ` · ${p.skipped} skipped (still undecided)` : ''}
           </p>
+          {busy && <p role="status" className="text-sm text-white/60">Saving</p>}
+          {error && <p role="alert" className="text-sm text-rose-300">{error} Go back to retry.</p>}
           <div className="flex flex-wrap items-center justify-center gap-2">
             {p.total > 0 && (
               <button type="button" onClick={goBack}
@@ -420,11 +432,10 @@ export default function BankReviewLightbox({
 
       {!done && (
         <div className="shrink-0 space-y-2 bg-black/60 px-4 py-2.5">
-          {error && (
-            <p role="alert" className="text-center text-sm text-rose-300">
-              ⚠️ {error} — try again, or close and check the app.
-            </p>
-          )}
+          <div className="min-h-5 text-center text-xs">
+            {error ? <p role="alert" className="text-rose-300">{error} Try again.</p>
+              : <p role="status" className="text-white/60">{busy ? 'Saving' : <span>{REVIEW_SHORTCUT_HINT}</span>}</p>}
+          </div>
           {notice && !error && (
             <p role="status" className="text-center text-sm text-sky-200">✂ {notice}</p>
           )}
@@ -484,17 +495,17 @@ export default function BankReviewLightbox({
           <div className="flex w-full gap-2">
             <button type="button" onClick={() => sendDecision('reject')} disabled={busy}
               title="Reject this image and move on (R) — reversible, nothing is deleted from disk"
-              className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-rose-400/60 bg-rose-500/20 px-3 py-2 text-sm font-semibold text-rose-100 disabled:opacity-50 hover:bg-rose-500/30 lg:min-h-0">
+              className="review-decision-button inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-rose-400/60 bg-rose-500/20 px-3 py-2 text-sm font-semibold text-rose-100 disabled:opacity-50 hover:bg-rose-500/30 lg:min-h-0">
               ✕ Reject{shortcut('R')}
             </button>
             <button type="button" onClick={doSkip}
               title="Decide later (S) — stays undecided and is not shown again in this review"
-              className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-white/25 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-white/10 lg:min-h-0">
+              className="review-decision-button inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-white/25 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-white/10 lg:min-h-0">
               ⏭ Skip{shortcut('S')}
             </button>
             <button type="button" onClick={() => sendDecision('keep')} disabled={busy}
               title="Keep this image and move on (K)"
-              className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-emerald-400/60 bg-emerald-500/20 px-3 py-2 text-sm font-semibold text-emerald-100 disabled:opacity-50 hover:bg-emerald-500/30 lg:min-h-0">
+              className="review-decision-button inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-emerald-400/60 bg-emerald-500/20 px-3 py-2 text-sm font-semibold text-emerald-100 disabled:opacity-50 hover:bg-emerald-500/30 lg:min-h-0">
               ✓ Keep{shortcut('K')}
             </button>
           </div>

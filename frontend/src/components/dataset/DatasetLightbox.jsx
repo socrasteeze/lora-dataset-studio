@@ -5,9 +5,9 @@
  *
  * The action bar is NOT always at the bottom: beside a portrait image on a wide
  * window it becomes a side rail in the space that image cannot use, which hands
- * the bar's height back to the photo; below `sm` it becomes ONE button opening a
- * panel, because on a phone neither axis has room and the picture was being left
- * 96 px tall. `lightboxActionPlacement.js` owns that decision and its
+ * the bar's height back to the photo. On phones, editing uses an Actions panel
+ * and the review decisions stay directly below the image.
+ * `lightboxActionPlacement.js` owns the editing placement and its
  * stability guarantees.
  */
 import { Fragment, useCallback, useEffect, useId, useRef, useState } from 'react';
@@ -34,6 +34,7 @@ import {
   REVIEW_SHORTCUT_HINT, reviewKeyAction,
 } from '../shared/reviewShortcuts';
 import ShortcutKey from '../shared/ShortcutKey';
+import { useReviewImagePreload } from '../shared/useReviewImagePreload.js';
 import { watermarkMaskButtonLabel } from '../../utils/watermarkRegions';
 
 const COMPARE_HELP = 'Show the original this image was made from, next to it, at the same scale.';
@@ -162,6 +163,7 @@ export default function DatasetLightbox({
   img,
   datasetId,
   nonce = 0,
+  imageNonces = {},
   compare = null,
   parentNonce = 0,
   refFilename = '',
@@ -224,6 +226,8 @@ export default function DatasetLightbox({
     () => freshLightboxImageState(img?.id ?? null));
   const dialogRef = useRef(null);
   const closeRef = useRef(null);
+  const decisionInFlight = useRef(new Set());
+  const [decisionError, setDecisionError] = useState(null);
 
   /* WHERE THE ACTIONS LIVE. A portrait photo on a wide monitor leaves two
      thirds of the width black while the buttons queue on one line under it, on
@@ -243,6 +247,8 @@ export default function DatasetLightbox({
      closed over. */
   const currentIdRef = useRef(imageId);
   useEffect(() => { currentIdRef.current = imageId; }, [imageId]);
+  // A save completing after Close must not reopen the lightbox.
+  useEffect(() => () => { currentIdRef.current = null; }, []);
   // Stamped with the id of the render that created it, and DROPPED if that is
   // no longer the image being shown: one slot, so a late writer stamping it
   // would reset the picture you moved to. See stampedPatch.
@@ -274,27 +280,43 @@ export default function DatasetLightbox({
      tile writes — so nothing here invents a second notion of "kept" that would
      have to be reconciled with captioning, export and training.
 
-     The move happens only once the write LANDS. Advancing first and posting
-     afterwards is how a decision gets silently dropped on a slow disk, and the
-     Bank already paid for that lesson: a lost verdict is worse than a slow one.
+     Move once the server accepts the write, before the full payload refresh.
      `nav.next` is captured BEFORE the call because refreshing can retire this
      very image from the shown list (a "◧ Undecided only" filter does exactly
      that), which would leave the neighbours unanswerable a moment later. */
   const nextImage = nav.next;
+  useReviewImagePreload([nav.prev, nextImage, images?.[nav.index + 2]]
+    .filter((image) => image?.filename)
+    .map((image) => `/api/dataset/${datasetId}/img/${encodeURIComponent(image.filename)}${
+      imageNonces?.[image.id] ? `?v=${imageNonces[image.id]}` : ''}`));
   const decide = useCallback(async (status) => {
-    if (!onStatus || deciding || busy || imageId == null) return;
+    if (!onStatus || deciding || (curationBusy ?? busy) || imageId == null
+        || decisionInFlight.current.has(imageId)) return;
     const after = nextImage;
+    decisionInFlight.current.add(imageId);
+    setDecisionError(null);
     patchImageState({ deciding: true });
+    let accepted = false;
+    const onAccepted = () => {
+      if (accepted) return;
+      accepted = true;
+      // Manual navigation while saving must not be overridden by a late reply.
+      if (currentIdRef.current === imageId && after && onNavigate) onNavigate(after);
+    };
     try {
-      await onStatus(imageId, status);
+      const result = await onStatus(imageId, status, { onAccepted });
+      if (result?.ok === false) throw new Error(result.error || 'Could not save this decision.');
       // At the end of the list there is nowhere to go: the picture stays under
       // the cursor wearing its new chip, rather than closing the overlay on the
       // user — the arrows already say which end this is.
-      if (after && onNavigate) onNavigate(after);
+      onAccepted();
+    } catch (error) {
+      if (!accepted) setDecisionError({ id: imageId, message: error?.message || 'Could not save this decision.' });
     } finally {
+      decisionInFlight.current.delete(imageId);
       patchImageState({ deciding: false });
     }
-  }, [onStatus, deciding, busy, imageId, nextImage, onNavigate, patchImageState]);
+  }, [onStatus, deciding, busy, curationBusy, imageId, nextImage, onNavigate, patchImageState]);
   // ⏭ Skip is deliberately nothing but "next": the image keeps whatever status
   // it already had. That is the promise that makes walking fast safe.
   const skipImage = useCallback(() => {
@@ -540,6 +562,57 @@ export default function DatasetLightbox({
     await onRotate(img.id, degrees);
   };
 
+  const reviewControls = (<>
+        {onStatus && (
+          /* ✓ Keep / ✕ Reject / ⏭ Skip — the Bank's review bar, in the screen
+             where a dataset is actually curated. Same order, same glyphs, same
+             colours and same keys, because the two screens ask the user the
+             very same question and a learned reflex must not be right in only
+             one of them. Each verdict then MOVES ON, which is what turns the
+             lightbox from a viewer into a way through 300 pictures.
+             The keys are printed on the buttons AND spelled out below: a
+             shortcut nobody can discover is folklore. */
+          <div className={`flex items-stretch gap-2 ${rail ? 'w-full flex-col' : 'w-full sm:w-auto'}`}>
+            <button type="button" onClick={() => decide('reject')} disabled={deciding || curationRefused}
+              aria-label={refused || `Reject ${alt} and move to the next image`}
+              title={refused || 'Reject this image and move on (R) — reversible, and nothing is deleted from disk'}
+              className="review-decision-button min-h-10 lg:min-h-9 flex-1 rounded-lg border border-rose-400/60 bg-rose-500/20 px-4 py-1.5 text-xs font-semibold text-rose-100 hover:bg-rose-500/30 disabled:cursor-not-allowed disabled:opacity-45">
+              ✕ Reject<ShortcutKey>R</ShortcutKey>
+            </button>
+            <button type="button" onClick={skipImage} disabled={!nextImage || !onNavigate}
+              aria-label={nextImage
+                ? `Skip ${alt} and move to the next image`
+                : nav.nextReason || 'There is no next image to skip to'}
+              title={nextImage
+                ? 'Decide later (S) — moves on and leaves this image exactly as it is'
+                : nav.nextReason || 'There is no next image to skip to'}
+              className="review-decision-button min-h-10 lg:min-h-9 flex-1 rounded-lg border border-white/25 px-4 py-1.5 text-xs font-semibold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45">
+              ⏭ Skip<ShortcutKey>S</ShortcutKey>
+            </button>
+            <button type="button" onClick={() => decide('keep')} disabled={deciding || curationRefused}
+              aria-label={refused || `Keep ${alt} and move to the next image`}
+              title={refused || 'Keep this image and move on (K) — kept images are the ones captioned, exported and trained on'}
+              className="review-decision-button min-h-10 lg:min-h-9 flex-1 rounded-lg border border-emerald-400/60 bg-emerald-500/20 px-4 py-1.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-45">
+              ✓ Keep<ShortcutKey>K</ShortcutKey>
+            </button>
+          </div>
+        )}
+        {onStatus && (
+          <div className={`min-h-5 text-xs ${rail || sheet ? 'w-full' : ''}`}>
+            {decisionError ? <p role="alert" className="text-rose-300">
+              {decisionError.id === imageId ? `${decisionError.message} Try again.`
+                : `Image ${decisionError.id}: ${decisionError.message} Go back to retry.`}
+            </p>
+              : <p role="status" className="text-white/60">{deciding ? 'Saving' : '\u00a0'}</p>}
+          </div>
+        )}
+        {onStatus && (
+          <p className={`text-2xs text-white/45 ${rail || sheet ? 'w-full' : ''}`}>
+            {REVIEW_SHORTCUT_HINT} · ← → move without deciding · Esc close
+          </p>
+        )}
+  </>);
+
   return (
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={`Inspect — ${alt}`}
       data-probe-chrome="lightbox" data-probe-layer
@@ -574,7 +647,7 @@ export default function DatasetLightbox({
         </div>
       ) : full ? (
         <div className="flex-1 min-h-0 min-w-0 overflow-auto">
-          <img src={url} alt={alt} onLoad={onImageLoad}
+          <img key={url} src={url} alt={alt} onLoad={onImageLoad}
             onClick={(e) => { e.stopPropagation(); patchImageState({ full: false }); }}
             className="max-w-none cursor-zoom-out select-none" />
         </div>
@@ -582,7 +655,7 @@ export default function DatasetLightbox({
         /* min-w-0 matters only in rail mode: without it this flex child refuses
            to shrink below its content and the rail gets pushed off-screen. */
         <div className="flex-1 min-h-0 min-w-0 flex items-center justify-center p-4">
-          <img src={url} alt={alt} onLoad={onImageLoad}
+          <img key={url} src={url} alt={alt} onLoad={onImageLoad}
             onClick={(e) => { e.stopPropagation(); patchImageState({ full: true }); }}
             className="max-h-full max-w-full object-contain cursor-zoom-in select-none" />
         </div>
@@ -599,20 +672,6 @@ export default function DatasetLightbox({
             target={nav.next} reason={nav.nextReason} onNavigate={onNavigate} />
         </>
       )}
-      </div>
-
-      {/* DOM order is the SAME in both placements — meta, then compare, crop,
-          mirror, rotate, improve, then the Klein note. A rail that reads left
-          to right on screen but jumps around under Tab would trade one problem
-          for a worse one, so nothing here reorders itself; only the axis
-          changes. `overflow-y-auto` is the promise that a short window can
-          still reach the last action. */}
-      {/* THE one button, and only on a narrow screen. It floats over the
-          picture instead of sitting in a strip of its own, because a strip is
-          exactly the height this placement exists to give back: the panel it
-          opens costs the image nothing while it is closed. It says what it
-          opens — "Actions" alone would be a mystery-meat pill — and its state is
-          carried by aria-expanded, not by its colour. */}
       {sheet && (
         <button type="button" ref={actionsBtnRef}
           onClick={(e) => { e.stopPropagation(); patchImageState({ actionsOpen: !actionsOpen }); }}
@@ -624,6 +683,22 @@ export default function DatasetLightbox({
             text-white shadow-lg hover:bg-black/90">
           <span aria-hidden="true">☰&nbsp;</span>Actions
         </button>
+      )}
+      </div>
+
+      {/* DOM order is the SAME in both placements — meta, then compare, crop,
+          mirror, rotate, improve, then the Klein note. A rail that reads left
+          to right on screen but jumps around under Tab would trade one problem
+          for a worse one, so nothing here reorders itself; only the axis
+          changes. `overflow-y-auto` is the promise that a short window can
+          still reach the last action. */}
+      {/* Phone review stays outside the editing drawer. Moving to another
+          image closes that drawer but leaves the decision row available. */}
+      {sheet && !panelOpen && onStatus && (
+        <div onClick={(event) => event.stopPropagation()} data-review-controls
+          className="shrink-0 space-y-1 bg-black/60 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          {reviewControls}
+        </div>
       )}
       <ActionsHost sheet={sheet} open={panelOpen} panelId={panelId}
         label={`Image actions — ${alt}`} closeRef={panelCloseRef} onDone={closePanel}>
@@ -679,45 +754,7 @@ export default function DatasetLightbox({
                 : full ? '100 % — click image to fit' : 'fitted — click image for 100 %'}
           </span>
         </div>
-        {onStatus && (
-          /* ✓ Keep / ✕ Reject / ⏭ Skip — the Bank's review bar, in the screen
-             where a dataset is actually curated. Same order, same glyphs, same
-             colours and same keys, because the two screens ask the user the
-             very same question and a learned reflex must not be right in only
-             one of them. Each verdict then MOVES ON, which is what turns the
-             lightbox from a viewer into a way through 300 pictures.
-             The keys are printed on the buttons AND spelled out below: a
-             shortcut nobody can discover is folklore. */
-          <div className={`flex items-stretch gap-2 ${rail ? 'w-full flex-col' : 'w-full sm:w-auto'}`}>
-            <button type="button" onClick={() => decide('keep')} disabled={deciding || curationRefused}
-              aria-label={refused || `Keep ${alt} and move to the next image`}
-              title={refused || 'Keep this image and move on (K) — kept images are the ones captioned, exported and trained on'}
-              className="min-h-10 lg:min-h-9 flex-1 rounded-lg border border-emerald-400/60 bg-emerald-500/20 px-4 py-1.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-45">
-              ✓ Keep<ShortcutKey>K</ShortcutKey>
-            </button>
-            <button type="button" onClick={() => decide('reject')} disabled={deciding || curationRefused}
-              aria-label={refused || `Reject ${alt} and move to the next image`}
-              title={refused || 'Reject this image and move on (R) — reversible, and nothing is deleted from disk'}
-              className="min-h-10 lg:min-h-9 flex-1 rounded-lg border border-rose-400/60 bg-rose-500/20 px-4 py-1.5 text-xs font-semibold text-rose-100 hover:bg-rose-500/30 disabled:cursor-not-allowed disabled:opacity-45">
-              ✕ Reject<ShortcutKey>R</ShortcutKey>
-            </button>
-            <button type="button" onClick={skipImage} disabled={!nextImage || !onNavigate}
-              aria-label={nextImage
-                ? `Skip ${alt} and move to the next image`
-                : nav.nextReason || 'There is no next image to skip to'}
-              title={nextImage
-                ? 'Decide later (S) — moves on and leaves this image exactly as it is'
-                : nav.nextReason || 'There is no next image to skip to'}
-              className="min-h-10 lg:min-h-9 flex-1 rounded-lg border border-white/25 px-4 py-1.5 text-xs font-semibold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45">
-              ⏭ Skip<ShortcutKey>S</ShortcutKey>
-            </button>
-          </div>
-        )}
-        {onStatus && (
-          <p className={`text-2xs text-white/45 ${rail || sheet ? 'w-full' : ''}`}>
-            {REVIEW_SHORTCUT_HINT} · ← → move without deciding · Esc close
-          </p>
-        )}
+        {(!sheet || panelOpen) && reviewControls}
         {canCompare && (
           <button type="button" aria-pressed={compareMode === 'derived'}
             onClick={toggleCompare('derived')}
