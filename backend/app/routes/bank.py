@@ -1767,8 +1767,7 @@ def bank_apply_flags(bank_id):
 
 def _curation_filters(data):
     """The shared candidate-pool filters for the curation selectors — the same
-    facets as the grid (status ∩ flag ∩ cluster ∩ style ∩ subfolder ∩ search ∩
-    NOT exclude), read out of a JSON body. Unknown keys (e.g. the grid's ``sort``,
+    facets as the grid, read out of a JSON body. Unknown keys (e.g. the grid's ``sort``,
     which only orders) are ignored."""
     def _int(name):
         v = data.get(name)
@@ -1794,6 +1793,11 @@ def _curation_filters(data):
         # Same reason as exclude: a curation pick must not hand back images the
         # grid is currently hiding.
         'tags': data.get('tags') or None,
+        'res_bucket': data.get('res_bucket') or None,
+        'framing': data.get('framing') or None,
+        'origin': data.get('origin') or None,
+        'wd14_tags': data.get('wd14_tags') or None,
+        'reason': data.get('reason') or None,
         # 🎨 medium and ⤢ angle scope a curation pick exactly as they scope the
         # grid, under their OWN keys.
         'medium': data.get('medium') or None,

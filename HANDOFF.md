@@ -1,14 +1,19 @@
 # HANDOFF
 
-**Updated:** 2026-10-11 | **Delivery:** main | **Base:** c3e4b3187
+**Updated:** 2026-10-12 | **Branch:** fix/bank-curation-filter-scope | **Base:** 4b303f302 | **Tree:** clean
 
 ## State
 
-Main delivery includes group comparison, saved collections, and the earlier Keep / Reject changes.
-The user explicitly authorized clean, merge, push and stale-branch removal without tests.
-Source and bundle have separate delivery commits. The live backend was not restarted.
+Bank curation filter correction has separate source and frontend/dist commits on the task branch; neither is pushed.
+Laptop regression and privacy checks passed; broader suites retain baseline failures. No desktop tests or live restart ran.
 
 ## Done this session
+
+- Curation now forwards resolution, framing, origin, WD14 tags and rejection reason to the shared grid predicates, including hidden folders. Similar and text search share the correction.
+- Added 18 regression cases: all pass on the fix and all fail against unchanged base application code. Ruff, frontend build and ESLint passed; ESLint reports 32 warnings on unchanged files.
+- Laptop source snapshot `765c12e40c99e16c1dafc5f915340a3585978afd`: backend initially 161 passed / 2 failed / 2 skipped; correcting the archive checkout's missing Git ref makes privacy 8 passed / 2 private-name skips. The remaining folder/job-state failure reproduces on base `4b303f302`. Frontend core 5159 passed / 17 failed; all 17 reproduce across ten unchanged-base test files. Bundled frontend 1073 passed / 4 skipped. Logs and source hashes are ignored under `.superpowers/curation-filter-scope/`.
+
+Earlier delivery:
 
 - Bank comparison opens from style/duplicate groups, similarity/manual selections, and collections; previews page at 24 and full detail opens on demand.
 - Persistent collections support create, rename, membership edits, merge, split, delete, undo, grid scope, and kept-only promotion through existing destinations.
@@ -19,13 +24,13 @@ Source and bundle have separate delivery commits. The live backend was not resta
 
 ## Open
 
-1. Full frontend qualification remains incomplete: the previous core run had 5149 passed / 17 failed. Fifteen failures reproduce on unchanged c3e4b3187; two local failures come from leftover excluded-plugin directories. The clean tracked baseline had 16 failures; this work corrected its shortcut-hint failure. Do not restore excluded plugins.
+1. Full frontend qualification remains incomplete: the laptop core run had 5159 passed / 17 failed. All 17 failures reproduce on unchanged `4b303f302` in ten test files. Do not restore excluded plugins. The existing folder-exclusion/job-state backend failure also reproduces on that base.
 2. Bundled frontend suites passed 1073 tests with 4 skips. The npm test chain remains failed because core fails; report these separately.
-3. The user waived new test runs and authorized main delivery. No tests, responsive probes or cloud Gates run during delivery. Delivery commits carry [skip ci] so the push does not start test jobs. Earlier receipts do not qualify the exact final commit.
+3. The earlier main delivery waived new test runs and used [skip ci]. Current curation work has laptop test receipts, but Full Gates did not run and no main landing is authorized.
 4. The operator must restart Studio to register collection routes and create the two additive tables. Production data and the live runtime were not exercised.
 5. Physical phone/PWA acceptance remains open. Browser validation used synthetic component fixtures and the actual Bank workspace against an isolated test backend.
 6. Source and the consolidated build(frontend) bundle remain separate commits. Remove only task branches whose tips are contained in main and which have no other worktree.
-7. (2026-10-11): Upstream ports sit on `upstream-review/2026-10-11`, unpushed. No tests ran. Land on `main` only after cloud Gates pass on the exact commit.
+7. (2026-10-12): The user authorized source and bundle commits on `fix/bank-curation-filter-scope`. Laptop tests used an isolated source snapshot; no desktop test, push or restart ran. Full Gates and the Torch overlay were not run. Upstream ports remain on `upstream-review/2026-10-11`, unpushed; main landing requires cloud Gates on the exact commit.
 
 ## Decisions
 
@@ -66,11 +71,12 @@ A later review starts after `9d936b9e4`. Do not merge `upstream/v1` or
 
 ## Verify
 
-Do not run these commands under the current no-tests instruction. Future validation requires
-new authorization. Implementation receipts are in the ignored scratch logs.
+The user authorized these tests on the laptop only. Desktop tests still require explicit
+authorization. Current receipts are in `.superpowers/curation-filter-scope/`.
 
 ```powershell
 .venv/Scripts/python.exe -m pytest backend/tests/test_bank_collections.py -q
+.venv/Scripts/python.exe -m pytest backend/tests/test_image_bank_curation.py backend/tests/test_bank_sort_exclude.py backend/tests/test_image_bank_text_search.py backend/tests/test_image_bank_text_exclude.py backend/tests/test_no_personal_data.py -q
 .venv/Scripts/python.exe -m ruff check .
 ```
 
