@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-11-review-controls-clear-home-indicator',
+    date: '2026-10-11',
+    title: 'Review buttons stay above the home indicator',
+    blurb: 'On a phone, ▶ Review keeps Back, rotate, Crop, Reject, Skip and Keep fully on screen, clear of the home indicator. The picture shrinks so those buttons stay in view.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-11-z-lmstudio-framing',
     date: '2026-10-11',
     title: 'Classify framing reads close-ups again with LM Studio',
