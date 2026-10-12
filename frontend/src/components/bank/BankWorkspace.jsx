@@ -2077,6 +2077,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               K/R/S. Deliberately a button of its own rather than a tile gesture —
               the tile click stays the bulk-selection gesture it has always been. */}
           <button type="button" onClick={() => openReview(null)} disabled={reviewLoading}
+            aria-label="Review from the current filter"
             title="Review the images of this filter one at a time, full size: ✓ Keep / ✕ Reject / ⏭ Skip (K/R/S) each move to the next. Optional random order."
             className={`${TOOLBAR_CELL} border border-indigo-400/60 bg-indigo-500/20 font-semibold text-indigo-200 disabled:opacity-50 hover:bg-indigo-500/30`}>
             {reviewLoading ? 'Preparing' : 'Review'}

@@ -7637,7 +7637,9 @@ def delete_rejected(user_id, bank_id, job=None, *, _bank_lease=None) -> dict:
     normal path — see start_delete_rejected): progress is reported per file and
     Stop is honoured between files.
     """
-    bank = _delete_rejected_guard(user_id, bank_id, check_busy=job is None)
+    # The decorator already owns or validates the Bank lease. A second busy
+    # check would reject this call's own synchronous reservation.
+    bank = _delete_rejected_guard(user_id, bank_id, check_busy=False)
 
     # (id, relpath) tuples, not ORM rows, and ONE realpath for the whole batch:
     # the loop commits as it goes, which expires live ORM objects and would make

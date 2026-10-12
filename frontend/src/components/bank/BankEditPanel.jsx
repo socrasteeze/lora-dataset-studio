@@ -143,6 +143,7 @@ export default function BankEditPanel({
       </button>
       {open && (
         <div className="space-y-2 pb-3">
+          <p className="text-xs text-content-subtle">To crop one image, open ▶ Review and press <b>C</b> or choose Crop.</p>
           <div className="lds-section py-2.5 space-y-1.5">
             <div className="flex items-baseline gap-1.5">
               <span className="text-sm font-semibold text-content">✨ Upscale &amp; improve</span>

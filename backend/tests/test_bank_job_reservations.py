@@ -363,6 +363,7 @@ def test_service_mutators_cannot_bypass_an_existing_promotion_reservation(
             lambda: banks.apply_flags('local', bank_id, ['blur']),
             lambda: banks.resolve_dups('local', bank_id),
             lambda: banks.undo_last('local', bank_id),
+            lambda: banks.delete_rejected('local', bank_id),
             lambda: banks.set_watermark_regions(
                 'local', bank_id, image_id, None),
             lambda: banks.undo_watermark_clean('local', bank_id, [image_id]),

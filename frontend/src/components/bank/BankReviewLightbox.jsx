@@ -17,7 +17,7 @@
  * cursor with the error visible, so a decision is never silently dropped.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PartyPopper, Shuffle } from 'lucide-react';
+import { Flag as FlagIcon, PartyPopper, Shuffle } from 'lucide-react';
 import PluginSlot from '../../plugins/PluginSlot.jsx'
 import { contributionKey, createLayerTracker } from '../../plugins/layerTracker.js'
 import { apiFetch, postJson } from '../../api/fetchClient'
@@ -31,7 +31,7 @@ import {
 import BankWatermarkMaskDialog from './BankWatermarkMaskDialog'
 import CropModal from '../dataset/CropModal.jsx'
 import SourceAttribution from '../dataset/SourceAttribution'
-import { canEditMask } from './bankWatermarkMask.js'
+import { canEditMask, maskButtonLabel } from './bankWatermarkMask.js'
 import { dupStateSuffix } from './bankDupBadge.js'
 import { cropOutcomeMessage, imageVersionQuery } from './bankEdits.js'
 import {
@@ -440,6 +440,15 @@ export default function BankReviewLightbox({
             <p role="status" className="text-center text-sm text-sky-200">✂ {notice}</p>
           )}
           <Facts img={img} />
+          {canEditMask(img) && (
+            <div className="flex justify-center">
+              <button type="button" onClick={() => setMaskId(id)} disabled={busy}
+                title="Draw the watermark zones on this image (M) — decides nothing. Works even when the scan found nothing: what you draw becomes the flag, and Inpaint then repaints exactly that."
+                className="inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100 disabled:opacity-50 hover:bg-amber-500/20">
+                <FlagIcon className="h-4 w-4" />{maskButtonLabel(img)}{shortcut('M')}
+              </button>
+            </div>
+          )}
           <div className="flex w-full gap-2">
             <button type="button" onClick={goBack} disabled={session.pos === 0}
               title="Previous image (←) — navigation only, decides nothing"

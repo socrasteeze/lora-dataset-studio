@@ -106,8 +106,9 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
     <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm">
       {/* flex-wrap: at 400 px the label, the bar and Stop cannot share one row —
           they used to squash the label to a sliver. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <span className={`min-w-0 text-content ${stale ? 'opacity-60' : ''}`}>
+      <div className="flex min-h-28 flex-wrap items-center gap-x-3 gap-y-1.5 sm:min-h-24 lg:min-h-10">
+        <span className={`min-w-0 max-w-full break-words text-content ${stale ? 'opacity-60' : ''}`}>
+          <span aria-hidden>⏳</span>{' '}
           {pipe
             ? `Launch all — step ${(pipe.index ?? 0) + 1}/${pipe.total_steps} · ${plainStepLabel(pipe.current) || pipe.current}`
             : ({ scan: 'Quality scan', faces: 'Face pass', score: 'Scoring pass',
@@ -124,10 +125,10 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
               delete_rejected: 'Deleting rejected files' }[kind] || 'Job') + ' running'}
           {/* A step with no per-image counter publishes done=total=0. Printing
               a bare "0" would read as "0 done" on work that is running — so
-              the figure only appears when there is one. The phase sentence
-              (loading the model, grouping styles) stays off this line. */}
+              the figure only appears when there is one. */}
           {(done || total) ? <>{' — '}{done}{total ? ` / ${total}` : ''}</> : null}
           {eta ? `${(done || total) ? ' · ' : ' — '}${eta}` : ''}
+          {activity.detail ? `${(done || total || eta) ? ' · ' : ' — '}${activity.detail}` : ''}
         </span>
         {pct != null && (
           <div className="h-1.5 w-40 overflow-hidden rounded bg-surface-raised" role="progressbar"
@@ -136,8 +137,7 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
           </div>
         )}
         {/* No counter (loading a model, grouping styles): an indeterminate bar,
-            so a phase that is working never looks like a pass that stopped. The
-            phase sentence stays off the line and rides on hover instead. */}
+            so a phase that is working never looks like a pass that stopped. */}
         {pct == null && !stale && (
           <div className="h-1.5 w-40 overflow-hidden rounded bg-surface-raised" role="progressbar"
             aria-valuetext={activity.detail || undefined} title={activity.detail || undefined}>
@@ -150,10 +150,15 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
             presses; the line below carries it for everyone else. */}
         <button type="button" disabled={asked} title={note || undefined}
           onClick={() => { setStopAskedFor(jobKey(activity)); onCancel?.() }}
-          className="ml-auto rounded-md border border-border px-2 py-0.5 text-xs text-content hover:bg-surface-raised disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent">
+          className="ml-auto min-h-10 min-w-20 rounded-md border border-border px-2 py-0.5 text-xs text-content hover:bg-surface-raised disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent lg:min-h-0">
           {stopLabel(asked)}
         </button>
       </div>
+      {note && (
+        <p aria-live="polite" className="mt-1.5 mb-0 h-16 overflow-y-auto break-words text-xs text-content-muted sm:h-12">
+          {note}
+        </p>
+      )}
       {stale && <ProgressUnknown stale />}
     </div>
     {/* Outside the live box on purpose. Scan belongs in this row; it does not

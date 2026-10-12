@@ -58,7 +58,7 @@ export default function ExcludeFolderDialog({ bankId, onClose, onChanged }) {
           </p>
         )}
         {!data && !error && (
-          <p className="text-sm text-content-subtle">Loading folders…</p>
+          <p className="text-sm text-content-subtle">Loading folders</p>
         )}
         {data && folders.length === 0 && (
           <p className="text-sm text-content-muted">

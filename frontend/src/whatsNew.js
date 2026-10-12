@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-12-bank-review-progress-repairs',
+    date: '2026-10-12',
+    title: 'Bank Review Repairs',
+    blurb: 'Bank Review restores the watermark-mask button. Running passes show their phase and explain what Stop keeps or finishes without a hover. The Edits panel shows where to crop, and direct rejected-file deletion recognizes its own Bank lock.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-12-bank-curation-filter-scope',
     date: '2026-10-12',
     title: 'Filtered Bank Picks',
