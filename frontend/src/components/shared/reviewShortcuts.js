@@ -61,6 +61,8 @@ export function reviewKeyAction(event) {
   if (!event) return null;
   if (event.metaKey || event.ctrlKey || event.altKey) return null;
   if (event.key === 'Escape') return 'close';
+  // Holding a key must not decide images the user has not inspected.
+  if (event.repeat) return null;
   if (event.shiftKey) return null;
   if (ownsTypedKeys(event.target)) return null;
   const key = typeof event.key === 'string' ? event.key : '';

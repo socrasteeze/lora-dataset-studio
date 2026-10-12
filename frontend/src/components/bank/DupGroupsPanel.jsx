@@ -56,7 +56,7 @@ const KINDS = {
  * either bulk ones you take on trust or a click on a 96-pixel thumbnail, and a
  * stamp is not a size at which two copies of one shot can be told apart. */
 export default function DupGroupsPanel({ bankId, live, onChanged, kind = 'exact',
-  semanticLabel = 'CLIP', notDuplicates = 0 }) {
+  semanticLabel = 'CLIP', notDuplicates = 0, onCompareGroup, onSaveCollection }) {
   const k = KINDS[kind] || KINDS.exact
   const toast = useToast()
   const [data, setData] = useState(null)
@@ -177,6 +177,10 @@ export default function DupGroupsPanel({ bankId, live, onChanged, kind = 'exact'
               <span className="font-semibold text-content">Group #{g.group}</span>
               <span>{g.images.length} images — {k.cardHint}</span>
               <span className="ml-auto" />
+              {onCompareGroup && <button type="button" onClick={() => onCompareGroup(g.group)}
+                className="min-h-10 rounded-md border border-border px-2 font-semibold text-content hover:bg-surface-raised">Compare Group</button>}
+              {onSaveCollection && <button type="button" onClick={() => onSaveCollection(g.group)}
+                className="min-h-10 rounded-md border border-border px-2 font-semibold text-content hover:bg-surface-raised">Save Collection</button>}
               <button type="button" onClick={() => setComparing(g.group)}
                 title="Compare these copies full screen — side by side or one at a time — then keep one with K"
                 className="min-h-10 lg:min-h-0 rounded-md border border-primary/70 bg-primary/15 px-2 py-0.5 font-semibold text-content hover:bg-primary/25">

@@ -90,6 +90,7 @@ export function bankFilterParts(filter, { labels = {} } = {}) {
     MEDIUM_BUCKETS = [], ANGLE_BUCKETS = [], REASON_BUCKETS = [] } = labels
   const out = []
   if (f.status) out.push(STATUS_LABEL[f.status] || f.status)
+  if (f.collectionId != null) out.push(`Collection #${f.collectionId}`)
   // ✕ Why narrows to ONE reason inside the rejected pile. It carries its own
   // status scope server-side, so it can be active with no status chip lit — all
   // the more reason for the folded header to keep naming it.

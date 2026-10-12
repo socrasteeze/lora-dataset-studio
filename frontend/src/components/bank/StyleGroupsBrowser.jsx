@@ -10,7 +10,7 @@ import { IconButton, Select } from '../common/Controls.jsx'
  * where the rest are reachable. Picking one filters the bank to it, exactly
  * like a strip tile.
  */
-export default function StyleGroupsBrowser({ bankId, activeStyle, onPick, onClose }) {
+export default function StyleGroupsBrowser({ bankId, activeStyle, onPick, onClose, onCompare, onSaveCollection }) {
   const [groups, setGroups] = useState(null)
   const [error, setError] = useState(null)
   const [sort, setSort] = useState('size')
@@ -94,6 +94,10 @@ export default function StyleGroupsBrowser({ bankId, activeStyle, onPick, onClos
                     {g.aesthetic != null && <span className="ml-auto">★ {g.aesthetic.toFixed(1)}</span>}
                   </span>
                 </button>
+                {onCompare && <button type="button" onClick={() => { onCompare(g.id); onClose() }}
+                  className="mt-1 min-h-10 w-full rounded border border-border px-2 text-xs font-semibold text-content hover:bg-surface-raised">Compare</button>}
+                {onSaveCollection && <button type="button" onClick={() => { onSaveCollection(g.id); onClose() }}
+                  className="mt-1 min-h-10 w-full rounded border border-border px-2 text-xs font-semibold text-content hover:bg-surface-raised">Save Collection</button>}
               </li>
             ))}
           </ul>

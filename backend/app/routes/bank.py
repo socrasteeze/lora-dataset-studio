@@ -12,6 +12,7 @@ from flask import Blueprint, current_app, jsonify, request, send_file
 from ..config import LOCAL_USER
 from ..models import BankImage
 from ..services import bank_groups
+from ..services import bank_collections
 from ..services import bank_queue
 from ..services import bank_jobs, dataset_activity
 from ._common import _map_error, _require_no_stalled_comfyui
@@ -26,6 +27,68 @@ from ..services import image_bank_service as banks
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('bank', __name__, url_prefix='/api')
+
+
+def _collection_result(fn):
+    try:
+        return jsonify({'ok': True, **fn()})
+    except bank_collections.CollectionNotFound as error:
+        return jsonify({'error': str(error)}), 404
+    except bank_collections.CollectionConflict as error:
+        return jsonify({'error': str(error)}), 409
+    except bank_jobs.BankJobBusy as error:
+        return _busy(error)
+    except (ValueError, TypeError) as error:
+        return jsonify({'error': str(error)}), 400
+
+
+@bp.get('/bank/<int:bank_id>/collections')
+def bank_collections_list(bank_id):
+    return _collection_result(lambda: bank_collections.list_collections(LOCAL_USER, bank_id))
+
+
+@bp.post('/bank/<int:bank_id>/collections')
+def bank_collection_create(bank_id):
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'JSON body must be an object'}), 400
+    return _collection_result(lambda: bank_collections.create(
+        LOCAL_USER, bank_id, data.get('name'), data.get('image_ids', [])))
+
+
+@bp.get('/bank/<int:bank_id>/collections/<int:collection_id>')
+def bank_collection_get(bank_id, collection_id):
+    return _collection_result(lambda: bank_collections.detail(
+        LOCAL_USER, bank_id, collection_id,
+        request.args.get('offset', 0), request.args.get('limit', 24)))
+
+
+@bp.get('/bank/<int:bank_id>/collections/<int:collection_id>/ids')
+def bank_collection_ids(bank_id, collection_id):
+    return _collection_result(lambda: bank_collections.member_ids(LOCAL_USER, bank_id, collection_id))
+
+
+@bp.get('/bank/<int:bank_id>/collections/<int:collection_id>/promotable')
+def bank_collection_promotable(bank_id, collection_id):
+    return _collection_result(lambda: {'ids': bank_collections.promotable_ids(
+        LOCAL_USER, bank_id, collection_id)})
+
+
+@bp.post('/bank/<int:bank_id>/collections/<int:collection_id>')
+def bank_collection_change(bank_id, collection_id):
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'JSON body must be an object'}), 400
+    return _collection_result(lambda: bank_collections.mutate(LOCAL_USER, bank_id, collection_id, data))
+
+
+def _promotion_ids(bank_id, data):
+    if data.get('collection_id') is None:
+        return data.get('image_ids')
+    ids = bank_collections.promotable_ids(LOCAL_USER, bank_id, data['collection_id'])
+    if not ids:
+        raise ValueError('This collection has no available kept images to promote.')
+    return ids
 
 
 def _app():
@@ -522,6 +585,14 @@ def bank_images(bank_id):
                     ids.append(int(tok))
                 except ValueError:
                     pass
+    collection_id = _int('collection_id')
+    if args.get('collection_id') is not None:
+        if collection_id is None or collection_id < 1:
+            return jsonify({'error': 'collection_id must be a positive integer'}), 400
+        try:
+            bank_collections._collection(LOCAL_USER, bank_id, collection_id)
+        except ValueError:
+            return jsonify({'error': 'Collection is unavailable. Clear the collection filter.'}), 400
     payload = banks.list_images(
         LOCAL_USER, bank_id,
         status=args.get('status') or None,
@@ -554,6 +625,7 @@ def bank_images(bank_id):
         medium=args.get('medium') or None,
         angle=args.get('angle') or None,
         ids=ids,
+        collection_id=collection_id,
         # ids_only=1 answers {'ids': [...]} for the WHOLE filter in one request —
         # what ▶ Review and "Select all in filter" actually need. Same filters,
         # same sort, same route, so the two answers can never disagree about what
@@ -584,6 +656,12 @@ def bank_facets(bank_id):
             return None
 
     subfolder = args.get('subfolder')
+    collection_id = _int('collection_id')
+    if args.get('collection_id') is not None:
+        try:
+            bank_collections._collection(LOCAL_USER, bank_id, collection_id)
+        except ValueError:
+            return jsonify({'error': 'Collection is unavailable. Clear the collection filter.'}), 400
     out = banks.facet_counts(
         LOCAL_USER, bank_id,
         status=args.get('status') or None,
@@ -599,7 +677,8 @@ def bank_facets(bank_id):
         framing=args.get('framing') or None,
         origin=args.get('origin') or None,
         medium=args.get('medium') or None,
-        angle=args.get('angle') or None)
+        angle=args.get('angle') or None,
+        collection_id=collection_id)
     if out is None:
         return jsonify({'error': 'not found'}), 404
     return jsonify(out)
@@ -1381,10 +1460,11 @@ def bank_promote(bank_id):
         return jsonify({'error': 'JSON body must be an object'}), 400
     try:
         dataset_id = dataset_activity.normalize_dataset_id(data.get('dataset_id'))
+        image_ids = _promotion_ids(bank_id, data)
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return _start(banks.start_promote, _app(), LOCAL_USER, bank_id,
-                  data.get('image_ids'), dataset_id)
+                  image_ids, dataset_id)
 
 
 @bp.post('/bank/<int:bank_id>/promote-to-bank')
@@ -1403,7 +1483,7 @@ def bank_promote_to_bank(bank_id):
         return jsonify({'error': 'JSON body must be an object'}), 400
     try:
         new_id = banks.start_bank_promote(_app(), LOCAL_USER, bank_id,
-                                          data.get('image_ids'),
+                                          _promotion_ids(bank_id, data),
                                           data.get('name'))
     except bank_jobs.BankJobBusy as e:
         return _busy(e)
@@ -1427,7 +1507,7 @@ def bank_promote_to_new_dataset(bank_id):
     data = request.get_json(silent=True) or {}
     try:
         new_id = banks.start_new_dataset_promote(
-            _app(), LOCAL_USER, bank_id, data.get('image_ids') or [],
+            _app(), LOCAL_USER, bank_id, _promotion_ids(bank_id, data) or [],
             data.get('name'), data.get('trigger_word'))
     except bank_jobs.BankJobBusy as e:
         return _busy(e)
@@ -1503,7 +1583,8 @@ def bank_dups_resolve(bank_id):
         out = banks.resolve_dups(LOCAL_USER, bank_id, strategy=strategy,
                                  group=data.get('group'),
                                  keep_ids=data.get('keep_ids'),
-                                 respect_existing_keep=False)
+                                 respect_existing_keep=False,
+                                 **({'expected_ids': data['expected_ids']} if 'expected_ids' in data else {}))
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, **out})
@@ -1549,7 +1630,8 @@ def _distinct_action(bank_id, data, mark, restore, col):
             out = restore(LOCAL_USER, bank_id,
                           group=None if group is None else int(group), col=col)
         else:
-            out = mark(LOCAL_USER, bank_id, int(group))
+            out = mark(LOCAL_USER, bank_id, int(group),
+                       **({'expected_ids': data['expected_ids']} if 'expected_ids' in data else {}))
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, **out})
@@ -1587,7 +1669,8 @@ def bank_semantic_dups_resolve(bank_id):
         out = banks.resolve_semantic_dups(LOCAL_USER, bank_id, strategy=strategy,
                                           group=data.get('group'),
                                           keep_ids=data.get('keep_ids'),
-                                          respect_existing_keep=False)
+                                          respect_existing_keep=False,
+                                          **({'expected_ids': data['expected_ids']} if 'expected_ids' in data else {}))
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, **out})
@@ -1598,7 +1681,8 @@ def bank_images_status(bank_id):
     data = request.get_json(silent=True) or {}
     try:
         n = banks.set_status(LOCAL_USER, bank_id, data.get('ids') or [],
-                             data.get('status'))
+                             data.get('status'),
+                             **({'collection_id': data['collection_id']} if data.get('collection_id') is not None else {}))
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, 'changed': n})
@@ -1672,6 +1756,7 @@ def _curation_filters(data):
 
     subfolder = data.get('subfolder')
     return {
+        'collection_id': (_int('collection_id') or 0) if data.get('collection_id') is not None else None,
         'status': data.get('status') or None,
         'flag': data.get('flag') or None,
         'cluster': _int('cluster'),

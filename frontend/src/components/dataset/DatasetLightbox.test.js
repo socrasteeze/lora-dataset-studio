@@ -115,7 +115,7 @@ test('the dataset lightbox offers Keep / Reject / Skip on the Bank keys', () => 
   assert.match(lightbox, /decide\(action\)/);
   // K/R are the SAME status words the grid tile writes — no second notion of
   // "kept" for captioning, export and training to disagree with.
-  assert.match(lightbox, /await onStatus\(imageId, status\)/);
+  assert.match(lightbox, /await onStatus\(imageId, status, \{ onAccepted \}\)/);
   assert.match(workspace, /onStatus=\{viewImgLive\._rescueReviewPreview \? null : ds\.setStatus\}/);
   // Printed, not folklore — from the same constant the handler is built on.
   assert.match(lightbox, /\{REVIEW_SHORTCUT_HINT\} · ← → move without deciding · Esc close/);
@@ -138,16 +138,19 @@ test('✦ Repair owns every shortcut while it is open, not just Escape', () => {
   assert.match(lightbox, /pluginLayer, panelOpen, closePanel,\s*\n\s*repairOpen, improveOpen, patchImageState\]\);/);
 });
 
-test('a verdict advances only once the write has landed, and skip touches nothing', () => {
+test('a verdict advances on acceptance, preserves manual navigation, and skip touches nothing', () => {
   const decide = lightbox.match(/const decide = useCallback\(([\s\S]*?)\n  \}, \[/)[1];
   // The move is INSIDE the try, after the await: advancing first and posting
   // afterwards is how a decision is silently dropped on a slow disk.
-  assert.match(decide, /await onStatus\(imageId, status\);\s*\n[\s\S]*?if \(after && onNavigate\) onNavigate\(after\)/);
+  assert.match(decide, /currentIdRef\.current === imageId && after && onNavigate/);
+  assert.match(decide, /const onAccepted = \(\) =>/);
+  assert.match(decide, /if \(accepted\) return/);
+  assert.match(decide, /result\?\.ok === false/);
   // The next image is captured BEFORE the write — refreshing under a status
   // filter can retire this very image from the shown list.
   assert.match(decide, /const after = nextImage;[\s\S]*await onStatus/);
   // A second K while the first is in flight must not fire a second write.
-  assert.match(decide, /if \(!onStatus \|\| deciding \|\| busy \|\| imageId == null\) return/);
+  assert.match(decide, /decisionInFlight\.current\.has\(imageId\)/);
   // ⏭ Skip is nothing but "next": no status call anywhere in it.
   const skip = lightbox.match(/const skipImage = useCallback\(([\s\S]*?)\n  \}, \[/)[1];
   assert.doesNotMatch(skip, /onStatus/);

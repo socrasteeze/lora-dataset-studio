@@ -41,6 +41,9 @@ import CoveragePanel from './BankCoveragePanel.jsx'
 // the eight passes behind one button instead of across the top of the screen.
 import BankFilterRail from './BankFilterRail.jsx'
 import StyleGroupsBrowser from './StyleGroupsBrowser.jsx'
+import BankGroupComparison from './BankGroupComparison.jsx'
+import BankCollectionsDialog from './BankCollectionsDialog.jsx'
+import { comparisonSelectionIds } from './groupComparison.js'
 import BankPassesPanel from './BankPassesPanel.jsx'
 import {
   FLAG_HINT, FLAG_LABEL, FRAMING_BUCKETS, ORIGIN_BUCKETS, QUALITY_REJECT_FLAGS,
@@ -212,7 +215,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // global — see gridSort.bankSortStorageKey). Every other facet starts empty on
   // purpose: an order is a habit, a filter is a question you asked once.
   const [filter, setFilter] = useState(() => ({ status: null, flag: null, cluster: null,
-    style: null, subfolder: null, search: null, exclude: null, tags: null,
+    style: null, collectionId: null, subfolder: null, search: null, exclude: null, tags: null,
     sort: loadBankSort(bankId), resBucket: null,
     origin: null,
     // 🔖 WD14 facet filter: whole tag names. Several in one facet match any of
@@ -259,6 +262,14 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const [selected, setSelected] = useState(() => new Set())
   const selectAnchor = useRef(null)
   const [promoteOpen, setPromoteOpen] = useState(false)
+  const [comparison, setComparison] = useState(null)
+  const activeBankRef = useRef(bankId)
+  activeBankRef.current = bankId
+  const imageRequestRef = useRef(0)
+  const [comparisonLoading, setComparisonLoading] = useState(false)
+  const [collectionsOpen, setCollectionsOpen] = useState(false)
+  const [collectionDraftIds, setCollectionDraftIds] = useState([])
+  const [collectionViewName, setCollectionViewName] = useState('')
   const [deleteRejectedOpen, setDeleteRejectedOpen] = useState(false)
   // ↩ one step back over the last bulk decision. `undoDismissedAt` remembers the
   // offer the user waved away by its timestamp, so the NEXT bulk action shows a
@@ -435,6 +446,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
 
   const filterParams = useCallback((f) => {
     const params = {}
+    if (f.collectionId != null) params.collection_id = String(f.collectionId)
     if (f.status) params.status = f.status
     if (f.flag) params.flag = f.flag
     if (f.cluster != null) params.cluster = String(f.cluster)
@@ -481,6 +493,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   }, [])
 
   const refreshImages = useCallback(async (f = filter, off = offset, view) => {
+    if (activeBankRef.current !== bankId) return
+    const requestNumber = ++imageRequestRef.current
     // `view` (optional) lets a caller drive the fetch with values it just set,
     // dodging state-closure lag; otherwise read the current selection view.
     const on = view ? view.on : showSelected
@@ -490,7 +504,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       : { ...filterParams(f), offset: String(off), limit: String(PAGE_SIZE) }
     try {
       const d = await apiFetch(`/api/bank/${bankId}/images?${new URLSearchParams(params)}`)
-      setPage(d)
+      if (activeBankRef.current === bankId && requestNumber === imageRequestRef.current) setPage(d)
     } catch { /* transient — next poll retries */ }
   }, [bankId, filter, offset, filterParams, showSelected, selectedOrder])
 
@@ -522,7 +536,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     // and the first fetch must already use it, hence the explicit filter here
     // instead of a setFilter that the fetch below would race.
     const f = { ...filter, sort: loadBankSort(bankId) }
-    if (f.sort !== filter.sort) setFilter(f)
+    f.collectionId = null
+    if (f.sort !== filter.sort || filter.collectionId != null) setFilter(f)
+    setComparison(null); setCollectionsOpen(false); setCollectionViewName('')
     // A new bank starts a new announcement history: without this reset, the
     // first payload of the next bank could re-toast its old finished snapshot.
     announcedActivityAt.current = undefined
@@ -675,7 +691,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       // all" left them narrowing a grid the header then called unfiltered,
       // which is the exact failure bankFilterSummary.js exists to prevent.
       // Every facet, or the button is lying.
-      medium: null, angle: null, reason: null })
+      medium: null, angle: null, reason: null, collectionId: null })
   }
 
   // Sort only reorders — the same rows match, so the selection (a set of ids)
@@ -1178,6 +1194,54 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     bankId, filter, filterParams, fetchAllIds, showSelected, selected,
     selectedOrder, setPage, toast, refreshPayload, refreshImages,
   })
+
+  const openComparison = async (options = {}) => {
+    setComparisonLoading(true)
+    try {
+      const ids = options.ids || (options.collectionId != null
+        ? (await apiFetch(`/api/bank/${bankId}/collections/${options.collectionId}/ids`)).ids
+        : await fetchAllIds(bankId, options.params || filterParams(filter)))
+      if (activeBankRef.current !== bankId) return
+      closeRail()
+      setComparison({ ids, kind: 'selection', title: 'Compare Group',
+        collectionId: options.params ? null : filter.collectionId, ...options })
+    } catch (error) {
+      toast.error(error.message || 'Could not open comparison.')
+      throw error
+    } finally { setComparisonLoading(false) }
+  }
+  const compareCurrent = () => openComparison({
+    ...(selected.size ? { ids: comparisonSelectionIds(selected, selectedOrder || []), title: 'Compare Selection' }
+      : showSelected ? { ids: selectedOrder || [] } : {}),
+  }).catch(() => {})
+  const openCollections = (ids = [...selected]) => {
+    closeRail(); setCollectionDraftIds(ids); setCollectionsOpen(true)
+  }
+  const openGroupCollection = async (params) => {
+    try {
+      const ids = await fetchAllIds(bankId, params)
+      if (activeBankRef.current === bankId) openCollections(ids)
+    }
+    catch (error) { toast.error(error.message || 'Could not load group members.') }
+  }
+  const openCollectionGrid = (collection) => {
+    setSearchText(''); setExcludeText('')
+    setTagSource(null); setTagPicked(new Set())
+    const f = { ...filter, status: null, flag: null, cluster: null, style: null,
+      collectionId: collection.id, subfolder: null, search: null, exclude: null, tags: null,
+      wd14Tags: [], resBucket: null, framing: null, origin: null, medium: null, angle: null, reason: null }
+    setCollectionViewName(collection.name); setF(f); setCollectionsOpen(false)
+  }
+  const collectionsChanged = (result) => {
+    if (activeBankRef.current !== bankId) return
+    if (result?.collections && filter.collectionId != null
+        && !result.collections.some((collection) => collection.id === filter.collectionId)) {
+      setF({ collectionId: null }); setCollectionViewName('')
+      refreshPayload()
+      return
+    }
+    refreshPayload(); refreshImages()
+  }
 
   const selectAllCurrent = async () => {
     try {
@@ -1949,6 +2013,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         )}
         {styleBrowserOpen && (
           <StyleGroupsBrowser bankId={bankId} activeStyle={filter.style}
+            onCompare={(id) => openComparison({ params: { style: String(id) }, kind: 'style', title: `Style Group ${id}` }).catch(() => {})}
+            onSaveCollection={(id) => openGroupCollection({ style: String(id) })}
             onPick={(id) => {
               setF({ style: id, flag: null, cluster: null })
               // On a phone the rail is a drawer over the grid: close it so the
@@ -1961,6 +2027,15 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         {/* ── The grid, full height ── with everything that acts on a SELECTION
             directly above it, where the effect of the click is visible. */}
         <main className="min-w-0 space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button disabled={comparisonLoading || !(selected.size || page.total)} onClick={compareCurrent}>Compare</Button>
+          <Button onClick={() => openCollections()}>Collections</Button>
+          {filter.collectionId != null && <>
+            <span className="min-w-0 flex-1 truncate text-xs text-content-muted" title={collectionViewName}>Collection: {collectionViewName || `#${filter.collectionId}`}</span>
+            <Button onClick={() => { setF({ collectionId: null }); setCollectionViewName('') }}>Clear Collection</Button>
+          </>}
+          {comparisonLoading && <span role="status" className="text-xs text-content-muted">Loading comparison</span>}
+        </div>
         {/* Results readout + selection actions. Five equal cells across the row. */}
         <div className="space-y-1.5">
         <div className="grid w-full grid-cols-5 items-stretch gap-1.5">
@@ -2483,10 +2558,14 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
 
           {filter.flag === 'dups' ? (
             <DupGroupsPanel bankId={bankId} live={live} kind="exact"
+              onCompareGroup={(groupId) => openComparison({ params: { group: String(groupId) }, kind: 'exact', groupId, title: `Duplicate Group ${groupId}` }).catch(() => {})}
+              onSaveCollection={(groupId) => openGroupCollection({ group: String(groupId) })}
               notDuplicates={payload?.dup?.not_duplicates ?? 0}
               onChanged={async () => { await refreshPayload(); await refreshImages() }} />
           ) : filter.flag === 'semantic_dups' ? (
             <DupGroupsPanel bankId={bankId} live={live} kind="semantic"
+              onCompareGroup={(groupId) => openComparison({ params: { semantic_group: String(groupId) }, kind: 'semantic', groupId, title: `Same Shot ${groupId}` }).catch(() => {})}
+              onSaveCollection={(groupId) => openGroupCollection({ semantic_group: String(groupId) })}
               semanticLabel={semanticState.label}
               notDuplicates={payload?.semantic_dup?.not_duplicates ?? 0}
               onChanged={async () => { await refreshPayload(); await refreshImages() }} />
@@ -2559,6 +2638,17 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           // header saying "3 promoted" over a grid showing none.
           onStarted={() => { setPromoteOpen(false); refreshPayload(); refreshImages() }} />
       )}
+
+      {comparison && <BankGroupComparison bankId={bankId} group={comparison} live={live}
+        suspended={collectionsOpen} onClose={() => setComparison(null)}
+        onChanged={() => { refreshPayload(); refreshImages() }} onSaveCollection={openCollections} />}
+      {collectionsOpen && <BankCollectionsDialog bankId={bankId} bankName={payload?.name || ''}
+        initialIds={collectionDraftIds} onClose={() => setCollectionsOpen(false)}
+        onOpenGrid={openCollectionGrid} onChanged={collectionsChanged}
+        onCompare={async (collection) => {
+          await openComparison({ collectionId: collection.id, kind: 'collection', title: collection.name })
+          setCollectionsOpen(false)
+        }} />}
 
       {deleteRejectedOpen && (
         <DeleteRejectedDialog bankId={bankId} count={counts?.reject || 0}

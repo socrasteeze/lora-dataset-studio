@@ -105,10 +105,10 @@ export function back(s) {
 
 /** Record a decision that the server ALREADY accepted, then advance. Callers
  * must not call this on a failed POST — the image must stay under the cursor. */
-export function decide(s, status) {
-  const id = currentId(s);
-  if (id == null) return s;
-  return advance({ ...s, decisions: { ...s.decisions, [id]: status } });
+export function decide(s, status, id = currentId(s)) {
+  if (id == null || !s.pool.includes(id)) return s;
+  const next = { ...s, decisions: { ...s.decisions, [id]: status } };
+  return currentId(s) === id ? advance(next) : next;
 }
 
 /** "Not now": nothing is written to the DB, but it is not proposed again in

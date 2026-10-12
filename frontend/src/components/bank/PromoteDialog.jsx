@@ -26,7 +26,7 @@ import { triggerWarning } from '../dataset/newDataset.js'
  * not — and why neither dataset door does: those re-encode to webp on the way
  * in, so the source weight would be a checkable lie. */
 export default function PromoteDialog({ bankId, bankName: sourceBankName,
-  selectedIds, onClose, onStarted }) {
+  selectedIds, onClose, onStarted, collectionId = null }) {
   const toast = useToast()
   const [destination, setDestination] = useState('dataset')
   const [datasets, setDatasets] = useState(null)
@@ -86,6 +86,7 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
         await postJson(`/api/bank/${bankId}/promote-to-bank`, {
           name: bankName.trim(),
           image_ids: useSelection ? selectedIds : [],
+          ...(collectionId != null ? { collection_id: collectionId } : {}),
         })
         // The job runs on THIS bank (its rows are the ones being marked), so the
         // progress bar is here — say where the new bank turns up rather than
@@ -97,6 +98,7 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
           name: newDsName.trim(),
           trigger_word: newDsTrigger.trim(),
           image_ids: useSelection ? selectedIds : [],
+          ...(collectionId != null ? { collection_id: collectionId } : {}),
         })
         // Same reasoning as the bank branch: the job is registered on THIS bank,
         // so the progress bar is here. Landing the user on the new dataset would
@@ -108,6 +110,7 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
         await postJson(`/api/bank/${bankId}/promote`, {
           dataset_id: Number(datasetId),
           image_ids: useSelection ? selectedIds : [],
+          ...(collectionId != null ? { collection_id: collectionId } : {}),
         })
         toast.success('Promotion started — follow the progress bar.')
       }

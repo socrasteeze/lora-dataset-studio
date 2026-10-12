@@ -135,6 +135,7 @@ Point it at a messy dump of thousands of images and triage it in place. Nothing 
 | **🔤 Find by text** | Rank what you're looking at by a written phrase — *"brunette outdoors, wide shot"* — reusing ✨ Score's embeddings. A ranking, not a filter |
 | **🎨 Pick diverse · ⚖️ Balanced pick** | Cover the visual space, or spread the pick evenly over face / bust / body / back instead of taking the top of one ranking |
 | **📊 Coverage** | The readiness meter says the set is big enough; it does not say it is varied. Coverage reads the labels, the scoring embeddings and the captions to name what the pool never shows — no profile views, one outfit, eye level only. Advice only: nothing is kept or rejected, and anything unmeasurable says so instead of drawing an empty bar |
+| **Group Comparison & Collections** | Compare related candidates, keep several examples, and save named Bank collections. Merge, split, and undo membership changes without moving source files. Promote only available kept members. See [Bank collections](docs/guide/using-the-app.md#bank-saved-collections). |
 | **🎚 Thresholds · ↩ Undo** | Retune the twelve numbers behind the flags without leaving the bank, and take the last bulk decision back |
 | **▶ Review** | Full-screen, one image at a time, **Keep / Reject / Skip** — for the pile that needs an eye, not a filter |
 | **📦 Move folder** | Move a bank's images to another disk and keep every analysis: scores, duplicate groups, faces, decisions, captions |
