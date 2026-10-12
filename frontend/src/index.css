@@ -32,6 +32,17 @@
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
 .app-mobile-nav > * { flex-shrink: 0; }
+/* Bank ▶ Review. 100vh is the fallback; 100dvh wins where it is supported,
+   so the shell matches the visible viewport. The decision bar keeps its
+   0.625rem bottom padding, and uses the home-indicator inset when larger. */
+.bank-review-shell {
+  height: 100vh;
+  height: 100dvh;
+}
+.bank-review-controls {
+  flex-shrink: 0;
+  padding-bottom: max(0.625rem, env(safe-area-inset-bottom));
+}
 .app-header a:focus-visible,
 .app-header button:focus-visible {
   outline: 2px solid rgb(var(--accent));

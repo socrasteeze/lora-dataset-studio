@@ -380,7 +380,7 @@ export default function BankReviewLightbox({
   return (
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Review the bank image by image"
       data-probe-chrome="review" data-probe-layer
-      className="fixed inset-0 z-[9996] flex flex-col bg-black/95">
+      className="bank-review-shell fixed inset-x-0 top-0 z-[9996] flex flex-col bg-black/95">
       <div className="flex shrink-0 flex-wrap items-center gap-3 px-4 py-2 text-sm">
         <span className="font-semibold text-white">▶ Review</span>
         <span className="tabular-nums text-white/80">
@@ -431,7 +431,7 @@ export default function BankReviewLightbox({
       )}
 
       {!done && (
-        <div className="shrink-0 space-y-2 bg-black/60 px-4 py-2.5">
+        <div className="bank-review-controls shrink-0 space-y-2 bg-black/60 px-4 pt-2.5">
           <div className="min-h-5 text-center text-xs">
             {error ? <p role="alert" className="text-rose-300">{error} Try again.</p>
               : <p role="status" className="text-white/60">{busy ? 'Saving' : <span>{REVIEW_SHORTCUT_HINT}</span>}</p>}
