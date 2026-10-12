@@ -25,6 +25,7 @@ Source and bundle have separate delivery commits. The live backend was not resta
 4. The operator must restart Studio to register collection routes and create the two additive tables. Production data and the live runtime were not exercised.
 5. Physical phone/PWA acceptance remains open. Browser validation used synthetic component fixtures and the actual Bank workspace against an isolated test backend.
 6. Source and the consolidated build(frontend) bundle remain separate commits. Remove only task branches whose tips are contained in main and which have no other worktree.
+7. (2026-10-11): Upstream ports sit on `upstream-review/2026-10-11`, unpushed. No tests ran. Land on `main` only after cloud Gates pass on the exact commit.
 
 ## Decisions
 
@@ -34,6 +35,25 @@ Source and bundle have separate delivery commits. The live backend was not resta
 - Generic comparison decisions affect selected candidates only. Explicit duplicate resolution rejects other copies; snapshot validation refuses changed groups. Distinct preserves decisions.
 - Collection promotion rechecks available kept members on the server and refuses an empty eligible set. Collection metadata never changes source files or verified attribution.
 - The user authorized isolated local tests and responsive checks during implementation, then instructed delivery without further tests. No real datasets, GPU jobs or external media were used for validation. No deployment or production restart is authorized.
+
+## Upstream review carried forward
+
+On 2026-10-11, `upstream` `v2` was `9d936b9e4`
+(`docs: simplify the Vast.ai signup badge label`, 2026-10-11). `v1` was
+`3fe3d4f0e`. The review used fork commit `d658c6357` and merge base
+`d13337cc3`. Git counted 700 fork-only and 22 upstream-only commits. The
+latter count is an ancestry difference, not 22 missing features.
+
+| Upstream commits | Decision and evidence |
+| --- | --- |
+| `d5a837849` | Ported as `f8dccc89b`. The fork ships no Runs-hub plugin, so `/cloud` polled the unregistered `/dataset/train/runs` and showed HTTP 404. Both `/dataset/train/runs` and `/dataset/train/cloud/runs` now serve `ct.all_runs`; What's New drops the Cloud-plugin wording. |
+| `c4fedcd46` | Ported cleanly as `dbe88f50a`. LM Studio now receives the image before the classify prompt. |
+| `6e80370cc`, `7bb6b6b96` | Bundle-only. Rebuilt from source as `0f49073dc`. |
+| `57217e137`, `9d936b9e4` | Skip the README Vast.ai referral badge under Divergence 4. It advertises the rented-GPU lane this fork removed. |
+
+Decision: adopt `d5a837849` and `c4fedcd46` on `upstream-review/2026-10-11`.
+A later review starts after `9d936b9e4`. Do not merge `upstream/v1` or
+`upstream/v2`.
 
 ## Traps
 
