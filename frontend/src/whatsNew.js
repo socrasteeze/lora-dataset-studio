@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-12-bank-curation-filter-scope',
+    date: '2026-10-12',
+    title: 'Filtered Bank Picks',
+    blurb: 'Pick diverse and Balanced pick now respect resolution, framing, origin, WD14 tags and rejection reason. Hidden folders also stay outside the selection. Similar and text search use the same filters.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-11-review-controls-clear-home-indicator',
     date: '2026-10-11',
     title: 'Review buttons stay above the home indicator',

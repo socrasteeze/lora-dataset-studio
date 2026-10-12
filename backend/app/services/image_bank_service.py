@@ -6588,69 +6588,24 @@ _CURATION_MAX_N = 2000       # a curated LoRA set is 20–200 images; this is ge
 
 def _pool_query(bank_id, th, *, status=None, flag=None, cluster=None,
                 style=None, subfolder=None, search=None, exclude=None, tags=None,
-                medium=None, angle=None, collection_id=None):
+                medium=None, angle=None, collection_id=None, res_bucket=None,
+                framing=None, origin=None, wd14_tags=None, reason=None):
     """The candidate-pool query for the curation selectors — the SAME filter
-    composition as list_images (status ∩ flag ∩ cluster ∩ style ∩ subfolder ∩
-    search ∩ NOT exclude), minus the ordering/pagination, so "give me 60 diverse
-    images" is
-    composable with whatever the grid is currently showing.
-
-    Kept as its own function (a small, deliberate mirror of the list_images WHERE
-    clauses) rather than a shared refactor: three curation-related branches touch
-    this file in parallel, so an additive helper rebases clean where an edit to
-    the list_images hot path would collide. When NO status is chosen the reject
-    pile is excluded — you curate from what you might keep, never from the bin."""
+    composition as list_images, without ordering/pagination. With no explicit
+    status or rejection reason, rejected images remain outside the pool."""
     q = BankImage.query.filter_by(bank_id=bank_id)
-    if collection_id is not None:
-        from . import bank_collections
-        q = bank_collections.scope_query(bank_id, collection_id, q)
-    if status in ('pending', 'keep', 'reject'):
-        q = q.filter(BankImage.status == status)
-    else:
+    if status not in ('pending', 'keep', 'reject') and reason not in REASON_KEYS:
         q = q.filter(BankImage.status != 'reject')
-    if flag == 'flagged':
-        crits = [c for c in (_flag_filter(f, th) for f in _QUALITY_FLAGS)
-                 if c is not None]
-        q = q.filter(or_(*crits))
-    elif flag == 'clean':
-        q = q.filter(_clean_criterion(th))
-    elif flag == 'dups':
-        # Same qualification as list_images — this function's own docstring calls
-        # itself a deliberate mirror of those WHERE clauses, so a divergence here
-        # is exactly the debt it warns about. Unqualified, a diversity pick on a
-        # resolved bank drew from 3 173 orphaned singletons.
-        q = q.filter(BankImage.dup_group.isnot(None),
-                     BankImage.dup_group.in_(
-                         _unresolved_dup_groups_q(bank_id).scalar_subquery()))
-    elif flag == 'semantic_dups':
-        q = q.filter(BankImage.semantic_dup_group.isnot(None),
-                     BankImage.semantic_dup_group.in_(
-                         _unresolved_dup_groups_q(
-                             bank_id, BankImage.semantic_dup_group).scalar_subquery()))
-    elif flag == 'no_face':
-        q = q.filter(BankImage.face_state == 'no_face')
-    elif flag in _QUALITY_FLAGS + _SCORE_FLAGS:
-        crit = _flag_filter(flag, th)
-        if crit is not None:
-            q = q.filter(crit)
-    if cluster is not None:
-        q = q.filter(BankImage.face_cluster == int(cluster))
-    if style is not None:
-        q = q.filter(BankImage.style_cluster == int(style))
-    # The two newest facets narrow a curation pick exactly as they narrow the
-    # grid — "60 diverse images, among the photographs, three-quarter only" has
-    # to mean the same thing in both places or the selection stops matching what
-    # the user is looking at.
-    if medium in MEDIUM_KEYS:
-        q = q.filter(BankImage.medium == medium)
-    if angle in ANGLES:
-        q = q.filter(_angle_case() == angle)
-    if subfolder is not None:
-        if subfolder == '':
-            q = q.filter(~BankImage.relpath.contains(os.sep))
-        else:
-            q = q.filter(BankImage.relpath.startswith(subfolder + os.sep))
-    return _apply_text_filters(q, search, exclude, tags)
+    q, _ = _apply_facets(
+        q, th, bank_id=bank_id, collection_id=collection_id,
+        status=status, reason=reason, flag=flag, cluster=cluster, style=style,
+        subfolder=subfolder, search=search, exclude=exclude, tags=tags,
+        res_bucket=res_bucket, framing=framing, origin=origin,
+        medium=medium, angle=angle)
+    for group in _clean_tag_groups(wd14_tags):
+        clauses = [_wd14_tag_clause(tag) for tag in group]
+        q = q.filter(clauses[0] if len(clauses) == 1 else or_(*clauses))
+    return q
 
 
 def _pool_embeddings(bank, emb_by_path, filters):

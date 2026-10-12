@@ -176,6 +176,129 @@ def test_diverse_composes_with_filter_and_excludes_rejects(client, tmp_path, app
     assert picked == {'i0.jpg', 'i1.jpg'}
 
 
+@pytest.mark.parametrize('selector', ['select-diverse', 'select-balanced'])
+@pytest.mark.parametrize(('filters', 'matching', 'outside'), [
+    ({'res_bucket': 'res_1_2'}, {'width': 1000, 'height': 1000},
+     {'width': 500, 'height': 500}),
+    ({'framing': 'face'}, {'framing': 'face'}, {'framing': 'body'}),
+    ({'origin': 'camera'}, {'origin': 'camera'}, {'origin': 'ai'}),
+    ({'wd14_tags': 'blonde_hair|brown_hair,shirt'},
+     {'tags_text': ',brown_hair,shirt,'},
+     {'tags_text': ',blonde_hair_ribbon,shirt,'}),
+    ({'reason': 'duplicate'}, {'status': 'reject', 'reject_reason': 'duplicate'},
+     {'status': 'reject', 'reject_reason': 'manual'}),
+    ({'reason': 'unrecorded'}, {'status': 'reject', 'reject_reason': None},
+     {'status': 'pending', 'reject_reason': None}),
+])
+def test_curation_matches_grid_facets(client, tmp_path, app, selector,
+                                     filters, matching, outside):
+    """Each formerly ignored facet selects the same whole pool as the grid."""
+    names = ['a.jpg', 'b.jpg', 'c.jpg', 'd.jpg']
+    bank_id, _ = _mkbank(client, tmp_path, names)
+    _write_score_cache(app, bank_id, {nm: _emb(1.0) for nm in names})
+    with app.app_context():
+        from app.extensions import db
+        from app.models import BankImage
+        rows = sorted(BankImage.query.filter_by(bank_id=bank_id).all(),
+                      key=lambda r: r.id)
+        for k, row in enumerate(rows):
+            row.framing = 'face'
+            for key, value in (matching if k < 2 else outside).items():
+                setattr(row, key, value)
+        db.session.commit()
+    grid = client.get(f'/api/bank/{bank_id}/images',
+                      query_string={**filters, 'ids_only': '1'})
+    assert grid.status_code == 200, grid.get_json()
+    expected = grid.get_json()['ids']
+    assert _names_of(app, bank_id, expected) == {'a.jpg', 'b.jpg'}
+    response = client.post(f'/api/bank/{bank_id}/{selector}',
+                           json={'n': 20, 'typicality': 0, **filters})
+    assert response.status_code == 200, response.get_json()
+    assert response.get_json()['pool'] == 2
+    assert set(response.get_json()['image_ids']) == set(expected)
+    sampled = client.post(f'/api/bank/{bank_id}/{selector}',
+                          json={'n': 1, 'typicality': 0, **filters})
+    assert sampled.status_code == 200, sampled.get_json()
+    assert sampled.get_json()['pool'] == 2
+    assert len(sampled.get_json()['image_ids']) == 1
+    assert set(sampled.get_json()['image_ids']).issubset(expected)
+
+
+@pytest.mark.parametrize('selector', ['select-diverse', 'select-balanced'])
+def test_curation_composes_facets_across_pages(client, tmp_path, app, selector):
+    """A composed filter reaches later pages and excludes each nonmatch."""
+    names = [f'i{k}.jpg' for k in range(8)]
+    bank_id, _ = _mkbank(client, tmp_path, names)
+    _write_score_cache(app, bank_id, {nm: _emb(1.0) for nm in names})
+    with app.app_context():
+        from app.extensions import db
+        from app.models import BankImage
+        rows = sorted(BankImage.query.filter_by(bank_id=bank_id).all(),
+                      key=lambda r: r.id)
+        for row in rows:
+            row.width = row.height = 1000
+            row.framing = 'face'
+            row.origin = 'camera'
+            row.tags_text = ',blonde_hair,shirt,'
+            row.caption = 'red dress'
+            row.status = 'keep'
+        rows[2].width = 500
+        rows[3].framing = 'body'
+        rows[4].origin = 'ai'
+        rows[5].tags_text = ',blonde_hair,'
+        rows[6].caption = 'blue dress'
+        rows[7].status = 'pending'
+        db.session.commit()
+    filters = {'res_bucket': 'res_1_2', 'framing': 'face', 'origin': 'camera',
+               'wd14_tags': 'blonde_hair|brown_hair,shirt', 'search': 'red',
+               'status': 'keep'}
+    first = client.get(f'/api/bank/{bank_id}/images',
+                       query_string={**filters, 'limit': 1}).get_json()
+    second = client.get(f'/api/bank/{bank_id}/images',
+                        query_string={**filters, 'limit': 1, 'offset': 1}).get_json()
+    assert first['total'] == second['total'] == 2
+    expected = [im['id'] for page in (first, second) for im in page['images']]
+    assert _names_of(app, bank_id, expected) == {'i0.jpg', 'i1.jpg'}
+    response = client.post(f'/api/bank/{bank_id}/{selector}',
+                           json={'n': 20, 'typicality': 0, **filters})
+    assert response.status_code == 200, response.get_json()
+    assert response.get_json()['pool'] == 2
+    assert set(response.get_json()['image_ids']) == set(expected)
+
+
+@pytest.mark.parametrize('selector', ['select-diverse', 'select-balanced'])
+def test_curation_excludes_hidden_folders(client, tmp_path, app, selector):
+    names = ['visible/a.jpg', 'hidden/b.jpg', 'hidden/nested/c.jpg']
+    bank_id, _ = _mkbank(client, tmp_path, names)
+    _write_score_cache(app, bank_id, {
+        os.path.basename(nm): _emb(1.0) for nm in names})
+    _set_framings(app, bank_id, {os.path.basename(nm): 'face' for nm in names})
+    response = client.put(f'/api/bank/{bank_id}/folder-exclusions',
+                          json={'excluded': ['hidden']})
+    assert response.status_code == 200, response.get_json()
+    response = client.post(f'/api/bank/{bank_id}/{selector}',
+                           json={'n': 20, 'typicality': 0})
+    assert response.status_code == 200, response.get_json()
+    assert response.get_json()['pool'] == 1
+    assert _names_of(app, bank_id, response.get_json()['image_ids']) == {'a.jpg'}
+
+
+@pytest.mark.parametrize('selector', ['select-diverse', 'select-balanced'])
+def test_curation_empty_filter_never_falls_back_to_bank(client, tmp_path, app, selector):
+    bank_id, _ = _mkbank(client, tmp_path, ['a.jpg'])
+    _write_score_cache(app, bank_id, {'a.jpg': _emb(1.0)})
+    _set_framings(app, bank_id, {'a.jpg': 'face'})
+    response = client.post(f'/api/bank/{bank_id}/{selector}',
+                           json={'n': 20, 'framing': 'back'})
+    if selector == 'select-balanced':
+        assert response.status_code == 400
+        assert 'nothing to select' in response.get_json()['error']
+    else:
+        assert response.status_code == 200, response.get_json()
+        assert response.get_json()['pool'] == 0
+        assert response.get_json()['image_ids'] == []
+
+
 # --- diversity: the typicality guard -----------------------------------------
 # Pure farthest-point sampling maximises the distance to what is already chosen,
 # which is EXACTLY the criterion that prefers isolated points: on a collected
