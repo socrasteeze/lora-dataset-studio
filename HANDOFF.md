@@ -1,11 +1,11 @@
 # HANDOFF
 
-**Updated:** 2026-10-12 | **Branch:** fix/bank-curation-filter-scope | **Base:** 2140d60c3 | **Tree:** clean
+**Updated:** 2026-10-12 | **Delivery target:** main | **Base:** 4b303f302 | **Qualification:** exact-head Fork Gates
 
 ## State
 
-The filter fix and follow-up suite repairs have separate source and frontend bundle commits on the task branch.
-Laptop test suites and responsive checks pass. No desktop tests, push, main landing or live restart ran.
+The delivery wave includes the filter fix, suite repairs and separate source/frontend bundle commits.
+The user authorized main publication after exact-commit cloud Gates. Git refs and GitHub Actions record landing/qualification status. No live restart ran.
 
 ## Done this session
 
@@ -27,13 +27,13 @@ Earlier delivery:
 
 ## Open
 
-1. Run the exact-commit cloud gate before the authorized main delivery. `.github/workflows/fork-gates.yml` runs the existing Gates script with pinned dev/CPU Torch dependencies on the exact PR head. Current laptop evidence combines passing test phases with a final attribution replay; the original invocation retains its exit 1 receipt.
+1. Qualification is recorded by `.github/workflows/fork-gates.yml`, which runs the existing Gates script with pinned dev/CPU Torch dependencies on the exact PR head. Check the cloud receipt for the delivered commit; laptop receipts alone do not qualify a later landing.
 2. The user authorized clean push, main merge and stale-branch deletion. Preserve the declared skips. Merge only after cloud Gates passes; delete only branches contained in main and absent from other worktrees.
-3. The earlier main delivery waived new test runs and used [skip ci]. Current tests run on the laptop only, with isolated data and pinned dev/CPU Torch dependencies. Main landing still requires the repository's exact-commit cloud gate.
+3. Desktop tests remain restricted. Laptop tests were explicitly authorized and isolated; the cloud workflow uses a fresh test environment. Preserve the original snapshot invocation's exit 1 receipt and its attribution replay as separate evidence.
 4. The operator must restart Studio to register collection routes and create the two additive tables. Production data and the live runtime were not exercised.
 5. Physical phone/PWA acceptance remains open. Browser validation used synthetic component fixtures and the actual Bank workspace against an isolated test backend.
 6. Source and the consolidated build(frontend) bundle remain separate commits. Remove only task branches whose tips are contained in main and which have no other worktree.
-7. (2026-10-12): The user authorized source and bundle commits on `fix/bank-curation-filter-scope`. Laptop tests used isolated data and the pinned dev/CPU Torch environment. Upstream ports remain on `upstream-review/2026-10-11`, unpushed; main landing requires cloud Gates on the exact commit.
+7. The earlier Runs and LM Studio framing ports (`f8dccc89b`, `dbe88f50a`) are already ancestors of main. There is no remaining local upstream-review branch to land or delete. Do not restore excluded plugins.
 
 ## Decisions
 
