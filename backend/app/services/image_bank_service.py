@@ -1999,7 +1999,7 @@ def _medium_counts(bank_id) -> dict:
     "not classified yet" is a different statement from "unsure", and merging them
     would let an unrun pass look like an undecided one."""
     q = (db.session.query(BankImage.medium, func.count(BankImage.id))
-         .filter(BankImage.bank_id == bank_id, BankImage.medium.isnot(None)))
+         .filter(_curated(bank_id), BankImage.medium.isnot(None)))
     got = {k: n for k, n in q.group_by(BankImage.medium).all()}
     return {k: int(got.get(k, 0)) for k in MEDIUM_KEYS}
 
@@ -2070,7 +2070,7 @@ def _angle_counts(bank_id) -> dict:
     are counted separately by bank_payload, never folded into 'frontal'."""
     bucket = _angle_case()
     rows = (db.session.query(bucket, func.count(BankImage.id))
-            .filter(BankImage.bank_id == bank_id)
+            .filter(_curated(bank_id))
             .group_by(bucket).all())
     got = {k: n for k, n in rows if k is not None}
     return {k: int(got.get(k, 0)) for k in ANGLES}
@@ -2081,7 +2081,7 @@ def _framing_counts(bank_id, extra_crit=None) -> dict:
     a NULL framing (not classified) are excluded, so every key is present with a
     real count. ``extra_crit`` narrows the pool (e.g. status='keep' for coverage)."""
     q = (db.session.query(BankImage.framing, func.count(BankImage.id))
-         .filter(BankImage.bank_id == bank_id, BankImage.framing.isnot(None)))
+         .filter(_curated(bank_id), BankImage.framing.isnot(None)))
     if extra_crit is not None:
         q = q.filter(extra_crit)
     got = {k: n for k, n in q.group_by(BankImage.framing).all()}
@@ -2188,7 +2188,7 @@ def tag_facets_payload(user_id, bank_id, limit=400) -> dict | None:
     if not bank:
         return None
     rows = (db.session.query(BankImage.tags_text)
-            .filter(BankImage.bank_id == bank_id,
+            .filter(_curated(bank_id),
                     BankImage.status != 'reject',
                     BankImage.tags_text.isnot(None),
                     BankImage.tags_text != '')
@@ -2214,7 +2214,7 @@ def _origin_counts(bank_id) -> dict:
     such. Rows with a NULL origin (scanned before this pass existed, or
     unreadable) are excluded: they are "not measured", a different thing again."""
     q = (db.session.query(BankImage.origin, func.count(BankImage.id))
-         .filter(BankImage.bank_id == bank_id, BankImage.origin.isnot(None)))
+         .filter(_curated(bank_id), BankImage.origin.isnot(None)))
     got = {k: n for k, n in q.group_by(BankImage.origin).all()}
     return {k: int(got.get(k, 0)) for k in ORIGINS}
 
@@ -2237,10 +2237,172 @@ def _reason_counts(bank_id) -> dict:
     the way back to it."""
     bucket = _reason_case()
     rows = (db.session.query(bucket, func.count(BankImage.id))
-            .filter(BankImage.bank_id == bank_id, BankImage.status == 'reject')
+            .filter(_curated(bank_id), BankImage.status == 'reject')
             .group_by(bucket).all())
     got = {k: n for k, n in rows}
     return {k: int(got.get(k, 0)) for k in REASON_KEYS}
+
+
+# Folders the user hid from curation. A path is relative, '/' separated, and
+# names a directory — never a file. Hiding 'chat' hides 'chat/a.jpg' and
+# 'chat/2024/a.jpg'. It does not hide a root file named 'chat.jpg'.
+_MAX_EXCLUDED_FOLDERS = 5000
+
+
+def _posix_rel(relpath: str) -> str:
+    return (relpath or '').replace('\\', '/')
+
+
+def _clean_folder_token(value) -> str | None:
+    """A relative folder path, or None when the token is not one."""
+    if not isinstance(value, str):
+        return None
+    path = value.replace('\\', '/').strip().strip('/')
+    if not path:
+        return None
+    parts = path.split('/')
+    if any(part in ('', '.', '..') for part in parts):
+        return None
+    return path
+
+
+def _rel_under_excluded(relpath: str, prefixes: set) -> bool:
+    """True when the file lives in an excluded folder or under one."""
+    parts = [p for p in _posix_rel(relpath).split('/') if p]
+    if len(parts) < 2 or not prefixes:
+        return False
+    acc = []
+    for part in parts[:-1]:
+        acc.append(part)
+        if '/'.join(acc) in prefixes:
+            return True
+    return False
+
+
+def _excluded_prefixes(bank_id) -> list:
+    """Stored folder paths. Empty when the bank hides nothing (or is gone)."""
+    bank = db.session.get(ImageBank, bank_id)
+    if bank is None:
+        return []
+    raw = _load_json_column(bank, 'excluded_folders')
+    if not isinstance(raw, list):
+        return []
+    out, seen = [], set()
+    for item in raw:
+        path = _clean_folder_token(item)
+        if path and path not in seen:
+            seen.add(path)
+            out.append(path)
+    return out
+
+
+def _relpath_posix_col():
+    """relpath with '/' separators, so a stored Windows path matches the list."""
+    return func.replace(BankImage.relpath, '\\', '/')
+
+
+def _excluded_relpath_clause(bank_id):
+    """SQL: the row is under an excluded folder. None when nothing is excluded,
+    so the unfiltered queries stay exactly the queries they were."""
+    prefixes = _excluded_prefixes(bank_id)
+    if not prefixes:
+        return None
+    norm = _relpath_posix_col()
+    # autoescape: a folder named chat_a must not also hide chatXa.
+    return or_(*(norm.startswith(path + '/', autoescape=True) for path in prefixes))
+
+
+def _curated(bank_id):
+    """This bank, minus folders the user hid. The grid, the counts, the passes
+    and the bank-wide curation writes all use this, so a hidden folder cannot
+    stay in a number the screen quotes or in an action that number describes."""
+    crit = (BankImage.bank_id == bank_id)
+    hidden = _excluded_relpath_clause(bank_id)
+    if hidden is None:
+        return crit
+    return and_(crit, ~hidden)
+
+
+def _visible_ids(bank_id, ids) -> list:
+    """``ids`` in the same order, without images that sit in an excluded folder."""
+    ids = list(ids)
+    if not ids or _excluded_relpath_clause(bank_id) is None:
+        return ids
+    wanted = set()
+    for i0 in range(0, len(ids), _SQL_IN_CHUNK):
+        wanted.update(
+            i for (i,) in db.session.query(BankImage.id).filter(
+                _curated(bank_id),
+                BankImage.id.in_(ids[i0:i0 + _SQL_IN_CHUNK])).all())
+    return [i for i in ids if i in wanted]
+
+
+def _known_folders(rels) -> set:
+    known = set()
+    for rel in rels:
+        parts = [p for p in _posix_rel(rel).split('/') if p]
+        acc = []
+        for part in parts[:-1]:
+            acc.append(part)
+            known.add('/'.join(acc))
+    return known
+
+
+def _normalize_excluded(raw, known: set) -> list:
+    if not isinstance(raw, list):
+        raise ValueError('excluded must be a list of folders')
+    if len(raw) > _MAX_EXCLUDED_FOLDERS:
+        raise ValueError(f'too many folders (max {_MAX_EXCLUDED_FOLDERS})')
+    cleaned, seen = [], set()
+    for item in raw:
+        path = _clean_folder_token(item)
+        if path is None:
+            raise ValueError('a folder path is not inside this bank')
+        if path not in known:
+            raise ValueError(f'no folder "{path}" in this bank')
+        if path not in seen:
+            seen.add(path)
+            cleaned.append(path)
+    cleaned.sort()
+    kept = []
+    for path in cleaned:
+        if any(path.startswith(parent + '/') for parent in kept):
+            continue
+        kept.append(path)
+    return kept
+
+
+def _folder_tree(rels, excluded: set) -> tuple:
+    """Every directory that holds an image, parents before children, plus how
+    many images sit in the bank root (those have no folder to uncheck)."""
+    counts: dict = {}
+    root = 0
+    for rel in rels:
+        parts = [p for p in _posix_rel(rel).split('/') if p]
+        if len(parts) < 2:
+            root += 1
+            continue
+        acc = []
+        for part in parts[:-1]:
+            acc.append(part)
+            path = '/'.join(acc)
+            counts[path] = counts.get(path, 0) + 1
+
+    def included(path: str) -> bool:
+        acc = []
+        for part in path.split('/'):
+            acc.append(part)
+            if '/'.join(acc) in excluded:
+                return False
+        return True
+
+    folders = [{'path': path,
+                'name': path.rsplit('/', 1)[-1],
+                'depth': path.count('/'),
+                'images': counts[path],
+                'included': included(path)}
+               for path in sorted(counts, key=str.casefold)]
+    return folders, root
 
 
 def _subfolder_of(relpath: str) -> str:
@@ -2258,7 +2420,7 @@ def _unresolved_dup_groups_q(bank_id, col=BankImage.dup_group):
     Everything that shows a group to a user, or counts what is left to do, must
     go through :func:`unresolved_dup_group_ids` instead."""
     return (db.session.query(col)
-            .filter(BankImage.bank_id == bank_id,
+            .filter(_curated(bank_id),
                     col.isnot(None),
                     BankImage.status != 'reject')
             .group_by(col)
@@ -2318,7 +2480,7 @@ def _group_live_members(bank_id, col, gids) -> dict:
     gids = [int(g) for g in gids]
     for i0 in range(0, len(gids), _SQL_IN_CHUNK):
         rows = (db.session.query(col, BankImage.id)
-                .filter(BankImage.bank_id == bank_id,
+                .filter(_curated(bank_id),
                         BankImage.status != 'reject',
                         col.in_(gids[i0:i0 + _SQL_IN_CHUNK]))
                 .order_by(BankImage.id.asc()).all())
@@ -2387,7 +2549,7 @@ def _res_bucket_counts(bank_id) -> dict:
     tier that no image falls into simply reports 0. Every tier id is present."""
     bucket = _res_bucket_case()
     rows = (db.session.query(bucket, func.count(BankImage.id))
-            .filter(BankImage.bank_id == bank_id,
+            .filter(_curated(bank_id),
                     BankImage.width.isnot(None),
                     BankImage.height.isnot(None))
             .group_by(bucket).all())
@@ -2497,7 +2659,7 @@ def _flag_counts(bank_id, th) -> tuple[dict, dict]:
                 func.count(BankImage.id),
                 func.coalesce(
                     func.sum(case((BankImage.status == 'pending', 1), else_=0)), 0))
-            .filter(BankImage.bank_id == bank_id).filter(crit).one())
+            .filter(_curated(bank_id)).filter(crit).one())
         flags[flag] = int(total or 0)
         actionable[flag] = int(pending or 0)
     # ✨ Clean rides along: the one chip of the Quality row that had no number,
@@ -2505,7 +2667,7 @@ def _flag_counts(bank_id, th) -> tuple[dict, dict]:
     # only — "auto-reject the clean ones" is not an action anything offers.
     flags['clean'] = int(
         db.session.query(func.count(BankImage.id))
-        .filter(BankImage.bank_id == bank_id, _clean_criterion(th)).scalar() or 0)
+        .filter(_curated(bank_id), _clean_criterion(th)).scalar() or 0)
     return flags, actionable
 
 
@@ -2550,7 +2712,7 @@ def _bp_caption_scope_sums(bank_id):
             _cap_sum('reject', asserted),
             _cap_sum('keep', unrecorded), _cap_sum('pending', unrecorded),
             _cap_sum('reject', unrecorded))
-        .filter(BankImage.bank_id == bank_id).one())
+        .filter(_curated(bank_id)).one())
     return (todo_keep, todo_pending, todo_reject, asserted_keep,
             asserted_pending, asserted_reject, unrecorded_keep,
             unrecorded_pending, unrecorded_reject)
@@ -2762,7 +2924,7 @@ def _bp_similarity_summaries(bank_id, base):
     lowest id), plus how many rows the face pass reached. Returns
     (dup, semantic_dup, clusters, faces_scanned, style_clusters)."""
     dup_rows = (db.session.query(BankImage.dup_group, func.count(BankImage.id))
-                .filter(BankImage.bank_id == bank_id,
+                .filter(_curated(bank_id),
                         BankImage.dup_group.isnot(None))
                 .group_by(BankImage.dup_group).all())
     # 'unresolved' is what the ≈ chip counts and what the user reads as "still to
@@ -2774,7 +2936,7 @@ def _bp_similarity_summaries(bank_id, base):
            'not_duplicates': len(_vetoed_group_ids(bank_id, BankImage.dup_group))}
     # Stage-2 semantic near-duplicate groups (crops/variants), same summary shape.
     sem_rows = (db.session.query(BankImage.semantic_dup_group, func.count(BankImage.id))
-                .filter(BankImage.bank_id == bank_id,
+                .filter(_curated(bank_id),
                         BankImage.semantic_dup_group.isnot(None))
                 .group_by(BankImage.semantic_dup_group).all())
     semantic_dup = {
@@ -2786,7 +2948,7 @@ def _bp_similarity_summaries(bank_id, base):
             bank_id, BankImage.semantic_dup_group))}
     # Person clusters, biggest first; cover = the member with the surest face.
     cl_rows = (db.session.query(BankImage.face_cluster, func.count(BankImage.id))
-               .filter(BankImage.bank_id == bank_id,
+               .filter(_curated(bank_id),
                        BankImage.face_cluster.isnot(None))
                .group_by(BankImage.face_cluster)
                .order_by(func.count(BankImage.id).desc(),
@@ -2795,7 +2957,7 @@ def _bp_similarity_summaries(bank_id, base):
     clusters = []
     for cid, size in cl_rows:
         cover = (BankImage.query
-                 .filter_by(bank_id=bank_id, face_cluster=cid)
+                 .filter(_curated(bank_id), BankImage.face_cluster == cid)
                  .order_by(BankImage.face_det.desc().nullslast(),
                            BankImage.id.asc())
                  .first())
@@ -2806,7 +2968,7 @@ def _bp_similarity_summaries(bank_id, base):
     # style" counterpart to the person clusters above. Cover = the lowest id of
     # the cluster (stable, no per-image quality signal to rank by here).
     st_rows = (db.session.query(BankImage.style_cluster, func.count(BankImage.id))
-               .filter(BankImage.bank_id == bank_id,
+               .filter(_curated(bank_id),
                        BankImage.style_cluster.isnot(None))
                .group_by(BankImage.style_cluster)
                .order_by(func.count(BankImage.id).desc(),
@@ -2815,7 +2977,7 @@ def _bp_similarity_summaries(bank_id, base):
     style_clusters = []
     for cid, size in st_rows:
         cover = (BankImage.query
-                 .filter_by(bank_id=bank_id, style_cluster=cid)
+                 .filter(_curated(bank_id), BankImage.style_cluster == cid)
                  .order_by(BankImage.id.asc()).first())
         style_clusters.append({'id': cid, 'size': size,
                                'cover_image_id': cover.id if cover else None})
@@ -2829,7 +2991,7 @@ def bank_payload(user_id, bank_id) -> dict | None:
     if not bank:
         return None
     th = thresholds()
-    base = BankImage.query.filter_by(bank_id=bank_id)
+    base = BankImage.query.filter(_curated(bank_id))
     total = base.count()
     (todo_keep, todo_pending, todo_reject, asserted_keep,
      asserted_pending, asserted_reject, unrecorded_keep,
@@ -2853,6 +3015,7 @@ def bank_payload(user_id, bank_id) -> dict | None:
         semantic['counts']['ok'] if semantic else 0)
     return {
         'id': bank.id, 'instance_id': bank.instance_id, 'name': bank.name, 'source_path': bank.source_path,
+        'excluded_folders': _excluded_prefixes(bank_id),
         'semantic_engine': (semantic['engine'] if semantic else
                             _selected_semantic_engine(bank)),
         'created_at': bank.created_at.isoformat() if bank.created_at else None,
@@ -2953,7 +3116,7 @@ def flag_preview(user_id, bank_id, overrides=None) -> dict | None:
             continue   # a malformed override falls back to the shipped threshold
     th['dup_distance'] = int(th['dup_distance'])
     th['min_side'] = int(th['min_side'])
-    base = BankImage.query.filter_by(bank_id=bank_id)
+    base = BankImage.query.filter(_curated(bank_id))
     # Same producer as the workspace payload, so the two can never answer the
     # same question differently — and so the panel's "before/after" line can
     # tell "would be flagged" from "would be rejected" if it ever needs to.
@@ -3469,6 +3632,12 @@ def _apply_facets(q, th, skip=None, *, bank_id=None, status=None, reason=None,
     if collection_id is not None:
         from . import bank_collections
         q = bank_collections.scope_query(bank_id, collection_id, q)
+    # Hidden folders are bank state, not a facet the rail can lift. They drop
+    # out of the grid and of every chip counted from this same query.
+    if bank_id is not None:
+        hidden = _excluded_relpath_clause(bank_id)
+        if hidden is not None:
+            q = q.filter(~hidden)
     if status in ('pending', 'keep', 'reject') and skip != 'status':
         q = q.filter(BankImage.status == status)
     if reason in REASON_KEYS and skip != 'reason':
@@ -3664,7 +3833,7 @@ def list_images(user_id, bank_id, status=None, reason=None, flag=None,
         # variable limit (default 999); the curation cap is 2 000 ids.
         for start in range(0, len(ordered), 500):
             chunk = ordered[start:start + 500]
-            scoped = BankImage.query.filter(BankImage.bank_id == bank_id, BankImage.id.in_(chunk))
+            scoped = BankImage.query.filter(_curated(bank_id), BankImage.id.in_(chunk))
             if collection_id is not None:
                 from . import bank_collections
                 scoped = bank_collections.image_query(user_id, bank_id, collection_id, scoped)
@@ -4253,7 +4422,7 @@ def _scoped_pool(bank_id, statuses=None, ids=None):
     """The rows a pass may touch: this bank, this scope, and — when the user made
     a selection — only those ids. The selection is INTERSECTED with the scope,
     never widened, the same contract the caption pass has always had."""
-    q = BankImage.query.filter_by(bank_id=bank_id).filter(_scope_clause(statuses))
+    q = BankImage.query.filter(_curated(bank_id)).filter(_scope_clause(statuses))
     if ids:
         q = q.filter(BankImage.id.in_([int(i) for i in ids][:_SQL_IN_CHUNK]))
     return q
@@ -4275,7 +4444,7 @@ def _todo_by_status(bank_id, todo_clause):
         return func.coalesce(func.sum(case((cond, 1), else_=0)), 0)
     keep, pending, reject = (
         db.session.query(_sum('keep'), _sum('pending'), _sum('reject'))
-        .filter(BankImage.bank_id == bank_id).one())
+        .filter(_curated(bank_id)).one())
     return {'keep': int(keep or 0), 'pending': int(pending or 0),
             'reject': int(reject or 0)}
 
@@ -5653,7 +5822,7 @@ def dup_groups_payload(user_id, bank_id, offset=0, limit=50,
     page = gids[max(0, int(offset)):max(0, int(offset)) + max(1, min(200, int(limit)))]
     groups = []
     by_gid = {gid: (BankImage.query
-                    .filter(BankImage.bank_id == bank_id, col == gid)
+                    .filter(_curated(bank_id), col == gid)
                     .order_by(BankImage.id.asc()).all())
               for gid in page}
     # ONE live-state lookup for the whole panel page. _page_images would
@@ -5683,7 +5852,7 @@ def style_groups_payload(user_id, bank_id) -> dict | None:
         return None
     rows = (db.session.query(BankImage.id, BankImage.style_cluster,
                              BankImage.aesthetic_score, BankImage.status)
-            .filter(BankImage.bank_id == bank_id,
+            .filter(_curated(bank_id),
                     BankImage.style_cluster.isnot(None))
             .all())
     groups = {}
@@ -5788,7 +5957,7 @@ def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
             wanted = list(keep_ids)
             for start in range(0, len(wanted), _SQL_IN_CHUNK):
                 rows = BankImage.query.filter(
-                    BankImage.bank_id == bank_id,
+                    _curated(bank_id),
                     BankImage.id.in_(wanted[start:start + _SQL_IN_CHUNK])).all()
                 for r in rows:
                     g = getattr(r, attr)
@@ -5818,7 +5987,7 @@ def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
         by_group: dict = {}
         for i in range(0, len(gids), _SQL_IN_CHUNK):
             for r in (BankImage.query
-                      .filter(BankImage.bank_id == bank_id,
+                      .filter(_curated(bank_id),
                               col.in_(gids[i:i + _SQL_IN_CHUNK]),
                               (BankImage.status != 'reject') if expected_ids is None else col == group)
                       .order_by(BankImage.id.asc()).all()):
@@ -6030,7 +6199,7 @@ def set_status(user_id, bank_id, ids, status, *, _bank_lease=None, collection_id
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
-    ids = [int(i) for i in (ids or [])]
+    ids = _visible_ids(bank_id, [int(i) for i in (ids or [])])
     reason = 'manual' if status == 'reject' else None
     published = {}
 
@@ -6085,9 +6254,11 @@ def rotate_images(user_id, bank_id, ids, delta, *, _bank_lease=None) -> dict:
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
-    ids = [int(i) for i in (ids or [])]
+    raw_ids = [int(i) for i in (ids or [])]
+    ids = _visible_ids(bank_id, raw_ids)
     if not ids:
-        raise ValueError('select at least one image')
+        raise ValueError('those images are in an excluded folder'
+                         if raw_ids else 'select at least one image')
     rotations = {}
     for i0 in range(0, len(ids), _SQL_IN_CHUNK):
         rows = BankImage.query.filter(
@@ -6318,7 +6489,7 @@ def apply_flags(user_id, bank_id, flags, snapshot=None, *,
             if crit is None:
                 continue
             picks.append((flag, BankImage.query
-                          .filter_by(bank_id=bank_id, status='pending')
+                          .filter(_curated(bank_id), BankImage.status == 'pending')
                           .filter(crit).all()))
 
         out = {}
@@ -7371,7 +7542,7 @@ def rejected_delete_preview(user_id, bank_id) -> dict | None:
     bank = get_bank(user_id, bank_id)
     if not bank:
         return None
-    rows = BankImage.query.filter_by(bank_id=bank_id, status='reject').all()
+    rows = BankImage.query.filter(_curated(bank_id), BankImage.status == 'reject').all()
     mine = {}
     for r in rows:
         p = abs_image_path(bank, r)
@@ -7467,7 +7638,8 @@ def start_delete_rejected(app, user_id, bank_id) -> dict:
     outcome once it has finished (immediately so under TESTING, where bank_jobs
     runs inline)."""
     _delete_rejected_guard(user_id, bank_id)
-    total = BankImage.query.filter_by(bank_id=bank_id, status='reject').count()
+    total = BankImage.query.filter(
+        _curated(bank_id), BankImage.status == 'reject').count()
 
     def _run(job):
         out = delete_rejected(
@@ -7512,7 +7684,7 @@ def delete_rejected(user_id, bank_id, job=None, *, _bank_lease=None) -> dict:
     # the loop commits as it goes, which expires live ORM objects and would make
     # every later row pay a re-SELECT (and abs_image_path a realpath) per file.
     rows = (db.session.query(BankImage.id, BankImage.relpath)
-            .filter_by(bank_id=bank_id, status='reject').all())
+            .filter(_curated(bank_id), BankImage.status == 'reject').all())
     root = os.path.realpath(bank.source_path)
     out = {'mode': 'trash', 'deleted': 0, 'trashed': 0, 'already_absent': 0,
            'rows_removed': 0, 'skipped': [], 'cancelled': False}
@@ -7952,7 +8124,7 @@ def _angle_pool(bank_id, statuses=None, ids=None):
     explicitly narrows it — which is the only thing this lane gains, since it
     writes nothing but `face_yaw` and leaves every cluster alone, so a partial
     run cannot renumber anything."""
-    q = BankImage.query.filter_by(bank_id=bank_id).filter(_angle_todo_clause())
+    q = BankImage.query.filter(_curated(bank_id)).filter(_angle_todo_clause())
     if statuses is not None:
         q = q.filter(BankImage.status.in_(statuses))
     if ids:
@@ -7997,7 +8169,7 @@ def start_faces(app, user_id, bank_id, device_id=None, angles_only=False,
             '👥 Group by person always covers the whole bank: the person clusters '
             'are one numbering computed from every face at once, so a partial run '
             'would renumber groups you have already worked with')
-    q = BankImage.query.filter_by(bank_id=bank_id)
+    q = BankImage.query.filter(_curated(bank_id))
     if angles_only:
         q = _angle_pool(bank_id, want, scope_ids)
         # BEFORE the install probe, and the order is the point: sending someone
@@ -8026,7 +8198,7 @@ def start_faces(app, user_id, bank_id, device_id=None, angles_only=False,
 
 
 def _asserted_image_count(bank_id) -> int:
-    return (BankImage.query.filter_by(bank_id=bank_id)
+    return (BankImage.query.filter(_curated(bank_id))
             .filter(BankImage.status != 'reject',
                     BankImage.face_cluster_origin == 'asserted').count())
 
@@ -8041,7 +8213,7 @@ def _faces_job(bank_id, device_id=None, angles_only=False, statuses=None, ids=No
         if angles_only:
             q = _angle_pool(bank_id, statuses, ids)
         else:
-            q = BankImage.query.filter_by(bank_id=bank_id)
+            q = BankImage.query.filter(_curated(bank_id))
             # Asserted rows are EXCLUDED from the identity lane, not merely
             # preserved: the user already told us who is in them, so paying an
             # embedding to re-derive it is exactly the cost "Single person here"
@@ -8055,7 +8227,7 @@ def _faces_job(bank_id, device_id=None, angles_only=False, statuses=None, ids=No
             return tuple((int(image_id), cluster_id)
                          for image_id, cluster_id in (
                 db.session.query(BankImage.id, BankImage.face_cluster)
-                .filter(BankImage.bank_id == bank_id,
+                .filter(_curated(bank_id),
                         BankImage.face_cluster_origin == 'asserted')
                 .order_by(BankImage.id.asc()).all()))
 
@@ -8337,7 +8509,7 @@ def start_semantic_index(app, user_id, bank_id, rescan=False):
         raise RuntimeError(reason)
     # SigLIP2 is a semantic Bank index, not the aesthetic Score pool: the bin is
     # searchable and participates in near-duplicate grouping too.
-    total = BankImage.query.filter_by(bank_id=bank_id).count()
+    total = BankImage.query.filter(_curated(bank_id)).count()
     return bank_jobs.start(
         app, bank_id, 'semantic_index',
         _semantic_index_job(bank_id, bool(rescan)), total=total)
@@ -8352,7 +8524,7 @@ def _semantic_index_job(bank_id, rescan=False):
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
             return
-        rows = (BankImage.query.filter_by(bank_id=bank_id)
+        rows = (BankImage.query.filter(_curated(bank_id))
                 .order_by(BankImage.id.asc()).all())
         paths = []
         for row in rows:
@@ -8542,7 +8714,7 @@ def start_score(app, user_id, bank_id, device_id=None, rescore=False):
         reason = _gpu_busy_reason() if use_gpu else None
         if reason:
             raise RuntimeError(reason)
-    total = (BankImage.query.filter_by(bank_id=bank_id)
+    total = (BankImage.query.filter(_curated(bank_id))
              .filter(BankImage.status != 'reject').count())
     return bank_jobs.start(app, bank_id, 'score',
                            _score_job(bank_id, device_id if remote else None,
@@ -8802,7 +8974,7 @@ def _score_job(bank_id, device_id=None, rescore=False):
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
             return
-        rows = (BankImage.query.filter_by(bank_id=bank_id)
+        rows = (BankImage.query.filter(_curated(bank_id))
                 .filter(BankImage.status != 'reject')
                 .order_by(BankImage.id.asc()).all())
         by_path = {}
@@ -11913,7 +12085,7 @@ def start_tags(app, user_id, bank_id, rescan=False, threshold=None):
         busy = _gpu_busy_reason()
         if busy:
             raise RuntimeError(busy)
-    q = BankImage.query.filter_by(bank_id=bank_id).filter(BankImage.status != 'reject')
+    q = BankImage.query.filter(_curated(bank_id)).filter(BankImage.status != 'reject')
     if not rescan:
         q = q.filter(BankImage.tags_state.is_(None))
     return bank_jobs.start(app, bank_id, 'tags',
@@ -11934,7 +12106,7 @@ def _tags_job(bank_id, rescan, threshold=None):
         # turns that read into a write. Same trap _framing_job documents.
         source_path = bank.source_path
         root = os.path.realpath(source_path)
-        q = (BankImage.query.filter_by(bank_id=bank_id)
+        q = (BankImage.query.filter(_curated(bank_id))
              .filter(BankImage.status != 'reject'))
         if not rescan:
             q = q.filter(BankImage.tags_state.is_(None))
@@ -13412,17 +13584,56 @@ def resolve_dups_keep_best(user_id, bank_id, snapshot=None, *,
 
 
 # --- subfolders (scoping facet) ---------------------------------------------
+def _bank_relpaths(bank_id) -> list:
+    return [rel for (rel,) in db.session.query(BankImage.relpath)
+            .filter(BankImage.bank_id == bank_id).all()]
+
+
+def folder_exclusion_payload(user_id, bank_id) -> dict | None:
+    """Every nested folder in the bank, and which of them are hidden.
+
+    Counts include images under a folder, so unchecking it says how many leave
+    the grid. Root files have no folder and are reported separately."""
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        return None
+    excluded = _excluded_prefixes(bank_id)
+    folders, root_images = _folder_tree(_bank_relpaths(bank_id), set(excluded))
+    return {'folders': folders, 'excluded': excluded, 'root_images': root_images}
+
+
+def set_excluded_folders(user_id, bank_id, excluded) -> dict | None:
+    """Replace the bank's hidden-folder list. None when the bank is gone.
+
+    A path has to be a real folder in this bank. Hiding a parent drops any
+    nested path, because the parent already covers it. An empty list clears
+    the column, which is the same state a bank that never hid a folder has."""
+    import json as _json
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        return None
+    cleaned = _normalize_excluded(excluded, _known_folders(_bank_relpaths(bank_id)))
+    bank.excluded_folders = _json.dumps(cleaned) if cleaned else None
+    db.session.commit()
+    return folder_exclusion_payload(user_id, bank_id)
+
+
 def subfolders_payload(user_id, bank_id) -> dict | None:
     """Top-level subfolders of the bank's source folder with image counts, for
     the scoping picker. Computed once on open (not polled) — a Telegram export
-    nests one folder per chat/date. '' = files at the bank root."""
+    nests one folder per chat/date. '' = files at the bank root.
+
+    Folders the user hid are left out of the counts: the picker is how you
+    curate, and a hidden folder is not there to curate."""
     bank = get_bank(user_id, bank_id)
     if not bank:
         return None
     from collections import Counter
     counts: Counter = Counter()
-    for (rel,) in (db.session.query(BankImage.relpath)
-                   .filter(BankImage.bank_id == bank_id).all()):
+    excluded = set(_excluded_prefixes(bank_id))
+    for rel in _bank_relpaths(bank_id):
+        if _rel_under_excluded(rel, excluded):
+            continue
         counts[_subfolder_of(rel)] += 1
     items = [{'name': name, 'count': n}
              for name, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
@@ -14684,10 +14895,11 @@ def _promote_source_rows(bank_id, ids) -> list:
         rows = []
         for i0 in range(0, len(wanted), _SQL_IN_CHUNK):
             rows.extend(BankImage.query.filter(
-                BankImage.bank_id == bank_id,
+                _curated(bank_id),
                 BankImage.id.in_(wanted[i0:i0 + _SQL_IN_CHUNK])).all())
     else:
-        rows = BankImage.query.filter_by(bank_id=bank_id, status='keep').all()
+        rows = BankImage.query.filter(
+            _curated(bank_id), BankImage.status == 'keep').all()
     rows.sort(key=lambda r: r.relpath)
     return rows
 

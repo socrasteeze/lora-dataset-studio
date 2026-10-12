@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Archive, BarChart3, FolderInput, FolderOpen, Lightbulb, Palette, Rocket, Search, Target, Trash2, Type, Undo2 } from 'lucide-react';
+import { AlertTriangle, Archive, BarChart3, FolderInput, FolderMinus, FolderOpen, Lightbulb, Palette, Rocket, Search, Target, Trash2, Type, Undo2 } from 'lucide-react';
 import { apiFetch, patchJson, postJson, putJson } from '../../api/fetchClient'
 import { useFolderPersons } from './useFolderPersons'
 import { useReviewLightbox } from './useReviewLightbox'
@@ -61,6 +61,7 @@ import ScoringPythonDialog from './ScoringPythonDialog'
 import PipelineReport from './PipelineReport'
 import FolderSyncNote from './FolderSyncNote'
 import RelocateBankDialog from './RelocateBankDialog'
+import ExcludeFolderDialog from './ExcludeFolderDialog'
 import ForgetMissingDialog from './ForgetMissingDialog'
 import BankReviewLightbox from './BankReviewLightbox'
 import PersonPreflightDialog from './PersonPreflightDialog'
@@ -293,6 +294,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // took ~300 px above the grid until a new run replaced it.
   const [dismissedReportAt, setDismissedReportAt] = useState(() => loadDismissedReport(bankId))
   const [relocating, setRelocating] = useState(false)
+  const [excludingFolders, setExcludingFolders] = useState(false)
   const [forgettingMissing, setForgettingMissing] = useState(false)
   const [openingSourceFolder, setOpeningSourceFolder] = useState(false)
   const [rejectFlags, setRejectFlags] = useState(() => new Set(['blur', 'uniform']))
@@ -1753,6 +1755,28 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     </>
   )
 
+  const excludedCount = payload?.excluded_folders?.length || 0
+  const onExclusionsChanged = async () => {
+    let nextSubs = subfolders
+    try {
+      const d = await apiFetch(`/api/bank/${bankId}/subfolders`)
+      nextSubs = d.subfolders || []
+      setSubfolders(nextSubs)
+    } catch { /* the grid refresh still hides the images */ }
+    if (filter.subfolder != null && !nextSubs.some((s) => s.name === filter.subfolder)) {
+      setF({ subfolder: null })
+    } else setF({})
+    refreshPayload({ force: true })
+  }
+  const excludeFolderButton = (extraClass) => (
+    <Button type="button" size="md" noShrink onClick={() => setExcludingFolders(true)}
+      title="Hide nested folders from this bank. The files stay on disk, and you can show them again."
+      className={extraClass}>
+      <FolderMinus aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />
+      Exclude folder{excludedCount > 0 ? ` (${excludedCount})` : ''}
+    </Button>
+  )
+
 
   return (
     /* ── Structure B ──────────────────────────────────────────────────────
@@ -1802,6 +1826,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 title="Moving this folder to another disk? Point the bank at its new location.">
                 <FolderInput aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Move folder
               </Button>
+              {excludeFolderButton()}
             </div>
           )}
         </div>
@@ -1821,6 +1846,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             squeezed them instead and "Delete rejected from disk" wrapped to five
             lines, a 123-px row on a 360-px phone. */}
         <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto border-t border-border pt-2 sm:flex-wrap sm:overflow-visible [@media(max-height:500px)]:ml-auto [@media(max-height:500px)]:flex-nowrap [@media(max-height:500px)]:overflow-x-auto [@media(max-height:500px)]:border-t-0 [@media(max-height:500px)]:pt-0">
+          {/* The path row above is hidden on a phone and in a short landscape
+              window. Exclude folder is curation, so it stays reachable there. */}
+          {excludeFolderButton('sm:hidden [@media(max-height:500px)]:!inline-flex')}
           {/* ☰ exists only where the rail cannot sit beside the grid — at 400 px
               it is the ONLY way back to the filters, so it is a real button and
               never a CSS-hidden one. */}
@@ -2724,6 +2752,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         <RelocateBankDialog bankId={bankId} bankName={payload?.name || `Bank #${bankId}`}
           sourcePath={payload?.source_path} onClose={() => setRelocating(false)}
           onDone={() => { refreshPayload({ force: true }); refreshImages() }} />
+      )}
+
+      {excludingFolders && (
+        <ExcludeFolderDialog bankId={bankId}
+          onClose={() => setExcludingFolders(false)}
+          onChanged={onExclusionsChanged} />
       )}
 
       {forgettingMissing && (

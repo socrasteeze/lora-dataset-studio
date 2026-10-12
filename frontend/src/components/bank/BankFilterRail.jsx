@@ -62,7 +62,7 @@ function TagFacetMenus({ facets, selected, onToggle }) {
   }, [openId])
   const open = facets.find((facet) => facet.id === openId) || null
   return (
-    <div ref={rootRef} className="mt-1.5 grid grid-cols-2 gap-1.5">
+    <div ref={rootRef} className="mt-1.5 grid grid-cols-2 gap-1.5 [&>button:nth-child(odd):last-of-type]:col-span-2">
       {facets.map((facet) => {
         const { count, title } = facetMenuState(facet, selected)
         const expanded = openId === facet.id
@@ -545,7 +545,7 @@ export default function BankFilterRail({
                     <p className="m-0 flex flex-wrap items-center gap-2 pl-1">
                       <button type="button" onClick={() => setPassOpen('angles')} disabled={!!live}
                         title={angleState.offer.why}
-                        className={btnClass({ size: 'sm' })}>
+                        className={`${btnClass({ size: 'sm' })} w-full`}>
                         ⤢ {angleState.offer.label}
                       </button>
                     </p>

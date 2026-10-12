@@ -346,6 +346,11 @@ class ImageBank(db.Model):
     # find out"), and whether the Launch-all report above still speaks for a step
     # somebody has re-run since. NULL = no pass has ever finished here.
     last_passes = db.Column(Text, nullable=True)
+    # Folders hidden from this bank's curation. JSON list of relative paths
+    # with '/' separators (a nested folder is 'chat/2024'). NULL = nothing
+    # hidden. Rows and files stay; checking the folder again shows them with
+    # the decisions they already had. Additive — see _SCHEMA_ADDITIONS.
+    excluded_folders = db.Column(Text, nullable=True)
 
     def __repr__(self):
         return f'<ImageBank {self.id} {self.name}>'

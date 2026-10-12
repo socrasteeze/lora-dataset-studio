@@ -692,6 +692,29 @@ def bank_subfolders(bank_id):
     return jsonify(payload)
 
 
+@bp.get('/bank/<int:bank_id>/folder-exclusions')
+def bank_folder_exclusions(bank_id):
+    """Nested folders in this bank, and which ones are hidden from curation."""
+    payload = banks.folder_exclusion_payload(LOCAL_USER, bank_id)
+    if payload is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(payload)
+
+
+@bp.put('/bank/<int:bank_id>/folder-exclusions')
+def bank_folder_exclusions_save(bank_id):
+    """Replace the hidden-folder list. Files and rows stay; the grid stops
+    showing what was unchecked."""
+    data = request.get_json(silent=True) or {}
+    try:
+        payload = banks.set_excluded_folders(LOCAL_USER, bank_id, data.get('excluded'))
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    if payload is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(payload)
+
+
 def _start(fn, *args, **kwargs):
     """Shared start-a-job envelope: 202 on launch, 409 when busy, 400/503 on
     validation errors."""
