@@ -56,7 +56,9 @@ export function GroupLabel({ children }) {
  *  Quality, Score, Groups); chips wrap together within it on narrow viewports. */
 export function FilterGroup({ label, children }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    /* Chips share the row they land on. One that wraps by itself grows to the
+       full width, instead of sitting at the left of an empty second column. */
+    <div className="flex flex-wrap items-center gap-1.5 [&>button]:grow">
       <GroupLabel>{label}</GroupLabel>
       {children}
     </div>

@@ -84,8 +84,11 @@ function Group({ group, open, onToggle, customised, children }) {
         <div id={panelId} className="space-y-3 border-t border-border px-3 py-3">
           <p className="text-xs text-content-subtle">{group.blurb}</p>
           {/* ONE column below ~640 px. Twelve numeric fields two-abreast on a
-              400 px phone is precisely the layout that stops being readable. */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div>
+              400 px phone is precisely the layout that stops being readable.
+              On a wide window the rail is still a narrow column, so a field
+              with nothing beside it — the last of an odd group, or a group of
+              one — spans the row instead of leaving the right half empty. */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>*:last-child:nth-child(odd)]:sm:col-span-2">{children}</div>
         </div>
       )}
     </section>

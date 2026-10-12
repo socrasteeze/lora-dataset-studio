@@ -514,6 +514,9 @@ _SCHEMA_ADDITIONS = (
     # When each pass last completed. A bank that predates it keeps NULL and
     # simply reports "never recorded" until its next pass writes a row.
     ('image_bank', 'last_passes', 'TEXT'),
+    # Folders the user hid from an open bank. NULL = the whole tree is visible,
+    # which is what every bank that predates the column already did.
+    ('image_bank', 'excluded_folders', 'TEXT'),
     # Per-Bank semantic engine. The non-null default makes every historical row
     # byte-for-byte compatible with the CLIP behaviour it already had.
     ('image_bank', 'semantic_engine', "VARCHAR(16) NOT NULL DEFAULT 'clip'"),

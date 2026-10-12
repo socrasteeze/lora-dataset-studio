@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-11-hide-folders-inside-a-bank',
+    date: '2026-10-11',
+    title: 'Hide folders inside a bank',
+    blurb: 'Open a bank and choose Exclude folder, next to Open folder and Move folder. Uncheck a nested folder and its images leave the grid, the counts, and curation until you check it again. The files stay on disk.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-11-group-comparison-collections',
     date: '2026-10-11',
     title: 'Compare & Collect',

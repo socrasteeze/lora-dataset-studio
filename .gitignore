@@ -98,3 +98,4 @@ docs/superpowers/
 # Written at the repo root by an external homelab dashboard (the port it
 # found the server on). Not ours, machine-local, never shipped.
 /.lds-dashboard-port
+grok.md

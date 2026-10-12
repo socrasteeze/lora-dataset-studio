@@ -2836,6 +2836,25 @@ are away no longer degrades them either: a file that is *absent* is not a file
 that is *broken*, so the pass stops and tells you the folder appears to have
 moved instead of marking thousands of images unusable.
 
+## Hide a folder inside a bank
+
+**Exclude folder** sits in the open bank, next to **Open folder** and **Move
+folder**. It lists every nested folder in that bank. Each one starts checked,
+which means its images are in the grid. Uncheck a folder and those images
+leave the grid, the counts, and the filters. Promote, delete rejected, and
+keep or reject skip them, and so do Score, captions, tags, the face pass, and
+the quality measurement. Everything inside that folder goes with it. Check it
+again and the images come back with the keep, reject, and score decisions they
+already had.
+
+Nothing is deleted. The files stay in the folder, and the bank keeps the rows.
+Images sitting loose in the bank's own folder are not inside a nested folder,
+so they stay visible — there is no box for them.
+
+This is separate from unticking a subfolder while you *create* banks. That
+choice leaves the folder out of the import. Exclude folder hides a folder
+inside a bank you already have, and you can show it again.
+
 ## Images you deleted from the folder yourself
 
 The bank's folder walk is deliberately **additive**: it registers files that
