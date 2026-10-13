@@ -782,7 +782,10 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   // never claim 768+1024 for a run that will emit 768.
   const advResStored = adv?.resolution ?? '768,1024';
   const advRes = (!!slider?.enabled && !adv?.resolution_explicit) ? '768' : advResStored;
-  const advResLabel = { '768': '768px', '1024': '1024px', '768,1024': '768+1024px' }[advRes] || advRes;
+  const advResLabel = {
+    '768': '768px', '1024': '1024px', '512,768': '512+768px',
+    '768,1024': '768+1024px', '512,768,1024': '512+768+1024px',
+  }[advRes] || advRes;
   const advSave = adv?.save_every ?? 250;
   const advSampleEvery = adv?.sample_every ?? 250;
   const advSampleEveryChoices = adv?.sample_every_choices ?? [100, 250, 500, 1000];
@@ -2507,6 +2510,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   aria-label="Training resolution"
                   className={fieldClass({ size: 'sm' })}>
                   <option value="768,1024">768 + 1024 (multi-scale)</option>
+                  <option value="512,768,1024">512 + 768 + 1024 (multi-scale)</option>
+                  <option value="512,768">512 + 768 (multi-scale)</option>
                   <option value="1024">1024 only</option>
                   <option value="768">768 only (low VRAM)</option>
                 </select>
