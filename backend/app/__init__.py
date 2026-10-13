@@ -671,6 +671,32 @@ def _apply_additive_migrations():
             db.session.commit()
         except Exception:
             db.session.rollback()
+    _ensure_schema_version()
+
+
+# The additive list above is the migration generation. create_all installs
+# missing tables, including bank collections. This row records that those
+# steps have run. It does not rewrite user rows, and a newer stamp is kept.
+SCHEMA_VERSION = 1
+
+
+def _ensure_schema_version():
+    from sqlalchemy import text
+    db.session.execute(text(
+        'CREATE TABLE IF NOT EXISTS schema_meta ('
+        'id INTEGER PRIMARY KEY CHECK (id = 1), '
+        'schema_version INTEGER NOT NULL)'))
+    row = db.session.execute(text(
+        'SELECT schema_version FROM schema_meta WHERE id = 1')).first()
+    if row is None:
+        db.session.execute(text(
+            'INSERT INTO schema_meta (id, schema_version) VALUES (1, :version)'),
+            {'version': SCHEMA_VERSION})
+    elif int(row[0]) < SCHEMA_VERSION:
+        db.session.execute(text(
+            'UPDATE schema_meta SET schema_version = :version WHERE id = 1'),
+            {'version': SCHEMA_VERSION})
+    db.session.commit()
 
 
 def _backfill_recovery_ids():
