@@ -506,8 +506,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       : { ...filterParams(f), offset: String(off), limit: String(PAGE_SIZE) }
     try {
       const d = await apiFetch(`/api/bank/${bankId}/images?${new URLSearchParams(params)}`)
-      if (activeBankRef.current === bankId && requestNumber === imageRequestRef.current) setPage(d)
-    } catch { /* transient — next poll retries */ }
+      if (activeBankRef.current === bankId && requestNumber === imageRequestRef.current) {
+        setPage(d)
+        return true
+      }
+    } catch { /* the pager decides whether the label moves */ }
+    return false
   }, [bankId, filter, offset, filterParams, showSelected, selectedOrder])
 
   useEffect(() => { refreshImagesRef.current = refreshImages }, [refreshImages])
@@ -833,7 +837,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [excludeText])
-  const goto = (off) => { setOffset(off); refreshImages(filter, off) }
+  const goto = (off) => {
+    refreshImages(filter, off).then((ok) => { if (ok) setOffset(off) })
+  }
 
   /* `onRefusal` is for a caller that OWNS a surface for the refusal — today the
      🚀 Launch all dialog, which draws it next to the checkboxes it is about and

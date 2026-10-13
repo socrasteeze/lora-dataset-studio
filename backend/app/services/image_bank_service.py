@@ -71,9 +71,9 @@ from . import (bank_edit_history, bank_jobs, bank_queue, bank_semantic_engine,
 from .pass_scopes import PASS_SCOPES, CAPTION_SCOPES, normalize_pass_statuses  # noqa: F401
 # Re-exported on purpose: the promote tests patch `banks._existing_dhash_rows`.
 from .face_dataset_service import _existing_dhash_rows  # noqa: F401
-from .face_dataset_service import (SCRAPE_IMPORT_MAX, _dhash, _download_scrape_item,
+from .face_dataset_service import (_dhash,
                                    _dataset_ingest_lock,
-                                   _hamming, _SCRAPE_DL_WORKERS,
+                                   _hamming,
                                    _watermark_regions_payload,
                                    _source_metadata_storage, bank_deterministic_analysis,
                                    create_dataset, import_images,
@@ -14108,142 +14108,6 @@ def _scrape_blob_name(raw: bytes) -> str | None:
 def scrape_import_to_bank(user_id, items, bank_id=None, name=None, *,
                           _bank_lease=None, _created=False) -> dict:
     raise ValueError('Online media imports are disabled in this offline fork.')
-    """🕸 Scrape → BANK: the scraper's second destination.
-
-    Downloads the SELECTED scanned images ({'url','title'}) into a bank's source
-    FOLDER, then lets the ordinary folder walk inventory them. Two modes:
-    ``bank_id`` appends to an existing bank (resume — a bank points at a live
-    folder, so a second scrape simply adds to the pile it already holds), while
-    ``name`` creates a new bank under ``bank_sources_root()`` exactly like
-    "Import to bank" does.
-
-    Deliberately does NOT reuse `scrape_import_urls`: that path is a DATASET
-    intake and rightly refuses what cannot be trained on (side < 768 px, ratio
-    > 3:1) and what it judges a perceptual duplicate. A bank is the step BEFORE
-    that judgement — "too small" and "near-duplicate" are verdicts its own passes
-    produce, with thresholds the user moves. Filtering at download time would
-    delete the evidence before the triage tool ever sees it. What IS kept from
-    that path is the download itself (`_download_scrape_item`: SSRF guard,
-    content-type allow-list, image-magic check, size cap) and the per-request cap
-    — AND, like the dataset intake, each item's provenance (validated the same
-    way, via `normalize_source_metadata`/`_source_metadata_storage`), so a Bank
-    image scraped in does not lose its origin the way it used to; promotion to
-    a Dataset already forwards `BankImage.source_metadata` unchanged.
-
-    Returns {'bank_id', 'name', 'created', 'saved', 'already_there', 'added',
-    'skipped': {...}}. ``added`` is what the folder walk actually inventoried.
-    Raises ValueError (bad input) or BankJobBusy (a pass owns the bank)."""
-    items = [it for it in (items or []) if isinstance(it, dict) and it.get('url')]
-    if not items:
-        raise ValueError('no items')
-    if len(items) > SCRAPE_IMPORT_MAX:
-        raise ValueError(f'max {SCRAPE_IMPORT_MAX} images per import')
-
-    if bank_id is not None:
-        if _bank_lease is None:
-            # Preserve the established quick 409 (and its test seam); the
-            # atomic lease immediately below is still authoritative if this
-            # advisory read races a new owner.
-            if bank_jobs.running(bank_id):
-                snap = bank_jobs.get(bank_id) or {}
-                raise bank_jobs.BankJobBusy(
-                    snap.get('kind') or 'background')
-            with bank_jobs.mutation_lease(bank_id, 'scrape_import') as lease:
-                return scrape_import_to_bank(
-                    user_id, items, bank_id=bank_id, name=name,
-                    _bank_lease=lease, _created=_created)
-        bank_jobs.require_reservation(_bank_lease, bank_id)
-        bank = get_bank(user_id, bank_id)
-        if bank is None:
-            raise ValueError('bank not found')
-        folder = bank.source_path
-        if not folder or not os.path.isdir(folder):
-            raise ValueError('this bank\'s folder is unavailable — relocate it first')
-        # Appending here WRITES into the bank's folder. On a legacy bank sitting
-        # on a dataset that means downloading scraped files straight into the
-        # dataset's training images — not destructive, but exactly the sharing
-        # this guard exists to end.
-        conflict = path_guard.dataset_folder_conflict(folder)
-        if conflict:
-            raise ValueError(
-                'This bank points at a dataset\'s own image folder, so scraping '
-                f'into it would drop files inside the dataset. {conflict["message"]}')
-    else:
-        name = (name or '').strip()
-        if not name:
-            raise ValueError('name is required')
-        bank = reservation = None
-        folder = None
-        try:
-            # Make the new row visible only after its mutation reservation is
-            # installed, exactly like the background Bank import paths.
-            bank = _stage_import_bank(user_id, name)
-            folder = bank.source_path
-            reservation = bank_jobs.reserve(bank.id, 'scrape_import')
-            db.session.commit()
-            return scrape_import_to_bank(
-                user_id, items, bank_id=bank.id, name=name,
-                _bank_lease=reservation, _created=True)
-        except Exception:
-            if bank is not None and not bank_jobs.launched(reservation):
-                # Before commit this rolls the staged row back; after commit it
-                # removes the otherwise empty/partial app-owned Bank.
-                _discard_unlaunched_import_bank(
-                    user_id, bank.id, folder, _bank_lease=reservation)
-            raise
-        finally:
-            bank_jobs.abort(reservation)
-
-    with ThreadPoolExecutor(max_workers=_SCRAPE_DL_WORKERS) as pool:
-        # Kept paired with its item (not a separate byte list): the blob name is
-        # only known once the bytes are in hand, and that is also the only way to
-        # find back which item's provenance a given blob owns.
-        downloaded = list(zip(items, pool.map(_download_scrape_item, items)))
-    # Downloads can be slow. Refresh the capability before the first write so a
-    # stale/purged lease can never publish beside a newer Bank owner.
-    bank_jobs.require_reservation(_bank_lease, bank.id)
-
-    skipped: dict[str, int] = {}
-    saved = already_there = 0
-    # relpath (== content-hash blob name, files land flat in the bank folder) ->
-    # stored provenance JSON, handed to the folder walk below so a freshly
-    # inventoried row is born WITH its source instead of the walk having no way
-    # to attach one to a bare file it just found on disk. Validated the same way
-    # as the dataset intake (normalize_source_metadata via _source_metadata_storage)
-    # — never trusted raw from the client.
-    source_metadata_by_blob: dict[str, str] = {}
-    for item, (reason, raw) in downloaded:
-        if reason != 'ok' or not raw:
-            skipped[reason] = skipped.get(reason, 0) + 1
-            continue
-        blob_name = _scrape_blob_name(raw)
-        if blob_name is None:
-            skipped['not_image'] = skipped.get('not_image', 0) + 1
-            continue
-        stored_metadata = _source_metadata_storage(item, image_url=item.get('url'))
-        if stored_metadata:
-            source_metadata_by_blob[blob_name] = stored_metadata
-        dest = os.path.join(folder, blob_name)
-        if os.path.exists(dest):
-            already_there += 1
-            continue
-        try:
-            with open(dest, 'wb') as fh:
-                fh.write(raw)
-        except OSError:
-            logger.warning('bank scrape: could not write %s', blob_name, exc_info=True)
-            skipped['errors'] = skipped.get('errors', 0) + 1
-            continue
-        saved += 1
-
-    # ONE inventory path for every bank: the same walk that picks up files the
-    # user drops in the folder by hand picks these up too. No third insert path.
-    sync = refresh_bank(
-        user_id, bank.id, force=True, _bank_lease=_bank_lease,
-        source_metadata_by_relpath=source_metadata_by_blob) or {}
-    return {'bank_id': bank.id, 'name': bank.name, 'created': _created,
-            'saved': saved, 'already_there': already_there,
-            'added': sync.get('added', 0), 'skipped': skipped}
 
 
 _BANK_TRANSFER_WATERMARK_STATES = frozenset(

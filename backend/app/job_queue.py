@@ -1277,6 +1277,49 @@ class JobQueueManager:
                     logger.critical(
                         'job_queue: startup could not durably pause uncertain job %s; '
                         'leaving it active and blocking new GPU work', job.job_id)
+            self._republish_orphaned_remote_jobs()
+
+    def _republish_orphaned_remote_jobs(self):
+        """Publish pending peer rows that never got a ClusterJob.
+
+        add_job commits the queue row, then creates the ClusterJob. A crash in
+        that gap leaves a pending remote row. Local recovery does not claim
+        those rows, and a peer only pulls a ClusterJob, so the generation would
+        sit pending forever. API backends claim the queue row themselves and
+        are left alone. A row that already has a ClusterJob is not published
+        again.
+        """
+        from .models import ClusterJob
+        from .services import cluster as cluster_svc
+        pending = (ImageGenerationQueue.query
+                   .filter(ImageGenerationQueue.status == 'pending',
+                           ImageGenerationQueue.worker_id.isnot(None))
+                   .all())
+        for job in pending:
+            worker = (job.worker_id or '').strip()
+            if not worker or worker == cluster_svc.LOCAL_DEVICE_ID:
+                continue
+            if cluster_svc.is_backend_id(worker):
+                continue
+            if ClusterJob.query.filter_by(image_job_id=job.job_id).first() is not None:
+                continue
+            try:
+                workflow = json.loads(job.workflow_data or '{}')
+                if not isinstance(workflow, dict):
+                    raise ValueError('workflow_data is not an object')
+                metadata = json.loads(job.job_metadata) if job.job_metadata else {}
+                if not isinstance(metadata, dict):
+                    metadata = {}
+                self._publish_remote_comfy_job(job.job_id, workflow, metadata, worker)
+            except Exception:
+                logger.exception(
+                    'job_queue: failed to republish remote comfy job %s', job.job_id)
+                job = ImageGenerationQueue.query.filter_by(job_id=job.job_id).first()
+                if job is not None and job.status == 'pending':
+                    job.update_status('failed',
+                                      error_message='failed to publish job to peer')
+                    db.session.commit()
+                    _dispatch_completion(job, None, True)
 
     def _harvest_unlinked_completed_jobs(self):
         """Attach results that FINISHED but were never linked to their row.

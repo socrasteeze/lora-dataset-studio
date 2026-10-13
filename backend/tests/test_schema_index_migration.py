@@ -57,3 +57,39 @@ def test_the_index_list_matches_the_models(app):
         # …and it must be one of the columns the additive path adds — a column
         # that has always existed already got its index at create time.
         assert (table, col) in added, f'{table}.{col} is not an additive column'
+
+
+def test_duplicate_instance_ids_block_the_unique_index(app):
+    """An upgraded table has the column and no unique index. Duplicates must
+    stop the index and must not be deleted."""
+    from sqlalchemy import text
+    from app import _ensure_instance_id_unique
+    from app.extensions import db
+    with app.app_context():
+        db.session.execute(text('PRAGMA foreign_keys=OFF'))
+        db.session.execute(text('DROP INDEX IF EXISTS ux_face_dataset_instance_id'))
+        db.session.execute(text('ALTER TABLE face_dataset RENAME TO face_dataset_with_unique'))
+        db.session.execute(text(
+            'CREATE TABLE face_dataset ('
+            'id INTEGER PRIMARY KEY, '
+            'instance_id VARCHAR(32), '
+            'user_id VARCHAR(36) NOT NULL, '
+            'name VARCHAR(100) NOT NULL, '
+            'trigger_word VARCHAR(60) NOT NULL)'))
+        db.session.execute(text(
+            "INSERT INTO face_dataset (user_id, name, trigger_word, instance_id) "
+            "VALUES ('local', 'a', 't', 'same'), ('local', 'b', 't', 'same')"))
+        db.session.commit()
+
+        _ensure_instance_id_unique()
+
+        names = {row[1] for row in db.session.execute(text('PRAGMA index_list(face_dataset)'))}
+        assert 'ux_face_dataset_instance_id' not in names
+        assert db.session.execute(text('SELECT COUNT(*) FROM face_dataset')).scalar() == 2
+
+        db.session.execute(text("DELETE FROM face_dataset WHERE name = 'b'"))
+        db.session.commit()
+        _ensure_instance_id_unique()
+        names = {row[1] for row in db.session.execute(text('PRAGMA index_list(face_dataset)'))}
+        assert 'ux_face_dataset_instance_id' in names
+

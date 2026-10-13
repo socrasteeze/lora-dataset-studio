@@ -494,7 +494,8 @@ def probe_backend(url: str, *, fresh: bool = False) -> bool:
         from ..utils.local_api import local_api_url
         url = local_api_url(url)
         r = requests.get(f'{url}/system_stats',
-                         timeout=_BACKEND_PROBE_TIMEOUT_SECONDS)
+                         timeout=_BACKEND_PROBE_TIMEOUT_SECONDS,
+                         allow_redirects=False)
         online = r.status_code == 200
     except (ValueError, requests.RequestException):
         online = False
