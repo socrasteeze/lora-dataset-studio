@@ -5,6 +5,7 @@ Erome wrapper, fixing type -1 sentinels that hid auth/429/DDoS-Guard
 errors as empty results.
 
 Security: --ignore-config, shell=False, list arguments, never --exec."""
+from ...plugins.fork_profile import offline_only
 from ...timeout_settings import network_timeout
 import json
 import os
@@ -108,6 +109,9 @@ def _run_simulate(url, max_items, cookies, extra_opts, image_range=None):
     defaulting to 1-max_items. Direct-image sources such as Civitai use it
     for Load more; gallery queues such as PornPics use --chapter-range
     through extra_opts instead."""
+    if offline_only():
+        return None, GdlError(
+            'Online media imports are disabled in this offline fork.', 'toolerror')
     cmd = [sys.executable, '-m', 'gallery_dl', '--ignore-config',
            '--simulate', '-j', '--range', image_range or f'1-{max_items}']
     if cookies:
@@ -293,6 +297,9 @@ def download(url, dest_dir, filename, *, cookies=None, extra_opts=None):
     """Download through gallery-dl into dest_dir with a deterministic name.
     Return (ok, abs_path|None, error|None); never raise. Use --ignore-config,
     shell=False, list arguments and -- before the URL."""
+    if offline_only():
+        return False, None, GdlError(
+            'Online media imports are disabled in this offline fork.', 'toolerror')
     cmd = [sys.executable, '-m', 'gallery_dl', '--ignore-config',
            '-D', dest_dir, '-o', f'filename={filename}_{{num}}.{{extension}}',
            '--no-part', '--no-mtime']

@@ -962,7 +962,10 @@ def fetch_output_image_bytes(filename, subfolder='', timeout=30):
     try:
         qs = urlencode({'filename': filename, 'subfolder': subfolder or '', 'type': 'output'})
         url = urljoin(api_address(), f"/view?{qs}")
-        response = requests.get(url, timeout=network_timeout(timeout))
+        response = requests.get(url, timeout=network_timeout(timeout),
+                                allow_redirects=False)
+        if response.status_code >= 300:
+            return None
         response.raise_for_status()
         return response.content
     except Exception as e:

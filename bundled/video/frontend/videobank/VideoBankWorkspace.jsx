@@ -58,6 +58,8 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
   const toast = useToast()
   const [bank, setBank] = useState(null)
   const [clips, setClips] = useState([])
+  const [clipError, setClipError] = useState(null)
+  const clipLoadRef = useRef(0)
   const [total, setTotal] = useState(0)
   const [status, setStatus] = useState('all')
   const [sourceId, setSourceId] = useState(null)
@@ -146,17 +148,21 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
   }, [bankId, onGone, toast])
 
   const loadClips = useCallback(async (append = false) => {
+    const requestId = ++clipLoadRef.current
     setLoadingClips(true)
+    if (!append) setClipError(null)
     try {
       const d = await apiFetch(videoClipsUrl(bankId, {
         status, sourceId, offset: append ? clips.length : 0, limit: PAGE,
       }), { background: true })
+      if (requestId !== clipLoadRef.current) return
       setClips((prev) => (append ? [...prev, ...(d.clips || [])] : (d.clips || [])))
       setTotal(d.total || 0)
     } catch {
-      if (!append) { setClips([]); setTotal(0) }
+      if (requestId !== clipLoadRef.current) return
+      if (!append) setClipError('Could not load shots.')
     } finally {
-      setLoadingClips(false)
+      if (requestId === clipLoadRef.current) setLoadingClips(false)
     }
   }, [bankId, status, sourceId, clips.length])
 
@@ -819,13 +825,13 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
       <VideoClipGrid bankId={bankId} clips={shownClips} selected={selected}
         onToggle={onToggle} onOpen={openAt} matchLines={matchLines}
         cursorId={burst.on ? cursorId : null}
-        emptyMessage={search
+        emptyMessage={clipError || (search
           ? `Nothing came back for “${search.query}”.`
           : emptyGridMessage({
             status,
             sourceName: bank.sources?.find((s) => s.id === sourceId)?.relpath,
             counts,
-          })} />
+          }))} />
 
       {!search && hasMore({ loaded: clips.length, total }) && (
         <div className="flex justify-center">

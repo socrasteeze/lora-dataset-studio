@@ -16,6 +16,8 @@ def _local_ip(value):
         return False
     if address.version == 6 and address.ipv4_mapped is not None:
         address = address.ipv4_mapped
+    if address == ipaddress.ip_address('169.254.169.254'):
+        return False
     return (address.is_loopback or address.is_private or address.is_link_local
             or (address.version == 4 and address in _TAILNET)) and not address.is_multicast
 

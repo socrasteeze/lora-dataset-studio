@@ -630,6 +630,7 @@ def _apply_additive_migrations():
         except Exception:
             db.session.rollback()  # a failed ALTER must never block boot
     _backfill_recovery_ids()
+    _ensure_instance_id_unique()
     # Before the engine selector there was only ``semantic_dup_group`` and its
     # space was necessarily CLIP.  Copy that visible partition into the durable
     # lane (or into SigLIP2 for Banks already switched by an intermediate build)
@@ -683,6 +684,34 @@ def _backfill_recovery_ids():
             f'UPDATE {table} SET instance_id = lower(hex(randomblob(16))) '
             "WHERE instance_id IS NULL OR trim(instance_id) = ''"))
     db.session.commit()
+
+
+def _ensure_instance_id_unique():
+    """Upgraded databases got instance_id as a plain column. Enforce uniqueness
+    the way a fresh create_all already does. Duplicate values are reported and
+    left in place — this does not delete rows."""
+    from sqlalchemy import text
+    for table in ('face_dataset', 'image_bank', 'bank_image'):
+        try:
+            columns = {row[1] for row in db.session.execute(
+                text(f'PRAGMA table_info({table})'))}
+            if 'instance_id' not in columns:
+                continue
+            duplicate = db.session.execute(text(
+                f'SELECT instance_id FROM {table} '
+                "WHERE instance_id IS NOT NULL AND trim(instance_id) != '' "
+                'GROUP BY instance_id HAVING COUNT(*) > 1 LIMIT 1')).first()
+            if duplicate is not None:
+                logger.error(
+                    'instance_id duplicates in %s; unique index not created', table)
+                continue
+            db.session.execute(text(
+                f'CREATE UNIQUE INDEX IF NOT EXISTS ux_{table}_instance_id '
+                f'ON {table} (instance_id)'))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            logger.exception('instance_id unique index failed for %s', table)
 
 
 def _cleanup_orphaned_lora_test_images():
