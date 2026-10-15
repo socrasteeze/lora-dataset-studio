@@ -6,6 +6,8 @@ import CoveragePanel from './CoveragePanel';
 import ClassifyFramingButton from './ClassifyFramingButton';
 import ReferencePanel from './ReferencePanel';
 import TrainingPanel from './TrainingPanel';
+import PreflightModal from './PreflightModal';
+import { createPortal } from 'react-dom';
 import { fmt } from '../../utils/studioFormat';
 import ImportDropzone from './ImportDropzone';
 import PluginSlot, { hasContributions } from '../../plugins/PluginSlot.jsx';
@@ -340,6 +342,9 @@ export default function DatasetWorkspace({ ds, onBack }) {
   // Continue anyway: acknowledgment from the readiness badge bypasses the quality safeguard,
   // unlocks Train and reaches launch as allow_not_ready. The server remains authoritative.
   const [notReadyAck, setNotReadyAck] = useState(false);
+  const [duplicateReview, setDuplicateReview] = useState(null);
+  const [duplicateReviewVersion, setDuplicateReviewVersion] = useState(0);
+  useEffect(() => { setDuplicateReview(null); setDuplicateReviewVersion(0); }, [ds.currentId]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [importToBankOpen, setImportToBankOpen] = useState(false);
   const [folderBrowseOpen, setFolderBrowseOpen] = useState(false);
@@ -2260,12 +2265,19 @@ export default function DatasetWorkspace({ ds, onBack }) {
                  * avoid refetching on every dataset poll.
                  */}
                 {caps.training_visible && (
-                  <TrainingReadiness datasetId={d.id} trainType={d.train_type} variant={d.train_variant}
-                    refreshKey={`${kept}|${keptCaptioned}|${pending}|${triage}|${d.caption_leak?.leaking ?? ''}`}
+                  <TrainingReadiness key={d.id} datasetId={d.id} trainType={d.train_type} variant={d.train_variant}
+                    refreshKey={`${kept}|${keptCaptioned}|${pending}|${triage}|${d.caption_leak?.leaking ?? ''}|${duplicateReviewVersion}`}
                     onJump={(targetId) => jumpTo({ targetId })}
+                    onReviewDuplicates={(report) => setDuplicateReview({ datasetId: d.id,
+                      report: { dup_pairs: report.dup_pairs || [] } })}
                     onOverrideChange={setNotReadyAck} />
                 )}
+                {duplicateReview?.datasetId === d.id && createPortal(
+                  <PreflightModal reviewOnly report={duplicateReview.report} datasetId={d.id} ds={ds}
+                    onDecision={() => setDuplicateReviewVersion((value) => value + 1)}
+                    onResolve={() => { setDuplicateReview(null); setDuplicateReviewVersion((value) => value + 1); }} />, document.body)}
                 <TrainingPanel ds={ds} keptCount={kept} kind={d.kind} allowNotReady={notReadyAck}
+                  onDuplicateDecision={() => setDuplicateReviewVersion((value) => value + 1)}
                   sectionVisible={section === 'training'}
                   onCheckpointsChange={setCheckpointCount}
                   checkpointHost={checkpointHost}

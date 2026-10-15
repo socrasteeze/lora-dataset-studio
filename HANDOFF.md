@@ -1,6 +1,62 @@
 # HANDOFF
 
-**Updated:** 2026-10-15 | **Target:** main | **Delivery base:** 4034ef3b9
+## Training and caption delivery
+
+- The operator authorized a clean commit and push of these follow-ups to main, with tests skipped. Source and the rebuilt frontend bundle use separate `[skip ci]` commits. Verify the final publication SHA against origin/main.
+- Scope: the two-column Training layout, direct duplicate-pair review, persisted Keep Both decisions and aligned, larger image-card caption controls. The previously delivered ATK resume repair remains intact.
+- Ruff and ESLint passed; ESLint retains 32 existing warnings. The frontend build and diff review passed. The privacy scan checked 3,013 publishable tracked and untracked text files with zero findings. Attribution-pattern hits are technical project references, policy filenames, scanner patterns, cursor variables or synthetic fixtures. No new source attribution was found. No credential rotation or history rewrite is indicated by these scans.
+- No tests, cloud suites, browser probes, fixture servers, application imports, production schema changes, service restarts or training jobs ran for this delivery. Runtime layout and the new duplicate decisions remain unqualified by execution. Earlier test results below apply only to their recorded scope.
+- Save current work and restart Studio to load Keep Both and its additive table. Refresh the browser to load the rebuilt interface. No runtime restart was performed during delivery.
+
+## Image-card readability follow-up
+
+- Implemented on noble/training-layout-duplicate-review and included in this delivery with the Training follow-up below.
+- Dataset tiles reserve a square image frame before the thumbnail loads. Image content and placeholders cannot change its height. Low face scores retain a thicker warning through an inset outline, with the same content width as other cards.
+- Status controls and caption actions use shared button heights and equal grid cells. Reject is on the left and Keep is on the right. Narrow tiles stack Expand and Caption, using the tile width rather than the viewport width. The disabled Caption action reserves its space when text is empty.
+- Caption boxes use 14 px desktop text, 16 px below lg, four rows and a fixed 112 px height. The origin line reserves its height even when no author is recorded. Source credits remain available below the controls so they cannot offset the caption rows. Existing caption draft, blur-save, busy-state and expanded-editor handlers remain in place.
+- Reviewed the Bank tile counterpart. Bank tiles use image overlays and an expanded editor, with no inline caption textarea to align. Its controls retain their existing touch targets and shared caption-origin helper.
+- ESLint and the frontend build passed; ESLint retains 32 existing warnings. Rebuilt frontend/dist. Diff review passed. Privacy scan: 3,013 publishable text files, zero findings. No new source attribution was found. Tests and rendered/browser probes remain unrun under this chat's instruction.
+
+```text
+# UI Stability Audit - Dataset Image Cards
+Scope: /datasets Images grid | Viewports: not rendered | Runtime: static-only
+
+## Verdict
+SHIP under the no-test exception. Runtime layout remains unqualified.
+
+## Findings
+| # | Check | Status | Severity | Evidence | Fix |
+| 1 | Intrinsic image height and score-border width | WARN | SHIFT | frontend/src/components/dataset/DatasetGridItem.jsx:65; frontend/src/components/dataset/DatasetGridItem.jsx:218 | Reserve the square frame and keep warning thickness out of layout sizing. |
+| 2 | Caption author and empty-caption geometry | WARN | SHIFT | frontend/src/components/dataset/DatasetGridItem.jsx:433 | Reserve the author line and both caption-action cells. |
+| 3 | Control alignment and readable captions | WARN | POLISH | frontend/src/components/dataset/DatasetGridItem.jsx:477; frontend/src/index.css:394 | Use shared button heights, narrow-card stacking and larger fixed-height caption boxes. |
+| 4 | Responsive geometry, hover and editing | NOT RUN | SHIFT | No browser or fixture server was started. | Verify on the operator's test machine. |
+```
+
+## Training layout and duplicate-review follow-up
+
+- Implementation branch: noble/training-layout-duplicate-review, based on fa09095f4. The prior ATK resume repair below was already committed separately; its source was preserved.
+- Training Advanced and Expert settings use two aligned columns at xl, larger labels/help text and consistent label widths. Phones keep one column. Preview prompts span the full form. Readiness checks use two columns on wide screens.
+- The duplicate warning opens Review Pairs on the Training page. The popup contains the flagged copies, with Reject and Keep Both. It cannot launch training in review-only mode. Pair actions serialize saves, show errors and update Resolved only after acceptance. Live dataset status prevents stale rejected copies being treated as active.
+- Keep Both writes a per-pair DatasetDuplicateKeep record. Ownership, kept statuses, dataset identity and both image-content fingerprints are checked. Approvals survive reopening and restart; changed image contents require review again. Other pairs remain unresolved. Reject and Keep Both refresh readiness, including decisions made from normal training preflight.
+- The new table is additive through normal startup db.create_all. No production app import, migration, restart, image mutation or training job was performed during implementation. Restart Studio to load the new routes/model before using Keep Both.
+- Added synthetic backend regressions for persistence, idempotency, metadata/file preservation, stale content, manual rejection, cross-dataset inputs and invalid requests. Added frontend render cases proving review-only cannot start training and normal preflight retains confirmation. These tests have not run. Earlier ATK test counts below do not qualify this follow-up.
+- Ruff, ESLint, the frontend build and diff review passed; ESLint retains 32 existing warnings. Rebuilt frontend/dist. Privacy scan: 3,013 publishable text files, zero findings. No new source attribution was found. Tests, cloud suites, fixtures and rendered/browser probes remain unrun under this chat's instruction.
+
+```text
+# UI Stability Audit — Training
+Scope: /datasets Training and duplicate review | Viewports: not rendered | Runtime: static-only
+
+## Verdict
+SHIP under the no-test exception. Runtime layout remains unqualified.
+
+## Findings
+| # | Check | Status | Severity | Evidence | Fix |
+| 1 | Wide form space and alignment | WARN | POLISH | frontend/src/components/dataset/TrainingPanel.jsx:2476 | Use two equal responsive columns, larger type and equal label widths. |
+| 2 | Duplicate warning navigation | WARN | POLISH | frontend/src/components/dataset/TrainingReadiness.jsx:95 | Open the actual flagged pair report in an embedded review popup. |
+| 3 | Responsive geometry and interaction | NOT RUN | SHIFT | No browser or fixture server was started. | Verify desktop, tablet and phone layouts on the operator's test machine. |
+```
+
+**Updated:** 2026-10-15 | **Target:** main | **Delivery base:** fa09095f4
 
 ## ATK resume compatibility
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { readinessSignature, overrideAck } from '../../utils/readinessOverride';
 import { HelpBadge } from '../../help/HelpMode';
+import { Button } from '../common/Controls.jsx';
 
 /*
  * Training-readiness badge mirrors server GET /train/preflight checks and verdict: ready, warnings
@@ -24,7 +25,7 @@ const ROW_CLS = { ok: 'text-emerald-400', warn: 'text-amber-300', fail: 'text-re
 // workspace passes its own — the report has the same shape (`checks` +
 // `verdict`), and one card rendering both is the parity rule made literal.
 export default function TrainingReadiness({ datasetId, trainType, variant, refreshKey, onJump,
-                                            onOverrideChange, endpoint = null }) {
+                                            onOverrideChange, onReviewDuplicates, endpoint = null }) {
   const [data, setData] = useState(null);
   const [open, setOpen] = useState(false);
   // Continue anyway acknowledges a bypassable QUALITY blocker. Uncheck whenever the blocking-state
@@ -75,23 +76,28 @@ export default function TrainingReadiness({ datasetId, trainType, variant, refre
         className="w-full flex items-center gap-2 px-3 py-2 text-left">
         <v.icon aria-hidden="true" className={`h-4 w-4 shrink-0 ${v.iconCls}`} />
         <span className="text-content text-sm font-semibold">{v.label}</span>
-        <span className="text-content-subtle text-2xs">{subtitle}</span>
+        <span className="text-content-subtle text-xs">{subtitle}</span>
         <span aria-hidden className="ml-auto text-content-subtle text-xs">{open ? '▾' : '▸'}</span>
       </button>
       {open && (
-        <ul className="m-0 px-3 pb-2.5 flex flex-col gap-1 list-none">
+        <ul className="m-0 grid grid-cols-1 gap-x-8 gap-y-3 px-3 pb-3 list-none xl:grid-cols-2">
           {data.checks.map((c) => (
-            <li key={c.id} className="flex items-start gap-2 text-xs">
+            <li key={c.id} className="grid min-h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-start gap-2 text-sm lg:min-h-7">
               <span aria-hidden className={`w-4 shrink-0 text-center font-bold ${ROW_CLS[c.status]}`}>
                 {ROW_ICON[c.status]}
               </span>
-              <span className="text-content">{c.label}</span>
-              <span className="text-content-subtle">— {c.detail}</span>
+              <div className="min-w-0 space-y-0.5">
+                <span className="block font-medium text-content">{c.label}</span>
+                <span className="block break-words text-xs leading-relaxed text-content-muted">{c.detail}</span>
+              </div>
               {c.status !== 'ok' && c.target && (
-                <button type="button" onClick={() => onJump?.(c.target)}
-                  className="ml-auto shrink-0 px-1.5 py-0.5 rounded border border-border text-content-muted hover:text-content hover:bg-surface-raised text-2xs">
-                  Fix →
-                </button>
+                <Button type="button" size="sm" noShrink onClick={() => {
+                  if (c.id === 'duplicates' && onReviewDuplicates && data.dup_pairs?.length) {
+                    onReviewDuplicates(data);
+                  } else onJump?.(c.target);
+                }}>
+                  {c.id === 'duplicates' && onReviewDuplicates && data.dup_pairs?.length ? 'Review Pairs' : 'Fix →'}
+                </Button>
               )}
             </li>
           ))}

@@ -1,6 +1,7 @@
 /** One curation tile: image + keep/reject + source/framing badges + caption + crop. */
 import { improvementBadge } from './improveCandidates.js';
 import SelectionMark from '../shared/SelectionMark';
+import { btnShape, controlHeight } from '../common/controls';
 import { Drama, Eye, Flag, Sparkles, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { displayLabel } from '../../utils/labels';
@@ -61,7 +62,8 @@ function faceBadge(img, thresholds) {
   const s = img.face_score;
   if (s >= green) return { border: 'border-2 border-green-500', icon: '✓', cls: 'text-green-300', label: s.toFixed(2) };
   if (s >= orange) return { border: 'border-2 border-amber-500', icon: '~', cls: 'text-amber-300', label: `${s.toFixed(2)} to review` };
-  return { border: 'border-4 border-red-500', icon: '⚠', cls: 'text-red-300', label: `${s.toFixed(2)} low` };
+  // Preserve the thicker warning without changing the card's content width.
+  return { border: 'border-2 border-red-500 outline outline-2 -outline-offset-4 outline-red-500', icon: '⚠', cls: 'text-red-300', label: `${s.toFixed(2)} low` };
 }
 
 // Watermark V1 badge from watermark_state (🚩 detected / ⊘ dismissed / ✨ cleaned /
@@ -212,8 +214,8 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
 
   return (
     <div tabIndex={0} aria-label={`${displayLabel(img.variation_label) || 'Dataset image'} card`}
-      className={`dataset-grid-item rounded-lg ${borderCls} ${selected ? 'ring-2 ring-primary' : ''} bg-app/40 overflow-hidden flex flex-col`}>
-      <div className="relative aspect-square bg-black">
+      className={`dataset-grid-item rounded-lg ${borderCls} ${selected ? 'ring-2 ring-primary' : ''} bg-app/40 overflow-hidden flex min-w-0 flex-col`}>
+      <div className="relative aspect-square shrink-0 bg-black">
         {selected && <SelectionMark />}
         {onToggleSelect && img.filename && (
           <label
@@ -244,7 +246,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
             }}
             title="Inspect (zoom)"
             aria-label={`Inspect ${displayLabel(img.variation_label) || 'the image'} full screen`}
-            className="block w-full h-full cursor-zoom-in disabled:cursor-not-allowed">
+            className="absolute inset-0 block w-full h-full cursor-zoom-in disabled:cursor-not-allowed">
             {/* The TILE fetches a thumbnail, the lightbox fetches the file: a
                 grid of 512 px WebPs instead of a wall of 1-4 megapixel PNGs is
                 the difference between a dataset that opens and one that churns.
@@ -260,7 +262,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
               className={`w-full h-full ${imgFitCls}`} />
           </button>
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-1 px-2 text-center"
+          <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-1 px-2 text-center"
             title={img.status === 'failed' ? (img.fail_reason || 'generation failed') : undefined}>
             {img.status === 'failed' ? (
               <>
@@ -395,94 +397,89 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
             onClose={() => setEditingPrompt(false)} />
         )}
       </div>
-      <SourceAttribution metadata={img.source_metadata}
-        className="mx-1.5 mt-1 block text-2xs leading-tight text-content-subtle" />
-      {isRescueDerived ? (
-        <p className="m-1.5 rounded border border-indigo-400/30 bg-indigo-500/10 px-2 py-1 text-center text-2xs text-indigo-200"
-          title="This winner was chosen atomically with its provenance pair. Caption and crop remain available.">
-          ✓ Chosen in Klein rescue review
-        </p>
-      ) : (
-        <div className="dataset-grid-item__actions flex gap-1 p-1.5">
-          <button type="button" onClick={() => onStatus(img.id, img.status === 'keep' ? 'pending' : 'keep')}
-            disabled={curationRefused}
-            title={curationRefusedReason || 'Keep'} aria-label={curationRefusedReason || 'Keep'}
-            aria-pressed={img.status === 'keep'}
-            className={`flex-1 py-1 rounded text-2xs disabled:cursor-not-allowed disabled:opacity-45 ${img.status === 'keep' ? 'bg-green-600 text-white' : 'bg-surface text-content-muted'}`}>✓</button>
-          <button type="button"
-            onClick={() => {
-              // Rejecting a GENERATED image offers an immediate retry of the same
-              // variation (in place, new seed) so the composition stays on target.
-              if (!isImageImproveCandidate && img.status !== 'reject'
-                  && img.source === 'generated' && img.filename && onRegenerate
-                  && window.confirm('Photo rejected — regenerate a new attempt of this variation?\n(OK = replace with a new attempt · Cancel = reject only)')) {
-                onRegenerate(img.id);
-                return;
-              }
-              onStatus(img.id, img.status === 'reject' ? 'pending' : 'reject');
-            }}
-            disabled={curationRefused}
-            title={curationRefusedReason || 'Reject (offers a regeneration)'} aria-label={curationRefusedReason || 'Reject'}
-            aria-pressed={img.status === 'reject'}
-            className={`flex-1 py-1 rounded text-2xs disabled:cursor-not-allowed disabled:opacity-45 ${img.status === 'reject' ? 'bg-red-600 text-white' : 'bg-surface text-content-muted'}`}>✕</button>
-        </div>
-      )}
-      {img.status === 'keep' && (
-        <div className="m-1.5 mt-0 flex flex-col gap-1">
-          <div className="dataset-grid-item__actions grid grid-flow-col auto-cols-fr gap-1">
-            <button type="button" onClick={() => setCaptionEditorOpen(true)}
+      <div className="flex flex-1 flex-col gap-2 p-2">
+        {isRescueDerived ? (
+          <p className={`dataset-grid-item__status ${controlHeight()} flex items-center justify-center rounded border border-indigo-400/30 bg-indigo-500/10 px-2 text-center text-xs text-indigo-200`}
+            title="Chosen in Klein rescue review with its provenance pair. Caption and crop remain available.">
+            ✓ Rescue Winner
+          </p>
+        ) : (
+          <div className="dataset-grid-item__actions dataset-grid-item__status grid grid-cols-2 gap-2">
+            <button type="button"
+              onClick={() => {
+                // Rejecting a GENERATED image offers an immediate retry of the same
+                // variation (in place, new seed) so the composition stays on target.
+                if (!isImageImproveCandidate && img.status !== 'reject'
+                    && img.source === 'generated' && img.filename && onRegenerate
+                    && window.confirm('Photo rejected — regenerate a new attempt of this variation?\n(OK = replace with a new attempt · Cancel = reject only)')) {
+                  onRegenerate(img.id);
+                  return;
+                }
+                onStatus(img.id, img.status === 'reject' ? 'pending' : 'reject');
+              }}
               disabled={curationRefused}
-              title={curationRefusedReason || 'Open a larger caption editor'}
-              aria-label={curationRefusedReason || 'Expand caption editor'}
-              className="rounded border border-border bg-surface px-1.5 py-0.5 text-2xs text-content-muted hover:text-content disabled:cursor-not-allowed disabled:opacity-45">
-              ⛶ Expand
-            </button>
-            {cap && (
+              title={curationRefusedReason || 'Reject (offers a regeneration)'} aria-label={curationRefusedReason || 'Reject'}
+              aria-pressed={img.status === 'reject'}
+              className={`${btnShape()} min-w-0 disabled:cursor-not-allowed ${img.status === 'reject' ? 'bg-red-600 text-white' : 'bg-surface text-content-muted hover:bg-surface-raised'}`}>✕</button>
+            <button type="button" onClick={() => onStatus(img.id, img.status === 'keep' ? 'pending' : 'keep')}
+              disabled={curationRefused}
+              title={curationRefusedReason || 'Keep'} aria-label={curationRefusedReason || 'Keep'}
+              aria-pressed={img.status === 'keep'}
+              className={`${btnShape()} min-w-0 disabled:cursor-not-allowed ${img.status === 'keep' ? 'bg-green-600 text-white' : 'bg-surface text-content-muted hover:bg-surface-raised'}`}>✓</button>
+          </div>
+        )}
+        {img.status === 'keep' && (
+          <div className="flex min-w-0 flex-col gap-2">
+            <div className="dataset-grid-item__actions dataset-grid-item__caption-actions grid gap-2">
+              <button type="button" onClick={() => setCaptionEditorOpen(true)}
+                disabled={curationRefused}
+                title={curationRefusedReason || 'Open a larger caption editor'}
+                aria-label={curationRefusedReason || 'Expand caption editor'}
+                className={`${btnShape()} min-w-0 border border-border bg-surface text-content hover:bg-surface-raised disabled:cursor-not-allowed`}>
+                <span aria-hidden="true">⛶</span> Expand
+              </button>
               <button type="button"
                 onClick={() => { editingRef.current = false; setCap(''); onCaption(img.id, ''); }}
-                disabled={curationRefused}
-                title={curationRefusedReason || 'Delete this image’s caption (then “Caption” regenerates it via JoyCaption)'}
+                disabled={curationRefused || !cap}
+                title={curationRefusedReason || (cap
+                  ? 'Delete this image’s caption (then “Caption” regenerates it via JoyCaption)'
+                  : 'No caption to delete')}
                 aria-label={curationRefusedReason || 'Delete this image’s caption'}
-                className="rounded border border-red-500/40 bg-red-500/15 px-1.5 py-0.5 text-2xs text-red-300 hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-45">
-                <Trash2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Caption
+                className={`${btnShape()} min-w-0 border border-red-500/40 bg-red-500/15 text-red-300 hover:bg-red-500/25 disabled:cursor-not-allowed`}>
+                <Trash2 aria-hidden="true" className="h-4 w-4 shrink-0" />Caption
               </button>
-            )}
+            </div>
+            {/* Reserve the origin line even when the caption has no recorded author. */}
+            <div className="h-5 min-w-0">
+              {(cap || '').trim() && captionOriginInfo(img.caption_origin).known && (
+                <span title={captionOriginInfo(img.caption_origin).title}
+                  aria-label={captionOriginInfo(img.caption_origin).short}
+                  className={`block truncate text-xs leading-5 ${
+                    captionIsAsserted(img.caption_origin)
+                      ? 'text-emerald-300' : 'text-content-muted'}`}>
+                  {captionOriginInfo(img.caption_origin).chip}
+                </span>
+              )}
+            </div>
+            <textarea value={cap} onChange={(e) => setCap(e.target.value)}
+              disabled={curationRefused} title={curationRefusedReason || undefined}
+              onFocus={() => { editingRef.current = true; }}
+              onBlur={() => {
+                editingRef.current = false;
+                if (!busy && cap !== (img.caption || '')) onCaption(img.id, cap);
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur(); } }}
+              rows={4} placeholder={datasetKind === 'style'
+                ? 'required: content only, no aesthetic or trigger'
+                : datasetKind === 'concept'
+                  ? 'caption without naming the concept'
+                  : 'caption (without the face)'} aria-label="Image caption"
+              className="h-28 w-full min-w-0 shrink-0 resize-none rounded border border-border bg-app/60 p-2 text-base leading-6 text-content [scrollbar-gutter:stable] lg:text-sm" />
           </div>
-          {/* WHO WROTE THE TEXT IN THE BOX BELOW.
-              ITS OWN LINE, not a badge slipped into the action row: at the M tile
-              density that row already holds ⛶ Expand and 🗑 Caption, and a third
-              item there is clipped at the tile's left edge — measured headless at
-              that density, where the chip read "yCaption".
-              ALWAYS VISIBLE, unlike that row: this is a readout, not an action, and
-              a provenance you have to hover to discover is one nobody discovers.
-              Only when there IS a caption and its author was recorded — stamping
-              "author not recorded" on every legacy tile would be a grid of identical
-              chips, which is noise; the expanded editor has room to say it and does. */}
-          {(cap || '').trim() && captionOriginInfo(img.caption_origin).known && (
-            <span title={captionOriginInfo(img.caption_origin).title}
-              aria-label={captionOriginInfo(img.caption_origin).short}
-              className={`block truncate text-2xs leading-none ${
-                captionIsAsserted(img.caption_origin)
-                  ? 'text-emerald-300' : 'text-content-subtle'}`}>
-              {captionOriginInfo(img.caption_origin).chip}
-            </span>
-          )}
-          <textarea value={cap} onChange={(e) => setCap(e.target.value)}
-            disabled={curationRefused} title={curationRefusedReason || undefined}
-            onFocus={() => { editingRef.current = true; }}
-            onBlur={() => {
-              editingRef.current = false;
-              if (!busy && cap !== (img.caption || '')) onCaption(img.id, cap);
-            }}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur(); } }}
-            rows={2} placeholder={datasetKind === 'style'
-              ? 'required: content only, no aesthetic or trigger'
-              : datasetKind === 'concept'
-                ? 'caption without naming the concept'
-                : 'caption (without the face)'} aria-label="Image caption"
-            className="text-2xs bg-app/60 border border-border rounded p-1 text-content resize-none" />
-        </div>
-      )}
+        )}
+        <SourceAttribution metadata={img.source_metadata}
+          className="block truncate text-xs leading-5 text-content-muted" />
+      </div>
       {captionEditorOpen && (
         <CaptionEditorDialog initialCaption={cap} imageUrl={url}
           labSurface={datasetLabSurface({ instanceId: datasetInstanceId, datasetId, imageId: img.id, filename: img.filename })}

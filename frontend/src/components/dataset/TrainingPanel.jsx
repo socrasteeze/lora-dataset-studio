@@ -222,6 +222,7 @@ function FullTransformerAdvancedRecipe({ stepsOverride, setStepsOverride, disabl
  * affiche l'état, liste les checkpoints et importe celui choisi.
  * Poll régulier : c'est ce poll qui fait avancer la file (fin du courant → suivant). */
 export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange,
+                                        onDuplicateDecision,
                                         checkpointHost = null,
                                         navigationPanel = null,
                                         onNavigationStateChange,
@@ -2139,7 +2140,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
       )}
 
       <details id="ds-training-advanced" open={advancedOpen}
-        className="lds-section open:pb-2.5 scroll-mt-20">
+        className="lds-section open:pb-2.5 scroll-mt-20 [&_.text-2xs]:text-xs [&_.text-xs]:text-sm [&_.w-28]:w-full sm:[&_.w-28]:w-36 [&_select]:max-w-full">
         <summary data-workspace-focus
           onClick={togglePanel('advanced', advancedOpen, setAdvancedOpen)}
           className="cursor-pointer select-none px-3 py-2 text-sm text-content font-semibold">
@@ -2472,8 +2473,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
 
           {/* Model & training knobs — researched defaults (see the Research note),
               editable per dataset. Each carries a plain-English "why / how". */}
-          <div className="flex flex-col divide-y divide-white/[0.07] [&>*]:py-2.5 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0">
-            <div className="flex items-center gap-1.5 text-indigo-300/80 text-2xs font-semibold uppercase tracking-wider">
+          <div className="grid grid-cols-1 gap-x-8 gap-y-4 xl:grid-cols-2 [&>*]:min-w-0 [&>div]:border-t [&>div]:border-border [&>div]:pt-3">
+            <div className="flex items-center gap-1.5 text-indigo-300/80 text-2xs font-semibold uppercase tracking-wider xl:col-span-2 !border-t-0 !pt-0">
               <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-indigo-400/60" /> Model &amp; training
             </div>
 
@@ -2552,7 +2553,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               </span>
             </div>
 
-            <div className="flex flex-col gap-0.5">
+            <div className="grid grid-cols-1 gap-x-8 gap-y-3 xl:col-span-2 xl:grid-cols-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-content text-xs w-28 shrink-0">Preview every</span>
                 <select value={String(advSampleEvery)} onChange={(e) => saveAdv({ sample_every: Number(e.target.value) })}
@@ -2564,7 +2565,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 </select>
               </div>
 
-              <div className="flex flex-col gap-0.5 mt-1">
+              <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-content text-xs w-28 shrink-0">Preview quality</span>
                   <label className="flex items-center gap-1.5">
@@ -2601,7 +2602,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   Preview settings do not change training weights. Leave both empty to follow {advFamilyLabel} ({advSampleStepsDefault} steps, CFG {advSampleGuidanceDefault}); distilled bases need fewer steps.
                 </span>
               </div>
-              <label className="flex flex-col gap-1 mt-1">
+              <label className="flex flex-col gap-1 mt-1 xl:col-span-2">
                 <span className="text-content text-xs">Preview prompts</span>
                 <textarea value={samplePromptsText}
                   onChange={(e) => setSamplePromptsText(e.target.value)}
@@ -2611,12 +2612,12 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   aria-label="Preview sample prompts, one per line"
                   className="px-2 py-1.5 rounded-lg border border-border bg-surface text-content text-xs font-mono leading-relaxed resize-y placeholder:text-content-subtle" />
               </label>
-              <div className="flex items-center gap-1.5 mt-1">
+              <div className="flex items-center gap-1.5 mt-1 xl:col-span-2">
                 <UseDatasetCaptionsButton images={datasetImages} max={advMaxPrompts}
                   onPick={applySamplePrompts} />
                 <HelpBadge topic="training.sample_prompts_from_dataset" />
               </div>
-              <span className="text-content-subtle text-2xs leading-relaxed">
+              <span className="text-content-subtle text-2xs leading-relaxed xl:col-span-2">
                 <b className="text-content-muted font-medium">Why:</b> these are the test images ai-toolkit renders
                 during the run so you can watch the LoRA learn (and later pick the best epoch).
                 <b className="text-content-muted font-medium"> How:</b> one prompt per line, up to {advMaxPrompts}. {isStyle
@@ -2637,7 +2638,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               <span>Expert — last-mile levers</span>
               <span className="ml-auto hidden sm:inline normal-case font-normal tracking-normal text-indigo-300/50">network · alpha · memory{advTimestepSupported ? ' · timestep' : ''} · optimizer · schedule · EMA</span>
             </summary>
-            <div className="flex flex-col px-2.5 pb-2.5 divide-y divide-indigo-400/10 [&>div]:py-2.5 [&>div:first-child]:pt-1 [&>div:last-child]:pb-0">
+            <div className="grid grid-cols-1 gap-x-8 gap-y-4 px-2.5 pb-2.5 xl:grid-cols-2 [&>div]:min-w-0 [&>div]:border-t [&>div]:border-indigo-400/10 [&>div]:pt-3">
               {/* Network variant — LoRA (default) or LoKr. LoKr is arch-generic in
                   ai-toolkit, so it's offered on every family; the *_supported guard
                   mirrors the timestep pattern for a future family that can't run it. */}
@@ -3714,7 +3715,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           continue dialog that raises it, which now stays open behind it. */}
       {preflightReport && createPortal((
         <PreflightModal report={preflightReport} datasetId={ds.currentId} ds={ds}
-          onResolve={resolvePreflight} />
+          onResolve={resolvePreflight} onDecision={onDuplicateDecision} />
       ), document.body)}
 
       {/*

@@ -297,6 +297,17 @@ class FaceDatasetImage(db.Model):
         return f'<FaceDatasetImage {self.id} ds={self.dataset_id} {self.status}>'
 
 
+class DatasetDuplicateKeep(db.Model):
+    """Explicit Keep Both decisions, bound to the dataset and image contents."""
+    __tablename__ = 'dataset_duplicate_keep'
+    dataset_id = db.Column(Integer, db.ForeignKey('face_dataset.id', ondelete='CASCADE'), primary_key=True)
+    image_a_id = db.Column(Integer, db.ForeignKey('face_dataset_image.id', ondelete='CASCADE'), primary_key=True)
+    image_b_id = db.Column(Integer, db.ForeignKey('face_dataset_image.id', ondelete='CASCADE'), primary_key=True)
+    dataset_instance_id = db.Column(String(32), nullable=False)
+    fingerprint_a = db.Column(String(64), nullable=False)
+    fingerprint_b = db.Column(String(64), nullable=False)
+
+
 class ImageBank(db.Model):
     """A triage bank: a big unsorted folder of images (a Telegram export, a
     scrape dump…) referenced IN PLACE — nothing is copied and the source files
