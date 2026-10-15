@@ -32,17 +32,22 @@ class _Gate:
     def __init__(self):
         self.lock = threading.Lock()
         self.writers = set()
+        self.readers = set()
         self.frozen = False
         self.held = []
         self.finished = threading.Event()
+        self.message = _RESTARTING
 
-    def freeze(self):
+    def freeze(self, own_token=None, message=_RESTARTING):
         with self.lock:
             if self.frozen:
                 raise RestartBlocked(_RESTARTING)
-            if self.writers:
+            if self.writers - {own_token}:
                 raise RestartBlocked(_BUSY)
+            if message != _RESTARTING and self.readers - {own_token}:
+                raise RestartBlocked('Another request is still running. Wait a moment, then retry the profile change.')
             self.frozen = True
+            self.message = message
             self.finished.clear()
 
     def acquire(self, lock):
@@ -69,13 +74,19 @@ def install_gate(app):
 
     @app.before_request
     def plugin_restart_admission():
-        if request.method in ('GET', 'HEAD', 'OPTIONS'):
-            return None
+        with gate.lock:
+            if gate.frozen and gate.message != _RESTARTING:
+                return jsonify(error=gate.message, code='restarting'), 503
+            if request.method in ('GET', 'HEAD', 'OPTIONS'):
+                token = object()
+                gate.readers.add(token)
+                setattr(g, _TOKEN, token)
+                return None
         if request.method == 'POST' and request.path.rstrip('/') == '/api/plugins/apply':
             return None
         with gate.lock:
             if gate.frozen:
-                return jsonify(error=_RESTARTING, code='restarting'), 503
+                return jsonify(error=gate.message, code='restarting'), 503
             token = object()
             gate.writers.add(token)
             setattr(g, _TOKEN, token)
@@ -87,6 +98,28 @@ def install_gate(app):
         if token is not None:
             with gate.lock:
                 gate.writers.discard(token)
+                gate.readers.discard(token)
+
+
+def freeze_profile_work():
+    """Use the shared admission gate for a profile move or controlled restart."""
+    gate = current_app.extensions.get(_EXTENSION)
+    registry = current_app.extensions.get('lds_plugins')
+    if gate is None or registry is None:
+        raise RestartBlocked('Restart safety is unavailable. Restart Studio with start.bat.')
+    gate.freeze(g.get(_TOKEN), 'Studio is applying a profile change. Wait before making changes.')
+    try:
+        from ..extensions import db
+        from ..models import BankQueueEntry
+        from ..services import bank_queue
+        gate.acquire(bank_queue._lock)
+        if bank_queue._queue or db.session.query(BankQueueEntry.id).first():
+            raise RestartBlocked('Finish or clear the Bank queue before changing profiles.')
+        _lock_and_check_work(gate, registry)
+        return gate
+    except Exception:
+        gate.release()
+        raise
 
 
 def _plugin_blockers(registry, changes=()):

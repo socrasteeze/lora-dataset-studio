@@ -41,27 +41,33 @@ For scripted setups, a handful of environment variables override paths and binds
 
 ## Instance Profiles
 
-Run `start.bat` to open **Studio Profiles**. Select **Default** to open the current
-instance. Its existing database, settings, credentials, dataset folders and training
-paths remain in place. No database or media is moved or copied.
+Run `start.bat` to open the last selected profile. The first launch uses
+**Default**, which keeps the current database, settings, credentials, dataset
+folders and training paths in place.
 
-Choose **Create Profile**, enter a name, then choose **Open Profile**. New profiles
-start with empty settings and a separate database, credentials file, plugin data,
-datasets, caches and training storage. Complete Setup for each new profile. Tool
-installations and model weights may be shared. Profile names are shown below the
-Studio title. **Open Browser** reopens the selected profile's local page.
+Open the **Settings** navigation menu and choose **Profiles**. On a phone, open
+the navigation menu and choose **Profiles**. The popup lists your profiles and
+lets you create another profile without leaving the app. Enter its name and
+choose **Create Profile**, then **Switch Profile** to open it.
 
-Only one profile can run per installation. To switch:
+New profiles have separate databases, settings, credentials, plugin data,
+datasets, caches and training storage. Creating a profile from the popup copies
+only the server bind host and token requirement, then generates an independent
+access token. Complete Setup for each new profile. Tool installations and model
+weights may be shared. The active profile name appears below the Studio title.
 
-1. Save browser edits and finish or clear the active profile's work queues.
-2. Stop Studio with `Ctrl+C` in its server window after its work has finished.
-3. Return to **Studio Profiles**, select the other profile and choose **Open Profile**.
+Only one profile can run per installation. Save or discard open edits and finish
+or clear work queues before switching. The popup refuses a switch while work
+still needs the server. It then restarts Studio and opens the selected profile
+in the same browser tab after that profile answers at its own port. Switching
+does not stop jobs or cancel queues. A remote phone cannot switch into a profile
+that is configured for local access only; enable its LAN access from the host
+first.
 
-The launcher never terminates work to make a switch. Closing the picker leaves
-Studio running. A live server, surviving training fence, unresolved generation or
-queued Bank work blocks another profile. Reopen the original profile to recover
-or clear that work. Old browser tabs keep their local drafts on their original
-profile's port; switching does not reuse that tab for a different database.
+A live server, surviving training fence, unresolved generation or queued Bank
+work blocks another profile. Reopen the original profile to recover or clear
+that work. Other browser tabs keep their local drafts on their original
+profile's port.
 
 Named profiles own their training export, output and generated-job directories.
 Their dataset/output overrides in **Local Tools** are read-only. Deployed LoRAs
@@ -71,13 +77,17 @@ original paths and can still find its existing checkpoints.
 
 The private profile registry and named instance files live under `.lds-profiles/`
 beside the installation. The registry captures Default's existing environment
-overrides when the first profile is created. Profile ports are fixed by the
+overrides on the first managed launch. Profile ports are fixed by the
 launcher to keep browser storage separate. If a port is occupied, close the
 conflicting service before retrying; Studio does not silently move to another port.
 LAN access and token controls remain editable in **Server & Access**. Only the
 profile's port is fixed by the launcher.
 
-Terminal access does not require the desktop picker:
+After installing this change, fully stop Studio and run `start.bat` again so
+the supervisor can switch profiles. Restarting only the backend under an old
+supervisor does not enable switching.
+
+Terminal recovery does not require the in-app popup:
 
 ```powershell
 .venv/Scripts/python.exe backend/profile_launcher.py --list
@@ -85,10 +95,41 @@ Terminal access does not require the desktop picker:
 .venv/Scripts/python.exe backend/profile_launcher.py --profile default
 ```
 
-Use the ID from `--list` to open a named profile. The graphical picker uses the
-Tk library included with normal Windows Python installations. If Tk is absent,
-use these terminal commands. `LDS_PROFILE_PICKER=0` keeps the direct `start.bat`
-launch path. The backend still checks profile ownership before importing the app.
+Use the ID from `--list` to open a named profile. Set `LDS_PROFILE_PICKER=1`
+before running `start.bat` to use the optional desktop recovery picker. It needs
+the Tk library included with normal Windows Python installations. The backend
+checks profile ownership before importing the app on every launch.
+
+## Bank Profile Moves
+
+Open a Bank and choose **Move to Profile** in its action bar. Select another
+profile, or create one in the popup, then choose **Move Bank**. Finish work and
+save open edits first. The destination profile stays inactive during the move.
+
+The move preserves Bank and image identities, captions, tags, scores, decisions,
+analysis groups, manual collections, folder assertions, saved reports, edit
+history and cached analysis. It copies cleaned, rotated and edited working
+files. Numeric database IDs and cache references are rebound for the destination;
+stable instance identities remain unchanged. An available bulk decision undo
+keeps its original one-hour expiry.
+
+The source images and their folder stay in place. This includes images imported
+into the source profile's storage. Keep that folder available because the moved
+Bank still reads it. Existing promoted datasets and other Banks stay in their
+original profile. Their cross-profile links become recorded history, which
+prevents a reused numeric ID from pointing at unrelated data.
+
+Studio verifies the copied metadata and cache files before removing the source
+Bank record. It retains a recovery copy of the source working cache and a move
+journal in the source profile's Bank working storage. An interrupted move can
+be retried with the same destination. Changed source metadata or changed copied
+files block automatic completion and retain the available copies for recovery.
+
+The destination must not already contain this Bank or another Bank for the same
+source folder and scope. Existing metadata is never merged or overwritten. If
+the destination database needs a schema update, open that profile once, return
+to the source profile and retry. Quality flags use the destination profile's
+thresholds; saved scores and decisions remain intact.
 
 ## Overview
 

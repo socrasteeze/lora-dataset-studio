@@ -28,6 +28,7 @@ import { datasetFolderNotice } from '../utils/pathRelation'
 import FolderSyncNote from '../components/bank/FolderSyncNote'
 import FolderCheckLine from '../components/bank/FolderCheckLine'
 import RelocateBankDialog from '../components/bank/RelocateBankDialog'
+import { useUnsavedWork } from '../hooks/useUnsavedWork'
 import ForgetMissingDialog from '../components/bank/ForgetMissingDialog'
 import PluginSlot from '../plugins/PluginSlot.jsx'
 import BankLaneTabs from '../components/bank/BankLaneTabs'
@@ -206,6 +207,7 @@ export default function BankPage() {
   })
   const [name, setName] = useState('')
   const [folder, setFolder] = useState('')
+  useUnsavedWork(!!(name.trim() || folder.trim()));
   const [creating, setCreating] = useState(false)
   // The list order is a display preference, so it lives client-side and sticks
   // (a library of twenty banks is unusable in creation order — see bankSort).

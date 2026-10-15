@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useUnsavedWork } from './useUnsavedWork';
 import { clearCaptionDraft, readCaptionDraft, writeCaptionDraft } from '../utils/captionDraft.js';
 
 function browserStorage() {
@@ -9,6 +10,7 @@ export function useCaptionDraft(key, caption = '', short = '') {
   const base = { caption: caption || '', short: short || '' };
   const [state, setState] = useState(() => ({ key, base,
     ...readCaptionDraft(browserStorage(), key, base) }));
+  useUnsavedWork(state.key === key && (state.caption !== base.caption || state.short !== base.short));
   // A picker can switch images without unmounting its dialog.
   if (state.key !== key) {
     setState({ key, base, ...readCaptionDraft(browserStorage(), key, base) });

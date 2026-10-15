@@ -61,6 +61,7 @@ import ScoringPythonDialog from './ScoringPythonDialog'
 import PipelineReport from './PipelineReport'
 import FolderSyncNote from './FolderSyncNote'
 import RelocateBankDialog from './RelocateBankDialog'
+import ProfileDialog from '../common/ProfileDialog'
 import ExcludeFolderDialog from './ExcludeFolderDialog'
 import ForgetMissingDialog from './ForgetMissingDialog'
 import BankReviewLightbox from './BankReviewLightbox'
@@ -197,6 +198,7 @@ async function fetchAllIds(bankId, params) {
 }
 
 export default function BankWorkspace({ bankId, onBack, onGone }) {
+  const [profileMoveOpen, setProfileMoveOpen] = useState(false)
   const toast = useToast()
   const { caps, loading: capsLoading, refresh: refreshCaps } = useCapabilities()
   // Updated on every render once the payload has been normalised. The unmount
@@ -1929,6 +1931,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             <Rocket aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Launch all
           </Button>
           <span className="ml-auto" />
+          <Button type="button" size="md" noShrink disabled={live || !payload?.instance_id}
+            onClick={() => setProfileMoveOpen(true)}>Move to Profile</Button>
           <Button type="button" size="md" noShrink variant="primary" onClick={() => setPromoteOpen(true)} disabled={live || !canPromote}
             title={canPromote
               ? 'Copy the kept selection into a dataset — or into a brand-new bank, to keep working on a shortlist apart'
@@ -2803,6 +2807,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         <BankReviewLightbox bankId={bankId} ids={review.ids} startId={review.startId}
           seedImages={page.images} onDecided={onReviewDecided}
           onRotated={onReviewRotated} onEdited={onReviewEdited} onClose={closeReview} />
+      )}
+
+      {profileMoveOpen && (
+        <ProfileDialog bank={{ id: bankId, instance_id: payload?.instance_id, name: payload?.name }}
+          onClose={() => setProfileMoveOpen(false)} onMoved={() => onGone?.()} />
       )}
 
       {relocating && (

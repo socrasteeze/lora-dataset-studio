@@ -85,6 +85,20 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-15-bank-profile-moves',
+    date: '2026-10-15',
+    title: 'Move Between Profiles',
+    blurb: 'Move a Bank from its workspace into another profile with decisions, captions, scores, groups, collections, edit history and analysis caches preserved. Source images stay in place. The destination is verified before the original Bank record is removed; an interrupted move retains recovery data.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-15-in-app-profiles',
+    date: '2026-10-15',
+    title: 'Switch Studio Profiles',
+    blurb: 'Open Profiles from the Settings menu or mobile navigation. Create a profile or switch with a controlled restart after work finishes. Unsaved edits block switching. Normal startup opens the last selected profile; the desktop picker remains available for recovery.',
+    to: '/settings/local-tools',
+  },
+  {
     id: '2026-10-15-named-instance-profiles',
     date: '2026-10-15',
     title: 'Separate Studio Profiles',
