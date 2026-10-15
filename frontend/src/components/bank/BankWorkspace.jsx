@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Archive, BarChart3, FolderInput, FolderMinus, FolderOpen, Lightbulb, Palette, Rocket, Search, Target, Trash2, Type, Undo2 } from 'lucide-react';
 import { apiFetch, del, patchJson, postJson, putJson } from '../../api/fetchClient'
 import { useFolderPersons } from './useFolderPersons'
@@ -8,6 +8,7 @@ import { useCurationLanes } from './useCurationLanes'
 import { useToast } from '../common/Toast'
 import { useCapabilities } from '../../context/CapabilitiesContext'
 import { useConnectionStatus } from '../../hooks/useConnectionStatus'
+import { useSelectionShortcuts } from '../../hooks/useSelectionShortcuts.js'
 import { loadSavedDeviceId } from '../common/DevicePicker'
 import { stepGate } from './passDeviceGate.js'
 import GpuBusyNotice from '../common/GpuBusyNotice'
@@ -33,7 +34,7 @@ const CaptionEditorDialog = lazy(() => import('../dataset/CaptionEditorDialog'))
 // panel and the grid are four files now, and all four drew the same chips.
 // The surface-inventory contract scans the whole Bank TREE, so moving a button
 // between these files is free and losing one is loud (see bankSurfaces.js).
-import { Stat } from './BankAtoms.jsx'
+import { CONTROL_DISABLED, FILTER_ACTIVE, FILTER_HOVER, FILTER_IDLE, Stat } from './BankAtoms.jsx'
 import { ProgressBar } from './BankProgress.jsx'
 import BankQueuedJob from './BankQueuedJob.jsx'
 import { queueJobActive } from './bankQueueActions.js'
@@ -150,9 +151,8 @@ const PAGE_SIZE = 120
    triage is done, and it dressed as a footnote. Same accent family as
    ▶ Review one by one, one size up. */
 const CURATE_BTN = 'inline-flex w-full min-w-0 items-center justify-center '
-  + 'rounded-md border border-indigo-400/60 bg-indigo-500/20 '
-  + 'px-3 py-1.5 text-center text-sm font-semibold text-indigo-200 '
-  + 'disabled:opacity-50 hover:bg-indigo-500/30'
+  + 'rounded-md border px-3 py-1.5 text-center text-sm font-semibold '
+  + `${FILTER_ACTIVE} ${FILTER_HOVER} ${CONTROL_DISABLED}`
 /* Shown / Review / selected / Select all / Auto-reject. One full-width row;
    each cell is the same width. Labels wrap below lg instead of widening the page. */
 const TOOLBAR_CELL = 'inline-flex h-full min-h-10 w-full min-w-0 items-center justify-center '
@@ -266,6 +266,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const [page, setPage] = useState({ images: [], total: 0 })
   const [selected, setSelected] = useState(() => new Set())
   const selectAnchor = useRef(null)
+  const bankPanesRef = useRef(null)
   const [promoteOpen, setPromoteOpen] = useState(false)
   const [comparison, setComparison] = useState(null)
   const activeBankRef = useRef(bankId)
@@ -407,6 +408,40 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // 📡 Drives the "we lost contact" note in the progress zone: a failed poll
   // must never render as "no job running".
   const connection = useConnectionStatus()
+
+  const desktopPanes = railOpen && railIsColumnNow && Boolean(payload)
+  useLayoutEffect(() => {
+    const panes = bankPanesRef.current
+    if (!desktopPanes || !panes) return undefined
+    const header = document.querySelector('.app-header')
+    let frame = null
+    const measure = () => {
+      const gap = parseFloat(getComputedStyle(panes).rowGap) || 0
+      const top = Math.max(panes.getBoundingClientRect().top,
+        (header?.getBoundingClientRect().bottom || 0) + gap)
+      const height = `${Math.max(0, Math.floor(window.innerHeight - top - gap))}px`
+      if (panes.style.getPropertyValue('--bank-pane-height') !== height) {
+        panes.style.setProperty('--bank-pane-height', height)
+      }
+    }
+    const schedule = () => {
+      if (frame != null) return
+      frame = requestAnimationFrame(() => { frame = null; measure() })
+    }
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule)
+    if (panes.parentElement) observer?.observe(panes.parentElement)
+    if (header) observer?.observe(header)
+    measure()
+    window.addEventListener('resize', schedule)
+    window.addEventListener('scroll', schedule, { passive: true })
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', schedule)
+      window.removeEventListener('scroll', schedule)
+      if (frame != null) cancelAnimationFrame(frame)
+      panes.style.removeProperty('--bank-pane-height')
+    }
+  }, [bankId, desktopPanes])
 
   const loadCoverage = useCallback(async () => {
     const requestId = ++coverageRequestRef.current
@@ -1202,12 +1237,22 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
 
   const batchStatus = async (ids, status) => {
     if (!ids.length) return
-    await act(() => postJson(`/api/bank/${bankId}/images/status`, { ids, status }),
+    const result = await act(() => postJson(`/api/bank/${bankId}/images/status`, { ids, status }),
       `${ids.length} image(s) → ${status}`)
+    if (!result || result.ok === false) return
     setSelected(new Set())
     // The selection is gone, so its view has nothing left to show — return to the grid.
     if (showSelected) { exitSelectionView(); setOffset(0); refreshImages(filter, 0, { on: false }) }
   }
+
+  const keepSelected = () => batchStatus([...selected], 'keep')
+  const rejectSelected = () => batchStatus([...selected], 'reject')
+  useSelectionShortcuts({
+    enabled: selected.size > 0,
+    onKeep: keepSelected,
+    onReject: rejectSelected,
+    onError: (error) => toast.error(error?.message || 'Could not save the selection.'),
+  })
 
   // ↩ Put the last bulk decision back. The reply is a ledger, not an "ok": it
   // is reported verbatim, so a restore that only got 340 of 400 rows back says
@@ -2055,8 +2100,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       {/* ── The rail, beside the grid it filters ─────────────────────────
           Below `sm` it cannot share this row, so it becomes a drawer OVER the
           grid instead of squeezing it: at 400 px both would be unusable. */}
-      <div className={`grid gap-3 ${railOpen && railIsColumnNow
-        ? 'lg:grid-cols-[20rem_minmax(0,1fr)] xl:grid-cols-[22rem_minmax(0,1fr)]' : 'grid-cols-1'}`}>
+      <div ref={bankPanesRef} className={`grid gap-3 ${railOpen && railIsColumnNow
+        ? 'lg:grid-cols-[20rem_minmax(0,1fr)] xl:grid-cols-[22rem_minmax(0,1fr)]' : 'grid-cols-1'} [--bank-pane-height:calc(100dvh-var(--app-header-h)-1.5rem)]`}>
         {railOpen && !railIsColumnNow && (
           <div className="fixed inset-0 z-40 bg-black/60" onClick={closeRail} aria-hidden />
         )}
@@ -2066,22 +2111,16 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
              as an object literal, not JSX children. `node --test` cannot parse
              JSX, so nothing in the suite would have caught it.
 
-             ⚠️ STICKY is not decoration — it is what makes layout B keep its own
-              promise. The rail is ~500 px tall; the grid it filters is thousands
-              (20 000 images). As a plain grid column the rail scrolls away after
-              one screen, so changing a filter means scrolling back UP — the exact
-              round trip this layout was built to remove, reintroduced by a
-              missing property. Pinned, the filters are beside the grid at every
-              scroll position, and the empty band under a short rail is never on
-              screen.
-              It carries its own overflow: a rail taller than the viewport (many
-              people, many tags) must scroll INSIDE its pin, otherwise its lower
-              half becomes unreachable — worse than not pinning at all.
-              Only when it IS a column: as a drawer it is `fixed` already, and
-             sticky on a drawer does nothing. */
+             Both panes use the visible space below their actual top edge.
+             Sizing them to the whole window puts the scrollbars' lower ends
+             below the screen until the outer page reaches its bottom.
+             Image count cannot change the shared pane height.
+             The rail scrolls separately and permits normal page scrolling at
+             its edges, so controls below the toolbar remain reachable.
+             On smaller screens the rail remains a fixed drawer. */
           <div id="bank-filter-rail"
             className={railIsColumnNow
-              ? 'min-w-0 lg:sticky lg:top-[calc(var(--app-header-h)+0.75rem)] lg:max-h-[calc(100vh-var(--app-header-h)-1.5rem)] lg:overflow-y-auto lg:self-start'
+              ? 'min-w-0 lg:sticky lg:top-[calc(var(--app-header-h)+0.75rem)] lg:min-h-0 lg:h-[var(--bank-pane-height)] lg:max-h-[var(--bank-pane-height)] lg:overflow-y-auto lg:[scrollbar-gutter:stable] lg:self-start'
               : 'min-w-0'}>
             <BankFilterRail
               bankId={bankId} filter={filter} setF={setF}
@@ -2135,13 +2174,15 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
 
         {/* ── The grid, full height ── with everything that acts on a SELECTION
             directly above it, where the effect of the click is visible. */}
-        <main className="min-w-0 space-y-3">
+        <main className={`min-w-0 space-y-3 ${railOpen && railIsColumnNow
+          ? 'lg:min-h-0 lg:h-[var(--bank-pane-height)] lg:overflow-y-auto lg:[scrollbar-gutter:stable]' : ''}`}>
         <div className="flex flex-wrap items-center gap-2">
-          <Button disabled={comparisonLoading || !(selected.size || page.total)} onClick={compareCurrent}>Compare</Button>
-          <Button onClick={() => openCollections()}>Collections</Button>
+          <Button size="sm" className={`${FILTER_HOVER} ${CONTROL_DISABLED}`}
+            disabled={comparisonLoading || !(selected.size || page.total)} onClick={compareCurrent}>Compare</Button>
+          <Button size="sm" className={FILTER_HOVER} onClick={() => openCollections()}>Collections</Button>
           {filter.collectionId != null && <>
             <span className="min-w-0 flex-1 truncate text-xs text-content-muted" title={collectionViewName}>Collection: {collectionViewName || `#${filter.collectionId}`}</span>
-            <Button onClick={() => { setF({ collectionId: null }); setCollectionViewName('') }}>Clear Collection</Button>
+            <Button size="sm" className={FILTER_HOVER} onClick={() => { setF({ collectionId: null }); setCollectionViewName('') }}>Clear Collection</Button>
           </>}
           {comparisonLoading && <span role="status" className="text-xs text-content-muted">Loading comparison</span>}
         </div>
@@ -2157,17 +2198,17 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           {/* The fast lane: full-size, one image at a time, Keep/Reject/Skip with
               K/R/S. Deliberately a button of its own rather than a tile gesture —
               the tile click stays the bulk-selection gesture it has always been. */}
-          <button type="button" onClick={() => openReview(null)} disabled={reviewLoading}
+          <button type="button" onClick={() => openReview(null)} disabled={reviewLoading || !(page.total > 0)}
             aria-label="Review from the current filter"
             title="Review the images of this filter one at a time, full size: ✓ Keep / ✕ Reject / ⏭ Skip (K/R/S) each move to the next. Optional random order."
-            className={`${TOOLBAR_CELL} border border-indigo-400/60 bg-indigo-500/20 font-semibold text-indigo-200 disabled:opacity-50 hover:bg-indigo-500/30`}>
+            className={`${TOOLBAR_CELL} border font-semibold ${FILTER_ACTIVE} ${FILTER_HOVER} ${CONTROL_DISABLED}`}>
             {reviewLoading ? 'Preparing' : 'Review'}
           </button>
           <span className={`${TOOLBAR_CELL} text-content-muted`}>{selected.size} selected</span>
-          <button type="button" onClick={selectAllCurrent}
+          <button type="button" onClick={selectAllCurrent} disabled={!(page.total > 0)}
             title="Selects every image the current filters show — all pages, not just the tiles on screen"
-            className={`${TOOLBAR_CELL} border border-border text-content-muted hover:text-content hover:bg-surface-raised`}>
-            Select all
+            className={`${TOOLBAR_CELL} border ${FILTER_IDLE} ${FILTER_HOVER} ${CONTROL_DISABLED}`}>
+            Select All
           </button>
           {/* Bulk-reject undecided images by quality flag — a triage shortcut that
               leaves your manual ✓/✕ untouched and deletes nothing off disk. */}
@@ -2175,8 +2216,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             <button type="button" onClick={() => setShowAutoReject((v) => !v)} disabled={live}
               aria-expanded={showAutoReject}
               title="Bulk-reject the still-undecided images carrying the chosen quality flags"
-              className={`${TOOLBAR_CELL} border border-border bg-surface-raised text-content disabled:opacity-50 hover:bg-surface`}>
-              Auto-reject
+              className={`${TOOLBAR_CELL} border ${showAutoReject ? FILTER_ACTIVE : FILTER_IDLE} ${FILTER_HOVER} ${CONTROL_DISABLED}`}>
+              Auto-Reject
             </button>
             {showAutoReject && (
               <>
@@ -2261,10 +2302,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               title={showSelected
                 ? 'Back to the full grid with its filters'
                 : 'Show only the selected images (as their own view), so a scattered curation/similarity result is visible in one place'}
-              className={`inline-flex min-h-10 w-full items-center justify-center rounded-md border px-2 text-xs font-medium lg:min-h-0 lg:h-7 ${showSelected
-                ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-200'
-                : 'border-border text-content-muted hover:text-content hover:bg-surface-raised'}`}>
-              {showSelected ? <><Undo2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Show all</> : <><Search aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Show selected ({selected.size})</>}
+              className={`inline-flex min-h-10 w-full items-center justify-center rounded-md border px-2 text-xs font-medium lg:min-h-0 lg:h-7 ${FILTER_HOVER} ${showSelected ? FILTER_ACTIVE : FILTER_IDLE}`}>
+              {showSelected ? <><Undo2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Show All</> : <><Search aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Show Selected ({selected.size})</>}
             </button>
           )}
           {/* The per-selection actions live in the pinned BankDecisionBar at the
@@ -2279,7 +2318,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         <div className="space-y-2">
           <button type="button" onClick={toggleCurate} aria-expanded={curateShown}
             aria-controls="bank-curate"
-            className="min-h-10 lg:min-h-0 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-content-subtle hover:text-content">Curate<span aria-hidden>{curateShown ? '▾' : '▸'}</span>
+            className={`min-h-10 lg:min-h-0 flex items-center gap-1.5 rounded-md text-2xs font-semibold uppercase tracking-wide text-content-muted ${FILTER_HOVER}`}>Curate<span aria-hidden>{curateShown ? '▾' : '▸'}</span>
             {!curateShown && (
               <span className="font-normal normal-case tracking-normal">
                 — pick diverse, balanced, similar, find by text, coverage advice
@@ -2729,8 +2768,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           trapped under it — a `fixed` bar permanently covered the last row of
           thumbnails and the pagination. */}
       <BankDecisionBar selected={selected}
-        onKeep={() => batchStatus([...selected], 'keep')}
-        onReject={() => batchStatus([...selected], 'reject')}
+        onKeep={keepSelected}
+        onReject={rejectSelected}
         onUndecided={() => batchStatus([...selected], 'pending')}
         onRotateLeft={() => rotateSelection(-90)}
         onRotateRight={() => rotateSelection(90)}

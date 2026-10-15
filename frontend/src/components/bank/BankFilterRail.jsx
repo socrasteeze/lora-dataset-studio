@@ -33,7 +33,7 @@ import DescribeFilterBar from './DescribeFilterBar.jsx'
 import SelectionTagsPanel from './SelectionTagsPanel.jsx'
 import SubfolderPersonPanel from './SubfolderPersonPanel'
 import { Button, Input, Select, btnClass, controlHeight, fieldClass } from '../common/Controls.jsx'
-import { Chip, FilterGroup, GroupLabel } from './BankAtoms.jsx'
+import { Chip, FILTER_ACTIVE, FILTER_HOVER, FILTER_IDLE, FilterGroup, GroupLabel } from './BankAtoms.jsx'
 import { facetMenuState, matchingTagOptions } from './bankTagFacets.js'
 import { FLAG_HINT, FLAG_LABEL, ORIGIN_BUCKETS } from './bankFacets.js'
 import { foldedCount } from './bankLayout.js'
@@ -84,15 +84,15 @@ function TagFacetMenus({ facets, other, selected, onToggle, onSelectAll }) {
             aria-label={count ? `${facet.label}, ${count} selected: ${title}` : facet.label}
             title={count ? title : undefined}
             onClick={() => setOpenId(expanded ? null : facet.id)}
-            className={`${fieldClass({ size: 'md' })} flex w-full min-w-0 items-center gap-1 text-left ${fullWidth ? 'col-span-2' : ''} ${(count || expanded) ? 'border-indigo-400/60' : ''} ${count ? 'text-indigo-200' : ''}`}>
+            className={`${fieldClass({ size: 'md' })} group flex w-full min-w-0 items-center gap-1 text-left ${FILTER_HOVER} ${fullWidth ? 'col-span-2' : ''} ${(count || expanded) ? 'border-indigo-400/60' : ''} ${count ? 'text-indigo-200' : ''}`}>
             <span className="min-w-0 flex-1 truncate">{facet.label}</span>
             {facet.id === 'other' && (
-              <span className="shrink-0 text-xs tabular-nums text-content-subtle">{other.length}</span>
+              <span className="shrink-0 text-xs tabular-nums text-content-subtle group-hover:text-indigo-200 group-focus-visible:text-indigo-200">{other.length}</span>
             )}
             {count > 0 && (
               <span className="shrink-0 rounded bg-indigo-500/20 px-1 text-xs tabular-nums">{count}</span>
             )}
-            <span aria-hidden="true" className="shrink-0 text-xs text-content-subtle">{expanded ? '▲' : '▼'}</span>
+            <span aria-hidden="true" className="shrink-0 text-xs text-content-subtle group-hover:text-indigo-200 group-focus-visible:text-indigo-200">{expanded ? '▲' : '▼'}</span>
           </button>
         )
       })}
@@ -118,11 +118,11 @@ function TagFacetMenus({ facets, other, selected, onToggle, onSelectAll }) {
               const checked = selected.includes(option.name)
               return (
                 <label key={option.name}
-                  className={`flex min-h-10 lg:min-h-0 ${isOther ? 'lg:min-h-7 py-1' : 'lg:h-7'} cursor-pointer items-center gap-2 rounded px-1.5 text-xs ${checked ? 'bg-indigo-500/15 text-indigo-200' : 'text-content hover:bg-surface-raised'}`}>
+                  className={`group flex min-h-10 lg:min-h-0 ${isOther ? 'lg:min-h-7 py-1' : 'lg:h-7'} cursor-pointer items-center gap-2 rounded px-1.5 text-xs hover:bg-indigo-500/25 hover:text-indigo-200 focus-within:bg-indigo-500/25 focus-within:text-indigo-200 ${checked ? 'bg-indigo-500/20 text-indigo-200' : 'text-content'}`}>
                   <input type="checkbox" className="shrink-0" checked={checked}
                     onChange={() => onToggle(option.name)} />
                   <span className={`min-w-0 flex-1 ${isOther ? 'break-words [overflow-wrap:anywhere]' : 'truncate'}`}>{option.label}</span>
-                  <span className="shrink-0 tabular-nums text-content-subtle">{option.count}</span>
+                  <span className="shrink-0 tabular-nums text-content-subtle group-hover:text-indigo-200 group-focus-within:text-indigo-200">{option.count}</span>
                 </label>
               )
             })}
@@ -203,9 +203,9 @@ export default function BankFilterRail({
           {filterSummary.text}
         </span>
         {filterSummary.count > 0 && (
-          <Button size="sm" noShrink onClick={clearAllFilters}
+          <Button size="sm" noShrink className={FILTER_HOVER} onClick={clearAllFilters}
             title="Clear every filter and show the whole bank again. The grid ORDER is a separate, remembered preference and is left alone.">
-            ✕ Clear all
+            ✕ Clear All
           </Button>
         )}
         {isDrawer && (
@@ -218,21 +218,16 @@ export default function BankFilterRail({
       {/*
        * Status comes FIRST as the main triage action. These four controls used to be gray chips
        * lost among the other filters; live feedback asked for better visibility and placement.
-       * Each shows its count and status color so the bank's distribution is readable before
-       * clicking.
+       * Each shows its count. Every selected status uses the same Bank accent.
        */}
       <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Filter by status">
         {[
           { id: null, label: 'All', n: statusCounts?.total,
-            on: 'border-indigo-400/70 bg-indigo-500/25 text-indigo-100',
             active: !filter.status && !filter.flag && filter.cluster == null && filter.style == null,
             set: () => setF({ status: null, flag: null, cluster: null, style: null }) },
-          { id: 'pending', label: 'Undecided', n: statusCounts?.pending,
-            on: 'border-amber-400/70 bg-amber-500/20 text-amber-100' },
-          { id: 'keep', label: '✓ Kept', n: statusCounts?.keep,
-            on: 'border-emerald-400/70 bg-emerald-500/20 text-emerald-100' },
-          { id: 'reject', label: '✕ Rejected', n: statusCounts?.reject,
-            on: 'border-rose-400/70 bg-rose-500/20 text-rose-100' },
+          { id: 'pending', label: 'Undecided', n: statusCounts?.pending },
+          { id: 'keep', label: '✓ Kept', n: statusCounts?.keep },
+          { id: 'reject', label: '✕ Rejected', n: statusCounts?.reject },
         ].map((s) => {
           const active = s.active ?? filter.status === s.id
           return (
@@ -242,9 +237,7 @@ export default function BankFilterRail({
               /* One line, one height: label left, count right. Allowed to wrap,
                  "✕ Rejected 116" broke onto two lines beside a one-line
                  "All 135" and the four tiles stopped being a grid. */
-              className={`${controlHeight('md')} flex min-w-0 items-center justify-between gap-2 whitespace-nowrap rounded-md border px-2.5 text-sm font-semibold transition-colors ${active
-                ? s.on
-                : 'border-border bg-surface-raised text-content-muted hover:text-content hover:bg-surface'}`}>
+              className={`${controlHeight('md')} flex min-w-0 items-center justify-between gap-2 whitespace-nowrap rounded-md border px-2.5 text-sm font-semibold transition-colors ${FILTER_HOVER} ${active ? FILTER_ACTIVE : FILTER_IDLE}`}>
               <span className="truncate">{s.label}</span>
               {typeof s.n === 'number' && (
                 <span className="text-xs font-normal tabular-nums opacity-80">
@@ -421,7 +414,7 @@ export default function BankFilterRail({
       {/* While anything is filtered the numbers describe the FILTERED bank, and
           the row says so: a count that silently changed meaning would be worse
           than the bank-wide one it replaces. */}
-      <div className="flex flex-col gap-3 border-t border-border pt-2">
+      <div className="flex flex-col gap-3 pt-2">
         <div className="flex flex-col gap-1.5">
           <FilterGroup label="Quality">
             {['blur', 'noise', 'uniform', 'small', 'soft_detail', 'bars', 'unreadable'].map((f) => (
@@ -483,7 +476,7 @@ export default function BankFilterRail({
       {/* 🔖 WD14 tags. One compact menu per category, two to a row. A menu keeps
           every ticked value. The checkboxes open under the row. */}
       {tagFiltersShown && (
-        <section aria-label="Tag filters" className="border-t border-border pt-2">
+        <section aria-label="Tag filters" className="pt-2">
           <div className="flex items-center gap-2">
             <GroupLabel>🔖 Tags</GroupLabel>
             {wd14Tags.length > 0 && (
@@ -501,14 +494,14 @@ export default function BankFilterRail({
           wall; hidden without a count they would be a disclosure nobody opens,
           so the button says how many it holds. */}
       {hiddenAxes > 0 && (
-        <div className="border-t border-border pt-2">
+        <div className="pt-2">
           <button type="button" onClick={() => setMoreOpen((v) => !v)}
             aria-expanded={moreOpen} aria-controls="bank-rail-more"
-            className={`${controlHeight('md')} flex w-full items-center gap-1.5 px-2 text-left text-sm text-content-muted hover:text-content`}>
+            className={`${controlHeight('md')} group flex w-full items-center gap-1.5 rounded-md px-2 text-left text-sm text-content-muted ${FILTER_HOVER}`}>
             <SlidersHorizontal aria-hidden="true" className="h-3.5 w-3.5" />
-            <span className="font-medium">More filters</span>
-            <span className="text-content-subtle">({hiddenAxes})</span>
-            <span aria-hidden className="ml-auto text-content-subtle">{moreOpen ? '▲' : '▼'}</span>
+            <span className="font-medium">More Filters</span>
+            <span className="text-content-subtle group-hover:text-indigo-200 group-focus-visible:text-indigo-200">({hiddenAxes})</span>
+            <span aria-hidden className="ml-auto text-content-subtle group-hover:text-indigo-200 group-focus-visible:text-indigo-200">{moreOpen ? '▲' : '▼'}</span>
           </button>
           {moreOpen && (
             <div id="bank-rail-more" className="mt-2 flex flex-col gap-3">
@@ -639,17 +632,17 @@ export default function BankFilterRail({
           the everyday gesture and the thresholds are the occasional one — but
           present, because tuning them used to mean leaving the bank for
           Settings and coming back blind. Same config keys, same save. */}
-      <div className="border-t border-border pt-2">
+      <div className="pt-2">
         <button type="button" onClick={() => setThresholdsOpen((v) => !v)}
           aria-expanded={thresholdsOpen} aria-controls="bank-thresholds-panel"
-          className={`${controlHeight('md')} flex w-full items-center gap-1.5 px-2 text-left text-sm text-content-muted hover:text-content`}>
+          className={`${controlHeight('md')} group flex w-full items-center gap-1.5 rounded-md px-2 text-left text-sm text-content-muted ${FILTER_HOVER}`}>
           <SlidersVertical aria-hidden="true" className="h-3.5 w-3.5" />
           {/* No subtitle: in the rail it wrapped the row to three lines beside
               one-line neighbours. What it opens is said in the tooltip. */}
           <span className="font-medium" title="What the chips above count as blurry, small, duplicate">
-            Filter thresholds
+            Filter Thresholds
           </span>
-          <span aria-hidden className="ml-auto text-content-subtle">{thresholdsOpen ? '▲' : '▼'}</span>
+          <span aria-hidden className="ml-auto text-content-subtle group-hover:text-indigo-200 group-focus-visible:text-indigo-200">{thresholdsOpen ? '▲' : '▼'}</span>
         </button>
         {thresholdsOpen && (
           <div id="bank-thresholds-panel" className="mt-2">
@@ -670,7 +663,7 @@ export default function BankFilterRail({
       </div>
 
       {/* View controls — order and tile size. */}
-      <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
+      <div className="flex flex-wrap items-center gap-2 pt-2">
         <GroupLabel>View</GroupLabel>
         <label className="flex min-w-0 flex-1 items-center gap-1 text-xs text-content-muted">
           Sort
@@ -690,7 +683,7 @@ export default function BankFilterRail({
           <Select size="sm" value={filter.sort} onChange={(e) => setSort(e.target.value)}
             title="Order the grid by anything the passes measured — resolution, size, aesthetic, NSFW, sharpness, noise, contrast, detail, bars, JPEG quality, face confidence. Images a pass never reached sink to the end. Remembered for this bank."
             aria-label="Sort the grid"
-            className="min-w-0 flex-1">
+            className={`min-w-0 flex-1 ${FILTER_HOVER}`}>
             {sortGroups.map((g) => (g.group ? (
               <optgroup key={g.group} label={g.group}>
                 {g.options.map((o) => (
@@ -706,8 +699,8 @@ export default function BankFilterRail({
             ))))}
           </Select>
         </label>
-        <Button size="sm" noShrink onClick={() => setTileSize((s) => (s === 'M' ? 'S' : 'M'))}>
-          {tileSize === 'M' ? 'Small tiles' : 'Medium tiles'}
+        <Button size="sm" noShrink className={FILTER_HOVER} onClick={() => setTileSize((s) => (s === 'M' ? 'S' : 'M'))}>
+          {tileSize === 'M' ? 'Small Tiles' : 'Medium Tiles'}
         </Button>
       </div>
 
@@ -721,7 +714,7 @@ export default function BankFilterRail({
           loud. The panel moved; a screen reader must still be able to jump to
           it by name. */}
       {tagRow && (
-        <section aria-label="Image tags" className="border-t border-border pt-2">
+        <section aria-label="Image tags" className="pt-2">
           <SelectionTagsPanel tagRow={tagRow} tagPicked={tagPicked}
             onToggle={(tag) => toggleTag(tag, tagRow)} onClear={clearTags} />
         </section>

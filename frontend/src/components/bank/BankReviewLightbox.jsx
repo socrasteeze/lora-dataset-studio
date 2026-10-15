@@ -35,7 +35,7 @@ import { canEditMask, maskButtonLabel } from './bankWatermarkMask.js'
 import { dupStateSuffix } from './bankDupBadge.js'
 import { cropOutcomeMessage, imageVersionQuery } from './bankEdits.js'
 import {
-  ownsTypedKeys, reviewKeyAction, REVIEW_SHORTCUT_HINT,
+  ownsTypedKeys, reviewKeyAction, REVIEW_ARROW_HINT, REVIEW_SHORTCUT_HINT,
 } from '../shared/reviewShortcuts.js'
 import { useReviewImagePreload } from '../shared/useReviewImagePreload.js'
 import ShortcutKey from '../shared/ShortcutKey'
@@ -330,7 +330,7 @@ export default function BankReviewLightbox({
   }, [applyEdit, bankId, busy, session])
 
   // Moving forward without judging IS a skip: it stays undecided in the DB and
-  // is not proposed again in this session (→ and ⏭ are deliberately the same).
+  // is not proposed again in this session (S and ⏭ are the same).
   const doSkip = useCallback(() => { setError(null); setNotice(null); setSession((s) => skip(s)) }, [])
   const goBack = useCallback(() => { setError(null); setNotice(null); setSession((s) => back(s)) }, [])
   const toggleShuffle = useCallback(() => setSession((s) => setShuffle(s, !s.shuffle)), [])
@@ -341,11 +341,11 @@ export default function BankReviewLightbox({
       // away from a decision on the image being edited.
       if (maskId != null || cropId != null) return
       if (pluginLayer) return
-      // K/R/S, ← and Esc come from the SHARED grammar (components/shared/
+      // Letters and culling arrows come from the SHARED grammar (components/shared/
       // reviewShortcuts.js) — the same one the dataset lightbox reads, so the
       // two review surfaces cannot drift apart one refactor at a time. The keys
       // below are the Bank's own and are read off the same event.
-      const action = reviewKeyAction(e)
+      const action = reviewKeyAction(e, { decisionArrows: true })
       if (action === 'close') { onClose(); return }
       if (action === 'keep') { e.preventDefault(); sendDecision('keep'); return }
       if (action === 'reject') { e.preventDefault(); sendDecision('reject'); return }
@@ -409,7 +409,7 @@ export default function BankReviewLightbox({
             {p.total > 0 && (
               <button type="button" onClick={goBack}
                 className="rounded-lg border border-white/25 px-4 py-2 text-sm text-white hover:bg-white/10">
-                ← Back to the last image
+                ↓ Back
               </button>
             )}
             <button type="button" onClick={onClose}
@@ -434,7 +434,7 @@ export default function BankReviewLightbox({
         <div className="bank-review-controls shrink-0 space-y-2 bg-black/60 px-4 pt-2.5">
           <div className="min-h-5 text-center text-xs">
             {error ? <p role="alert" className="text-rose-300">{error} Try again.</p>
-              : <p role="status" className="text-white/60">{busy ? 'Saving' : <span>{REVIEW_SHORTCUT_HINT}</span>}</p>}
+              : <p role="status" className="text-white/60">{busy ? 'Saving' : <span>{REVIEW_SHORTCUT_HINT}<span className="hidden lg:inline"> · {REVIEW_ARROW_HINT}</span></span>}</p>}
           </div>
           {notice && !error && (
             <p role="status" className="text-center text-sm text-sky-200">✂ {notice}</p>
@@ -451,9 +451,10 @@ export default function BankReviewLightbox({
           )}
           <div className="flex w-full gap-2">
             <button type="button" onClick={goBack} disabled={session.pos === 0}
-              title="Previous image (←) — navigation only, decides nothing"
+              title="Previous image (↓). Its saved decision stays in place."
+              aria-keyshortcuts="ArrowDown"
               className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-white/20 px-3 py-2 text-sm text-white disabled:opacity-35 hover:bg-white/10">
-              Back
+              Back{shortcut('↓')}
             </button>
             <button type="button" onClick={() => rotateCurrent(-90)} disabled={busy}
               aria-label="Rotate this image 90 degrees left"
@@ -503,7 +504,8 @@ export default function BankReviewLightbox({
           </div>
           <div className="flex w-full gap-2">
             <button type="button" onClick={() => sendDecision('reject')} disabled={busy}
-              title="Reject this image and move on (R) — reversible, nothing is deleted from disk"
+              title="Reject this image and move on (R or ←). Nothing is deleted from disk."
+              aria-keyshortcuts="R ArrowLeft"
               className="review-decision-button inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-rose-400/60 bg-rose-500/20 px-3 py-2 text-sm font-semibold text-rose-100 disabled:opacity-50 hover:bg-rose-500/30 lg:min-h-0">
               ✕ Reject{shortcut('R')}
             </button>
@@ -513,7 +515,8 @@ export default function BankReviewLightbox({
               ⏭ Skip{shortcut('S')}
             </button>
             <button type="button" onClick={() => sendDecision('keep')} disabled={busy}
-              title="Keep this image and move on (K)"
+              title="Keep this image and move on (K or →)"
+              aria-keyshortcuts="K ArrowRight"
               className="review-decision-button inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-emerald-400/60 bg-emerald-500/20 px-3 py-2 text-sm font-semibold text-emerald-100 disabled:opacity-50 hover:bg-emerald-500/30 lg:min-h-0">
               ✓ Keep{shortcut('K')}
             </button>

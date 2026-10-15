@@ -37,7 +37,7 @@ test('the lightbox offers Keep, Reject and Skip with their K/R/S shortcuts', () 
   // dataset lightbox reads, so the two review surfaces cannot drift apart. What
   // is pinned here is that this lightbox still binds each verdict to its own
   // action rather than quietly dropping one.
-  assert.match(lightbox, /reviewKeyAction\(e\)/)
+  assert.match(lightbox, /reviewKeyAction\(e, \{ decisionArrows: true \}\)/)
   assert.match(lightbox, /action === 'keep'[^\n]*sendDecision\('keep'\)/)
   assert.match(lightbox, /action === 'reject'[^\n]*sendDecision\('reject'\)/)
   assert.match(lightbox, /action === 'skip'[^\n]*doSkip\(\)/)

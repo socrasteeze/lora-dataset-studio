@@ -31,7 +31,7 @@ import {
   freshLightboxImageState, lightboxImageState, lightboxNeighbours, stampedPatch,
 } from './lightboxNavigation';
 import {
-  REVIEW_SHORTCUT_HINT, reviewKeyAction,
+  REVIEW_ARROW_HINT, REVIEW_SHORTCUT_HINT, reviewKeyAction,
 } from '../shared/reviewShortcuts';
 import ShortcutKey from '../shared/ShortcutKey';
 import { useReviewImagePreload } from '../shared/useReviewImagePreload.js';
@@ -412,11 +412,9 @@ export default function DatasetLightbox({
   // Focus trap keeps Tab inside the dialog (P2-7).
   useFocusTrap(dialogRef, !!(img && img.filename));
 
-  /* Keyboard. The grammar — K keep, R reject, S/→ skip, ← back, Esc close, and
-     which keystrokes a focused field owns — is READ from the shared module, not
-     re-decided here: it is the Bank's, and a reflex learned there has to be
-     right here too. Modifier keys and text entry are handled inside it (⌘R must
-     reload the page, not reject the picture). */
+  /* Culling shares the Bank's letters and decision arrows. Read-only previews
+     retain arrow navigation. The shared grammar also protects text entry,
+     native controls and modified keys. */
   const prev = nav.prev;
   useEffect(() => {
     const onKey = (e) => {
@@ -438,7 +436,7 @@ export default function DatasetLightbox({
         if (reviewKeyAction(e) === 'close') patchImageState({ improveOpen: false });
         return;
       }
-      const action = reviewKeyAction(e);
+      const action = reviewKeyAction(e, { decisionArrows: !!onStatus });
       /* Escape peels ONE layer: an open actions panel first, the lightbox only
          once it is closed. Closing everything at once would throw the user out
          of the image they were about to act on — the panel is a detour, not a
@@ -575,7 +573,8 @@ export default function DatasetLightbox({
           <div className={`flex items-stretch gap-2 ${rail ? 'w-full flex-col' : 'w-full sm:w-auto'}`}>
             <button type="button" onClick={() => decide('reject')} disabled={deciding || curationRefused}
               aria-label={refused || `Reject ${alt} and move to the next image`}
-              title={refused || 'Reject this image and move on (R) — reversible, and nothing is deleted from disk'}
+              title={refused || 'Reject this image and move on (R or ←). Nothing is deleted from disk.'}
+              aria-keyshortcuts="R ArrowLeft"
               className="review-decision-button min-h-10 lg:min-h-9 flex-1 rounded-lg border border-rose-400/60 bg-rose-500/20 px-4 py-1.5 text-xs font-semibold text-rose-100 hover:bg-rose-500/30 disabled:cursor-not-allowed disabled:opacity-45">
               ✕ Reject<ShortcutKey>R</ShortcutKey>
             </button>
@@ -591,7 +590,8 @@ export default function DatasetLightbox({
             </button>
             <button type="button" onClick={() => decide('keep')} disabled={deciding || curationRefused}
               aria-label={refused || `Keep ${alt} and move to the next image`}
-              title={refused || 'Keep this image and move on (K) — kept images are the ones captioned, exported and trained on'}
+              title={refused || 'Keep this image and move on (K or →). Kept images are captioned, exported and trained on.'}
+              aria-keyshortcuts="K ArrowRight"
               className="review-decision-button min-h-10 lg:min-h-9 flex-1 rounded-lg border border-emerald-400/60 bg-emerald-500/20 px-4 py-1.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-45">
               ✓ Keep<ShortcutKey>K</ShortcutKey>
             </button>
@@ -608,7 +608,7 @@ export default function DatasetLightbox({
         )}
         {onStatus && (
           <p className={`text-2xs text-white/45 ${rail || sheet ? 'w-full' : ''}`}>
-            {REVIEW_SHORTCUT_HINT} · ← → move without deciding · Esc close
+            {REVIEW_SHORTCUT_HINT}<span className="hidden lg:inline"> · {REVIEW_ARROW_HINT}</span> · Esc close
           </p>
         )}
   </>);

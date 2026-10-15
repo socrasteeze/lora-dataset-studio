@@ -92,12 +92,12 @@ export function progress(s) {
   };
 }
 
-/** Move on without judging (→ / the end of a decision). Stops at the end. */
+/** Move on after skipping or accepting a decision. Stops at the end. */
 export function advance(s) {
   return isFinished(s) ? s : { ...s, pos: s.pos + 1 };
 }
 
-/** Step back (←) — explicit navigation, so re-seeing the previous image is
+/** Step back (↓) — explicit navigation, so re-seeing the previous image is
  * wanted here. Also the way back from the end-of-pool screen. */
 export function back(s) {
   return s.pos <= 0 ? s : { ...s, pos: s.pos - 1 };

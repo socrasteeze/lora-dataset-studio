@@ -1,4 +1,5 @@
 import { UNDO_HINT, undoBannerText } from './bankUndo.js'
+import ShortcutKey from '../shared/ShortcutKey'
 
 /* THE BANK'S PINNED DECISION BAR.
  *
@@ -84,13 +85,15 @@ export default function BankDecisionBar({
             </button>
           </div>
           <div className="grid grid-cols-2 gap-1.5">
-            <button type="button" onClick={onKeep}
-              className={`${DECIDE} border border-emerald-400/60 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30`}>
-              ✓ Keep
-            </button>
             <button type="button" onClick={onReject}
+              title="Reject the selected images (R)" aria-keyshortcuts="R"
               className={`${DECIDE} border border-rose-400/60 bg-rose-500/20 text-rose-100 hover:bg-rose-500/30`}>
-              ✕ Reject
+              ✕ Reject<ShortcutKey>R</ShortcutKey>
+            </button>
+            <button type="button" onClick={onKeep}
+              title="Keep the selected images (K)" aria-keyshortcuts="K"
+              className={`${DECIDE} border border-emerald-400/60 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30`}>
+              ✓ Keep<ShortcutKey>K</ShortcutKey>
             </button>
           </div>
           <div className="grid grid-cols-2 gap-1.5">

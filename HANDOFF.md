@@ -1,8 +1,18 @@
 # HANDOFF
 
-**Updated:** 2026-10-15 | **Target:** main | **Delivery base:** dbd9f1c61 | **Task branch:** noble/queued-bank-workspace-jobs
+**Updated:** 2026-10-15 | **Target:** main | **Delivery base:** 7908be0f5 | **Task branch:** noble/bank-filter-contrast
 
-## State
+## UI delivery
+
+- Removed the Bank filter rail's section divider lines. Added amber hover/focus highlights to chips, tag menus and disclosure controls.
+- Watermark scanning starts unchecked in the shared Launch All dialog, including queue submissions. Existing queued jobs retain their saved choices. Updated the relevant test expectations without running them.
+- Selected status filters, Review and curation controls share the same amber palette. Toolbar sizes, hover/focus styles, disabled colors and label capitalization are consistent. Review and Select All disable for empty filtered results.
+- Desktop Bank filters and results scroll separately. Both use one measured height based on the space below their actual visible top, so the sidebar scrollbar is reachable before reaching the canvas bottom. Header/viewport resizing and page scrolling update that height; image counts do not determine it. Scrollbar gutters stay reserved. Removed scroll containment after the operator reported trapped wheel scrolling. Both panes explicitly allow their grid minimum height to shrink. Runtime and device behavior remain unverified.
+- Bank and Dataset selection bars put Reject on the left and Keep on the right, with R/K shortcuts. Full-screen culling opts into Left=Reject, Right=Keep and Down=Back; read-only previews retain arrow navigation. Back does not undo a saved decision. The selection listener excludes editors, overlays, repeat keys, modifiers and typing, and serializes keyboard requests. Failed Bank bulk writes keep the selection. Added key-grammar regressions without running them.
+- Rebuilt frontend/dist. Ruff, ESLint and the build passed; ESLint retains 32 existing warnings. The privacy scan checked 3,004 publishable text files and found no issues. No tests, visual probes, application imports or live jobs ran.
+- The operator authorized a clean commit and push of all these follow-ups to main, with tests skipped. Source and the consolidated frontend bundle use separate commits with `[skip ci]`. Verify the final publication SHA against origin/main. Refresh the browser to load the frontend; visual and device verification remain unrun.
+
+## Previous queue delivery
 
 The operator asked for workspace jobs to join the shared queue and wait when another Bank is running. The preceding delivery exposed direct work and made queued pipelines wait for it. This delivery queues workspace analysis passes, folder checks and Launch All themselves.
 The operator explicitly authorized a clean push to main without tests. Source and rebuilt frontend are separate delivery commits. No tests, probes, application imports, live jobs or runtime changes ran during implementation.
@@ -20,7 +30,7 @@ The operator explicitly authorized a clean push to main without tests. Source an
 ## Open
 
 1. The operator will test on another machine. Do not start or resume local or cloud suites without a new instruction. Commands below are for that machine only.
-2. Workspace queue behavior, restart migration, populated panel layout, bulk profile moves, full Gates and physical-device behavior remain unqualified by runtime tests. The optional private-name check is unverified. This delivery uses the operator's no-test exception, not a full qualification.
+2. Filter layout stability, culling shortcuts, watermark defaults, workspace queue behavior, restart migration, bulk profile moves, full Gates and physical-device behavior remain unqualified by runtime tests. The optional private-name check is unverified. This delivery uses the operator's no-test exception, not a full qualification.
 3. Fully stop Studio after saving edits and finishing work, then run `start.bat`. An old supervisor cannot enable the new in-app switching protocol through a backend-only restart. Desktop picker and physical phone/PWA acceptance remain operator checks.
 4. Prior cloud runs `38777264998` and `38777264930` were cancelled. Historical frontend results on `51ef21b88` do not qualify the current delivery.
 5. After current work finishes, fully restart Studio to load the new backend and additive queue columns. Running jobs were not interrupted. The diagnosis is source-based; no live job reproduction ran.
@@ -78,6 +88,7 @@ From frontend:
 node --import ./scripts/registerSdk.mjs --test tests/instance-profile-render.test.mjs tests/dataset-storage-render.test.mjs
 node --import ./scripts/registerSdk.mjs --test src/components/bank/bankProfileMove.test.js src/components/bank/bankBulk.test.js
 node --import ./scripts/registerSdk.mjs --test tests/bank-queue-panel-render.test.mjs src/components/bank/bankQueueActions.test.js
+node --import ./scripts/registerSdk.mjs --test src/components/shared/reviewShortcuts.test.js src/components/dataset/DatasetLightbox.test.js src/components/bank/pipelineSteps.test.js src/components/bank/pipeline-ui.test.js tests/bank-review-lightbox-contract.test.mjs tests/bank-decision-bar-contract.test.mjs
 npm test
 npm run lint
 npm run build

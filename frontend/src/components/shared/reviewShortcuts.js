@@ -1,6 +1,7 @@
 /**
  * ONE keyboard grammar for judging images, wherever the app shows a picture
- * full-size: K keep · R reject · S skip · ← back · Esc close.
+ * full-size: K keep · R reject · S skip · Esc close. Culling surfaces also
+ * use ← reject · → keep · ↓ back; inspection surfaces retain arrow navigation.
  *
  * The Bank's ▶ Review lightbox taught it, and the dataset's inspection lightbox
  * now speaks the same one — reading it from HERE rather than from a second
@@ -21,6 +22,7 @@
 
 /** The shortcut line printed under the buttons, in both lightboxes. */
 export const REVIEW_SHORTCUT_HINT = 'K keep · R reject · S skip';
+export const REVIEW_ARROW_HINT = '← reject · → keep · ↓ back';
 
 /**
  * Does the focused element own this keystroke?
@@ -53,12 +55,11 @@ export function ownsTypedKeys(target) {
  * Escape is answered BEFORE the typing guard: a field focused inside an overlay
  * must never be able to trap the user in it.
  *
- * → is the same action as S deliberately. Moving on without judging IS a skip:
- * the image keeps whatever status it already had, which is the one promise that
- * makes a fast walk safe.
+ * decisionArrows is explicit: preview and comparison callers keep navigation
+ * keys, while full-screen culling maps the arrows to verdicts and Back.
  */
-export function reviewKeyAction(event) {
-  if (!event) return null;
+export function reviewKeyAction(event, { decisionArrows = false } = {}) {
+  if (!event || event.defaultPrevented || event.isComposing) return null;
   if (event.metaKey || event.ctrlKey || event.altKey) return null;
   if (event.key === 'Escape') return 'close';
   // Holding a key must not decide images the user has not inspected.
@@ -69,7 +70,20 @@ export function reviewKeyAction(event) {
   const letter = key.toLowerCase();
   if (letter === 'k') return 'keep';
   if (letter === 'r') return 'reject';
+  const type = typeof event.target?.type === 'string' ? event.target.type.toLowerCase() : '';
+  if (key.startsWith('Arrow') && ['range', 'radio'].includes(type)) return null;
+  if (decisionArrows) {
+    if (key === 'ArrowLeft') return 'reject';
+    if (key === 'ArrowRight') return 'keep';
+    if (key === 'ArrowDown') return 'back';
+  }
   if (letter === 's' || key === 'ArrowRight') return 'skip';
   if (key === 'ArrowLeft') return 'back';
   return null;
+}
+
+/** Bulk decisions use letters only; arrows belong to full-screen culling. */
+export function selectionKeyAction(event) {
+  const action = reviewKeyAction(event);
+  return action === 'keep' || action === 'reject' ? action : null;
 }

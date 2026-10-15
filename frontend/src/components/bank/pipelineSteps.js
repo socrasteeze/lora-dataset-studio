@@ -50,6 +50,7 @@ export const STEP_COPY = {
   watermark: {
     label: 'Find watermarks', needs: 'Vision model',
     desc: 'GPU · watermarks and logos.',
+    defaultOff: true,
   },
   faces: {
     label: 'Group by person', needs: 'Quality tools',
