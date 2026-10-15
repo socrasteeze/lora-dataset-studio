@@ -45,6 +45,17 @@ def test_default_preserves_explicit_legacy_paths_and_environment(tmp_path):
     assert child['HF_TOKEN'] == 'synthetic-token'
 
 
+def test_default_retains_the_previously_bound_port_for_browser_storage(store):
+    data = store.root / 'data'
+    data.mkdir()
+    (data / 'server.lock').write_text(json.dumps({
+        'pid': 424242, 'host': '127.0.0.1', 'port': 5051,
+    }), encoding='utf-8')
+    store.environ['LDS_PORT'] = '5050'
+    assert store.get('default')['port'] == 5051
+    assert store.create('Example')['port'] != 5051
+
+
 def test_new_profiles_start_empty_and_do_not_inherit_secrets(store):
     store.environ.update({key: 'synthetic-secret' for key in profiles.SECRET_KEYS})
     store.environ['LDS_ALLOW_SECOND_INSTANCE'] = '1'

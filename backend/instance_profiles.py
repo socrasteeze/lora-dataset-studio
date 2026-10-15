@@ -74,6 +74,7 @@ class ProfileStore:
         self.registry = self.home / 'profiles.json'
 
     def _default(self):
+        from single_instance import read_lock
         data = Path(self.environ.get('LDS_DATA_DIR') or self.root / 'data').resolve()
         paths = dict(zip(PATH_KEYS, (
             data, Path(self.environ.get('LDS_CONFIG') or self.root / 'config.json').resolve(),
@@ -81,7 +82,8 @@ class ProfileStore:
             Path(self.environ.get('LDS_PLUGINS_DIR') or data / 'plugins').resolve(),
             Path(self.environ.get('LDS_EXTENSIONS_DIR') or self.root / 'backend' / 'extensions').resolve(),
         )))
-        port = self.environ.get('LDS_PORT')
+        recorded = read_lock(data)
+        port = recorded['port'] if recorded else self.environ.get('LDS_PORT')
         if not port:
             try:
                 port = json.loads(paths['LDS_CONFIG'].read_text(encoding='utf-8')).get('server', {}).get('port')
