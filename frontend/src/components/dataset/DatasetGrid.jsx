@@ -20,6 +20,8 @@ import { useToast } from '../common/Toast';
 import { btnClass, btnShape } from '../common/controls';
 import { autoTriageAvailable, autoTriageEmptyReason } from './faceScoringGate.js';
 import { bulkActionMessage, createBulkActionGate } from './bulkActionGate.js';
+import { useSelectionShortcuts } from '../../hooks/useSelectionShortcuts.js';
+import ShortcutKey from '../shared/ShortcutKey';
 import { READS_STAY_OPEN, datasetBusyReason } from './datasetBusyReason.js';
 import {
   autoTriageFailureMessage,
@@ -394,6 +396,13 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
     try { localStorage.setItem(TILE_SIZE_KEY, tileSize); } catch { /* ignore — private mode */ }
   }, [tileSize]);
 
+  useSelectionShortcuts({
+    enabled: !!images?.length && selected.size > 0 && !curationWriteBusy && typeof onBatch === 'function',
+    onKeep: () => act('keep'),
+    onReject: () => act('reject'),
+    onError: (error) => toast.error(error?.message || 'Could not save the selection.'),
+  });
+
   if (!images || !images.length) {
     return (
       <p id="ds-images-review" tabIndex={-1} data-workspace-focus
@@ -531,10 +540,12 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
                   {bulkActionMessage(bulkAction)}
                 </span>
               )}
-              <button type="button" disabled={curationWriteBusy} onClick={() => act('keep')}
-                className={`${batchBtn} bg-green-600/80 text-white`}>✓ Keep</button>
               <button type="button" disabled={curationWriteBusy} onClick={() => act('reject')}
-                className={`${batchBtn} bg-red-600/80 text-white`}>✕ Reject</button>
+                title="Reject the selected images (R)" aria-keyshortcuts="R"
+                className={`${batchBtn} bg-red-600/80 text-white`}>✕ Reject<ShortcutKey>R</ShortcutKey></button>
+              <button type="button" disabled={curationWriteBusy} onClick={() => act('keep')}
+                title="Keep the selected images (K)" aria-keyshortcuts="K"
+                className={`${batchBtn} bg-green-600/80 text-white`}>✓ Keep<ShortcutKey>K</ShortcutKey></button>
               <button type="button" disabled={curationWriteBusy} onClick={() => act('pending')}
                 title="Back to undecided" className={`${batchBtn} bg-surface text-content border border-border`}>↺ Undecide</button>
               <button type="button" disabled={curationWriteBusy} onClick={() => act('clear_caption')}

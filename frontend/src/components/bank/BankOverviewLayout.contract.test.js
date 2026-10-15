@@ -96,7 +96,7 @@ test('the rail stays on screen while the grid scrolls under it', () => {
   assert.match(workspace, /lg:sticky/)
   assert.match(workspace, /lg:self-start/)
   assert.match(workspace, /lg:overflow-y-auto/)
-  assert.match(workspace, /lg:max-h-\[calc\(100vh-var\(--app-header-h\)-1\.5rem\)\]/)
+  assert.match(workspace, /lg:max-h-\[var\(--bank-pane-height\)\]/)
   // …and only as a column: the drawer branch must stay plain.
   assert.match(workspace, /railIsColumnNow\s*\n?\s*\?\s*'min-w-0 lg:sticky/)
 

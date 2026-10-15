@@ -14,6 +14,11 @@
  * favour of the app's existing colours, so an atom that hard-coded a hex here
  * would be the one thing standing between the Bank and the rest of the app.
  */
+export const FILTER_ACTIVE = 'border-indigo-400/60 bg-indigo-500/20 text-indigo-200'
+export const FILTER_IDLE = 'border-border bg-surface text-content'
+export const FILTER_HOVER = 'enabled:hover:border-indigo-400 enabled:hover:bg-indigo-500/25 enabled:hover:text-indigo-200 focus-visible:border-indigo-400 focus-visible:bg-indigo-500/25 focus-visible:text-indigo-200'
+export const CONTROL_DISABLED = 'disabled:border-border disabled:bg-surface disabled:text-content-subtle disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-border disabled:hover:bg-surface disabled:hover:text-content-subtle'
+
 /** A filter chip. `active` is the selected state, not a hover — the rail is
  *  read at a glance and "which facets am I on" has to survive that glance. */
 export function Chip({ active, onClick, children, title }) {
@@ -21,9 +26,8 @@ export function Chip({ active, onClick, children, title }) {
     <button type="button" onClick={onClick} title={title}
       /* A fixed height and no wrapping: a chip whose label wraps is twice the
          height of its neighbours and breaks the row. */
-      className={`inline-flex min-h-10 lg:min-h-0 lg:h-7 items-center whitespace-nowrap rounded-full border px-2.5 text-xs font-medium transition-colors ${active
-        ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-200'
-        : 'border-border bg-surface text-content-muted hover:text-content hover:bg-surface-raised'}`}>
+      className={`inline-flex min-h-10 lg:min-h-0 lg:h-7 items-center whitespace-nowrap rounded-full border px-2.5 text-xs font-medium transition-colors ${FILTER_HOVER} ${active
+        ? FILTER_ACTIVE : FILTER_IDLE}`}>
       {children}
     </button>
   )

@@ -85,6 +85,34 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-15-directional-image-culling',
+    date: '2026-10-15',
+    title: 'Faster Culling Controls',
+    blurb: 'Reject is left, Keep is right, with R/K shortcuts for selections. Full-screen Bank and Dataset culling adds Left to reject, Right to keep and Down to revisit the previous image.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-15-steady-bank-filters',
+    date: '2026-10-15',
+    title: 'Steady Bank Filters',
+    blurb: 'Desktop Bank filters and image results scroll in separate panes. Narrowing the results keeps the filter controls in place, including when few images or none match.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-15-watermark-scan-opt-in',
+    date: '2026-10-15',
+    title: 'Choose Watermark Scans',
+    blurb: 'Launch all starts with watermark scanning unchecked. Select Find watermarks when you want to include it in a run or queued job.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-15-bank-filter-contrast',
+    date: '2026-10-15',
+    title: 'Consistent Bank Controls',
+    blurb: 'Bank filters and review controls share one amber accent with matching hover and focus highlights. Divider lines are removed, and empty results disable Review and Select All.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-15-queued-workspace-jobs',
     date: '2026-10-15',
     title: 'Bank Jobs Wait',

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { REVIEW_SHORTCUT_HINT, ownsTypedKeys, reviewKeyAction } from './reviewShortcuts.js';
+import { REVIEW_ARROW_HINT, REVIEW_SHORTCUT_HINT, ownsTypedKeys, reviewKeyAction, selectionKeyAction } from './reviewShortcuts.js';
 
 const press = (key, extra = {}) => ({ key, target: null, ...extra });
 
@@ -78,4 +78,50 @@ test('Escape answers even from inside a caption field', () => {
 
 test('the printed hint is the one the handler implements', () => {
   assert.equal(REVIEW_SHORTCUT_HINT, 'K keep · R reject · S skip');
+  assert.equal(REVIEW_ARROW_HINT, '← reject · → keep · ↓ back');
+});
+
+test('full-screen culling uses Left reject, Right keep and Down back', () => {
+  const cull = (key, extra) => reviewKeyAction(press(key, extra), { decisionArrows: true });
+  assert.equal(cull('ArrowLeft'), 'reject');
+  assert.equal(cull('ArrowRight'), 'keep');
+  assert.equal(cull('ArrowDown'), 'back');
+  assert.equal(cull('k'), 'keep');
+  assert.equal(cull('r'), 'reject');
+  assert.equal(cull('s'), 'skip');
+  assert.equal(reviewKeyAction(press('ArrowLeft')), 'back');
+  assert.equal(reviewKeyAction(press('ArrowRight')), 'skip');
+  assert.equal(reviewKeyAction(press('ArrowDown')), null);
+});
+
+test('culling arrows respect held keys, modifiers and editable fields', () => {
+  for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowDown']) {
+    for (const guard of ['repeat', 'ctrlKey', 'metaKey', 'altKey', 'shiftKey', 'defaultPrevented', 'isComposing']) {
+      assert.equal(reviewKeyAction(press(key, { [guard]: true }), { decisionArrows: true }), null);
+    }
+    for (const target of [
+      { tagName: 'INPUT', type: 'text' }, { tagName: 'INPUT', type: 'range' },
+      { tagName: 'INPUT', type: 'radio' }, { tagName: 'TEXTAREA' },
+      { tagName: 'SELECT' }, { isContentEditable: true },
+    ]) {
+      assert.equal(reviewKeyAction(press(key, { target }), { decisionArrows: true }), null);
+    }
+  }
+  assert.equal(reviewKeyAction(press('ArrowLeft', { target: { tagName: 'INPUT', type: 'checkbox' } }),
+    { decisionArrows: true }), 'reject');
+});
+
+test('bulk selection accepts only unmodified K and R, never navigation keys', () => {
+  for (const key of ['k', 'K']) assert.equal(selectionKeyAction(press(key)), 'keep');
+  for (const key of ['r', 'R']) assert.equal(selectionKeyAction(press(key)), 'reject');
+  for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowDown', 's', 'Escape', 'Enter', ' ']) {
+    assert.equal(selectionKeyAction(press(key)), null);
+  }
+  for (const key of ['k', 'r']) {
+    assert.equal(selectionKeyAction(press(key, { repeat: true })), null);
+    assert.equal(selectionKeyAction(press(key, { ctrlKey: true })), null);
+    assert.equal(selectionKeyAction(press(key, { defaultPrevented: true })), null);
+    assert.equal(selectionKeyAction(press(key, { isComposing: true })), null);
+    assert.equal(selectionKeyAction(press(key, { target: { tagName: 'INPUT', type: 'search' } })), null);
+  }
 });

@@ -452,8 +452,9 @@ parts, and knowing which is which saves reading the rest of this section twice:
   (Score, Framing, Medium, Angle, Resolution, Origin) sit behind **🎛 More
   filters** so the everyday ones stay on one screen. On a narrow window the rail
   becomes a drawer you open with **☰ Filters**, and it remembers whether you
-  keep it open. On a wide window the rail stays put as you scroll the grid, so
-  the chips are still there ten thousand images down;
+  keep it open. On a wide window, filters and image results scroll in separate
+  viewport-sized panes. Narrowing the results keeps the filter controls in place,
+  even when few images or none match;
 - the **grid** filling the rest, with the selection actions directly above it.
 
 The analysis passes live **inside ⚙ Passes** rather than across the top of the
@@ -720,8 +721,9 @@ its files are about to disappear.
 **🚀 Launch all** does the whole funnel for you in one go. Tick which passes
 run and how auto-reject behaves, hit Go, and walk away — it chains *scan →
 auto-reject → score → find watermarks → group by person → classify framing →
-(optional) caption* in that exact order. Auto-reject is **off by default**.
-When you select it, it starts with only
+(optional) caption* in that exact order. Auto-reject and watermark scanning are
+**off by default**. Select **Find watermarks** when you want that scan in the run.
+When you select Auto-reject, it starts with only
 **≈ Duplicates** on (keep the best, reject the rest); Blurry / Noisy / Flat /
 Small are there, off, so an overnight run does not bin soft or plain shots
 unless you tick them. Two things make it safe to run overnight: a pass whose
@@ -1587,6 +1589,10 @@ review workflow after promotion.
 
 ## Review a bank one image at a time
 
+The selection bar puts **Reject (R)** on the left and **Keep (K)** on the right.
+On the grid, **R** and **K** apply to the selected images. These shortcuts leave
+text fields and open dialogs alone.
+
 Filter chips and bulk actions clear the obvious trash, but the last call —
 *is this shot good enough for the LoRA?* — is made one image at a time, and
 squinting at a 140-pixel thumbnail is not how you make it. **▶ Review** (above
@@ -1595,8 +1601,8 @@ after the other:
 
 - **✓ Keep**, **✕ Reject**, **⏭ Skip** — each one saves and jumps straight to the
   next image. The keyboard is the point: **K** keep, **R** reject, **S** skip,
-  **←/→** move without deciding, **Esc** to leave. A few hundred images go by in
-  minutes.
+  **←** reject, **→** keep, **↓** back, **Esc** to leave. Back returns to the
+  previous image; its saved decision stays in place until you change it.
 - **⏭ Skip** decides nothing (the image stays undecided) but is not shown again
   in that run — it's "not now", not "no".
 - **🎲 Random order** walks what's left in shuffled order instead of folder
@@ -2045,15 +2051,19 @@ The full-screen view is where you can actually *see* whether a hand is right or
 an eye is mush — so that is where the verdict belongs. The bar under the image
 carries the same three buttons as the Bank's **▶ Review**, on the same keys:
 
-- **✓ Keep** — `K`
-- **✕ Reject** — `R`
-- **⏭ Skip** — `S` (or **→**)
+- **✕ Reject** — `R` or **←**
+- **✓ Keep** — `K` or **→**
+- **⏭ Skip** — `S`
 
 **Keep and Reject move you on** as soon as the verdict is saved, so a folder of
 300 pictures is worked through with one hand on the keyboard and never a return
 trip to the grid. **Skip is nothing but "next"**: the image keeps whatever it
-already had, undecided included. **←** goes back the same way — navigation only,
+already had, undecided included. **↓** goes back the same way — navigation only,
 it decides nothing.
+
+The Dataset grid uses the same selection controls: Reject on the left, Keep on
+the right, with **R** and **K** for the current selection. Read-only previews
+retain **←/→** navigation because they cannot accept decisions.
 
 On phones, **Reject**, **Skip**, and **Keep** stay below the image. You do not
 need to reopen **Actions** after each decision. Nearby images preload, and the
@@ -3147,10 +3157,10 @@ marker under the thumbnail. From there:
 | `?` | Show or hide the shortcut panel |
 | `Esc` | Leave burst mode |
 
-They are the same keys as the image bank's **▶ Review** — `K` keep, `R` reject,
-`S` skip, `←` back, `Esc` out — because a reflex that is right on one screen and
-wrong on the next is worse than no reflex. `P`, `U` and `Home` are this lane's
-own: a video bank has three verdicts where the image review has two.
+The letter keys match the image bank's **▶ Review**: `K` keep, `R` reject,
+`S` skip and `Esc` out. This video mode retains arrow navigation; full-screen
+image culling uses `←` reject, `→` keep and `↓` back. `P`, `U` and `Home` are
+this lane's own: a video bank has three verdicts where the image review has two.
 
 Four things are worth knowing before you lean on it:
 

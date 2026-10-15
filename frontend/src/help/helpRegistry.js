@@ -535,7 +535,8 @@ const TOPICS = [
      'big image', 'zoom', 'open image', 'keep reject skip', 'keep', 'reject', 'skip',
      'fast triage', 'quick triage', 'decide', 'decision', 'next image', 'advance',
      'random', 'random order', 'shuffle', 'shuffled', 'sample', 'representative',
-     'keyboard', 'shortcut', 'shortcuts', 'hotkey', 'bank', 'triage'],
+     'keyboard', 'shortcut', 'shortcuts', 'hotkey', 'bank', 'triage',
+     'arrow keys', 'left reject', 'right keep', 'down back', 'selection shortcuts'],
     '/bank', 'using-the-app', 'review-a-bank-one-image-at-a-time'),
   // DIVERGENCE 10 — hand-ported from upstream's help/topics/pages.js.
   action('bank-compare-duplicates', 'Compare the copies of a duplicate group',

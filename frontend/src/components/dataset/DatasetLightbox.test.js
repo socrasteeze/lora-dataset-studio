@@ -110,7 +110,7 @@ test('the dataset lightbox offers Keep / Reject / Skip on the Bank keys', () => 
   // The grammar is READ, never re-decided here — that is what stops the two
   // review surfaces from drifting apart one refactor at a time.
   assert.match(lightbox, /from '\.\.\/shared\/reviewShortcuts'/);
-  assert.match(lightbox, /const action = reviewKeyAction\(e\)/);
+  assert.match(lightbox, /const action = reviewKeyAction\(e, \{ decisionArrows: !!onStatus \}\)/);
   assert.match(lightbox, /action === 'keep' \|\| action === 'reject'/);
   assert.match(lightbox, /decide\(action\)/);
   // K/R are the SAME status words the grid tile writes — no second notion of
@@ -118,7 +118,7 @@ test('the dataset lightbox offers Keep / Reject / Skip on the Bank keys', () => 
   assert.match(lightbox, /await onStatus\(imageId, status, \{ onAccepted \}\)/);
   assert.match(workspace, /onStatus=\{viewImgLive\._rescueReviewPreview \? null : ds\.setStatus\}/);
   // Printed, not folklore — from the same constant the handler is built on.
-  assert.match(lightbox, /\{REVIEW_SHORTCUT_HINT\} · ← → move without deciding · Esc close/);
+  assert.match(lightbox, /\{REVIEW_SHORTCUT_HINT\}.*\{REVIEW_ARROW_HINT\}.*Esc close/);
   assert.equal(REVIEW_SHORTCUT_HINT, 'K keep · R reject · S skip');
 });
 

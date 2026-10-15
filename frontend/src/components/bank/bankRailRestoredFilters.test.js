@@ -21,9 +21,9 @@ test('the rail heads itself with what is filtering, in words', () => {
 
 test('the rail offers one click back to the whole bank', () => {
   assert.match(rail, /onClick=\{clearAllFilters\}/)
-  assert.match(rail, /✕ Clear all/)
+  assert.match(rail, /✕ Clear All/)
   // One-line fixed height, like every other small button in the rail.
-  assert.match(rail, /<Button size="sm" noShrink[^>]*>\s*✕ Clear all/)
+  assert.match(rail, /<Button size="sm" noShrink[^>]*>\s*✕ Clear All/)
   assert.ok(workspace.includes('clearAllFilters={clearAllFilters}'),
     'BankWorkspace passes clearAllFilters to the rail')
 })

@@ -62,15 +62,19 @@ test('the selection actions exist in exactly one place — the bar, not inline',
   const keepInBar = (bar.match(/onClick=\{onKeep\}/g) || []).length
   assert.equal(keepInBar, 1)
   const keepInline = (workspace.match(/batchStatus\(\[\.\.\.selected\], 'keep'\)/g) || []).length
-  assert.equal(keepInline, 1, 'batchStatus(...,\'keep\') must be wired exactly once, from the bar\'s onKeep')
+  assert.equal(keepInline, 1, 'the button and shortcut must share one keep command')
+  assert.match(workspace, /onKeep=\{keepSelected\}/)
   assert.doesNotMatch(workspace, />✓ Keep<\/button>/, 'no inline ✓ Keep button should remain in BankWorkspace.jsx')
 })
 
-test('Keep and Reject share one even row, Undecide and Clear selection the next', () => {
+test('Reject is left of Keep in one even row, Undecide and Clear selection the next', () => {
   const grids = [...bar.matchAll(/className="grid grid-cols-2 gap-1\.5"/g)]
   assert.equal(grids.length, 2, 'two even two-column rows: Keep/Reject, then Undecide/Clear selection')
   assert.match(bar, />\s*✓ Keep\s*</)
   assert.match(bar, />\s*✕ Reject\s*</)
+  assert.ok(bar.indexOf('onClick={onReject}') < bar.indexOf('onClick={onKeep}'))
+  assert.match(bar, /Reject<ShortcutKey>R<\/ShortcutKey>/)
+  assert.match(bar, /Keep<ShortcutKey>K<\/ShortcutKey>/)
   // The Dataset bulk bar's word for the same action (DatasetGrid.jsx). "Skip"
   // belongs to the review lightbox, where it really skips; "CLR" said nothing.
   assert.match(bar, />\s*↺ Undecide\s*</)
