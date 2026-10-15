@@ -62,7 +62,7 @@ def isolated_plugin_runtime():
 
     original_path = list(sys.path)
     with pytest.MonkeyPatch.context() as patch:
-        for key in ('LDS_PROFILE_ID', 'LDS_PROFILE_NAME', 'LDS_PROFILES_HOME'):
+        for key in ('LDS_PROFILE_ID', 'LDS_PROFILE_NAME', 'LDS_PROFILE_PORT', 'LDS_PROFILES_HOME'):
             patch.delenv(key, raising=False)
         patch.setattr(config, 'DEFAULTS', deepcopy(config.DEFAULTS))
         patch.setattr(config, '_cache', None)

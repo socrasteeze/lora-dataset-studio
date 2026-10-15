@@ -65,7 +65,7 @@ function Invoke-IsolatedValidation([scriptblock]$Body) {
   $names = @('LDS_DATA_DIR', 'LDS_CONFIG', 'LDS_ENV', 'LDS_PLUGINS_DIR',
              'LDS_EXTENSIONS_DIR', 'LDS_BUNDLED_DIR', 'LDS_PLUGIN_DISTRIBUTION',
              'LDS_PLUGIN_BUILD_MODE', 'LDS_PLUGINS', 'LDS_EXTENSIONS', 'LDS_GATES_SCRATCH')
-  $names += @('LDS_PROFILE_ID', 'LDS_PROFILE_NAME', 'LDS_PROFILES_HOME')
+  $names += @('LDS_PROFILE_ID', 'LDS_PROFILE_NAME', 'LDS_PROFILE_PORT', 'LDS_PROFILES_HOME')
   $saved = @{}
   foreach ($name in $names) { $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
   try {

@@ -74,6 +74,8 @@ beside the installation. The registry captures Default's existing environment
 overrides when the first profile is created. Profile ports are fixed by the
 launcher to keep browser storage separate. If a port is occupied, close the
 conflicting service before retrying; Studio does not silently move to another port.
+LAN access and token controls remain editable in **Server & Access**. Only the
+profile's port is fixed by the launcher.
 
 Terminal access does not require the desktop picker:
 

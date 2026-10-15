@@ -26,7 +26,8 @@ bp = Blueprint('settings', __name__, url_prefix='/api')
 
 def _instance_profile():
     from instance_profiles import public_profile, training_path
-    return {**public_profile(), 'training': {
+    return {**public_profile(), 'port': int(os.environ['LDS_PROFILE_PORT'])
+            if os.environ.get('LDS_PROFILE_PORT') else None, 'training': {
         kind: str(path) for kind in ('datasets', 'output', 'jobs')
         if (path := training_path(kind)) is not None}}
 

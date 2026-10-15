@@ -74,11 +74,12 @@ export default function ServerSection({ config, setField, runtime, handleSave, c
   const [copied, setCopied] = useState(false)
   const [copiedUrl, setCopiedUrl] = useState(null)   // which reach-URL was just copied (by key)
   const bindManaged = runtime.bind_managed === true
+  const profilePort = runtime.profile?.port || null
   const access = resolveServerAccess({
     bindManaged,
     browserOrigin: typeof window === 'undefined' ? null : window.location?.origin,
     configHost: config.server.host,
-    configPort: config.server.port,
+    configPort: profilePort || config.server.port,
     runtimeLanIp: runtime.lan_ip,
   })
   const lan = access.lan
@@ -93,7 +94,7 @@ export default function ServerSection({ config, setField, runtime, handleSave, c
   const tsIp = runtime.tailscale_ip || null
   const knownRuntime = bindManaged ? !!access.origin : runtime.host != null && runtime.port != null
   const dirty = !bindManaged && knownRuntime
-    && (runtime.host !== config.server.host || runtime.port !== config.server.port)
+    && (runtime.host !== config.server.host || runtime.port !== (profilePort || config.server.port))
 
   // The exact URL(s) a phone should open. Token is appended ONLY when the token
   // gate is on (a tokenless URL would 403); when it's on but no token exists yet,
@@ -183,13 +184,15 @@ export default function ServerSection({ config, setField, runtime, handleSave, c
         <input id="server-port" type="number" min={1} max={65535}
           value={port ?? ''}
           disabled={bindManaged}
+          readOnly={!!profilePort}
           aria-describedby={bindManaged ? 'server-bind-managed-note' : undefined}
           onChange={(e) => setField('server', 'port', Math.max(1, Math.min(65535, Number(e.target.value) || 1)))}
           className={`${INPUT_CLASS} max-w-[8rem] disabled:cursor-not-allowed disabled:opacity-60`} />
         {/* The shipped port is 5050 and nothing on this screen said so — a user
             who typed 8080 to test something had no way back to the value
             start.bat binds by default. */}
-        {!bindManaged && (
+        {profilePort && <p className="mt-1 text-xs text-content-muted">The profile launcher owns this port.</p>}
+        {!bindManaged && !profilePort && (
           <ResetToDefault label="Port" section="server" field="port"
             config={config} configDefaults={configDefaults} setField={setField} />
         )}
@@ -362,7 +365,7 @@ export default function ServerSection({ config, setField, runtime, handleSave, c
                 <span className="text-content-subtle"> — reachable at http://{lanIp}:{runtime.port}/</span>
               )}
               {dirty && (
-                <> · Saved: <span className="font-medium text-content">{config.server.host}:{config.server.port}</span></>
+                <> · Saved: <span className="font-medium text-content">{config.server.host}:{profilePort || config.server.port}</span></>
               )}
             </span>
           )}
