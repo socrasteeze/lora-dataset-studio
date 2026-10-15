@@ -1,4 +1,4 @@
-"""Cross-bank pipeline queue — run several banks' "Launch all" back-to-back.
+"""Cross-bank queue for workspace passes and Launch-all pipelines.
 
 A single bank already serializes its own passes (bank_jobs, one live job per
 bank) and the heavy GPU passes are globally exclusive (gpu_window). What was
@@ -44,12 +44,10 @@ state that must outlive the process cannot live in the process.
 Same contract as ``bank_jobs``:
 * **Thread-safe** — one module lock guards the FIFO; a second lock guards the
   single-worker invariant.
-* Finished entries are dropped from the FIFO (the running bank's live progress
-  is shown by its own bank_jobs snapshot); the queue only ever lists what is
-  still pending or currently running.
-* A durable write that fails is logged and swallowed — the record is worth
-  having, it is not worth failing a launch for. Same call this module already
-  makes for its activity-log mirror.
+* Completed entries are dropped. Failed workspace jobs stay visible for Retry
+  or Remove and do not hold a machine slot.
+* Workspace submissions must be saved before they can run. Legacy pipeline
+  persistence and cleanup retain their best-effort behavior.
 """
 import json
 import logging
@@ -92,9 +90,8 @@ def _wait_for_a_job_to_end(seen) -> None:
 
 # ── the durable half ─────────────────────────────────────────────────────────
 #
-# Three calls, all best-effort. A failure here loses the restart-resume for one
-# entry; it must never lose the entry itself, which is why each one swallows and
-# logs rather than raising into a launch the user is waiting on.
+# Workspace admission requires a durable insert. Legacy inserts and cleanup
+# use _safely so a bookkeeping failure cannot interrupt an already running job.
 
 #: The app to write with. `cancel`, `clear` and `_remove` take no `app` argument
 #: — they are called from routes, from the worker thread and from tests — so the
@@ -123,13 +120,37 @@ def _persist_add(entry) -> None:
     from ..utils.dbbusy import write_with_retry
     row = BankQueueEntry(
         bank_id=entry['bank_id'], user_id=str(entry['user_id']),
-        steps=json.dumps(list(entry['steps'])),
+        operation=entry.get('operation'),
+        operation_payload=(json.dumps(entry['operation_payload'], allow_nan=False)
+                           if entry.get('operation') else None),
+        steps=json.dumps([] if entry.get('operation') else list(entry['steps'])),
         reject_flags=json.dumps(list(entry['reject_flags'])),
         resolve_dups=bool(entry['resolve_dups']),
         device_id=entry.get('device_id'), group_key=entry.get('group_key'),
         enqueued_at=float(entry['enqueued_at']))
     write_with_retry(lambda: db.session.add(row))
     entry['row_id'] = row.id
+
+
+def _persist_remove_entry(entry):
+    from ..models import BankQueueEntry
+    from ..utils.dbbusy import write_with_retry
+    if entry.get('row_id') is not None:
+        write_with_retry(lambda: BankQueueEntry.query.filter_by(id=entry['row_id']).delete(synchronize_session=False))
+    elif entry.get('ready') is not False:
+        _persist_remove([entry['bank_id']])
+
+
+def _persist_operation_state(entry):
+    from ..extensions import db
+    from ..models import BankQueueEntry
+    from ..utils.dbbusy import write_with_retry
+    def save():
+        row = db.session.get(BankQueueEntry, entry['row_id'])
+        if row is None:
+            raise RuntimeError('The queued job record is unavailable.')
+        row.operation_payload = json.dumps(entry['operation_payload'], allow_nan=False)
+    write_with_retry(save)
 
 
 def _persist_remove(bank_ids) -> None:
@@ -182,14 +203,24 @@ def restore(app) -> int:
                 # would run it twice; keep the earliest and drop the rest.
                 continue
             seen.add(row.bank_id)
+            try:
+                operation_payload = json.loads(row.operation_payload) if row.operation_payload else None
+                if row.operation and not isinstance(operation_payload, dict):
+                    raise ValueError('invalid queued payload')
+            except (ValueError, TypeError):
+                operation_payload = {'error': 'The stored job is invalid. Remove it and submit the job again.'}
             restored.append({
                 'bank_id': row.bank_id, 'user_id': row.user_id,
+                'operation': row.operation,
+                'operation_payload': operation_payload,
                 'steps': json.loads(row.steps or '[]'),
                 'reject_flags': json.loads(row.reject_flags or '[]'),
                 'resolve_dups': bool(row.resolve_dups),
                 'device_id': row.device_id, 'group_key': row.group_key,
                 'enqueued_at': row.enqueued_at or time.time(),
-                'state': 'pending', 'row_id': row.id})
+                'state': 'failed' if operation_payload and operation_payload.get('error') else 'pending',
+                'error': operation_payload.get('error') if operation_payload else None,
+                'row_id': row.id})
     if not restored:
         return 0
     with _lock:
@@ -277,6 +308,95 @@ def _find(bank_id):
     return None
 
 
+def enqueue_operation(app, user_id, bank_id, operation, options):
+    """Queue an exact workspace job; durable recording precedes eligibility."""
+    from . import bank_jobs, bank_queue_operations as operations
+    payload, device_id = operations.prepare(operation, user_id, bank_id, options)
+    entry = {'bank_id': bank_id, 'user_id': user_id, 'operation': operation,
+             'operation_payload': payload, 'steps': payload['options'].get('steps') or [operation],
+             'reject_flags': payload['options'].get('reject_flags') or [],
+             'resolve_dups': bool(payload['options'].get('resolve_dups')),
+             'device_id': device_id, 'group_key': _group_key_of(user_id, bank_id),
+             'enqueued_at': time.time(), 'state': 'pending', 'ready': False}
+    global _app_ref
+    _app_ref = app
+    with _lock:
+        if _find(bank_id) is not None:
+            raise BankAlreadyQueued(bank_id)
+        _queue.append(entry)
+        position = len(_queue)
+    try:
+        _persist_add(entry)
+    except Exception as exc:
+        with _lock:
+            if _find(bank_id) is entry:
+                _queue.remove(entry)
+        raise RuntimeError('The job could not be saved to the queue. Check storage and retry.') from exc
+    with _lock:
+        accepted = _find(bank_id) is entry
+        if accepted:
+            entry['ready'] = True
+    if not accepted:
+        _persist_remove_entry(entry)
+        raise ValueError('The job was cancelled before submission finished.')
+    _log(bank_id, 'job queued', 'info', detail=operation)
+    bank_jobs._announce_ended()
+    if app.config.get('TESTING'):
+        # A test-mode inline runner must leave blocked work pending. Tests can
+        # release the blocker and advance the same worker explicitly.
+        if (not bank_jobs.running(bank_id) and not _active_work_reason(entry)
+                and (device_id or not _local_gpu_reason())):
+            _drain(app)
+    else:
+        _ensure_worker(app)
+    return position
+
+
+def _local_gpu_reason():
+    from . import image_bank_service as banks
+    return banks._gpu_busy_reason()
+
+
+def retry(app, bank_id):
+    from . import bank_jobs
+    with _lock:
+        entry = _find(bank_id)
+        if (entry is None or entry['state'] != 'failed' or not entry.get('operation')
+                or entry.get('ready') is False):
+            raise ValueError('There is no failed workspace job to retry.')
+        entry['operation_payload'].pop('error', None)
+        entry.pop('error', None)
+        entry['ready'] = False
+    try:
+        _persist_operation_state(entry)
+    except Exception:
+        with _lock:
+            entry['error'] = 'The retry could not be saved. Retry again after checking storage.'
+            entry['operation_payload']['error'] = entry['error']
+            entry['ready'] = True
+        raise
+    with _lock:
+        if _find(bank_id) is not entry:
+            return False
+        entry.update(state='pending', ready=True, claimed=False)
+    bank_jobs._announce_ended()
+    if not app.config.get('TESTING'):
+        _ensure_worker(app)
+    return True
+
+
+def _fail_operation(entry, error):
+    from ..utils.redact import redact_tokens, redact_user_paths
+    error = redact_user_paths(redact_tokens(str(error)))
+    with _lock:
+        if _find(entry['bank_id']) is not entry:
+            return
+        entry.update(state='failed', claimed=False, error=error)
+        entry['operation_payload']['error'] = error
+    _safely('record the job failure', _persist_operation_state, entry)
+    _log(entry['bank_id'], 'queued job failed', 'error')
+
+
 def enqueue(app, user_id, bank_id, steps=None, reject_flags=None,
             resolve_dups=False, device_id=None):
     """Add a bank's Launch-all run to the queue. One live entry per bank —
@@ -335,7 +455,7 @@ def enqueue(app, user_id, bank_id, steps=None, reject_flags=None,
     with _lock:
         still_queued = _find(bank_id) is entry
     if not still_queued:
-        _safely('forget the already-finished bank', _persist_remove, [bank_id])
+        _safely('forget the already-finished bank', _persist_remove_entry, entry)
     _log(bank_id, 'bank queued', 'info', detail=f'position {position}')
     # Under TESTING every bank_jobs job runs INLINE, so drain the whole queue
     # synchronously here (no worker thread) — same inline-vs-thread split as
@@ -434,8 +554,17 @@ def _ensure_worker(app):
 
 def _worker_loop(app, lane):
     _current.lane = lane
-    with app.app_context():
-        _drain(app)
+    try:
+        with app.app_context():
+            _drain(app)
+    finally:
+        # Admission can happen after the last claim check but before this
+        # thread exits. Transfer ownership before checking for that new work.
+        with _worker_lock:
+            if _workers.get(lane) is threading.current_thread():
+                _workers.pop(lane, None)
+        if _lane_has_pending(lane):
+            _ensure_worker(app)
 
 
 def _drain(app):
@@ -468,7 +597,7 @@ def _claim_next(lane=None):
         busy_units = {_unit_of(e) for e in _queue
                       if e['state'] == 'running' or e.get('claimed')}
         for e in _queue:
-            if e['state'] != 'pending' or e.get('claimed'):
+            if e['state'] != 'pending' or e.get('claimed') or e.get('ready') is False:
                 continue
             if lane is not None and _lane_of(e) != lane:
                 continue
@@ -563,13 +692,17 @@ def _process_next(app) -> bool:
         if _find(bank_id) is not entry:
             return True                          # cancelled at the last moment
         entry['state'] = 'running'
-    _log(bank_id, 'pipeline starting', 'info',
+    _log(bank_id, 'queued job starting', 'info',
          detail=', '.join(entry['steps']) if entry.get('steps') else None)
 
     try:
-        banks.start_pipeline(app, entry['user_id'], bank_id, entry['steps'],
-                             entry['reject_flags'], entry['resolve_dups'],
-                             device_id=entry.get('device_id'))
+        if entry.get('operation'):
+            from . import bank_queue_operations
+            launched_job = bank_queue_operations.execute(app, entry)
+        else:
+            launched_job = banks.start_pipeline(app, entry['user_id'], bank_id, entry['steps'],
+                                               entry['reject_flags'], entry['resolve_dups'],
+                                               device_id=entry.get('device_id'))
     except bank_jobs.BankJobBusy:
         # A manual launch grabbed the slot between our check and here — back to
         # pending, claim RELEASED so the lane can pick it up again, and let the
@@ -581,34 +714,51 @@ def _process_next(app) -> bool:
                 entry['claimed'] = False
         _wait_for_a_job_to_end(seen)
         return True
-    except (ValueError, RuntimeError) as e:
+    except Exception as e:
+        if entry.get('operation'):
+            _fail_operation(entry, e)
+            return True
+        if not isinstance(e, (ValueError, RuntimeError)):
+            raise
         # Bank gone / prerequisite failed at launch: drop it and move on.
         _log(bank_id, 'queue entry dropped', 'error', detail=str(e))
-        _remove(bank_id)
+        _remove(bank_id, expected_entry=entry)
         return True
 
-    # Wait for the pipeline to finish before starting the next bank: woken by
+    # A cancellation can arrive during the service's preflight, before its
+    # bank_jobs record exists. Apply that cancellation to the job just launched.
+    with _lock:
+        removed = _find(bank_id) is not entry
+    if removed and isinstance(launched_job, dict):
+        bank_jobs.cancel(bank_id, expected_job=launched_job)
+
+    # Wait for the job to finish before starting the next bank: woken by
     # bank_jobs the moment it ends, with the poll as the fallback.
     while True:
         seen = bank_jobs.ended_count()
         if not bank_jobs.running(bank_id):
             break
         _wait_for_a_job_to_end(seen)
-    _log(bank_id, 'pipeline done, dequeued', 'ok')
-    _remove(bank_id)
+    if entry.get('operation') and isinstance(launched_job, dict) and launched_job.get('error'):
+        _fail_operation(entry, launched_job['error'])
+        return True
+    _log(bank_id, 'queued job done, dequeued', 'ok')
+    _remove(bank_id, expected_entry=entry)
     return True
 
 
-def _remove(bank_id) -> bool:
+def _remove(bank_id, expected_entry=None) -> bool:
     with _lock:
         found = False
         for i, e in enumerate(_queue):
             if e['bank_id'] == bank_id:
+                if expected_entry is not None and e is not expected_entry:
+                    break
                 _queue.pop(i)
                 found = True
                 break
     if found:
-        _safely('forget the finished bank', _persist_remove, [bank_id])
+        _safely('forget the finished bank', _persist_remove_entry, e)
     return found
 
 
@@ -622,7 +772,7 @@ def cancel(bank_id) -> bool:
             return False
         was_running = entry['state'] == 'running'
         _queue.remove(entry)
-    _safely('forget the cancelled bank', _persist_remove, [bank_id])
+    _safely('forget the cancelled bank', _persist_remove_entry, entry)
     if was_running:
         bank_jobs.cancel(bank_id)
         _log(bank_id, 'removed from queue (was running)', 'warn')
@@ -641,13 +791,13 @@ def clear(pending_only=False) -> int:
     loop sees the entry gone and stops (see _process_next)."""
     from . import bank_jobs
     with _lock:
-        kept = [e for e in _queue if pending_only and e['state'] == 'running']
+        kept = [e for e in _queue if pending_only and e['state'] != 'pending']
         removed = [e for e in _queue if not any(e is k for k in kept)]
         running_ids = [e['bank_id'] for e in removed if e['state'] == 'running']
-        all_ids = [e['bank_id'] for e in removed]
         n = len(removed)
         _queue[:] = kept
-    _safely('forget the cleared queue', _persist_remove, all_ids)
+    for entry in removed:
+        _safely('forget the cleared queue entry', _persist_remove_entry, entry)
     for bid in running_ids:
         bank_jobs.cancel(bid)
     if n:
@@ -664,6 +814,7 @@ def snapshot() -> dict:
     active = bank_jobs.active_bank_jobs()
     with _lock:
         items = [{'bank_id': e['bank_id'], 'state': e['state'], 'position': i + 1,
+                  'operation': e.get('operation'), 'error': e.get('error'),
                   'steps': list(e['steps']), 'reject_flags': list(e['reject_flags']),
                   'resolve_dups': e['resolve_dups'], 'enqueued_at': e['enqueued_at'],
                   'device_id': e.get('device_id'),
@@ -693,7 +844,9 @@ def state_for(bank_id):
     with _lock:
         for i, e in enumerate(_queue):
             if e['bank_id'] == bank_id:
-                return {'state': e['state'], 'position': i + 1}
+                return {'state': e['state'], 'position': i + 1,
+                        **({'operation': e['operation'], 'error': e.get('error')}
+                           if e.get('operation') else {})}
     return None
 
 

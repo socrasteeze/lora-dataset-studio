@@ -15,7 +15,8 @@
 
 const plural = (n, one, many) => (n === 1 ? one : many)
 
-export const waitingItems = (queue) => (queue?.items || []).filter((i) => i.state !== 'running')
+export const queueJobActive = (entry) => ['pending', 'running'].includes(entry?.state)
+export const waitingItems = (queue) => (queue?.items || []).filter((i) => i.state === 'pending')
 export const runningItems = (queue) => [
   ...(queue?.active_jobs || []), ...(queue?.items || []).filter((i) => i.state === 'running'),
 ]

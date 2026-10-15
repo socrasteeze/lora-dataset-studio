@@ -1148,6 +1148,8 @@ class BankQueueEntry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     bank_id = db.Column(db.Integer, nullable=False, index=True)
     user_id = db.Column(db.String(64), nullable=False, default='local')
+    operation = db.Column(db.String(48))
+    operation_payload = db.Column(db.Text)
     steps = db.Column(db.Text, default='[]')              # JSON list
     reject_flags = db.Column(db.Text, default='[]')       # JSON list
     resolve_dups = db.Column(db.Boolean, default=False)

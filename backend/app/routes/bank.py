@@ -1,8 +1,8 @@
 """🗃️ Image bank API — triage a big unsorted folder before it becomes datasets.
 
-All heavy passes (quality scan, face clustering, promotion) return 202 and run
-in ONE background thread per bank; the UI polls GET /bank/<id> whose payload
-embeds the live job. 409 = a job is already running on this bank.
+Analysis passes return 202 after entering the shared Bank queue. Promotion
+keeps its existing launch path. Each Bank has one live background job; the UI
+polls its activity and queue state. Duplicate queue submissions return 409.
 """
 import logging
 import os
@@ -16,10 +16,7 @@ from ..services import bank_collections
 from ..services import bank_queue
 from ..services import bank_jobs, dataset_activity
 from ._common import _map_error, _require_no_stalled_comfyui
-# The ✨ improve preflight answers the SAME three engine exceptions here as in the
-# dataset lane, and its 409 body is what itemizes the missing assets and starts
-# their download. Imported rather than re-derived: a second copy of that mapping
-# is a second thing to keep in step with the installer.
+# Keep the shared missing-engine recovery response before queuing an improve.
 from .datasets import _improve_engine_error
 from ..services import bank_filter_translator as translator
 from ..services import image_bank_service as banks
@@ -746,6 +743,20 @@ def _start(fn, *args, **kwargs):
     return jsonify({'ok': True}), 202
 
 
+def _queued_start(operation, app, user_id, bank_id, *, _reply=None, **options):
+    try:
+        position = bank_queue.enqueue_operation(app, user_id, bank_id, operation, options)
+    except bank_queue.BankAlreadyQueued as exc:
+        return jsonify(error=str(exc), busy_kind=None), 409
+    except (ValueError, TypeError) as exc:
+        if operation.startswith('folder-'):
+            return _folder_person_error(exc)
+        return jsonify(error=str(exc)), 400
+    except RuntimeError as exc:
+        return jsonify(error=str(exc)), 503
+    return jsonify(ok=True, queued=True, position=position, operation=operation, **(_reply or {})), 202
+
+
 def _scope(data):
     """The two keys every pass dialog can send: WHERE to run.
 
@@ -763,7 +774,7 @@ def bank_scan(bank_id):
     for the duplicate grouping whatever the scan finds — that is the 🎚 panel's
     "↻ Re-group duplicates", whose pool is empty on an already-scanned bank."""
     data = request.get_json(silent=True) or {}
-    return _start(banks.start_scan, _app(), LOCAL_USER, bank_id,
+    return _queued_start('scan', _app(), LOCAL_USER, bank_id,
                   rescan=bool(data.get('rescan')),
                   regroup=bool(data.get('regroup')), **_scope(data))
 
@@ -773,7 +784,7 @@ def bank_faces(bank_id):
     """Face embeddings + person clustering. Takes NO scope on purpose: the
     clusters are one numbering of the whole bank (400 if one is sent anyway)."""
     data = request.get_json(silent=True) or {}
-    return _start(banks.start_faces, _app(), LOCAL_USER, bank_id,
+    return _queued_start('faces', _app(), LOCAL_USER, bank_id,
                   device_id=data.get('device_id'))
 
 
@@ -785,7 +796,7 @@ def bank_score(bank_id):
     the ✨ Score button itself always ran, and still runs, the complete pass (it
     just skips what is already computed)."""
     data = request.get_json(silent=True) or {}
-    return _start(banks.start_score, _app(), LOCAL_USER, bank_id,
+    return _queued_start('score', _app(), LOCAL_USER, bank_id,
                   rescore=bool(data.get('rescore')),
                   device_id=data.get('device_id'))
 
@@ -828,7 +839,7 @@ def bank_semantic_index(bank_id):
         data = {}
     if not isinstance(data, dict):
         return jsonify({'error': 'request body must be an object'}), 400
-    return _start(banks.start_semantic_index, _app(), LOCAL_USER, bank_id,
+    return _queued_start('semantic_index', _app(), LOCAL_USER, bank_id,
                   rescan=bool(data.get('rescan')))
 
 
@@ -851,7 +862,7 @@ def bank_semantic_dedup(bank_id):
     # ``force`` skips the "nothing has changed since the last run" shortcut. The
     # shortcut reads state, not pixels, so a file swapped under an unchanged
     # cache is exactly what it cannot see — this is the way out.
-    return _start(banks.start_semantic_dedup, _app(), LOCAL_USER, bank_id,
+    return _queued_start('semantic_dedup', _app(), LOCAL_USER, bank_id,
                   threshold=threshold, force=bool(data.get('force')))
 
 
@@ -865,7 +876,7 @@ def bank_watermark(bank_id):
     # this route simply never passed it on, so "Run on" applied to Launch all
     # and to nothing else. Clicking the same pass by itself stayed on this
     # machine's card with nothing in the UI admitting the difference.
-    return _start(banks.start_watermark, _app(), LOCAL_USER, bank_id,
+    return _queued_start('watermark', _app(), LOCAL_USER, bank_id,
                   rescan=bool(data.get('rescan')), limit=data.get('limit'),
                   device_id=data.get('device_id'), **_scope(data))
 
@@ -907,7 +918,7 @@ def bank_text_scan(bank_id):
     N rows of the scope, deterministic, so redo re-reads the same sample.
     Same {statuses}/{image_ids} scope dials as every other pass. 202/409/400/503."""
     data = request.get_json(silent=True) or {}
-    return _start(banks.start_text_scan, _app(), LOCAL_USER, bank_id,
+    return _queued_start('text_scan', _app(), LOCAL_USER, bank_id,
                   rescan=bool(data.get('rescan')), limit=data.get('limit'),
                   **_scope(data))
 
@@ -933,7 +944,7 @@ def bank_watermark_crop(bank_id):
     anywhere else. A body without them is the request that shipped before, byte
     for byte."""
     data = request.get_json(silent=True) or {}
-    return _start(banks.start_watermark_crop, _app(), LOCAL_USER, bank_id,
+    return _queued_start('watermark_crop', _app(), LOCAL_USER, bank_id,
                   **_scope(data))
 
 
@@ -947,7 +958,7 @@ def bank_watermark_inpaint(bank_id):
     Takes the same {statuses}/{image_ids} scope as the other passes. A body
     without them repaints exactly what it repainted before."""
     data = request.get_json(silent=True) or {}
-    return _start(banks.start_watermark_inpaint, _app(), LOCAL_USER, bank_id,
+    return _queued_start('watermark_inpaint', _app(), LOCAL_USER, bank_id,
                   method=data.get('method') or 'auto',
                   device_id=data.get('device_id'),
                   target=data.get('target') or 'all',
@@ -1063,23 +1074,20 @@ def bank_improve(bank_id):
     if gate:
         return gate
     engine = (data.get('engine') or '').strip() or None
+    # Preserve the install/recovery response without reserving the GPU or
+    # starting a pass before the queue grants its turn.
+    from ..services import face_dataset_service as fds
     try:
-        banks.start_improve(_app(), LOCAL_USER, bank_id, engine=engine,
-                            **_scope(data))
-    except bank_jobs.BankJobBusy as e:
-        return _busy(e)
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        # Provider unavailability is also a RuntimeError. Give restoration
-        # refusals their structured response before the generic busy-GPU 503.
-        engine_error = _improve_engine_error(e)
+        engine = fds.resolve_improve_engine(engine)
+        fds._improve_preflight(engine)
+    except Exception as exc:
+        engine_error = _improve_engine_error(exc)
         if engine_error:
             return engine_error
-        if isinstance(e, RuntimeError):
-            return jsonify({'error': str(e)}), 503
+        if isinstance(exc, (ValueError, RuntimeError)):
+            return jsonify(error=str(exc)), 400 if isinstance(exc, ValueError) else 503
         raise
-    return jsonify({'ok': True}), 202
+    return _queued_start('improve', _app(), LOCAL_USER, bank_id, engine=engine, **_scope(data))
 
 
 @bp.put('/bank/<int:bank_id>/image/<int:image_id>/watermark-regions')
@@ -1126,7 +1134,7 @@ def bank_framing(bank_id):
     reusing the dataset Qwen3-VL classifier. {rescan:true} re-classifies scanned
     rows. 202/409/503."""
     data = request.get_json(silent=True) or {}
-    return _start(banks.start_framing, _app(), LOCAL_USER, bank_id,
+    return _queued_start('framing', _app(), LOCAL_USER, bank_id,
                   rescan=bool(data.get('rescan')),
                   device_id=data.get('device_id'), **_scope(data))
 
@@ -1140,7 +1148,7 @@ def bank_tags(bank_id):
     No device_id: this pass is local-only (see banks.LOCAL_ONLY_STEPS).
     202/409/503."""
     data = request.get_json(silent=True) or {}
-    return _start(banks.start_tags, _app(), LOCAL_USER, bank_id,
+    return _queued_start('tags', _app(), LOCAL_USER, bank_id,
                   rescan=bool(data.get('rescan')),
                   threshold=data.get('threshold'))
 
@@ -1165,7 +1173,7 @@ def bank_medium(bank_id):
     SigLIP2 for its general semantic tools. ``rescan`` recomputes verdicts.
     """
     data = request.get_json(silent=True) or {}
-    return _start(banks.start_medium, _app(), LOCAL_USER, bank_id,
+    return _queued_start('medium', _app(), LOCAL_USER, bank_id,
                   rescan=bool(data.get('rescan')), **_scope(data))
 
 
@@ -1177,7 +1185,7 @@ def bank_angles(bank_id):
     person clusters untouched. 202/409/503; 400 when there is nothing to
     backfill."""
     data = request.get_json(silent=True) or {}
-    return _start(banks.start_faces, _app(), LOCAL_USER, bank_id,
+    return _queued_start('angles', _app(), LOCAL_USER, bank_id,
                   angles_only=True, **_scope(data))
 
 
@@ -1229,7 +1237,7 @@ def bank_caption(bank_id):
     reading of this endpoint is never the one you get by omitting a key.
     202/409/503/400."""
     data = request.get_json(silent=True) or {}
-    return _start(banks.start_caption, _app(), LOCAL_USER, bank_id,
+    return _queued_start('caption', _app(), LOCAL_USER, bank_id,
                   ids=data.get('image_ids') or None, force=bool(data.get('force')),
                   vocabulary=data.get('vocabulary') or None,
                   length=data.get('length') or None,
@@ -1330,7 +1338,7 @@ def bank_pipeline(bank_id):
     prerequisite is checked INSIDE the job (a missing extra skips that step,
     it never fails the launch)."""
     data = request.get_json(silent=True) or {}
-    return _start(banks.start_pipeline, _app(), LOCAL_USER, bank_id,
+    return _queued_start('pipeline', _app(), LOCAL_USER, bank_id,
                   steps=data.get('steps') or None,
                   reject_flags=data.get('reject_flags') or None,
                   resolve_dups=bool(data.get('resolve_dups')),
@@ -1370,6 +1378,16 @@ def bank_queue_list():
     """The cross-bank queue: which bank is running and what is lined up behind
     it, so the Banks page can show and manage the queue."""
     return jsonify(bank_queue.snapshot())
+
+
+@bp.post('/bank-queue/<int:bank_id>/retry')
+def bank_queue_retry(bank_id):
+    try:
+        return jsonify(ok=bank_queue.retry(_app(), bank_id))
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+    except Exception:
+        return jsonify(error='The retry could not be saved. Check storage and retry.'), 503
 
 
 @bp.delete('/bank-queue/<int:bank_id>')
@@ -1594,7 +1612,11 @@ def bank_promotable(bank_id):
 
 @bp.post('/bank/<int:bank_id>/cancel')
 def bank_cancel(bank_id):
-    return jsonify({'ok': bank_jobs.cancel(bank_id)})
+    queued = bank_queue.state_for(bank_id)
+    if queued and queued['state'] == 'running':
+        return jsonify(ok=bank_queue.cancel(bank_id))
+    stopped = bank_jobs.cancel(bank_id)
+    return jsonify(ok=stopped or (bank_queue.cancel(bank_id) if queued else False))
 
 
 @bp.get('/bank/<int:bank_id>/dup-groups')
@@ -2129,15 +2151,8 @@ def bank_check_folder_person(bank_id):
     sub = _asserted_subfolder_arg()
     if sub is None:
         return jsonify({'error': 'subfolder is required'}), 400
-    try:
-        folder_person.start_sample_check(_app(), LOCAL_USER, bank_id, sub)
-    except ValueError as e:
-        return _folder_person_error(e)
-    except RuntimeError as e:
-        return jsonify({'error': str(e)}), 400
-    except bank_jobs.BankJobBusy as e:
-        return _busy(e)
-    return jsonify({'ok': True, 'sample_size': folder_person.SAMPLE_SIZE}), 202
+    return _queued_start('folder-check', _app(), LOCAL_USER, bank_id, subfolder=sub,
+                         _reply={'sample_size': folder_person.SAMPLE_SIZE})
 
 
 @bp.post('/bank/<int:bank_id>/folder-scan')
@@ -2150,16 +2165,8 @@ def bank_scan_folder_persons(bank_id):
     free (the embeddings are cached); this button is for asking before ever
     running that pass, and it says what it costs."""
     from ..services import folder_person
-    try:
-        folder_person.start_folder_scan(_app(), LOCAL_USER, bank_id)
-    except ValueError as e:
-        return _folder_person_error(e)
-    except RuntimeError as e:
-        return jsonify({'error': str(e)}), 400
-    except bank_jobs.BankJobBusy as e:
-        return _busy(e)
-    return jsonify({'ok': True, 'sample_size': folder_person.SAMPLE_SIZE,
-                    'limit': folder_person.MAX_SCAN_FOLDERS}), 202
+    return _queued_start('folder-scan', _app(), LOCAL_USER, bank_id,
+                         _reply={'sample_size': folder_person.SAMPLE_SIZE, 'limit': folder_person.MAX_SCAN_FOLDERS})
 
 
 # --- the preflight of 👤 Group by person -------------------------------------
@@ -2184,16 +2191,8 @@ def bank_person_preflight(bank_id):
     🔎 Scan folders with a far higher ceiling, because the alternative the user
     just chose is one embedding per image over the whole bank."""
     from ..services import folder_person
-    try:
-        folder_person.start_preflight(_app(), LOCAL_USER, bank_id)
-    except ValueError as e:
-        return _folder_person_error(e)
-    except RuntimeError as e:
-        return jsonify({'error': str(e)}), 400
-    except bank_jobs.BankJobBusy as e:
-        return _busy(e)
-    return jsonify({'ok': True, 'sample_size': folder_person.SAMPLE_SIZE,
-                    'limit': folder_person.MAX_PREFLIGHT_FOLDERS}), 202
+    return _queued_start('folder-preflight', _app(), LOCAL_USER, bank_id,
+                         _reply={'sample_size': folder_person.SAMPLE_SIZE, 'limit': folder_person.MAX_PREFLIGHT_FOLDERS})
 
 
 @bp.post('/bank/<int:bank_id>/folder-persons/accept')

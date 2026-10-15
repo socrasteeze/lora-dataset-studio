@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Archive, BarChart3, FolderInput, FolderMinus, FolderOpen, Lightbulb, Palette, Rocket, Search, Target, Trash2, Type, Undo2 } from 'lucide-react';
-import { apiFetch, patchJson, postJson, putJson } from '../../api/fetchClient'
+import { apiFetch, del, patchJson, postJson, putJson } from '../../api/fetchClient'
 import { useFolderPersons } from './useFolderPersons'
 import { useReviewLightbox } from './useReviewLightbox'
 import { useCaptionOptions } from './useCaptionOptions'
@@ -35,6 +35,8 @@ const CaptionEditorDialog = lazy(() => import('../dataset/CaptionEditorDialog'))
 // between these files is free and losing one is loud (see bankSurfaces.js).
 import { Stat } from './BankAtoms.jsx'
 import { ProgressBar } from './BankProgress.jsx'
+import BankQueuedJob from './BankQueuedJob.jsx'
+import { queueJobActive } from './bankQueueActions.js'
 import Tile from './BankTile.jsx'
 import CoveragePanel from './BankCoveragePanel.jsx'
 // The two structural halves of the redesign: all of triage beside the grid, and
@@ -598,10 +600,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bankId])
 
-  // Poll while a job runs; refresh the grid once when it lands.
+  // Poll waiting jobs too: another Bank can finish and release this job's turn.
   const live = payload?.activity && !payload.activity.finished
+  const queuedJob = payload?.queue_state
+  const watchingJob = live || queueJobActive(queuedJob)
+  const bankBusy = live || !!queuedJob
   useEffect(() => {
-    if (!live) {
+    if (!watchingJob) {
       /* The landing is announced PER JOB GENERATION (started_at), not per
          "the poll saw it running". The old gate was activityWasLive, and it
          silenced every job that finished before the first 2 s tick — a 👥 pass
@@ -643,8 +648,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       } catch { return }               // transient — the next tick retries
       finally { activityPendingRef.current.delete(bankId) }
       if (dropped) return
-      setPayload((p) => (p ? { ...p, activity: next.activity } : p))
-      const landed = !next.activity || next.activity.finished
+      setPayload((p) => (p ? { ...p, activity: next.activity, queue_state: next.queue_state } : p))
+      const landed = !queueJobActive(next.queue_state) && (!next.activity || next.activity.finished)
       if (landed || (!payloadPendingRef.current.has(bankId)
           && Date.now() - fullPayloadAt.current >= FULL_PAYLOAD_MS)) {
         fullPayloadAt.current = Date.now()
@@ -656,7 +661,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     // Depend on activity FIELDS, never the object: polling changes its identity and would restart
     // the interval every 2 seconds.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live, bankId, refreshPayload, refreshImages, toast,
+  }, [watchingJob, bankId, refreshPayload, refreshImages, toast,
+      queuedJob?.state,
       payload?.activity?.error, payload?.activity?.cancelled,
       payload?.activity?.detail, payload?.activity?.started_at])
 
@@ -691,7 +697,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     assertFolderPerson, revokeFolderPerson, checkFolderPerson,
     scanFolderPersons,
   } = useFolderPersons({
-    bankId, live, filter, toast, refreshImages, refreshPayload,
+    bankId, live: watchingJob, filter, toast, refreshImages, refreshPayload,
   })
 
 
@@ -909,7 +915,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     try {
       const next = await apiFetch(`/api/bank/${bankId}/activity`, { background: true })
       if (activeBankRef.current !== bankId) return null
-      setPayload((p) => (p ? { ...p, activity: next.activity } : p))
+      setPayload((p) => (p ? { ...p, activity: next.activity, queue_state: next.queue_state } : p))
       return next.activity
     } catch { return null }
   }
@@ -917,9 +923,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const act = async (fn, okMsg, { onRefusal } = {}) => {
     try {
       const d = await fn()
-      if (okMsg) toast.success(okMsg)
-      // The bar first, the dashboard after: a 202 means a job is running RIGHT
-      // NOW, and the heavy payload it rides in can be half a minute away.
+      if (d?.queued) {
+        toast.success(`Added to the queue (position ${d.position}).`)
+        setPayload((p) => (p ? { ...p, queue_state: {
+          state: 'pending', position: d.position, operation: d.operation,
+        } } : p))
+      } else if (okMsg) toast.success(okMsg)
+      // Adopt the cheap queue/activity state before refreshing the dashboard.
       await adoptActivity()
       await Promise.all([refreshPayload(), refreshImages()])
       return d
@@ -978,7 +988,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     if (!preflightNeeded(plan)) return false
     if (preflightWillSample(plan)) {
       try {
-        await postJson(`/api/bank/${bankId}/person-preflight`, {})
+        const d = await postJson(`/api/bank/${bankId}/person-preflight`, {})
+        setPayload((p) => (p ? { ...p, queue_state: {
+          state: 'pending', position: d.position, operation: d.operation,
+        } } : p))
+        await adoptActivity()
       } catch (e) {
         const kind = e?.body?.busy_kind
         const message = e?.status === 409 && kind
@@ -1000,6 +1014,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   /* The answer. Accepted folders become ORDINARY assertions (same endpoint
      family, same revoke) and only then does the pass the user asked for run. */
   const proceedPreflight = async ({ accept }) => {
+    if (queuedJob?.state === 'failed' && queuedJob.operation === 'folder-preflight') {
+      const removed = await act(() => del(`/api/bank-queue/${bankId}`), null)
+      if (!removed) return
+    }
     const run = preflight?.run
     setPreflight(null)
     if (accept && accept.length) {
@@ -1075,6 +1093,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   }
   const startCaption = (run) => runPass('caption', run, captionRunOptions())
   const cancelJob = () => act(() => postJson(`/api/bank/${bankId}/cancel`, {}), null)
+  const cancelQueuedJob = () => act(() => del(`/api/bank-queue/${bankId}`), null)
 
   const changeSemanticEngine = async (engine) => {
     if (engine === semanticState.engine || semanticSwitching || semanticOperationBusy || live) return
@@ -1925,15 +1944,15 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             title="Open the analysis passes — scan, score, group by person, framing, medium, crops, watermarks and captions.">
             {passesButtonLabel(live)}
           </Button>
-          <Button type="button" size="md" noShrink variant="primary" onClick={() => setLaunchOpen(true)} disabled={live || !(counts?.total > 0)}
+          <Button type="button" size="md" noShrink variant="primary" onClick={() => setLaunchOpen(true)} disabled={bankBusy || !(counts?.total > 0)}
             title={`Run the whole triage in one go — scan, auto-reject, Score${semanticState.engine === 'siglip2' ? ', SigLIP 2 semantic index' : ''}, crops/variants, watermarks, group by person and (optionally) caption. Start it and walk away. If the person pass is in, it checks your folders first and asks once, before the run.`}
             className="font-bold shadow">
             <Rocket aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Launch all
           </Button>
           <span className="ml-auto" />
-          <Button type="button" size="md" noShrink disabled={live || !payload?.instance_id}
+          <Button type="button" size="md" noShrink disabled={bankBusy || !payload?.instance_id}
             onClick={() => setProfileMoveOpen(true)}>Move to Profile</Button>
-          <Button type="button" size="md" noShrink variant="primary" onClick={() => setPromoteOpen(true)} disabled={live || !canPromote}
+          <Button type="button" size="md" noShrink variant="primary" onClick={() => setPromoteOpen(true)} disabled={bankBusy || !canPromote}
             title={canPromote
               ? 'Copy the kept selection into a dataset — or into a brand-new bank, to keep working on a shortlist apart'
               : 'Keep some images first'}
@@ -1944,7 +1963,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               banner below says it is, and a button that still opened a dialog only
               to be refused there would make that sentence a lie. */}
           <Button type="button" size="md" noShrink onClick={() => setDeleteRejectedOpen(true)}
-            disabled={live || !(counts?.reject > 0) || !!payload?.dataset_conflict}
+            disabled={bankBusy || !(counts?.reject > 0) || !!payload?.dataset_conflict}
             title={payload?.dataset_conflict
               ? 'This bank sits on a dataset’s image folder — deleting these files would delete the dataset’s images.'
               : (counts?.reject > 0)
@@ -1978,6 +1997,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         onForget={() => setForgettingMissing(true)} />
 
       <ProgressBar activity={payload?.activity} onCancel={cancelJob} offline={!connection.online} />
+      <BankQueuedJob entry={queuedJob} live={live} onCancel={cancelQueuedJob}
+        onRetry={() => act(() => postJson(`/api/bank-queue/${bankId}/retry`, {}), null)} />
 
       {!live && payload?.pipeline_report
         && payload.pipeline_report.finished_at !== dismissedReportAt && (
@@ -2009,7 +2030,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               nothing about peers, so it keeps upstream's shape and the fork's
               answer stays computed in one place — here. */}
           <BankPassesPanel
-            bankId={bankId} payload={payload} counts={counts} live={live}
+            bankId={bankId} payload={payload} counts={counts} live={bankBusy}
             compact={!railIsColumnNow}
             caps={caps} capsLoading={capsLoading}
             semanticState={semanticState} semanticReady={semanticReady}
@@ -2750,7 +2771,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           the folder preflight, 🏷️ Caption carries its five options and its
           destructive twin; everything else is the shared three blocks. */}
       {passOpen && (
-        <PassDialog passId={passOpen} payload={payload} live={live}
+        <PassDialog passId={passOpen} payload={payload} live={bankBusy}
           semanticEngine={semanticState.engine}
           selectionSize={selected.size}
           detectorReady={!!caps.watermark_detect}
@@ -2784,10 +2805,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
 
       {preflight && (
         <PersonPreflightDialog plan={preflight.plan} probing={preflight.probing}
-          activity={payload?.activity}
+          activity={payload?.activity} queueState={queuedJob}
           reload={() => apiFetch(`/api/bank/${bankId}/person-preflight`)}
           onProceed={proceedPreflight}
-          onStopProbe={() => postJson(`/api/bank/${bankId}/cancel`, {})}
+          onStopProbe={queuedJob?.operation === 'folder-preflight' ? cancelQueuedJob : cancelJob}
           onCancel={() => setPreflight(null)} />
       )}
 

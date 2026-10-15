@@ -55,6 +55,7 @@ export const JOB_LABELS = {
   text_scan: '🔤 Text scan',
   improve: '✨ Upscale & improve',
   framing: '📐 Framing pass',
+  tags: '🔖 Tags pass',
   medium: 'Medium pass',
   angles: '⤢ Angle measurement',
   caption: 'Captioning',

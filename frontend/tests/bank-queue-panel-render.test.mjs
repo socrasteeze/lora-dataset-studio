@@ -10,6 +10,7 @@ import test from 'node:test'
 import { createElement, renderToStaticMarkup } from './support/mountJsx.mjs'
 
 const { default: BankQueuePanel } = await import('../src/components/bank/BankQueuePanel.jsx')
+const { default: BankQueuedJob } = await import('../src/components/bank/BankQueuedJob.jsx')
 const { MemoryRouter } = await import('react-router')
 
 const noop = () => {}
@@ -17,7 +18,7 @@ const NAMES = { 1: 'Alpha', 2: 'Bravo', 3: 'Charlie' }
 const html = (items, active_jobs = []) => renderToStaticMarkup(createElement(MemoryRouter, null,
   createElement(BankQueuePanel, {
     queue: { items, active_jobs }, nameOf: (id) => NAMES[id], onCancel: noop, onStopDirect: noop,
-    onClearWaiting: noop, onStopRunning: noop,
+    onClearWaiting: noop, onStopRunning: noop, onRetry: noop,
   })))
 const item = (bank_id, state, extra = {}) => ({ bank_id, state, position: bank_id, ...extra })
 
@@ -31,8 +32,8 @@ test('a workspace pass remains visible when no pipeline is queued', () => {
   assert.match(out, />Alpha</)
   assert.match(out, /Score pass/)
   assert.match(out, /aria-label="Stop Alpha"/)
-  assert.match(out, />Stop running</)
-  assert.doesNotMatch(out, />Clear waiting</)
+  assert.match(out, />Stop Running</)
+  assert.doesNotMatch(out, />Clear Waiting</)
 })
 
 test('direct work and a waiting pipeline retain separate controls', () => {
@@ -47,19 +48,19 @@ test('direct work and a waiting pipeline retain separate controls', () => {
 
 test('a running bank with banks waiting offers both actions, and no Clear all', () => {
   const out = html([item(1, 'running'), item(2, 'pending'), item(3, 'pending')])
-  assert.match(out, />Clear waiting</)
-  assert.match(out, />Stop running</)
+  assert.match(out, />Clear Waiting</)
+  assert.match(out, />Stop Running</)
   assert.doesNotMatch(out, /Clear all/)
   assert.match(out, />3 in line</)
 })
 
 test('each action appears only when it has something to act on', () => {
   const waitingOnly = html([item(2, 'pending')])
-  assert.match(waitingOnly, />Clear waiting</)
-  assert.doesNotMatch(waitingOnly, />Stop running</)
+  assert.match(waitingOnly, />Clear Waiting</)
+  assert.doesNotMatch(waitingOnly, />Stop Running</)
   const runningOnly = html([item(1, 'running')])
-  assert.match(runningOnly, />Stop running</)
-  assert.doesNotMatch(runningOnly, />Clear waiting</)
+  assert.match(runningOnly, />Stop Running</)
+  assert.doesNotMatch(runningOnly, />Clear Waiting</)
 })
 
 test('the ✕ names its bank, and says when it stops a run', () => {
@@ -93,4 +94,37 @@ test('the machine and the wait reason still show', () => {
     item(2, 'pending', { waiting_for: 'the GPU is busy' })])
   assert.match(out, />on (<!-- -->)?Peer box</)
   assert.match(out, />the GPU is busy</)
+})
+
+test('a failed workspace job names the pass and offers Retry without Clear Waiting', () => {
+  const out = html([item(2, 'failed', { operation: 'caption', error: 'Install the required model in Setup.' })])
+  assert.match(out, /Captioning/)
+  assert.match(out, />Failed</)
+  assert.match(out, /Install the required model in Setup/)
+  assert.match(out, /aria-label="Retry Bravo"/)
+  assert.match(out, /aria-label="Remove Bravo from queue"/)
+  assert.doesNotMatch(out, />Clear Waiting</)
+  assert.doesNotMatch(out, />Stop Running</)
+})
+
+test('the workspace shows pending jobs and allows cancellation before they start', () => {
+  const out = renderToStaticMarkup(createElement(BankQueuedJob, {
+    entry: { state: 'pending', position: 2, operation: 'score' }, onCancel: noop, onRetry: noop,
+  }))
+  assert.match(out, /Score pass/)
+  assert.match(out, /Waiting in queue · #2/)
+  assert.match(out, />Cancel Job</)
+  assert.doesNotMatch(out, />Retry</)
+})
+
+test('the workspace keeps failures actionable and leaves live progress to the existing bar', () => {
+  const failed = renderToStaticMarkup(createElement(BankQueuedJob, {
+    entry: { state: 'failed', operation: 'caption', error: 'Synthetic failure' }, onCancel: noop, onRetry: noop,
+  }))
+  assert.match(failed, /Synthetic failure/)
+  assert.match(failed, />Retry</)
+  assert.match(failed, />Remove</)
+  assert.equal(renderToStaticMarkup(createElement(BankQueuedJob, {
+    entry: { state: 'running', operation: 'scan' }, live: true,
+  })), '')
 })
