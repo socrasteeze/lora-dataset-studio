@@ -125,7 +125,7 @@ test('duplicate resolution waits for every refresh before releasing its busy sta
     assert.ok(end > callsiteStart, `the ${kind} callsite is a self-closing element`);
     const callsite = ws.slice(callsiteStart, end);
     assert.match(callsite,
-      /onChanged=\{async \(\) => \{ await refreshPayload\(\); await refreshImages\(\) \}\}/,
+      /onChanged=\{async \(\) => \{ await Promise\.all\(\[refreshPayload\(\), refreshImages\(\)\]\) \}\}/,
       `the ${kind} callback returns and awaits both parent refreshes`);
   }
 });

@@ -717,7 +717,7 @@ export default function BankPage() {
         )}
         {previewError && <p role="alert" className="text-sm text-rose-300">{previewError}</p>}
         {!previewReady && !previewError && <p role="status" className="text-sm text-content-muted">
-          {folder.trim() ? 'Loading subfolders…' : 'Choose a folder to preview its subfolders.'}
+          {folder.trim() ? 'Loading subfolders' : 'Choose a folder to preview its subfolders.'}
         </p>}
         {previewReady && (
           <div className="lds-section py-3 text-sm">

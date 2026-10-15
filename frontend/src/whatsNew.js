@@ -85,11 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
-    id: '2026-10-14-faster-bank-opening',
+    id: '2026-10-14-wider-settings-forms',
     date: '2026-10-14',
-    title: 'Open Banks Faster',
-    blurb: 'Saved images load before the source-folder check finishes. Bank statistics use fewer database queries, and changing filters cancels the previous grid request.',
-    to: '/bank',
+    title: 'Wider Settings Forms',
+    blurb: 'Settings use more of the page width, with two field columns on larger screens and one on phones. Tables, explanations and diagnostics keep a full row.',
+    to: '/settings/captioning',
   },
   {
     id: '2026-10-14-single-bank-import-exclusions',
@@ -99,11 +99,11 @@ export const WHATS_NEW = [
     to: '/bank',
   },
   {
-    id: '2026-10-14-wider-settings-forms',
+    id: '2026-10-14-faster-bank-opening',
     date: '2026-10-14',
-    title: 'Wider Settings Forms',
-    blurb: 'Settings use more of the page width, with two field columns on larger screens and one on phones. Tables, explanations and diagnostics keep a full row.',
-    to: '/settings/captioning',
+    title: 'Open Banks Faster',
+    blurb: 'Saved images load before the source-folder check finishes. Bank statistics use fewer database queries, and changing filters cancels the previous grid request.',
+    to: '/bank',
   },
   {
     id: '2026-10-14-bank-other-tags',
