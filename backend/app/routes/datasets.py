@@ -20,6 +20,7 @@ from .. import config as cfg
 from ..gpu_window import gpu_exclusive_vision_window
 from ..services import face_dataset_service as svc
 from ..services import dataset_activity
+from ..services import dataset_duplicates
 from ..services.dataset_storage import dataset_path, ensure_dataset_dir
 from ..services import dataset_thumbs
 from ..services import lora_test_studio as lts
@@ -1637,6 +1638,18 @@ def dataset_image_status(image_id):
     except Exception as e:
         return _map_error(e)
     return (jsonify({'ok': True}), 200) if ok else (jsonify({'error': 'not found'}), 404)
+
+
+@bp.post('/dataset/<int:dataset_id>/duplicates/keep-both')
+def dataset_duplicates_keep_both(dataset_id):
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({'error': 'Expected an image pair.'}), 400
+    try:
+        return jsonify(dataset_duplicates.keep_both(
+            LOCAL_USER, dataset_id, data.get('image_ids'), data.get('fingerprints')))
+    except Exception as error:
+        return _map_error(error)
 
 
 @bp.post('/dataset/<int:dataset_id>/delete')

@@ -6984,14 +6984,18 @@ def _pf_identity_leaks(ds, kept, caps, concept, slider, warnings, _check):
     return leak_images
 
 
-def _pf_duplicates(kept, n, slider, warnings, _check):
+def _pf_duplicates(kept, n, slider, warnings, _check, *, dataset=None):
     """5) near-duplicate pairs among kept (pairwise dHash). Returns dup_pairs."""
     # 5) Pairwise dHash finds near-duplicates among kept images (cheap around 60).
     # Retain both images for the UI. Skip sliders because their substrate is not
     # learned as an identity.
     dup_pairs = []
     if not slider:
+        from . import dataset_duplicates
+        approved = dataset_duplicates.approved_pairs(dataset) if dataset is not None else {}
         try:
+            fingerprints = {}
+            reviewed = 0
             hp = []  # [(row, dhash)] for readable kept images
             for r in kept:
                 p = fds._img_path(r)
@@ -7001,16 +7005,26 @@ def _pf_duplicates(kept, n, slider, warnings, _check):
             for i in range(len(hp)):
                 for j in range(i + 1, len(hp)):
                     if fds._hamming(hp[i][1], hp[j][1]) <= fds.SCRAPE_DHASH_MAX_DISTANCE:
-                        ra, rb = hp[i][0], hp[j][0]
-                        dup_pairs.append({'a': {'id': ra.id, 'filename': ra.filename},
-                                          'b': {'id': rb.id, 'filename': rb.filename}})
+                        ra, rb = sorted((hp[i][0], hp[j][0]), key=lambda row: row.id)
+                        for row in (ra, rb):
+                            if row.id not in fingerprints:
+                                fingerprints[row.id] = dataset_duplicates.fingerprint(row)
+                        pair_hashes = (fingerprints[ra.id], fingerprints[rb.id])
+                        if all(pair_hashes) and approved.get((ra.id, rb.id)) == pair_hashes:
+                            reviewed += 1
+                            continue
+                        dup_pairs.append({'a': {'id': ra.id, 'filename': ra.filename,
+                                                'fingerprint': pair_hashes[0]},
+                                          'b': {'id': rb.id, 'filename': rb.filename,
+                                                'fingerprint': pair_hashes[1]}})
             if dup_pairs:
                 warnings.append(f'{len(dup_pairs)} pair(s) of kept images are near-duplicates — '
-                                'the model overfits repeated content; reject one of each pair.')
-                _check('duplicates', 'No near-duplicates', 'warn',
-                       f'{len(dup_pairs)} near-duplicate pair(s) — reject one of each', 'gf-images')
+                                'review each pair to reject a copy or keep both.')
+                _check('duplicates', 'Duplicate Review', 'warn',
+                       f'{len(dup_pairs)} near-duplicate pair(s) to review', 'gf-images')
             elif n:
-                _check('duplicates', 'No near-duplicates', 'ok', '0 pair')
+                _check('duplicates', 'Duplicate Review', 'ok',
+                       f'{reviewed} pair(s) approved to keep both' if reviewed else 'No unresolved pairs')
         except Exception:
             pass   # best-effort: an unreadable file must not block the preflight
     return dup_pairs
@@ -7325,7 +7339,7 @@ def training_preflight(user_id, dataset_id, train_type=None, variant=None,
     leak_images = _pf_identity_leaks(ds, kept, caps, concept, slider,
                                      warnings, _check)
 
-    dup_pairs = _pf_duplicates(kept, n, slider, warnings, _check)
+    dup_pairs = _pf_duplicates(kept, n, slider, warnings, _check, dataset=ds)
 
     _pf_triage(rows, warnings, _check)
 

@@ -85,6 +85,27 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-15-dataset-caption-alignment',
+    date: '2026-10-15',
+    title: 'Readable Image Captions',
+    blurb: 'Image cards align their controls and caption boxes. Larger text, taller buttons and roomier caption editors make review easier. Narrow cards stack caption actions to keep labels readable.',
+    to: '/datasets?section=images&panel=review',
+  },
+  {
+    id: '2026-10-15-training-duplicate-review',
+    date: '2026-10-15',
+    title: 'Review Training Duplicates',
+    blurb: 'Review Pairs opens the flagged copies side by side. Reject a copy or save Keep Both to resolve that pair in future training checks.',
+    to: '/datasets?section=training&panel=launch',
+  },
+  {
+    id: '2026-10-15-training-options-columns',
+    date: '2026-10-15',
+    title: 'Readable Training Settings',
+    blurb: 'Advanced settings use two aligned columns on wide screens, with larger labels and help text. Phones retain one column, and preview prompts use the full width.',
+    to: '/datasets?section=training&panel=advanced',
+  },
+  {
     id: '2026-10-15-whole-state-resume-cache-compat',
     date: '2026-10-15',
     title: 'Reliable Training Resume',

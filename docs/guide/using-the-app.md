@@ -74,6 +74,21 @@ captioning rules and a few guards change with the dataset kind.
 11. **Export** — at any point, **Export ZIP** gives you the curated, captioned
     set as a standard ai-toolkit dataset. Nothing is locked in.
 
+## Review training duplicates
+
+In **Training**, expand the readiness card and select **Review Pairs** beside
+**Duplicate Review**. The popup shows the flagged copies side by side. Select
+**Reject** under one copy, or **Keep Both** to approve that pair. Failed saves
+leave the pair unresolved and show an error. Source files stay on disk.
+
+Keep Both is saved with the dataset and resolves that pair in future readiness
+and training checks, including after a restart. Other pairs still need review.
+Editing or replacing either image makes the pair eligible for review again.
+Select **Done** to return to Training; this review does not start a training run.
+
+Advanced training settings use two aligned columns on wide screens and one on
+phones. Labels and help text use larger type. Preview prompts span both columns.
+
 ## Retry a reference edit
 
 After an **✦ Edit** candidate appears, **Retry** repeats the exact prompt, selected
