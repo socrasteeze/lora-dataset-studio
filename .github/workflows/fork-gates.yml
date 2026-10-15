@@ -51,6 +51,12 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Install Browser for Bank Checks
+        run: node frontend/node_modules/playwright-core/cli.js install chromium
+
+      - name: Check Bank Imports and Settings in Browser
+        run: node frontend/scripts/bankOtherTagsProbe.mjs
+
       - name: Check Bank Tags and Grouping Contracts
         shell: pwsh
         env:
@@ -67,12 +73,6 @@ jobs:
           backend/tests/test_bank_payload_poll_cost.py backend/tests/test_bank_split_exclude.py
           backend/tests/test_bank_folder_exclusion.py backend/tests/test_image_bank_refresh.py
           backend/tests/test_klein_path.py -q --basetemp "$env:RUNNER_TEMP/lds-focused-tags"
-
-      - name: Install Browser for Bank Checks
-        run: node frontend/node_modules/playwright-core/cli.js install chromium
-
-      - name: Check Bank Imports and Settings in Browser
-        run: node frontend/scripts/bankOtherTagsProbe.mjs
 
       - name: Run Fork Gates
         shell: pwsh
