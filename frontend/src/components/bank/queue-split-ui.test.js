@@ -57,15 +57,15 @@ test('split mode previews and creates one bank per subfolder', () => {
   // per checkbox and a race between what is ticked and what is drawn. They ride
   // the create call only.
   assert.match(page, /postJson\('\/api\/bank\/split',\s*\n?\s*\{ folder, include_loose: includeLoose, exclude: normalizeExcluded\(excluded\) \}\)/);
-  // The pressed button and the loose-files option exist and default to including loose.
-  assert.match(page, /aria-pressed=\{splitMode\}/);
-  assert.match(page, /aria-label="One bank per subfolder"/);
-  assert.match(page, />\s*Subfolders\s*</);
-  assert.match(page, /Enabled: create one bank for each top-level subfolder\. Select to disable\./);
+  // Opening the preview does not turn one parent bank into separate banks.
+  assert.match(page, /aria-expanded=\{foldersOpen\}/);
+  assert.match(page, /aria-label="Choose Subfolders"/);
+  assert.match(page, /Subfolders \{excluded\.size/);
+  assert.match(page, /Separate Banks/);
   assert.match(page, /useState\(true\)/);            // includeLoose defaults on
   assert.match(page, /Include Loose Images/);
   const picker = page.indexOf('<FolderPickerField inline')
-  const toggle = page.indexOf('aria-pressed={splitMode}')
+  const toggle = page.indexOf('aria-expanded={foldersOpen}')
   const create = page.indexOf('<Button type="submit"', toggle)
   assert.ok(picker >= 0 && picker < toggle && toggle < create,
     'Subfolders stays between Browse and Create in the creation row');

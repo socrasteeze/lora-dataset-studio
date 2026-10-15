@@ -275,3 +275,182 @@ def test_activity_route_reports_no_job_as_null(client, tmp_path, app):
     response = client.get(f'/api/bank/{bank_id}/activity')
     assert response.status_code == 200
     assert response.get_json() == {'activity': None}
+
+
+def test_saved_workspace_inventory_does_not_wait_for_a_source_walk(
+        client, tmp_path, app, monkeypatch):
+    bank_id, source = _bank(client, tmp_path, count=2)
+    Image.new('RGB', (32, 32)).save(source / 'new.jpg')
+    from app.services import image_bank_service as banks
+    monkeypatch.setattr(banks, 'refresh_bank', lambda *a, **k: pytest.fail(
+        'opening the saved inventory waited for the source folder'))
+    response = client.get(f'/api/bank/{bank_id}?sync=0')
+    assert response.status_code == 200
+    assert response.get_json()['counts']['total'] == 2
+    assert client.get(f'/api/bank/{bank_id}/images').get_json()['total'] == 2
+
+
+def test_separate_source_check_is_additive_without_rebuilding_statistics(
+        client, tmp_path, app, monkeypatch):
+    bank_id, source = _bank(client, tmp_path, count=2)
+    from app.services import image_bank_service as banks
+    with app.app_context():
+        from app.extensions import db
+        from app.models import BankImage
+        row = BankImage.query.filter_by(bank_id=bank_id).first()
+        row.status, row.face_cluster, row.style_cluster = 'keep', 7, 9
+        image_id = row.id
+        db.session.commit()
+    Image.new('RGB', (32, 32)).save(source / 'new.jpg')
+    monkeypatch.setattr(banks, 'bank_payload', lambda *a, **k: pytest.fail(
+        'the source check rebuilt the full dashboard'))
+    response = client.get(f'/api/bank/{bank_id}/folder-sync')
+    assert response.status_code == 200
+    assert response.get_json()['added'] == 1
+    with app.app_context():
+        assert BankImage.query.filter_by(bank_id=bank_id).count() == 3
+        row = db.session.get(BankImage, image_id)
+        assert (row.status, row.face_cluster, row.style_cluster) == ('keep', 7, 9)
+
+
+def test_source_check_requires_an_existing_bank(client, app):
+    assert client.get('/api/bank/999999/folder-sync').status_code == 404
+
+
+def _count_image_queries(engine, operation):
+    from sqlalchemy import event
+    queries = []
+
+    def record(_conn, _cursor, statement, _parameters, _context, _many):
+        if statement.lstrip().upper().startswith('SELECT') and 'bank_image' in statement:
+            queries.append(statement)
+
+    event.listen(engine, 'before_cursor_execute', record)
+    try:
+        result = operation()
+    finally:
+        event.remove(engine, 'before_cursor_execute', record)
+    return result, len(queries)
+
+
+def test_flag_rollup_matches_filtered_rows_in_one_image_query(client, tmp_path, app):
+    bank_id, _ = _bank(client, tmp_path, count=12)
+    with app.app_context():
+        from app.extensions import db
+        from app.models import BankImage
+        from app.services import image_bank_service as banks
+        for index, row in enumerate(BankImage.query.filter_by(bank_id=bank_id).order_by(BankImage.id)):
+            row.status = ('pending', 'keep', 'reject')[index % 3]
+            row.quality_state = ('ok', 'error', None)[index % 3]
+            row.blur_score, row.noise_score = index * 40, index * 4
+            row.width, row.height = index * 200, index * 200
+            row.nsfw_score, row.aesthetic_score = index / 12, index
+        db.session.commit()
+        th = banks.thresholds()
+        (flags, actionable), query_count = _count_image_queries(
+            db.engine, lambda: banks._flag_counts(bank_id, th))
+        assert query_count == 1
+        base = BankImage.query.filter(banks._curated(bank_id))
+        for flag in banks._QUALITY_FLAGS + banks._SCORE_FLAGS:
+            criterion = banks._flag_filter(flag, th)
+            assert flags[flag] == base.filter(criterion).count()
+            assert actionable[flag] == base.filter(criterion, BankImage.status == 'pending').count()
+        assert flags['clean'] == base.filter(banks._clean_criterion(th)).count()
+
+
+def test_headline_rollup_keeps_null_and_status_meanings_in_two_image_queries(
+        client, tmp_path, app):
+    bank_id, _ = _bank(client, tmp_path, count=4)
+    with app.app_context():
+        from app.extensions import db
+        from app.models import BankImage
+        from app.services import image_bank_service as banks
+        rows = BankImage.query.filter_by(bank_id=bank_id).order_by(BankImage.id).all()
+        rows[0].status, rows[0].quality_state = 'keep', 'ok'
+        rows[0].aesthetic_score, rows[0].framing = 6.0, 'body'
+        rows[0].face_state, rows[0].face_yaw = 'ok', 0.0
+        rows[0].watermark_state, rows[0].tags_state = 'clean', 'ok'
+        rows[0].watermark_fingerprint = rows[0].analysis_fingerprint = 'a' * 64
+        rows[0].edit_method, rows[0].medium = 'crop', 'photo'
+        rows[1].status, rows[1].face_state = 'reject', 'no_face'
+        rows[2].nsfw_score, rows[2].edit_method = 0.0, 'improve'
+        db.session.commit()
+        base = BankImage.query.filter(banks._curated(bank_id))
+        counts, query_count = _count_image_queries(db.engine, lambda: banks._bp_counts(
+            base, 4, *([0] * 9)))
+        assert query_count == 2
+        expected = {
+            'total': 4, 'scanned': 1, 'unscanned': 3, 'unscanned_scannable': 2,
+            'keep': 1, 'pending': 2, 'reject': 1, 'scored': 2, 'tagged': 1,
+            'watermark_scanned': 1, 'framing_classified': 1, 'cropped': 1,
+            'improved': 1, 'medium_classified': 1, 'angle_measured': 1,
+            'angle_backfillable': 1, 'promoted': 0,
+        }
+        assert {key: counts[key] for key in expected} == expected
+
+
+def test_group_covers_preserve_rank_ties_nulls_and_excluded_folders(
+        client, tmp_path, app):
+    bank_id, _ = _bank(client, tmp_path, count=90)
+    with app.app_context():
+        from app.extensions import db
+        from app.models import BankImage
+        from app.services import image_bank_service as banks
+        rows = BankImage.query.filter_by(bank_id=bank_id).order_by(BankImage.id).all()
+        for index, row in enumerate(rows):
+            row.face_cluster = row.style_cluster = index // 2
+            row.face_det = None if index < 5 else 0.5 if index < 8 else index / 100
+            row.face_state = 'ok'
+        rows[0].relpath = os.path.join('hidden', 'demo.jpg')
+        db.session.commit()
+        banks.set_excluded_folders(_uid(), bank_id, ['hidden'])
+        base = BankImage.query.filter(banks._curated(bank_id))
+        result, query_count = _count_image_queries(
+            db.engine, lambda: banks._bp_similarity_summaries(bank_id, base))
+        assert query_count < 25, 'group covers must not add one query per displayed group'
+        _dup, _semantic, people, faces_scanned, styles = result
+        assert len(people) == len(styles) == 40
+        assert faces_scanned == 89
+        # Largest groups first, then cluster id. The one-member hidden group
+        # falls outside the forty displayed groups.
+        assert [group['id'] for group in people] == list(range(1, 41))
+        assert [group['id'] for group in styles] == list(range(1, 41))
+        for group in people:
+            members = rows[group['id'] * 2:group['id'] * 2 + 2]
+            expected = sorted(members, key=lambda row: (
+                row.face_det is None, -(row.face_det or 0), row.id))[0].id
+            assert group['size'] == 2
+            assert group['cover_image_id'] == expected
+        for group in styles:
+            assert group['cover_image_id'] == rows[group['id'] * 2].id
+
+
+def test_bank_cards_share_counter_query_and_keep_existing_scopes(app, tmp_path):
+    with app.app_context():
+        from app.extensions import db
+        from app.models import BankImage, ImageBank
+        from app.services import image_bank_service as banks
+        owned = ImageBank(user_id=_uid(), name='Demo', source_path=str(tmp_path / 'source'))
+        empty = ImageBank(user_id=_uid(), name='Empty', source_path=str(tmp_path / 'empty'))
+        foreign = ImageBank(user_id='somebody-else', name='Foreign', source_path=str(tmp_path / 'other'))
+        db.session.add_all([owned, empty, foreign])
+        db.session.flush()
+        db.session.add_all([
+            BankImage(bank_id=owned.id, relpath='one.jpg', status='keep', quality_state='ok'),
+            BankImage(bank_id=owned.id, relpath='two.jpg', status='reject'),
+            BankImage(bank_id=owned.id, relpath='three.jpg', status='pending'),
+            BankImage(bank_id=foreign.id, relpath='four.jpg', status='keep'),
+        ])
+        db.session.commit()
+        cards, query_count = _count_image_queries(db.engine, lambda: banks.list_banks(_uid()))
+        # One pass-coverage read, one counters read, one preview per owned bank.
+        assert query_count == 4
+        by_id = {card['id']: card for card in cards}
+        assert set(by_id) == {owned.id, empty.id}
+        assert {key: by_id[owned.id][key] for key in ('total', 'keep', 'reject', 'scanned')} == {
+            'total': 3, 'keep': 1, 'reject': 1, 'scanned': 1,
+        }
+        assert all(by_id[empty.id][key] == 0 for key in ('total', 'keep', 'reject', 'scanned'))
+        assert by_id[owned.id]['preview_ids'] == [
+            row.id for row in BankImage.query.filter(
+                BankImage.bank_id == owned.id, BankImage.status != 'reject').order_by(BankImage.id)]

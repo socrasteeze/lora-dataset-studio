@@ -392,7 +392,9 @@ function PageLoading() {
 function Shell() {
   const { pathname } = useLocation();
   const wideWorkspaceRoute = pathname === '/canvas' || pathname === '/bank'
-    || pathname === '/datasets' || pathname === '/gallery' || pathname === '/plugins';
+    || pathname === '/datasets' || pathname === '/gallery' || pathname === '/plugins'
+    || pathname === '/settings' || pathname.startsWith('/settings/')
+    || (pathname.startsWith('/plugins/') && pathname.endsWith('/settings'));
   /* 🖼 THE BOARD IS THE WHOLE SCREEN. The canvas is not a document with a
      picture in it — it is a surface you pan and zoom, and every pixel the page
      keeps for itself is a pixel of board you have to pan to reach. So `/canvas`

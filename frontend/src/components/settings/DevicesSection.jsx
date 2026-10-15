@@ -245,7 +245,7 @@ export default function DevicesSection({ config, setField, handleSave, configDef
               ))}
             </ul>
           )}
-          <div className="mt-3 flex flex-wrap items-end gap-2">
+          <div className="settings-wide mt-3 flex flex-wrap items-end gap-2">
             <div>
               <label htmlFor="backend-name" className="block text-xs text-content-muted">Name</label>
               <input id="backend-name" value={backendName}
@@ -282,7 +282,7 @@ export default function DevicesSection({ config, setField, handleSave, configDef
             <strong className="text-content">Full app on the other machine.</strong> Score, Faces,
             Framing, Watermarks and Captions can run there. Scan and auto-reject stay here.
           </p>
-          <div className="flex flex-wrap items-end gap-2">
+          <div className="settings-wide flex flex-wrap items-end gap-2">
             <div>
               <label htmlFor="join-label" className="block text-xs text-content-muted">Optional Label</label>
               <input id="join-label" value={joinLabel} onChange={(e) => setJoinLabel(e.target.value)}
@@ -350,7 +350,7 @@ export default function DevicesSection({ config, setField, handleSave, configDef
       {role === 'peer' && (
         <Card title="Join a Primary"
           help="Paste the Primary’s Tailscale URL and a join token. After joining, use the Primary’s web UI from this laptop — datasets stay on the Primary; this box only runs GPU work.">
-          <div className="space-y-3 max-w-lg">
+          <div className="settings-fields space-y-3">
             <div>
               <label htmlFor="peer-primary-url" className="block text-sm font-medium text-content">Primary URL</label>
               <input id="peer-primary-url" value={peerUrl}

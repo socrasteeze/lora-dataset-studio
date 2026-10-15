@@ -81,7 +81,7 @@ function LoraPresetCard({ preset, index, presets, save, loraScan,
     patchPreset({ loras: next })
   }
   return (
-    <div className="rounded-lg border border-border p-3 space-y-2">
+    <div className="settings-wide rounded-lg border border-border p-3 space-y-2">
       <div className="flex items-center gap-2">
         <input
           type="text" aria-label={`Preset ${index + 1} name`}

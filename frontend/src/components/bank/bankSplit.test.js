@@ -62,7 +62,7 @@ test('the all-excluded warning names WHICH outcome, never a guess', () => {
   assert.match(withLoose, /Only the loose root images/)
   const nothing = allExcludedWarning(plan, { loose: 6, includeLoose: false })
   assert.match(nothing, /nothing left to import/)
-  assert.match(nothing, /Subfolders/, 'the way out is named')
+  assert.match(nothing, /Select at least one subfolder/, 'the way out is named')
   assert.equal(allExcludedWarning(splitPlan({ preview: preview([['a', 1]]) })), null)
 })
 
@@ -77,4 +77,24 @@ test('an exclusion naming a folder that is not there changes nothing', () => {
   const plan = splitPlan({ preview: preview([['a', 1]]), excluded: ['gone'] })
   assert.equal(plan.bankCount, 1)
   assert.equal(plan.allExcluded, false)
+})
+
+test('single-bank mode keeps included folders together and counts only included images', () => {
+  const plan = splitPlan({ preview: preview([['alpha', 3], ['beta', 9]], 2),
+    excluded: ['beta'], splitBanks: false })
+  assert.equal(plan.bankCount, 1)
+  assert.equal(plan.imageCount, 5)
+  assert.equal(plan.rows.length, 3)
+  assert.equal(plan.rows.find((row) => row.name === 'beta').excluded, true)
+})
+
+test('single-bank mode can keep only loose images but cannot silently restore excluded folders', () => {
+  const plan = splitPlan({ preview: preview([['alpha', 3]], 2), excluded: ['alpha'], splitBanks: false })
+  assert.equal(plan.bankCount, 1)
+  assert.equal(plan.imageCount, 2)
+  assert.match(allExcludedWarning(plan, { loose: 2, splitBanks: false }), /included in this bank/)
+  const empty = splitPlan({ preview: preview([['alpha', 3]]), excluded: ['alpha'], splitBanks: false })
+  assert.equal(empty.bankCount, 0)
+  assert.equal(empty.imageCount, 0)
+  assert.match(allExcludedWarning(empty, { splitBanks: false }), /nothing left to import/)
 })

@@ -4,8 +4,9 @@
  * part of the preview request: that effect is debounced on the folder path, so
  * an exclusion-aware preview would mean one re-POST per checkbox and a race
  * between what is ticked and what is drawn. The server walks with the exclusion
- * list once, at create time, and prunes at depth 0 so an excluded 40 000-file
- * folder is never read at all.
+ * list once, at create time. Separate banks prune excluded subfolders from
+ * their walk. One parent bank persists exclusions through its existing
+ * visibility scope so hidden folders can be restored later.
  *
  * The count on screen ("Will create N bank(s)") therefore has to be computed
  * here rather than taken from the server — which is exactly why it lives in a
@@ -28,7 +29,7 @@ export function normalizeExcluded(excluded) {
  *  no-subfolder fallback imports the PARENT, which would recurse straight back
  *  into everything just excluded. The UI must say so before the click, not
  *  surface it as a 400. */
-export function splitPlan({ preview, excluded, includeLoose = true }) {
+export function splitPlan({ preview, excluded, includeLoose = true, splitBanks = true }) {
   const skip = new Set(normalizeExcluded(excluded))
   const subs = preview?.subfolders || []
   const rows = subs.map((s) => ({
@@ -47,10 +48,11 @@ export function splitPlan({ preview, excluded, includeLoose = true }) {
     })
   }
   const kept = rows.filter((r) => !r.excluded)
+  const imageCount = kept.reduce((n, r) => n + r.imageCount, 0)
   return {
     rows,
-    bankCount: kept.length,
-    imageCount: kept.reduce((n, r) => n + r.imageCount, 0),
+    bankCount: splitBanks ? kept.length : (imageCount > 0 ? 1 : 0),
+    imageCount,
     // Only about SUBFOLDERS: a loose bank is what saves the all-excluded case.
     allExcluded: subs.length > 0 && subs.every((s) => skip.has(s.name)),
   }
@@ -59,13 +61,13 @@ export function splitPlan({ preview, excluded, includeLoose = true }) {
 /** The warning shown when every subfolder is ticked off, or null. Says which of
  *  the two outcomes it is — a loose bank, or a refusal — so the button is never
  *  pressed on a guess. */
-export function allExcludedWarning(plan, { loose = 0, includeLoose = true } = {}) {
+export function allExcludedWarning(plan, { loose = 0, includeLoose = true, splitBanks = true } = {}) {
   if (!plan?.allExcluded) return null
   if (loose > 0 && includeLoose) {
+    if (!splitBanks) return 'Every subfolder is excluded. Only loose root images will be included in this bank.'
     return 'Every subfolder is excluded. Only the loose root images will become a '
       + 'bank — nothing from the excluded folders is imported.'
   }
   return 'Every subfolder is excluded and there is nothing left to import. '
-    + 'Untick one, or turn off "Subfolders" to make a single bank '
-    + 'from the whole folder.'
+    + 'Select at least one subfolder, or include loose images.'
 }

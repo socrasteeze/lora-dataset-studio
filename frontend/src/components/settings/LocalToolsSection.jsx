@@ -275,7 +275,7 @@ function ComfyFolderOverrides({ config, setField }) {
       <summary className="cursor-pointer text-sm font-medium text-content-muted">
         Advanced: ComfyUI folder overrides
       </summary>
-      <div className="mt-3 space-y-4">
+      <div className="settings-fields mt-3 space-y-4">
         <p className="text-xs text-content-muted">
           Leave these empty unless ComfyUI was started with its own folders (
           <code>--output-directory</code>, <code>--input-directory</code>,{' '}

@@ -221,17 +221,18 @@ export default function BankPage() {
   })
   const [page, setPage] = useState(1)
   const [appliedList, setAppliedList] = useState({ query: '', sort })
-  // "One bank per subfolder": split a parent folder so each top-level subfolder
-  // becomes its own bank (loose root images get their own bank too — nothing
-  // dropped). A live preview shows what will be created before committing.
+  // The preview chooses included folders independently of whether they become
+  // one parent bank or separate banks. Single-bank exclusions stay persisted.
   const [splitMode, setSplitMode] = useState(false)
+  const [foldersOpen, setFoldersOpen] = useState(false)
   const [includeLoose, setIncludeLoose] = useState(true)
-  // Top-level subfolders ticked OFF for this import. Client state only: the
+  // Top-level subfolders ticked OFF for this import. Client state until create: the
   // preview effect is debounced on `folder`, so sending exclusions with it
   // would mean a re-POST per checkbox and a race between what is ticked and
   // what is drawn. They ride the create call instead.
   const [excluded, setExcluded] = useState(() => new Set())
   const [preview, setPreview] = useState(null)
+  const [previewError, setPreviewError] = useState('')
   // The bank whose Launch-all dialog is open (queue or run-now from the list).
   // What the Launch-all dialog is about: one bank, or every bank that still has
   // undecided images. `null` = closed.
@@ -327,21 +328,30 @@ export default function BankPage() {
     return it ? { state: it.state, position: it.position } : (queue ? null : bank.queue_state)
   }
 
-  // Live preview of the subfolder split (debounced) whenever the toggle is on.
+  // Live folder preview (debounced), shared by both import modes.
   useEffect(() => {
-    if (!splitMode || !folder.trim()) { setPreview(null); return undefined }
+    if (!folder.trim()) { setPreview(null); setPreviewError(''); return undefined }
+    if (!foldersOpen) return undefined
     let alive = true
     const t = setTimeout(async () => {
       try {
         const d = await postJson('/api/bank/split/preview', { folder })
-        if (alive) setPreview(d)
-      } catch { if (alive) setPreview(null) }
+        if (alive) { setPreview({ ...d, requestedFolder: folder }); setPreviewError('') }
+      } catch (error) {
+        if (alive) { setPreview(null); setPreviewError(error?.message || 'Could not load subfolders.') }
+      }
     }, 400)
     return () => { alive = false; clearTimeout(t) }
-  }, [splitMode, folder])
+  }, [foldersOpen, folder])
   // A new folder has new subfolders — names ticked off the previous one would
   // silently exclude whatever happens to share a name.
   useEffect(() => { setExcluded(new Set()) }, [folder])
+  const changeImportFolder = (value) => {
+    setFolder(value)
+    setExcluded(new Set())
+    setPreview(null)
+    setPreviewError('')
+  }
   // Best effort: a failed list just means no live hint, never a broken form.
   useEffect(() => {
     if (currentId != null) return undefined
@@ -422,18 +432,23 @@ export default function BankPage() {
 
   // Computed once: the row list, the "Will create N" count and the all-excluded
   // warning are three views of the same decision.
-  const splitPlanNow = splitMode && preview
-    ? splitPlan({ preview, excluded, includeLoose })
+  const previewReady = preview?.requestedFolder === folder
+  const splitPlanNow = previewReady
+    ? splitPlan({ preview, excluded, includeLoose: splitMode ? includeLoose : true, splitBanks: splitMode })
     : null
   const splitWarning = allExcludedWarning(splitPlanNow, {
-    loose: preview?.loose_root_count || 0, includeLoose,
+    loose: previewReady ? preview.loose_root_count || 0 : 0,
+    includeLoose: splitMode ? includeLoose : true, splitBanks: splitMode,
   })
+  const emptySelection = !!splitPlanNow?.allExcluded && splitPlanNow.imageCount === 0
+  const previewPending = foldersOpen && (!previewReady || !!previewError)
+  const needsImportRestart = !splitMode && excluded.size > 0 && !preview?.single_bank_exclusions
 
   const create = async (e) => {
     e.preventDefault()
     // A bank over a dataset's folder would share the dataset's LIVE files; the
     // server refuses it, and so does the form (the notice says what to do).
-    if (creating || folderNotice) return
+    if (creating || folderNotice || emptySelection || previewPending || needsImportRestart) return
     setCreating(true)
     try {
       if (splitMode) {
@@ -449,10 +464,15 @@ export default function BankPage() {
         setName(''); setFolder(''); setPreview(null)
         refresh()
       } else {
-        const d = await postJson('/api/bank/create', { name, folder })
+        const d = await postJson('/api/bank/create', {
+          name, folder, excluded_folders: normalizeExcluded(excluded),
+        })
         // One folder is one bank. Re-adding it refreshes the bank that already
         // owns it — `added: 0` alone would read as a failed import.
-        toast.success(d.reused
+        toast.success(d.excluded_folders?.length
+          ? (d.reused ? 'Bank refreshed. Selected exclusions saved; existing exclusions kept.'
+            : 'One bank created with the selected folder exclusions.')
+          : d.reused
           ? `That folder is already the bank “${d.name}” — refreshed, ${d.added} new image(s).`
           : `Bank created — ${d.added} image(s) inventoried.`)
         // Nested folders mean two banks over the same files. Harmless while
@@ -660,18 +680,16 @@ export default function BankPage() {
           <FolderPickerField inline size="lg" id="bank-folder" label="Folder"
             fieldClassName="col-span-2 min-w-0 lg:min-w-64 lg:grow-[3]"
             browseClassName="min-w-0 w-full !px-1 !text-xs lg:w-auto lg:!px-4 lg:!text-sm"
-            value={folder} onChange={setFolder} required
+            value={folder} onChange={changeImportFolder} required
             placeholder="C:\path\to\unsorted-images (subfolders included)" />
-          <Button type="button" size="lg" aria-pressed={splitMode}
-            aria-label="One bank per subfolder"
-            onClick={() => setSplitMode((value) => !value)}
-            title={splitMode
-              ? 'Enabled: create one bank for each top-level subfolder. Select to disable.'
-              : 'Disabled: create one bank for this folder. Select to create one bank for each top-level subfolder.'}
-            className={`min-w-0 w-full !px-1 !text-xs lg:w-auto lg:!px-4 lg:!text-sm ${splitMode ? 'border-primary/60 bg-primary/15 text-content' : ''}`}>
-            Subfolders
+          <Button type="button" size="lg" aria-expanded={foldersOpen}
+            aria-controls="bank-import-subfolders" aria-label="Choose Subfolders"
+            onClick={() => setFoldersOpen((value) => !value)}
+            title="Choose which subfolders to include, with one bank or separate banks."
+            className={`min-w-0 w-full !px-1 !text-xs lg:w-auto lg:!px-4 lg:!text-sm ${foldersOpen || splitMode || excluded.size ? 'border-primary/60 bg-primary/15 text-content' : ''}`}>
+            Subfolders {excluded.size > 0 && <span className="tabular-nums">({excluded.size})</span>}
           </Button>
-          <Button type="submit" size="lg" variant="primary" disabled={creating || !!folderNotice}
+          <Button type="submit" size="lg" variant="primary" disabled={creating || !!folderNotice || emptySelection || previewPending || needsImportRestart}
             className="col-span-2 min-w-0 w-full lg:w-auto"
             title={folderNotice ? 'That folder belongs to a dataset' : undefined}>
             {creating ? 'Inventorying' : (
@@ -681,6 +699,15 @@ export default function BankPage() {
           </Button>
           <HelpBadge topic="bank-split-subfolders" className="col-span-4 lg:col-auto" />
         </div>
+        {foldersOpen && <section id="bank-import-subfolders" aria-label="Import Subfolders" className="space-y-3">
+          <label className="flex min-h-10 items-center gap-2 text-sm text-content-muted">
+            <input type="checkbox" checked={splitMode} onChange={(event) => setSplitMode(event.target.checked)} />
+            Separate Banks
+          </label>
+          <p className="text-xs text-content-muted">
+            {splitMode ? 'Each checked subfolder becomes a separate bank.'
+              : 'Keep one bank. Uncheck subfolders to exclude them; source folders stay on disk.'}
+          </p>
         {splitMode && (
           <label className="flex items-center gap-1.5 text-sm text-content-muted">
             <input type="checkbox" checked={includeLoose}
@@ -688,7 +715,11 @@ export default function BankPage() {
             Include Loose Images
           </label>
         )}
-        {splitMode && preview && (
+        {previewError && <p role="alert" className="text-sm text-rose-300">{previewError}</p>}
+        {!previewReady && !previewError && <p role="status" className="text-sm text-content-muted">
+          {folder.trim() ? 'Loading subfolders…' : 'Choose a folder to preview its subfolders.'}
+        </p>}
+        {previewReady && (
           <div className="lds-section py-3 text-sm">
             {preview.subfolders.length === 0 ? (
               <p className="text-content-muted">
@@ -698,7 +729,8 @@ export default function BankPage() {
             ) : (
               <>
                 <p className="font-semibold text-content">
-                  Will create {splitPlanNow.bankCount} bank(s):
+                  {splitMode ? <>Will create {splitPlanNow.bankCount} bank(s):</>
+                    : <>One Bank · {splitPlanNow.imageCount} Images</>}
                 </p>
                 {/* Untick a folder to leave it out of THIS import. It stays on
                     the list, struck through: a row that silently vanished would
@@ -709,7 +741,7 @@ export default function BankPage() {
                       {r.kind === 'loose' ? (
                         <>• {r.name} — {r.imageCount} image(s){r.excluded && ' — skipped'}</>
                       ) : (
-                        <label className="flex items-center gap-1.5">
+                        <label className="flex min-h-10 lg:min-h-0 items-center gap-2 py-1">
                           <input type="checkbox" checked={!r.excluded}
                             onChange={(e) => setExcluded((prev) => {
                               const next = new Set(prev)
@@ -732,6 +764,10 @@ export default function BankPage() {
             )}
           </div>
         )}
+        </section>}
+        {needsImportRestart && <p role="alert" className="text-sm text-amber-300">
+          Restart Studio and refresh this page to import with folder exclusions.
+        </p>}
         {/* basis-full: its own row inside the wrapping flex form, so the sentence
             never squeezes the fields — including at 400 px. */}
         {folderNotice && (

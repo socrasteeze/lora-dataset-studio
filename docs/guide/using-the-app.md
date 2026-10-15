@@ -473,8 +473,15 @@ The funnel itself:
 1. **Create a bank** — give it a name and paste the folder path. The app
    inventories every image in place (subfolders included). Nothing is copied,
    nothing is modified; rejecting an image is a reversible status, never a file
-   deletion. If your folder is really a *folder of folders* (a Telegram export
-   with one subfolder per chat, say), enable **Subfolders** between Browse and Create. Each
+   deletion. Open **Subfolders** between Browse and Create to choose which
+   subfolders to include. Leave **Separate Banks** off to keep one named bank
+   rooted at the selected parent. Unchecked folders stay hidden from that bank's
+   grid, counts, curation and passes across rescans. Their files stay on disk;
+   the bank's **Exclude Folder** control can restore their visibility later.
+   Re-importing an existing bank adds the requested exclusions and preserves
+   its earlier exclusions and decisions.
+   If your folder is really a *folder of folders* (a Telegram export
+   with one subfolder per chat, say), turn on **Separate Banks** in the preview. Each
    top-level subfolder becomes its own bank — so you can curate, queue and
    promote each one separately. A preview shows exactly which banks will be made
    and how many images each holds; loose images sitting directly in the parent
@@ -483,7 +490,7 @@ The funnel itself:
    the 40 000-file archive you do not want triaged. Excluded folders stay on the
    list struck through (so you can see what you skipped rather than wonder what
    the walk missed), and they are not read at all rather than read and then
-   discarded. The exclusion applies to *that import*: each bank created is rooted
+   discarded in Separate Banks mode. In that mode, the exclusion applies to *that import*: each bank created is rooted
    at its own subfolder, so nothing you excluded can reappear later. If you tick
    off **every** subfolder the app says so before you press the button — it will
    make the loose-files bank if there is one, and refuse outright if there is
@@ -494,8 +501,9 @@ The funnel itself:
    itself any more: on a big library that was a full inventory of every image on
    disk each time you walked past the page. It tells you how fresh its counts
    are, and **🔄 Rescan Folders** checks them all on demand ("42 new image(s)
-   found in the folder"). Opening one bank still walks that bank's own folder, so
-   its own count is always current the moment you look at it. A folder that went
+   found in the folder"). Opening one bank shows its saved images first, then
+   checks that bank's source folder in the background. New images and updated
+   counts appear when that check finishes. A folder that went
    missing (unplugged drive, renamed folder) is still flagged from the list
    without any rescan. Files you removed from the folder are reported at the top
    of the bank, never deleted from it, so an unplugged drive can't wipe your
