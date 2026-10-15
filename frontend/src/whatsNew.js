@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-15-caption-tags-spacing',
+    date: '2026-10-15',
+    title: 'Tidier Caption Tags',
+    blurb: 'The caption-tag panel keeps Close beside its heading and separates the selection count from the title. Missing-caption guidance appears once with consistent spacing.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-15-bank-toolbar-background-stats',
     date: '2026-10-15',
     title: 'Faster Bank Controls',

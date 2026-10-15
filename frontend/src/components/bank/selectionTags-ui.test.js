@@ -26,10 +26,10 @@ test('the tag row opens on the SELECTION, with no second click', () => {
 });
 
 test('one selected image reads as one image, several read as several', () => {
-  assert.match(ws, /🏷️ Tags of the selected image/);
-  assert.match(ws, /🏷️ Tags across \$\{tagRow\.size\} selected images/);
-  // The tile button keeps its own wording — it is a different gesture.
-  assert.match(ws, /🏷️ Tags of \$\{tagRow\.name\}/);
+  assert.match(ws, /🏷️ Caption Tags/);
+  assert.match(ws, /\$\{tagRow\.size\} selected \$\{tagRow\.size === 1 \? 'image' : 'images'\}/);
+  // A tile's filename remains available, truncated with its full tooltip.
+  assert.match(ws, /title=\{tagRow\.kind === 'image' \? tagRow\.name : undefined\}/);
 });
 
 test('the tag inspector is mounted ONCE, in the filter rail, at every width', () => {
@@ -62,7 +62,9 @@ test('every chip carries a FRACTION, never a bare count', () => {
 });
 
 test('an empty row SAYS why instead of rendering an empty box', () => {
-  assert.match(ws, /has no caption yet — run 🏷️ Caption/);
+  // The shared shortfall note supplies the missing-caption explanation once.
+  assert.match(ws, /!\(tagRow\.uncaptioned > 0 && tagRow\.counted === 0\)/);
+  assert.match(ws, /selectionTagsNotes\(tagRow, tagRow\.unread\)/);
   assert.match(ws, /No caption here has a word worth filtering on/);
 });
 

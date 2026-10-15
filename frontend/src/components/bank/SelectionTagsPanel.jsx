@@ -11,38 +11,36 @@
  * The counting itself is unit-tested in bankTags.test.js; this file only renders.
  */
 import { Chip, GroupLabel } from './BankAtoms.jsx'
+import { Button } from '../common/Controls.jsx'
 import { selectionTagsNotes, tagCountLabel, tagFilterSummary } from './bankTags.js'
 
 export default function SelectionTagsPanel({ tagRow, tagPicked, onToggle, onClear }) {
   return (
-    <div className="space-y-1.5 rounded-lg border border-emerald-400/30 bg-emerald-500/5 px-2.5 py-2">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <GroupLabel>
-          {tagRow.kind === 'image' ? `🏷️ Tags of ${tagRow.name}`
-            : tagRow.size === 1 ? '🏷️ Tags of the selected image'
-              : `🏷️ Tags across ${tagRow.size} selected images`}
-        </GroupLabel>
-        <span className="text-2xs text-content-subtle">
-          attributes you pick — unlike 🎯 Similar, which matches the look
-        </span>
-        {tagRow.frozen && (
-          <span className="rounded border border-border px-1.5 text-2xs text-content-subtle">
-            held from the selection you filtered on
-          </span>
-        )}
-        <button type="button" onClick={onClear}
-          className="ml-auto rounded border border-border px-2 py-0.5 text-2xs text-content-muted hover:text-content">
+    <div className="space-y-2 rounded-lg border border-emerald-400/30 bg-emerald-500/5 px-2.5 py-2">
+      <div className="flex min-w-0 items-start justify-between gap-2">
+        <div className="min-w-0 space-y-0.5">
+          <GroupLabel>🏷️ Caption Tags</GroupLabel>
+          <p className="m-0 truncate text-2xs text-content-subtle"
+            title={tagRow.kind === 'image' ? tagRow.name : undefined}>
+            {tagRow.kind === 'image' ? tagRow.name
+              : `${tagRow.size} selected ${tagRow.size === 1 ? 'image' : 'images'}`}
+          </p>
+        </div>
+        <Button type="button" size="sm" noShrink onClick={onClear}>
           ✕ Close
-        </button>
+        </Button>
       </div>
-      {tagRow.rows.length === 0 ? (
-        <p className="m-0 text-xs text-content-muted">
-          {tagRow.uncaptioned > 0 && tagRow.counted === 0
-            ? (tagRow.size === 1
-              ? 'This image has no caption yet — run 🏷️ Caption and its tags appear here.'
-              : `None of these ${tagRow.size} images has a caption yet — run 🏷️ Caption on them and their tags appear here.`)
-            : 'No caption here has a word worth filtering on.'}
+      {tagRow.frozen && (
+        <p className="m-0 text-2xs text-content-subtle">
+          Held from the selection you filtered on.
         </p>
+      )}
+      {tagRow.rows.length === 0 ? (
+        !(tagRow.uncaptioned > 0 && tagRow.counted === 0) && (
+          <p className="m-0 text-xs leading-snug text-content-muted">
+            No caption here has a word worth filtering on.
+          </p>
+        )
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {tagRow.rows.map(({ tag, count }) => {
@@ -62,7 +60,8 @@ export default function SelectionTagsPanel({ tagRow, tagPicked, onToggle, onClea
         </div>
       )}
       {selectionTagsNotes(tagRow, tagRow.unread).map((note) => (
-        <p key={note} className="m-0 text-2xs leading-snug text-content-subtle">{note}</p>
+        <p key={note} className={`m-0 leading-snug ${tagRow.rows.length === 0
+          ? 'text-xs text-content-muted' : 'text-2xs text-content-subtle'}`}>{note}</p>
       ))}
       {tagPicked.size > 0 && (
         <p className="m-0 text-2xs text-content-muted">
