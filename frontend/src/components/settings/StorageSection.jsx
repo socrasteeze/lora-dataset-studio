@@ -4,6 +4,7 @@ import { Card, INPUT_CLASS, SIDE_BUTTON_CLASS } from './primitives'
 import { SettingsGroup, SettingsGroupsToc, useSettingsGroupProps } from './SettingsGroupsView'
 import { STORAGE_GROUPS } from './settingsGroups'
 import ResetToDefault from './ResetToDefault'
+import { FolderBrowserModal } from '../common/FolderPicker'
 import {
   formatSize, locationRows, moveLabel, movePercent, relocationChoices,
 } from './storageLocations.js'
@@ -33,6 +34,7 @@ function LocationEditor({
   const [check, setCheck] = useState(null)
   const [checking, setChecking] = useState(false)
   const [job, setJob] = useState(null)
+  const [browsing, setBrowsing] = useState(false)
 
   useEffect(() => { setDraft(stored) }, [stored])
 
@@ -104,25 +106,36 @@ function LocationEditor({
       </p>
       <div>
         <label htmlFor={id} className="block text-sm font-medium text-content">
-          Folder (leave empty for the default)
+          Folder
         </label>
-        {/* Column on a phone: a path field and two buttons never share 400 px.
+        {/* Column on a phone: a path field and buttons never share 400 px.
             sm:items-end: side by side, field and button share one height. */}
         <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-end">
-          <input id={id} type="text" value={draft} disabled={busy}
+          <input id={id} type="text" value={draft} disabled={checking || busy}
             onChange={(e) => { setDraft(e.target.value); setCheck(null) }}
             placeholder="Defaults to the app’s data folder"
-            className={`${INPUT_CLASS} sm:flex-1`} />
+            className={`${INPUT_CLASS} min-w-0 sm:flex-1`} />
+          <button type="button" onClick={() => setBrowsing(true)} disabled={checking || busy}
+            className={`${SIDE_BUTTON_CLASS} shrink-0`}>
+            Browse
+          </button>
           <button type="button" onClick={validate} disabled={checking || busy}
             className={`${SIDE_BUTTON_CLASS} shrink-0`}>
-            {checking ? 'Checking' : 'Check folder'}
+            {checking ? 'Checking' : 'Check Folder'}
           </button>
         </div>
+        <p className="mt-1 text-xs text-content-muted">Leave empty for the default folder.</p>
         <div className="mt-1">
           <ResetToDefault label={label} section={section} field={field}
             config={config} configDefaults={configDefaults} setField={setField} />
         </div>
       </div>
+
+      {browsing && (
+        <FolderBrowserModal initial={draft || current || null}
+          onPick={(path) => { setDraft(path); setCheck(null); return { ok: true } }}
+          onClose={() => setBrowsing(false)} />
+      )}
 
       {check && !check.ok && (
         <p className="rounded-lg border border-rose-500/40 bg-rose-500/10 p-2 text-xs text-rose-200">
@@ -366,7 +379,7 @@ export default function StorageSection({
       <SettingsGroup {...groupProps(locationsGroup)}>
       <LocationEditor id="dataset-images-root" storageKey="datasets"
         label="Dataset images root" section="paths" field="dataset_images_root"
-        help="Where dataset images live on disk — usually the biggest folder of all."
+        help="Stores manual datasets and Bank promotions. New folders use five-digit IDs, such as 00001. Move existing files when changing this root to keep current datasets available."
         {...shared('datasets')} />
 
       </SettingsGroup>

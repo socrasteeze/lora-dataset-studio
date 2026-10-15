@@ -67,15 +67,18 @@ def _dataset_count():
 
 # --- the happy path -----------------------------------------------------------
 
-def test_it_creates_the_dataset_with_the_app_defaults_and_imports_into_it(app, source):
+def test_it_creates_the_dataset_with_the_app_defaults_and_imports_into_it(app, source, tmp_path):
     """Name + trigger is not a REDUCED dataset — it is the same one the Datasets
     page produces when you leave its pickers alone."""
     bank_id, _folder, ids = source
     with app.app_context():
+        from app import config as cfg
         from app.extensions import db
         from app.models import FaceDataset, FaceDatasetImage
         from app.services import image_bank_service as banks
 
+        root = tmp_path / 'chosen-datasets'
+        cfg.save_config({'paths': {'dataset_images_root': str(root)}})
         new_id = banks.start_new_dataset_promote(app, 'local', bank_id, ids,
                                                  'Emma', 'zchar_emma')
         ds = db.session.get(FaceDataset, new_id)
@@ -92,6 +95,8 @@ def test_it_creates_the_dataset_with_the_app_defaults_and_imports_into_it(app, s
         landed = FaceDatasetImage.query.filter_by(dataset_id=new_id).all()
         assert len(landed) == 2
         assert all(r.bank_image_id in ids for r in landed)
+        assert all((root / f'{new_id:05d}' / r.filename).is_file() for r in landed)
+        assert not (root / str(new_id)).exists()
 
 
 def test_an_empty_selection_means_every_kept_image(app, source):

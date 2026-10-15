@@ -991,8 +991,15 @@ everything**, and each row shows its effective path, what it holds, and free spa
 on that drive.
 
 - **Dataset images root** → `paths.dataset_images_root`. Leave it blank for
-  `<data dir>/datasets`. To change it, enter an absolute folder and press **Check
-  folder**; the app proves it can write there with a temporary file. You then choose
+  `<data dir>/datasets`. This shared location stores manually created datasets and
+  Bank promotions. New dataset folders use a minimum of five digits, such as
+  `00001` and `00042`; larger IDs are not truncated. Existing unpadded folders
+  remain in use and are not renamed. Bank promotion links to this setting.
+  To change it, use **Browse** to select a folder on the host, or type an absolute
+  path, then press **Check Folder**. Browse supports host drives, parent navigation
+  and typed paths from desktop and phone clients. Selecting a folder only fills
+  the field; the app proves it can write there with a temporary file when checked.
+  You then choose
   explicitly between moving the current files (copy first, remove the old copy only
   after the last byte lands) or adopting the new folder empty and leaving the old
   files untouched. The setting is saved only after a move finishes.

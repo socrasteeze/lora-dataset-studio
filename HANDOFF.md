@@ -1,5 +1,12 @@
 # HANDOFF
 
+## Dataset Storage Pending (2026-10-15)
+
+- Work is on `noble/dataset-storage-padding`, based on `1b226c740`. The operator requested local commits before validation, with source and bundle separated. New image-dataset folders use a minimum of five digits. Existing unpadded folders retain priority and are not renamed. Checkpoint provenance and backup restore use the same resolver.
+- Settings > Storage reuses `paths.dataset_images_root` for manual creation and Bank promotion. Browse uses the shared host filesystem browser. Both creation forms link to the field in a separate tab to retain their input. Changing the root affects all datasets; the existing explicit Move option is required to carry current files across. No real data was moved or renamed.
+- Ruff, ESLint, the frontend build and diff whitespace checks passed. ESLint retains 32 existing warnings. The privacy scan checked 2,984 tracked/untracked text files with zero findings. The attribution review found no new attribution. The served bundle is rebuilt. No tests, browser checks, app imports, runtime restart or push ran. Cloud qualification remains pending; main stays unchanged.
+- Cloud checks remain required: `backend/tests/test_dataset_storage.py`, `test_dataset_routes.py`, `test_bank_promote_to_new_dataset.py`, checkpoint/snapshot, backup, storage and privacy regressions; `npm test`; and exact-head `scripts/gates.ps1 -Phase Gates`. The existing cloud browser script now checks Storage browsing and explicit validation at all five supported sizes. Those new checks have not run. The optional private-name check remains unverified.
+
 ## Peer HTTP Qualification Follow-Up (2026-10-14)
 
 - Head `c7fb45faa` passed Full Fork Gates: 9,767 backend tests passed, 10 skipped and 8 subtests passed; 5,185 core and 1,073 bundled frontend tests passed with 4 bundled skips. The 265 focused Bank tests and all Bank/Settings rendered checks passed.

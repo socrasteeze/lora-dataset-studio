@@ -6,6 +6,7 @@ import {
   weightNotice,
 } from './bankPromote.js'
 import { triggerWarning } from '../dataset/newDataset.js'
+import { settingsLinkHref } from '../common/settingsLinkHref'
 
 /** ⬆ Promote: copy the selection somewhere it can be worked on. THREE
  * destinations.
@@ -237,6 +238,17 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
               </p>
             )}
           </div>
+        )}
+
+        {!toBank && (
+          <p className="text-xs text-content-subtle">
+            Dataset folders use the shared Storage location.{' '}
+            <a href={settingsLinkHref('storage', 'dataset-images-root')}
+              target="_blank" rel="noreferrer"
+              className="inline-flex min-h-10 items-center underline lg:min-h-0">
+              Dataset Location
+            </a>
+          </p>
         )}
 
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
