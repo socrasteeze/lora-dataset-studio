@@ -18,6 +18,7 @@ def main():
     import pytest
     from PIL import Image
     from public_plugin_fixture import create_test_app
+    from werkzeug.serving import make_server
 
     patch = pytest.MonkeyPatch()
     app = create_test_app(runtime, patch, config_object={
@@ -26,8 +27,10 @@ def main():
     from app.config import LOCAL_USER
     from app.extensions import db
     from app.models import BankImage, ImageBank
+    from app import setup_state
 
     with app.app_context():
+        setup_state.complete_core()
         source = runtime / 'sources'
         source.mkdir(exist_ok=True)
         bank = ImageBank(user_id=LOCAL_USER, name='Demo', source_path=str(source))
@@ -50,7 +53,20 @@ def main():
     def ready():
         return {'bank_id': bank_id}
 
-    app.run(host='127.0.0.1', port=port, debug=False, use_reloader=False, threaded=True)
+    @app.post('/test/shutdown')
+    def shutdown():
+        import threading
+        threading.Thread(target=server.shutdown, daemon=True).start()
+        return {'stopping': True}
+
+    server = make_server('127.0.0.1', port, app, threaded=True)
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
+        with app.app_context():
+            db.session.remove()
+            db.engine.dispose()
 
 
 if __name__ == '__main__':
