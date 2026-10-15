@@ -51,6 +51,27 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Check Bank Tags and Grouping Contracts
+        shell: pwsh
+        env:
+          LDS_DATA_DIR: ${{ runner.temp }}/lds-focused-data
+          LDS_CONFIG: ${{ runner.temp }}/lds-focused-config.json
+          LDS_ENV: ${{ runner.temp }}/lds-focused.env
+          LDS_PLUGINS_DIR: ${{ runner.temp }}/lds-focused-plugins
+          LDS_EXTENSIONS_DIR: ${{ runner.temp }}/lds-focused-extensions
+        run: >-
+          .venv/Scripts/python.exe -X utf8 -m pytest
+          backend/tests/test_bank_tags.py backend/tests/test_bank_folder_person.py
+          backend/tests/test_bank_groups.py backend/tests/test_bank_collections.py
+          backend/tests/test_bank_dup_distinct.py backend/tests/test_image_bank_semantic_dedup.py
+          backend/tests/test_klein_path.py -q --basetemp "$env:RUNNER_TEMP/lds-focused-tags"
+
+      - name: Install Browser for Bank Checks
+        run: node frontend/node_modules/playwright-core/cli.js install chromium
+
+      - name: Check Bank Other Tags in Browser
+        run: node frontend/scripts/bankOtherTagsProbe.mjs
+
       - name: Run Fork Gates
         shell: pwsh
         env:
@@ -62,7 +83,7 @@ jobs:
         run: ./scripts/gates.ps1 -Phase Gates -ScratchRoot D:/lds-gates
 
       - name: Save Gate Receipts
-        # The browser check below writes a second receipt on the same exact head.
+        # The browser check writes a second receipt on the same exact head.
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -70,12 +91,6 @@ jobs:
           path: .git/lds-gates-validation/*.json
           include-hidden-files: true
           if-no-files-found: warn
-
-      - name: Install Browser for Bank Checks
-        run: node frontend/node_modules/playwright-core/cli.js install chromium
-
-      - name: Check Bank Other Tags in Browser
-        run: node frontend/scripts/bankOtherTagsProbe.mjs
 
       - name: Save Browser Receipt
         if: always()
