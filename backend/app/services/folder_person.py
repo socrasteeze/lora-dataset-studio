@@ -627,6 +627,11 @@ def _folder_signature(bank_id, subfolder, *, include_analysis=True) -> str:
         threshold = _svc().thresholds().get('face_threshold')
     except Exception:  # noqa: BLE001 — freshness degrades to a stable sentinel
         threshold = None
+    return _signature_for_rows(rows, threshold, include_analysis=include_analysis)
+
+
+def _signature_for_rows(rows, threshold, *, include_analysis=True):
+    """Shared identity for stored evidence, including profile ID rebinding."""
     digest = hashlib.sha256()
     digest.update(f'face-threshold:{threshold!r}\n'.encode('utf-8'))
     for image_id, relpath, fingerprint, rotation, clean_method in rows:

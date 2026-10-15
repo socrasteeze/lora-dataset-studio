@@ -1783,6 +1783,7 @@ def _image_dict(row: BankImage, th: dict, promoted_by, live) -> dict:
         **mask,
         'id': row.id,
         'instance_id': row.instance_id,
+        'profile_history': row.profile_history,
         'name': os.path.basename(row.relpath),
         'relpath': row.relpath,
         'rotation': rotation,

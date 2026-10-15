@@ -143,6 +143,7 @@ export const CORE_GUIDE_ANCHORS = {
     "how-settings-work",
     "advanced-environment-overrides",
     "instance-profiles",
+    "bank-profile-moves",
     "overview",
     "image-engines",
     "trained-image-models",

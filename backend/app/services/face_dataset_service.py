@@ -3163,7 +3163,7 @@ _BACKUP_IMG_FIELDS = ('filename', 'source', 'framing', 'variation_label', 'statu
                       # preservation, lossless transfer) — dropping either here
                       # would silently lose it across a backup/restore cycle.
                       'fail_reason', 'source_metadata',
-                      'bank_analysis_snapshot', 'transfer_metadata')
+                      'bank_analysis_snapshot', 'transfer_metadata', 'bank_profile_history')
 
 
 def _backup_basename(value):

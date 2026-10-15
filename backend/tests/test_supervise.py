@@ -135,8 +135,33 @@ def test_the_child_is_told_the_supervisor_owns_the_relaunch():
                           spawn=fake_spawn)
 
     assert seen['env']['LDS_RESTART_MODE'] == 'supervisor'
+    assert seen['env']['LDS_PROFILE_SWITCH_SUPPORTED'] == '1'
     assert seen['env']['EXISTING'] == 'kept', 'the child must inherit the launcher env'
     assert seen['command'] == ['py.exe', 'run.py']
+
+
+def test_profile_switch_changes_the_next_child_after_the_old_child_exits(tmp_path):
+    from instance_profiles import ProfileStore
+    store = ProfileStore(root=tmp_path, environ={})
+    target = store.create('Example')
+    store.request_switch('default', target['id'])
+    launches = []
+
+    def spawn(_command, env):
+        launches.append(dict(env))
+        return 75 if len(launches) == 1 else 0
+
+    launcher = supervise.backend_launcher('py.exe', 'run.py', env={
+        'LDS_PROFILES_HOME': str(store.home), 'LDS_PROFILE_ID': 'default',
+        'HF_TOKEN': 'synthetic-token'}, spawn=spawn)
+    assert launcher() == 75
+    assert launcher() == 0
+    assert launches[0]['LDS_PROFILE_ID'] == 'default'
+    assert launches[1]['LDS_PROFILE_ID'] == target['id']
+    assert launches[1]['LDS_DATA_DIR'] == target['paths']['LDS_DATA_DIR']
+    assert launches[1]['LDS_NO_BROWSER'] == '1'
+    assert 'HF_TOKEN' not in launches[1]
+    assert store.selected() == target['id']
 
 
 def test_a_crash_is_announced_rather_than_papered_over():

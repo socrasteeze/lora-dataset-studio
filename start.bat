@@ -152,7 +152,7 @@ rem Ctrl+C keeps working). Under the supervisor that loop is not needed --
 rem supervise.py sets LDS_RESTART_MODE=supervisor in the child, which updater.py
 rem tests BEFORE LDS_SUPERVISOR, so the same restart ends in exit 75 and the
 rem supervisor owns the relaunch. Two relaunchers would race for the port.
-if not "%LDS_PROFILE_PICKER%"=="0" (
+if "%LDS_PROFILE_PICKER%"=="1" (
   "%VPY%" backend\profile_launcher.py
   goto :eof
 )

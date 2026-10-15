@@ -192,6 +192,7 @@ class FaceDatasetImage(db.Model):
     # gain one, and a dangling id must read as "not promoted", never as a boot
     # error. Additive column (migration in create_app).
     bank_image_id = db.Column(Integer, nullable=True, index=True)
+    bank_profile_history = db.Column(Text, nullable=True)
     # Facial similarity to the reference (face analyzer phase A). face_score = cosine
     # Raw ArcFace value (NULL if not scored); face_state = scorable|no_face|low_det|too_small|
     # extreme_pose|unreadable|error. Persist the raw score so the UI can recalibrate thresholds.
@@ -658,6 +659,7 @@ class BankImage(db.Model):
     # read as "a dataset id" everywhere, so it is never re-pointed at a bank.
     # An image can have gone to both; the two answers stay independent.
     promoted_bank_id = db.Column(Integer, nullable=True)
+    profile_history = db.Column(Text, nullable=True)
     # Same portable envelope as FaceDatasetImage.transfer_metadata. A Bank does
     # not interpret Dataset-only values, but must carry them byte-for-metadata
     # through Bank -> Bank and back to a Dataset.

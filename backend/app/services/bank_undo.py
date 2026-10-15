@@ -47,6 +47,8 @@ NAMED, never clobbered.
 """
 import threading
 import time
+import copy
+import json
 
 _lock = threading.Lock()
 _snapshots: dict = {}        # bank_id -> {'label', 'rows', 'at'}
@@ -95,6 +97,7 @@ class Snapshot:
 def record(bank_id, label, rows):
     """Replace the bank's undo offer. ``rows`` is {image_id: {'before','after'}}."""
     with _lock:
+        _transfer_path(bank_id).unlink(missing_ok=True)
         _snapshots[int(bank_id)] = {'label': str(label), 'rows': dict(rows),
                                     'at': time.time()}
 
@@ -103,6 +106,7 @@ def peek(bank_id):
     """The offer as the UI shows it: {label, count, at} — or None. Purges a
     stale entry on the way through, like the job registry does."""
     with _lock:
+        _load_transfer_locked(bank_id)
         snap = _snapshots.get(int(bank_id))
         if not snap:
             return None
@@ -117,6 +121,7 @@ def take(bank_id):
     """Pop the offer for a restore. One shot: an undo that half-succeeded is not
     re-offered, because a second press would find the same conflicts."""
     with _lock:
+        _load_transfer_locked(bank_id)
         snap = _snapshots.pop(int(bank_id), None)
     if snap and time.time() - snap['at'] > _TTL:
         return None
@@ -128,6 +133,35 @@ def clear(bank_id):
     (🗑 Delete rejected drops the very rows it points at) and by bank deletion."""
     with _lock:
         _snapshots.pop(int(bank_id), None)
+        _transfer_path(bank_id).unlink(missing_ok=True)
+
+
+def _transfer_path(bank_id):
+    from .. import config as cfg
+    return cfg._data_dir() / 'banks' / str(int(bank_id)) / 'profile_undo.json'
+
+
+def _load_transfer_locked(bank_id):
+    path = _transfer_path(bank_id)
+    if int(bank_id) in _snapshots or not path.is_file():
+        return
+    try:
+        if path.stat().st_size > 64 * 1024 * 1024:
+            return
+        value = json.loads(path.read_text(encoding='utf-8'))
+        value['rows'] = {int(key): {field: tuple(state[field]) for field in ('before', 'after')}
+                         for key, state in value['rows'].items()}
+        path.unlink()
+        if time.time() - value['at'] <= _TTL:
+            _snapshots[int(bank_id)] = value
+    except (OSError, ValueError, TypeError, KeyError):
+        return
+
+
+def export_snapshot(bank_id):
+    with _lock:
+        _load_transfer_locked(bank_id)
+        return copy.deepcopy(_snapshots.get(int(bank_id)))
 
 
 def reset():

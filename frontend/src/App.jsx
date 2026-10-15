@@ -16,6 +16,7 @@ import SetupJourneyNotice from './components/setup/SetupJourneyNotice'
 import ComfyRecoveryBanner from './components/common/ComfyRecoveryBanner'
 import GenerationQueueDock from './components/common/GenerationQueueDock'
 import InstanceProfile from './components/common/InstanceProfile'
+import ProfileDialog from './components/common/ProfileDialog'
 import { lazyPage } from './utils/lazyPage'
 
 // Each page is its own chunk, fetched on first navigation — the entry bundle
@@ -143,6 +144,7 @@ function PeerWorkingChip({ activity }) {
 }
 
 function NavBar() {
+  const [profilesOpen, setProfilesOpen] = useState(false)
   const { caps } = useCapabilities()
   // ONE poller for the peer flag, shared by both chip mount points below.
   const peerActivity = usePeerActivity()
@@ -279,6 +281,7 @@ function NavBar() {
         </span>
       </NavLink>
       <NavLink to="/settings" className={navItemClass} onClick={() => setOpen(false)}>Settings</NavLink>
+      <button type="button" className={NAV_ITEM_BASE} onClick={() => { setOpen(false); setProfilesOpen(true) }}>Profiles</button>
       <NavLink to="/plugins" className={navItemClass} onClick={() => setOpen(false)}>Plugins</NavLink>
       <NavLink to="/help" className={navItemClass} onClick={() => setOpen(false)}>Help</NavLink>
       <HelpModeToggle onToggle={() => setOpen(false)} />
@@ -335,6 +338,8 @@ function NavBar() {
                     </span>
                   </NavLink>
                   <NavLink to="/settings" role="menuitem" className={menuItemClass} onClick={close}>Settings</NavLink>
+                  <button type="button" role="menuitem" className={MENU_ITEM_BASE}
+                    onClick={() => { close(); setProfilesOpen(true) }}>Profiles</button>
                   <NavLink to="/plugins" role="menuitem" className={menuItemClass} onClick={close}>Plugins</NavLink>
                 </>
               )}
@@ -368,6 +373,7 @@ function NavBar() {
           {!desktopNav && <div className="px-2 py-1.5">{machineLoad}</div>}
         </nav>
       )}
+      {profilesOpen && <ProfileDialog onClose={() => setProfilesOpen(false)} />}
     </header>
   )
 }

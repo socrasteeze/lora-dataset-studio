@@ -76,6 +76,35 @@ def test_new_profiles_start_empty_and_do_not_inherit_secrets(store):
             'LDS_DATA_DIR', 'LDS_PLUGINS_DIR', 'LDS_EXTENSIONS_DIR'))
 
 
+def test_selection_defaults_to_the_current_install_and_survives_store_reopen(store):
+    assert store.selected() == 'default'
+    store.select('default')
+    original = store.get('default')
+    store.environ['LDS_DATA_DIR'] = str(store.root / 'unrelated')
+    assert store.get('default') == original
+    named = store.create('Example')
+    store.select(named['id'])
+    reopened = profiles.ProfileStore(home=store.home, root=store.root, environ={})
+    assert reopened.selected() == named['id']
+
+
+def test_switch_request_is_consumed_once_by_the_source_supervisor(store):
+    named = store.create('Example')
+    store.request_switch('default', named['id'])
+    assert store.selected() == 'default'
+    assert store.consume_switch('default') == named['id']
+    assert store.selected() == named['id']
+    assert store.consume_switch('default') is None
+
+
+def test_stale_switch_request_does_not_change_the_selected_profile(store):
+    named = store.create('Example')
+    store.request_switch('default', named['id'])
+    with pytest.raises(profiles.ProfileError):
+        store.consume_switch(named['id'])
+    assert store.selected() == 'default'
+
+
 @pytest.mark.parametrize('name', ['', ' ', 'a' * 61, 'bad\nname'])
 def test_invalid_names_are_refused_before_writes(store, name):
     with pytest.raises(profiles.ProfileError):

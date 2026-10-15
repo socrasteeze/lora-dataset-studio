@@ -47,6 +47,7 @@ def run_backend(python, script, *, env=None, spawn=None):
     """
     child_env = dict(os.environ if env is None else env)
     child_env['LDS_RESTART_MODE'] = 'supervisor'
+    child_env['LDS_PROFILE_SWITCH_SUPPORTED'] = '1'
     runner = spawn or (lambda command, env: subprocess.call(command, env=env))
     return runner([python, script], child_env)
 
@@ -73,10 +74,20 @@ def backend_launcher(python, script, *, env=None, spawn=None):
     Carries the one piece of state a relaunch must not repeat: opening a browser
     tab. The first launch may open one; every relaunch after it stays silent.
     """
-    state = dict(os.environ if env is None else env)
+    initial = dict(os.environ if env is None else env)
+    state = dict(initial)
 
     def once():
         code = run_backend(python, script, env=state, spawn=spawn)
+        if code == RESTART_EXIT:
+            from instance_profiles import ProfileStore
+            store = ProfileStore(environ=initial)
+            source = state.get('LDS_PROFILE_ID') or store.selected()
+            target = store.consume_switch(source)
+            if target is not None:
+                state.clear()
+                state.update(store.child_environment(target))
+                state['LDS_NO_BROWSER'] = '1'
         state['LDS_OPEN_BROWSER'] = '0'
         return code
 

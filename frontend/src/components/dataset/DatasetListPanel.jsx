@@ -9,6 +9,7 @@ import { Button, Chip, Input, btnClass, btnShape, fieldClass } from '../common/C
 import Pagination from '../common/Pagination.jsx';
 import { HelpBadge } from '../../help/HelpMode';
 import { canCreateDataset } from './newDataset';
+import { useUnsavedWork } from '../../hooks/useUnsavedWork';
 import { settingsLinkHref } from '../common/settingsLinkHref';
 import { requestHelpTip } from '../../help/helpTips';
 import { contributions } from '../../plugins/registry.js';
@@ -223,6 +224,7 @@ function NewDatasetForm({ onCreate, onClose }) {
   // Concept only: what the captioner must OMIT from every caption so the concept binds to the
   // trigger, the inverse of a character LoRA. Required for concepts.
   const [conceptDesc, setConceptDesc] = useState('');
+  useUnsavedWork(!!(name.trim() || trigger.trim() || conceptDesc.trim()));
   // Character only: face fidelity (default) or face + body. Body mode excludes body markings from
   // captions and targets more body shots.
   const [fidelity, setFidelity] = useState('face');

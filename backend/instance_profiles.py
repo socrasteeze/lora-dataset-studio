@@ -143,7 +143,45 @@ class ProfileStore:
                 return row
         raise ProfileError('That profile is unavailable. Choose an existing profile.')
 
-    def create(self, name):
+    def selected(self):
+        path = self.home / 'selected.json'
+        if not path.exists():
+            return 'default'
+        try:
+            ident = json.loads(path.read_text(encoding='utf-8'))['id']
+            self.get(ident)
+            return ident
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            raise ProfileError('The selected profile is unavailable. Choose a profile with the recovery launcher.') from exc
+
+    def select(self, ident):
+        self.get(ident)
+        with FileLease(self.home / 'registry.lock'):
+            if not self.registry.exists():
+                _write_json(self.registry, {'version': 1, 'profiles': self.profiles()})
+            _write_json(self.home / 'selected.json', {'id': ident})
+
+    def request_switch(self, source, target):
+        self.get(source)
+        self.get(target)
+        _write_json(self.home / 'switch.json', {'source': source, 'target': target})
+
+    def consume_switch(self, source):
+        path = self.home / 'switch.json'
+        if not path.exists():
+            return None
+        try:
+            value = json.loads(path.read_text(encoding='utf-8'))
+            if value['source'] != source:
+                raise ValueError('stale switch request')
+            target = self.get(value['target'])['id']
+            self.select(target)
+            path.unlink()
+            return target
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            raise ProfileError('The profile switch could not be completed. Use the recovery launcher.') from exc
+
+    def create(self, name, *, config=None):
         name = str(name or '').strip()
         if not name or len(name) > 60 or any(ord(char) < 32 for char in name):
             raise ProfileError('Enter a profile name of 1 to 60 characters.')
@@ -161,7 +199,7 @@ class ProfileStore:
             base.mkdir(parents=True)
             for key in ('LDS_DATA_DIR', 'LDS_PLUGINS_DIR', 'LDS_EXTENSIONS_DIR'):
                 Path(paths[key]).mkdir()
-            Path(paths['LDS_CONFIG']).write_text('{}\n', encoding='utf-8')
+            Path(paths['LDS_CONFIG']).write_text(json.dumps(config or {}) + '\n', encoding='utf-8')
             Path(paths['LDS_ENV']).write_text('', encoding='utf-8')
             row = {'id': ident, 'name': name, 'port': port, 'paths': paths}
             _write_json(self.registry, {'version': 1, 'profiles': [*rows, row]})
@@ -241,16 +279,19 @@ def _check_unfinished_work(database):
 def prepare_runtime():
     """Acquire before app imports. Keep the returned lease for the process life."""
     store = ProfileStore()
-    ident = os.environ.get('LDS_PROFILE_ID', 'default')
+    ident = os.environ.get('LDS_PROFILE_ID') or store.selected()
     environment = store.child_environment(ident)
     # These belong to the current launcher, including supervised restart exit 75.
     for key in ('LDS_RESTART_MODE', 'LDS_SUPERVISOR'):
         if key in os.environ:
             environment[key] = os.environ[key]
     lease = FileLease(store.home / 'active.lock')
-    lease.__enter__()
+    transition = FileLease(store.home / 'transition.lock')
+    transition.__enter__()
     try:
+        lease.__enter__()
         store.check_other_work(ident)
+        store.select(ident)
         os.environ.update(environment)
         os.environ.pop('LDS_ALLOW_SECOND_INSTANCE', None)
         if ident != 'default':
@@ -260,6 +301,8 @@ def prepare_runtime():
     except Exception:
         lease.__exit__()
         raise
+    finally:
+        transition.__exit__()
 
 
 def public_profile():
