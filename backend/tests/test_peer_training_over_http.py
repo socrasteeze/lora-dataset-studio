@@ -91,11 +91,13 @@ class _PeerHandler(BaseHTTPRequestHandler):
         for key, value in (headers or {}).items():
             self.send_header(key, value)
         self.send_header('Content-Length', str(len(body)))
+        # The client can return as soon as headers arrive, before this handler
+        # resumes. Publish the status before making the response observable.
+        if self._record is not None:
+            self._record['status'] = status
         self.end_headers()
         if body:
             self.wfile.write(body)
-        if self._record is not None:
-            self._record['status'] = status
 
     def _json_out(self, status, payload):
         self._send(status, json.dumps(payload).encode('utf-8'),

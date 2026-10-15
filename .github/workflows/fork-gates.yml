@@ -51,7 +51,7 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Check Heartbeat and Missing Rows
+      - name: Check Heartbeat, Missing Rows and Peer HTTP
         shell: pwsh
         env:
           LDS_DATA_DIR: ${{ runner.temp }}/lds-heartbeat-data
@@ -73,7 +73,7 @@ jobs:
           } finally {
             Remove-Item -LiteralPath $heartbeatBaselinePath -ErrorAction SilentlyContinue
           }
-          .venv/Scripts/python.exe -X utf8 -m pytest backend/tests/test_gpu_window_close_race.py backend/tests/test_bank_forget_missing.py -q --basetemp "$env:RUNNER_TEMP/hb-current"
+          .venv/Scripts/python.exe -X utf8 -m pytest backend/tests/test_gpu_window_close_race.py backend/tests/test_bank_forget_missing.py backend/tests/test_peer_training_over_http.py -q --basetemp "$env:RUNNER_TEMP/hb-current"
 
       - name: Install Browser for Bank Checks
         run: node frontend/node_modules/playwright-core/cli.js install chromium
