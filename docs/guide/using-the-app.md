@@ -784,23 +784,34 @@ offered — it only gets a note saying it hasn't reported what it can run.
 
 Got several banks to clean? Instead of babysitting them one at a time, open a
 bank's Launch-all dialog from the Banks page and choose **Add to queue**. The
-**Launch-all queue** works through the banks one at a time **on each machine**,
+**Bank Queue** works through the banks one at a time **on each machine**,
 each one waiting its turn for the GPU rather than failing when another bank — or
 a training run — is using it. A panel on the Banks page shows what's running and
 what's lined up and names the machine each bank will run on. The ✕ on a
-waiting row removes that bank in one tap. **Clear waiting** removes every
-waiting bank and leaves the running one going; **Stop running** stops the
+waiting row removes that bank in one tap. **Clear Waiting** removes every
+waiting bank and leaves the running one going; **Stop Running** stops the
 running bank, keeps its finished steps and lets the next waiting bank start.
 Both ask first, and so does the ✕ on the running row, because it stops a run.
 Queue three exports before bed and they'll be triaged by morning.
 
-Work started inside a Bank also appears in this panel under **Active Passes**,
-even when no Launch-all pipeline is queued. It keeps its original pass settings
-and is separate from the waiting pipeline entries. A queued pipeline waits for
-active Bank work on the same machine to finish, including CPU work and time
-between GPU steps. A shared Bank or name group stays exclusive across machines.
-Use **Stop** on an active pass to stop that work, or **Stop running** to stop
-all displayed running work. **Clear waiting** leaves active passes running.
+Analysis passes, folder checks and **Launch all** started inside a Bank join
+this same queue. They wait for active Bank work on the same machine to finish,
+including CPU work and time between GPU steps. Their selected images, scope,
+redo flags, caption options and machine are saved across restarts. A Bank can
+have one queued entry at a time. Use Launch all to chain several passes.
+
+The workspace shows the waiting position and **Cancel Job** before the job
+starts. A failed workspace job stays in the queue with its error. **Retry**
+uses the saved options; **Remove** frees the Bank for a different job. Failed
+jobs do not block other Banks and are left in place by **Clear Waiting**.
+If selected images or the Bank were removed or replaced, submit a new job
+with a fresh selection.
+
+Imports, promotion and file deletion keep their existing action flows.
+Running work outside the queue also appears under **Active Passes**.
+Use **Stop** there to stop that work, or **Stop Running** to stop all displayed
+running work. **Clear Waiting** leaves active passes running. A shared Bank or
+name group stays exclusive across machines.
 
 **One lane per machine.** Everything aimed at this computer runs strictly in
 order — two banks never share the graphics card. A bank you sent to a compute

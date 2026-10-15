@@ -122,7 +122,7 @@ Point it at a messy dump of thousands of images and triage it in place. Nothing 
 
 **Select Banks** lets you rename, change grouping, move to another profile or delete several banks together. Profile moves preserve metadata and caches while source images stay in place. Review names before applying a batch; failed items remain available for retry. Deleting a bank preserves external source images. LDS-managed imported copies go to Trash. [Bulk bank management](docs/guide/using-the-app.md#manage-several-banks)
 
-**Active Passes** on the Bank list includes work started inside a Bank. Queued Launch-all pipelines wait for that machine's active Bank work to finish, including phases where the GPU is idle. **Stop running** covers both active passes and queued pipelines.
+Analysis passes and **Launch all** started inside a Bank use the same **Bank Queue** as the Bank list. They wait for that machine's active Bank work, including phases where the GPU is idle. Queued jobs retain their selected scope, model options and machine across restarts. Failed workspace jobs stay visible for **Retry** or **Remove**. **Stop Running** covers active passes and queued jobs.
 
 | Sub-feature | What it gets you |
 | :-- | :-- |

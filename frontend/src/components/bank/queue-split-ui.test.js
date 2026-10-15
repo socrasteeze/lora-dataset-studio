@@ -154,8 +154,8 @@ test('the queue panel splits Clear all into Clear waiting and Stop running', () 
   // One "Clear all" also cancelled the running pipeline, so tidying the line
   // stopped the bank mid-run. Each action now does one thing.
   assert.doesNotMatch(panel, />\s*Clear all\s*</);
-  assert.match(panel, /\{waiting > 0 && \([\s\S]*?Clear waiting/);
-  assert.match(panel, /\{running > 0 && \([\s\S]*?Stop running/);
+  assert.match(panel, /\{waiting > 0 && \([\s\S]*?Clear Waiting/);
+  assert.match(panel, /\{running > 0 && \([\s\S]*?Stop Running/);
   assert.match(page, /onClearWaiting=\{clearWaiting\} onStopRunning=\{stopRunning\}/);
 });
 

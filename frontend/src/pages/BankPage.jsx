@@ -331,7 +331,7 @@ export default function BankPage() {
       return { state: 'running' }
     }
     const it = queue?.items?.find((i) => i.bank_id === bank.id)
-    return it ? { state: it.state, position: it.position } : (queue ? null : bank.queue_state)
+    return it ? { state: it.state, position: it.position, operation: it.operation, error: it.error } : (queue ? null : bank.queue_state)
   }
 
   // Live folder preview (debounced), shared by both import modes.
@@ -600,8 +600,8 @@ export default function BankPage() {
     const id = dialogScope?.bankId
     setDialogScope(null)
     try {
-      await postJson(`/api/bank/${id}/pipeline`, config)
-      toast.success('Launch all started — Stop it any time from the bank.')
+      const d = await postJson(`/api/bank/${id}/pipeline`, config)
+      toast.success(`Added to the queue (position ${d.position}).`)
       open(id)
     } catch (e) {
       toast.error(e?.message || 'Could not start Launch all.')
@@ -636,6 +636,11 @@ export default function BankPage() {
     const ask = removeQueuedConfirm(live, nameOf, id)
     if (ask && !window.confirm(ask)) return
     try { await del(`/api/bank-queue/${id}`) } catch (e) { toast.error(e?.message || 'Could not update the queue.') }
+    refreshQueue()
+  }
+  const retryQueued = async (id) => {
+    try { await postJson(`/api/bank-queue/${id}/retry`, {}) }
+    catch (e) { toast.error(e?.message || 'Could not retry the job.') }
     refreshQueue()
   }
   // Clear waiting leaves the running bank alone: pending_only tells the server
@@ -810,7 +815,7 @@ export default function BankPage() {
           "GPU busy" flag — every bank is skipped and the night is wasted. The
           notice is silent unless the server says the flag has nothing behind it. */}
       <GpuBusyNotice onCleared={refreshQueue} />
-      <BankQueuePanel queue={queue} nameOf={nameOf} onCancel={cancelQueued} onStopDirect={stopDirect}
+      <BankQueuePanel queue={queue} nameOf={nameOf} onCancel={cancelQueued} onRetry={retryQueued} onStopDirect={stopDirect}
         onClearWaiting={clearWaiting} onStopRunning={stopRunning} />
       {/* Second way in: the scraper's own destination. A bank no longer needs a
           folder you prepared by hand — you can fill one straight from the web. */}
@@ -943,7 +948,7 @@ export default function BankPage() {
                 )}
                 {qs && (
                   <span className="rounded bg-indigo-500/15 px-1.5 py-px text-2xs font-semibold text-indigo-300">
-                    {qs.state === 'running' ? 'running' : `queued · #${qs.position}`}
+                    {qs.state === 'running' ? 'running' : qs.state === 'failed' ? 'Failed' : `queued · #${qs.position}`}
                   </span>
                 )}
                 {!selectingBanks && <button type="button" onClick={() => setRelocating(b)}

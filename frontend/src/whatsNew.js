@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-15-queued-workspace-jobs',
+    date: '2026-10-15',
+    title: 'Bank Jobs Wait',
+    blurb: 'Analysis passes and Launch all started inside a Bank now join the shared Bank Queue. Jobs keep their options, show their waiting position, and offer Retry or Remove if they fail.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-15-bank-queue-active-work',
     date: '2026-10-15',
     title: 'Visible Bank Work',

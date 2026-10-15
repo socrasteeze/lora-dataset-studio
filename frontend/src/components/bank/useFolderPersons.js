@@ -30,7 +30,8 @@ export function useFolderPersons({
     setFolderPersonBusy(true)
     try {
       const d = await call()
-      if (success) toast.success(success(d))
+      if (d?.queued) toast.success(`Added to the queue (position ${d.position}).`)
+      else if (success) toast.success(success(d))
       // The payload too, not only the grid: an assertion creates (or dissolves)
       // a person cluster, and the PEOPLE row above would otherwise keep showing
       // a group that no longer exists until the next poll.

@@ -517,12 +517,12 @@ def set_cancel_hook(job, hook):
         job['_cancel_hook'] = hook
 
 
-def cancel(bank_id) -> bool:
+def cancel(bank_id, *, expected_job=None) -> bool:
     """Flag the bank's live job as cancelled (and fire its hook). False when
     there is nothing to cancel."""
     with _lock:
         job = _jobs.get(bank_id)
-        if not job or job['finished']:
+        if not job or job['finished'] or (expected_job is not None and job is not expected_job):
             return False
         _log(bank_id, f"stop requested for {job['kind']}", 'warn',
              device=job.get('device'))

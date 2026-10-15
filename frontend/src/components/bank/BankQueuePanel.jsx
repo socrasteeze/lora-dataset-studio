@@ -2,7 +2,7 @@ import { HelpBadge } from '../../help/HelpMode'
 import { jobLabel } from './bankPassRun.js'
 import { runningItems, waitingItems } from './bankQueueActions.js'
 
-/** The cross-bank "Launch all" queue: which bank is running now and what is lined
+/** The cross-bank job queue: which bank is running now and what is lined
  * up behind it. Drains one bank at a time per machine (never a busy-GPU 503), so
  * a user can queue several banks and walk away. Names are resolved from the
  * loaded banks.
@@ -20,7 +20,7 @@ const ROW = 'group flex items-center gap-2 rounded-md px-1 text-sm transition-co
   + 'hover:bg-surface-raised focus-within:bg-surface-raised active:bg-surface-raised '
   + 'has-[:active]:bg-surface-raised'
 
-export default function BankQueuePanel({ queue, nameOf, onCancel, onClearWaiting, onStopRunning, onStopDirect }) {
+export default function BankQueuePanel({ queue, nameOf, onCancel, onRetry, onClearWaiting, onStopRunning, onStopDirect }) {
   const active = queue?.active_jobs || []
   const queued = queue?.items || []
   if (!queued.length && !active.length) return null
@@ -29,7 +29,7 @@ export default function BankQueuePanel({ queue, nameOf, onCancel, onClearWaiting
   return (
     <div className="rounded-lg border border-indigo-400/40 bg-indigo-500/10 p-4 space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-sm font-semibold text-content">⏳ Launch-all queue</h2>
+        <h2 className="text-sm font-semibold text-content">⏳ Bank Queue</h2>
         <HelpBadge topic="bank-launch-queue" />
         <span className="text-xs text-content-muted">{queued.length} in line</span>
         <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
@@ -37,14 +37,14 @@ export default function BankQueuePanel({ queue, nameOf, onCancel, onClearWaiting
             <button type="button" onClick={onClearWaiting}
               title="Remove every waiting bank. The running bank keeps going."
               className={`${ACTION} border-border text-content-muted hover:text-content hover:bg-surface-raised`}>
-              Clear waiting
+              Clear Waiting
             </button>
           )}
           {running > 0 && (
             <button type="button" onClick={onStopRunning}
               title="Stop the running bank. Its finished steps are kept."
               className={`${ACTION} border-rose-400/50 text-rose-300 hover:bg-rose-500/15`}>
-              Stop running
+              Stop Running
             </button>
           )}
         </div>
@@ -71,8 +71,11 @@ export default function BankQueuePanel({ queue, nameOf, onCancel, onClearWaiting
             <span className="w-5 shrink-0 text-right text-content-subtle">{it.position}.</span>
             <span className="flex min-w-0 grow flex-wrap items-center gap-x-2 gap-y-0.5">
               <span className="min-w-0 max-w-full truncate font-medium text-content">{nameOf(it.bank_id)}</span>
+              <span className="text-xs text-content-muted">{jobLabel(it.operation || 'pipeline')}</span>
               {it.state === 'running' ? (
                 <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-px text-2xs font-semibold text-emerald-300">running</span>
+              ) : it.state === 'failed' ? (
+                <span className="shrink-0 rounded bg-rose-500/15 px-1.5 py-px text-2xs font-semibold text-rose-300">Failed</span>
               ) : (
                 <span className="shrink-0 rounded bg-surface-raised px-1.5 py-px text-2xs font-semibold text-content-muted">waiting</span>
               )}
@@ -93,7 +96,13 @@ export default function BankQueuePanel({ queue, nameOf, onCancel, onClearWaiting
                   {it.waiting_for}
                 </span>
               )}
+              {it.state === 'failed' && it.error && (
+                <span className="w-full break-words text-xs text-rose-300">{it.error}</span>
+              )}
             </span>
+            {it.state === 'failed' && <button type="button" onClick={() => onRetry(it.bank_id)}
+              aria-label={`Retry ${nameOf(it.bank_id)}`}
+              className={`${ACTION} shrink-0 border-indigo-400/50 text-indigo-200`}>Retry</button>}
             {/* A small glyph in a finger-sized box: 40 px below lg, compact on
                 a desktop. */}
             <button type="button" onClick={() => onCancel(it.bank_id)}

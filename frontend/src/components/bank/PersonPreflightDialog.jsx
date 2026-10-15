@@ -5,6 +5,7 @@ import {
   savingLine, skipNote, togglePicked,
 } from './personPreflight.js'
 import { HelpBadge } from '../../help/HelpMode'
+import { queueJobActive } from './bankQueueActions.js'
 
 /** 👤 The preflight of 👤 Group by person — shown at LAUNCH time, standalone or
  *  on the way into 🚀 Launch all.
@@ -23,7 +24,7 @@ import { HelpBadge } from '../../help/HelpMode'
  *  All the wording lives in personPreflight.js so `node --test` can prove it.
  */
 export default function PersonPreflightDialog({
-  plan: initialPlan, probing, activity, reload, onProceed, onStopProbe, onCancel,
+  plan: initialPlan, probing, activity, queueState, reload, onProceed, onStopProbe, onCancel,
 }) {
   const [plan, setPlan] = useState(initialPlan)
   // 'probing' — the sample job is running · 'choose' — the answer is on screen
@@ -42,8 +43,10 @@ export default function PersonPreflightDialog({
   const notReached = notReachedLine(plan)
 
   const kind = activity?.kind
-  const jobLive = !!activity && !activity.finished && kind === 'folder-preflight'
-  const jobDone = kind === 'folder-preflight' && !!activity?.finished
+  const queued = queueState?.operation === 'folder-preflight' ? queueState : null
+  const jobLive = queueJobActive(queued) || (!!activity && !activity.finished && kind === 'folder-preflight')
+  const jobDone = !queueJobActive(queued) && (queued?.state === 'failed'
+    || (kind === 'folder-preflight' && !!activity?.finished))
   if (jobLive) sawJob.current = true
 
   /* The probe landed → pull the fresh verdicts and pre-tick the good ones.
@@ -55,7 +58,7 @@ export default function PersonPreflightDialog({
     const settled = jobDone || (sawJob.current && !jobLive)
     if (!settled) return
     settling.current = true
-    const failed = activity?.error
+    const failed = queued?.error || activity?.error
     Promise.resolve(reload ? reload() : plan)
       .then((fresh) => { if (fresh) setPlan(fresh) })
       .catch(() => {})
@@ -126,7 +129,8 @@ export default function PersonPreflightDialog({
         {phase !== 'choose' ? (
           <div className="lds-section py-3 text-sm space-y-1">
             <p className="font-semibold text-content">
-              {phase === 'stopping' ? 'Stopping the check' : 'Checking your folders'}
+              {phase === 'stopping' ? 'Stopping the check' : queued?.state === 'pending'
+                ? `Waiting in queue · #${queued.position}` : 'Checking your folders'}
             </p>
             <p className="text-content-muted">{preflightCostLine(plan)}</p>
             {activity && !activity.finished && (

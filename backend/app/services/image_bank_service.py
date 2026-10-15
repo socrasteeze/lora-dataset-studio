@@ -3118,6 +3118,7 @@ def bank_payload(user_id, bank_id) -> dict | None:
         'clusters': clusters, 'faces_scanned': faces_scanned,
         'style_clusters': style_clusters,
         'activity': bank_jobs.get(bank_id),
+        'queue_state': bank_queue.state_for(bank_id),
         # ↩ the one-step-back offer, so the bar survives a reload (the decision
         # it takes back is in the database, not in a tab).
         'undo': bank_undo.peek(bank_id),
@@ -3154,7 +3155,7 @@ def bank_activity(user_id, bank_id) -> dict | None:
     """
     if not get_bank(user_id, bank_id):
         return None
-    return {'activity': bank_jobs.get(bank_id)}
+    return {'activity': bank_jobs.get(bank_id), 'queue_state': bank_queue.state_for(bank_id)}
 
 
 def flag_preview(user_id, bank_id, overrides=None) -> dict | None:

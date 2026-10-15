@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  clearWaitingConfirm, removeQueuedConfirm, runningItems, stopRunningConfirm, waitingItems,
+  clearWaitingConfirm, queueJobActive, removeQueuedConfirm, runningItems, stopRunningConfirm, waitingItems,
 } from './bankQueueActions.js'
 
 const NAMES = { 1: 'Alpha', 2: 'Bravo', 3: 'Charlie', 4: 'Delta' }
@@ -16,6 +16,20 @@ test('waiting and running are split by state', () => {
   assert.deepEqual(waitingItems(q).map((i) => i.bank_id), [2, 3])
   assert.deepEqual(runningItems(null), [])
   assert.deepEqual(waitingItems(undefined), [])
+})
+
+test('failed jobs stay visible without being cleared as waiting work', () => {
+  const q = queue('failed', 'pending')
+  assert.deepEqual(waitingItems(q).map((i) => i.bank_id), [2])
+  assert.equal(clearWaitingConfirm(queue('failed')), null)
+  assert.equal(stopRunningConfirm(queue('failed'), nameOf), null)
+})
+
+test('activity polling follows pending and running queue states', () => {
+  assert.equal(queueJobActive({ state: 'pending' }), true)
+  assert.equal(queueJobActive({ state: 'running' }), true)
+  assert.equal(queueJobActive({ state: 'failed' }), false)
+  assert.equal(queueJobActive(null), false)
 })
 
 test('Stop running includes direct workspace work while Clear waiting keeps it', () => {
