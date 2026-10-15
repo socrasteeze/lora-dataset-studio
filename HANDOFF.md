@@ -1,29 +1,26 @@
 # HANDOFF
 
-**Updated:** 2026-10-15 | **Target:** main | **Delivery base:** 279d02539 | **Task branch:** noble/profile-popup-bank-moves
+**Updated:** 2026-10-15 | **Target:** main | **Delivery base:** 50b7bc8d9 | **Task branch:** noble/bulk-bank-profile-moves
 
 ## State
 
-The in-app Profiles popup and verified Bank profile moves extend the named-profile implementation already on main. The operator explicitly authorized a clean push to main without tests. Source and rebuilt frontend are separate delivery commits.
+Bulk Move to Profile in the Bank list extends the in-app profile popup and verified single-Bank transfer already delivered on main. The operator explicitly authorized a clean push to main without tests. Source and rebuilt frontend are separate delivery commits.
 No local or cloud tests, responsive probes, application imports, live profile switches or real Bank moves ran for this change. The live runtime and profile registry remain untouched by implementation work.
 
 ## Done this session
 
-- Added Profiles to desktop Settings navigation and mobile navigation. The shared in-app popup creates profiles, switches through the supervisor and reconnects to the exact destination identity.
-- Normal `start.bat` opens the last selected profile, starting with Default. The optional Tk picker remains a recovery path via `LDS_PROFILE_PICKER=1` or the existing CLI.
-- Added a shared admission reservation for profile transitions. It refuses active requests, unsaved edits, running jobs and queued work, and prevents a second backend from starting during a move.
-- Added Move to Profile in the Bank workspace. All persistent Bank tables and columns are copied, identifiers are remapped, and metadata/cache hashes are verified before source records are removed. Source images stay in place, including imported Bank source folders.
-- Preserved cleaned/rotated/edited files, edit histories, manual collection undo, folder assertions/probes, NPZ embeddings and bulk decision undo within its original expiry. Rebound cache paths and folder evidence signatures without rerunning inference.
-- Missing collection members use negative aliases after a move so numeric ID reuse cannot attach unrelated images. Remove and Split accept those existing aliases; adding an image still requires a positive live image ID.
-- Cross-profile promotion links become explicit history; they cannot bind unrelated destination IDs. Source dataset images keep their own files, captions and recorded Bank origin.
-- Added durable retry receipts and retained source working-cache recovery copies under Bank working storage. Destination collisions, unsupported schema, links/junctions and changed copies are refused. Target profiles with old additive columns must be opened once before moving into them.
-- Updated the Guide, help registry, reserved anchors and What's New. Added synthetic regression coverage for moves/recovery and profile API/supervisor behavior. These tests are authored but unrun.
-- Ruff, ESLint, frontend build, whitespace and privacy scans passed. ESLint retains 32 existing warnings. Privacy: 2,997 text files, zero findings. Attribution matches are legitimate code, fixtures or project documentation.
+- Added Move to Profile beside Edit Banks and Delete Banks in the list selection toolbar. Existing selection spans pages and filters and keeps its 500-Bank limit. Narrow layouts use two columns; wider layouts keep the actions on one row.
+- Extended the existing Profiles popup with a stable selection snapshot, Bank progress/results and destination creation before the first submission. The destination stays fixed during retries.
+- Each Bank uses the existing verified transfer endpoint sequentially. The backend still owns metadata preservation, cache verification, ID rebinding, promotion history and recovery. Source images stay in place. No backend or schema change was needed.
+- Acknowledged moves leave the source list and selection immediately. Failed, unconfirmed and unprocessed Banks remain selected. Retry skips acknowledged moves and reuses the same operation IDs. A failed move or invalid acknowledgement stops the batch before the next Bank so later promotion-history changes cannot invalidate an unfinished transfer snapshot.
+- Protected busy/unconfirmed moves against navigation and browser exit. Paused the Bank list queue poll while the profile popup is open so it does not contend with the transfer gate.
+- Updated both Guide topics, README, help search terms and What's New. Added synthetic unit coverage for sequential execution, partial failures, exact retries and invalid acknowledgements, plus bulk popup render coverage. Tests are authored but unrun.
+- Ruff, ESLint, frontend build, whitespace and privacy scans passed. ESLint retains 32 existing warnings. Privacy: 2,999 text files, zero findings. Attribution matches are legitimate code, fixtures or project documentation.
 
 ## Open
 
 1. The operator will test on another machine. Do not start or resume local or cloud suites without a new instruction. Commands below are for that machine only.
-2. Profile switching, Bank move/recovery, full Gates and populated responsive behavior remain unqualified by runtime tests. The optional private-name check is unverified. This landing is an explicit operator exception, not a full qualification.
+2. Bulk selection/move/retry, profile switching, Bank move/recovery, full Gates and populated responsive behavior remain unqualified by runtime tests. The optional private-name check is unverified. This landing is an explicit operator exception, not a full qualification.
 3. Fully stop Studio after saving edits and finishing work, then run `start.bat`. An old supervisor cannot enable the new in-app switching protocol through a backend-only restart. Desktop picker and physical phone/PWA acceptance remain operator checks.
 4. Prior cloud runs `38777264998` and `38777264930` were cancelled. Historical frontend results on `51ef21b88` do not qualify the current delivery.
 
@@ -34,6 +31,7 @@ No local or cloud tests, responsive probes, application imports, live profile sw
 - Switching starts from an embedded popup and uses a controlled backend restart. It never terminates jobs. A supervisor capability marker prevents an older supervisor from accepting a request it cannot consume.
 - Moving a Bank changes profile ownership of metadata and working files. Its original source directory remains a live dependency. The source working cache is retained for recovery and is not automatically purged.
 - A move into a profile that already contains this Bank or the same source folder/scope is refused; metadata is never silently merged. Profile thresholds remain independent.
+- Bulk moves commit one Bank at a time and can partly succeed. Resolve a failed or uncertain move through its existing receipt before moving the next Bank.
 - Source and bundles remain separate commits. This delivery uses `[skip ci]` under the operator's explicit instruction to publish without running tests.
 
 ## Traps
@@ -75,6 +73,7 @@ From frontend:
 
 ```powershell
 node --import ./scripts/registerSdk.mjs --test tests/instance-profile-render.test.mjs tests/dataset-storage-render.test.mjs
+node --import ./scripts/registerSdk.mjs --test src/components/bank/bankProfileMove.test.js src/components/bank/bankBulk.test.js
 npm test
 npm run lint
 npm run build

@@ -50,3 +50,19 @@ test('the Bank move popup explains file preservation before submission', () => {
   assert.match(html, /after verification/);
   assert.doesNotMatch(html, /Switch Profile/);
 });
+
+test('the bulk move popup shows the complete selected set before submission', () => {
+  const html = render(ProfileDialog, {
+    banks: [
+      { id: 1, instance_id: 'a'.repeat(32), name: 'Example One' },
+      { id: 2, instance_id: 'b'.repeat(32), name: 'Example Two' },
+    ], onClose() {}, onResults() {},
+  });
+  assert.match(html, /Move Banks/);
+  assert.match(html, /2 of 2 banks remain/);
+  assert.match(html, /Example One/);
+  assert.match(html, /Example Two/);
+  assert.match(html, /Bank Move Results/);
+  assert.match(html, /Source images stay in place/);
+  assert.doesNotMatch(html, /Switch Profile/);
+});

@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import { apiFetch, postJson } from '../../api/fetchClient'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
 import { hasUnsavedWork, useUnsavedWork } from '../../hooks/useUnsavedWork'
+import { bankSelectionKey, successfulBulkKeys } from '../bank/bankBulk.js'
+import { createBankMoveBatch, runBankMoveBatch } from '../bank/bankProfileMove.js'
 import { Button, Input } from './Controls.jsx'
 
 function operationId() {
@@ -10,18 +12,59 @@ function operationId() {
     (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
-export default function ProfileDialog({ onClose, bank = null, onMoved }) {
+export default function ProfileDialog({ onClose, bank = null, banks = null, onMoved, onResults }) {
   const dialog = useRef(null)
   const operation = useRef(null)
+  const batch = useRef(null)
+  const submitting = useRef(false)
+  const navigation = useRef({})
+  const bulk = banks !== null
+  const [moveBanks] = useState(() => (banks || []).map((row) => ({
+    id: row.id, instance_id: row.instance_id, name: row.name,
+  })))
+  const [moveResults, setMoveResults] = useState([])
+  const [progress, setProgress] = useState(null)
+  const [targetLocked, setTargetLocked] = useState(false)
+  const [networkUnknown, setNetworkUnknown] = useState(false)
   const [catalog, setCatalog] = useState(null)
   const [selected, setSelected] = useState('')
   const [name, setName] = useState('')
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [destination, setDestination] = useState('')
-  const moving = !!bank
+  const moving = !!bank || bulk
+  const succeeded = successfulBulkKeys(moveResults)
+  const resultsByBank = new Map(moveResults.map((row) => [bankSelectionKey(row), row]))
+  const remaining = moveBanks.filter((row) => !succeeded.has(bankSelectionKey(row)))
+  navigation.current = { busy, networkUnknown, name }
   useFocusTrap(dialog)
-  useUnsavedWork(!!name.trim() || busy === 'moving' || busy === 'creating')
+  useUnsavedWork(!!name.trim() || busy === 'moving' || busy === 'creating' || networkUnknown)
+
+  useEffect(() => {
+    if (!bulk) return undefined
+    const previousOverflow = document.body.style.overflow
+    const entryUrl = window.location.href
+    let restoring = false
+    document.body.style.overflow = 'hidden'
+    const guardNavigation = (event) => {
+      if (restoring) return
+      const state = navigation.current
+      if (!submitting.current && !state.busy && !state.networkUnknown && !state.name.trim()) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      restoring = true
+      history.pushState(null, '', entryUrl)
+      window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }))
+      setTimeout(() => { restoring = false }, 0)
+    }
+    window.addEventListener('popstate', guardNavigation, true)
+    window.addEventListener('hashchange', guardNavigation, true)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('popstate', guardNavigation, true)
+      window.removeEventListener('hashchange', guardNavigation, true)
+    }
+  }, [bulk])
 
   useEffect(() => {
     let live = true
@@ -31,21 +74,23 @@ export default function ProfileDialog({ onClose, bank = null, onMoved }) {
   }, [])
 
   const close = () => {
-    if (busy) return
+    if (busy || submitting.current) return
     if (name.trim()) { setError('Create this profile or clear its name before closing.'); return }
+    if (networkUnknown && !window.confirm('Close with an unresolved move? Keep this popup open to retry.')) return
     onClose()
   }
 
   const create = async (event) => {
     event.preventDefault()
-    if (!name.trim() || busy) return
+    if (!name.trim() || busy || submitting.current || targetLocked) return
+    submitting.current = true
     setBusy('creating'); setError('')
     try {
       const result = await postJson('/api/profiles', { name: name.trim() })
       setCatalog((previous) => ({ ...previous, profiles: [...previous.profiles, result.profile] }))
       setSelected(result.profile.id); setName('')
     } catch (failure) { setError(failure.message || 'The profile could not be created.') }
-    finally { setBusy('') }
+    finally { submitting.current = false; setBusy('') }
   }
 
   const reconnect = async (url, profileId) => {
@@ -69,12 +114,29 @@ export default function ProfileDialog({ onClose, bank = null, onMoved }) {
   }
 
   const apply = async () => {
-    if (!selected || busy) return
+    if (!selected || busy || submitting.current) return
     if (name.trim()) { setError('Create the new profile or clear its name first.'); return }
-    if (hasUnsavedWork()) { setError('Save or discard open edits before changing profiles.'); return }
+    if (!(bulk && targetLocked) && hasUnsavedWork()) { setError('Save or discard open edits before changing profiles.'); return }
+    submitting.current = true
     setError(''); setBusy(moving ? 'moving' : 'switching')
     try {
-      if (moving) {
+      if (bulk) {
+        if (!batch.current) batch.current = createBankMoveBatch(moveBanks, selected, operationId)
+        setTargetLocked(true)
+        setNetworkUnknown(false)
+        const results = await runBankMoveBatch(batch.current, {
+          post: postJson,
+          onProgress: setProgress,
+          onResult: (result) => {
+            setMoveResults((previous) => [...previous.filter((row) => bankSelectionKey(row) !== bankSelectionKey(result)), result])
+            if (result.ok) onResults?.([result])
+          },
+        })
+        setNetworkUnknown(results.some((row) => row.unknown))
+        if (batch.current.completed.size === batch.current.items.length) onClose()
+        else if (!results.some((row) => row.unknown)) setError('Some Banks still need attention. Retry continues with the remaining Banks.')
+        setBusy('')
+      } else if (moving) {
         if (!operation.current || operation.current.profile !== selected) {
           operation.current = { profile: selected, id: operationId() }
         }
@@ -93,6 +155,7 @@ export default function ProfileDialog({ onClose, bank = null, onMoved }) {
         await reconnect(url.toString(), result.profile_id)
       }
     } catch (failure) { setError(failure.message || 'The profile action did not complete.'); setBusy('') }
+    finally { submitting.current = false }
   }
 
   const current = catalog?.profiles.find((profile) => profile.id === catalog.current)
@@ -108,9 +171,10 @@ export default function ProfileDialog({ onClose, bank = null, onMoved }) {
             : 'One profile runs at a time. Switching restarts Studio after running work has finished.'}
         </p>
         <p className="mt-2 break-words text-xs text-content-subtle">Current: {current?.name || 'Loading'}</p>
-        {moving && <p className="mt-2 break-words text-sm font-medium text-content">{bank.name}</p>}
+        {bank && <p className="mt-2 break-words text-sm font-medium text-content">{bank.name}</p>}
+        {bulk && <p className="mt-2 text-sm text-content-muted">{remaining.length} of {moveBanks.length} banks remain.</p>}
         <label htmlFor="profile-destination" className="mt-4 block text-sm font-medium text-content">Destination</label>
-        <select id="profile-destination" value={selected} disabled={!!busy}
+        <select id="profile-destination" value={selected} disabled={!!busy || targetLocked}
           onChange={(event) => { setSelected(event.target.value); setError(''); setDestination('') }}
           className="mt-1 min-h-10 w-full min-w-0 rounded-md border border-border bg-surface-raised px-3 text-sm text-content">
           <option value="">{choices.length ? 'Choose a profile' : 'Create a profile below'}</option>
@@ -119,9 +183,9 @@ export default function ProfileDialog({ onClose, bank = null, onMoved }) {
         <form onSubmit={create} className="mt-4 border-t border-border pt-3">
           <label htmlFor="profile-name" className="block text-sm font-medium text-content">New Profile</label>
           <div className="mt-1 flex min-w-0 flex-col gap-2 sm:flex-row">
-            <Input id="profile-name" value={name} maxLength={60} disabled={!!busy}
+            <Input id="profile-name" value={name} maxLength={60} disabled={!!busy || targetLocked}
               onChange={(event) => setName(event.target.value)} className="min-w-0 flex-1" />
-            <Button type="submit" disabled={!!busy || !name.trim() || !catalog}>
+            <Button type="submit" disabled={!!busy || targetLocked || !name.trim() || !catalog}>
               {busy === 'creating' ? 'Creating' : 'Create Profile'}
             </Button>
           </div>
@@ -132,17 +196,30 @@ export default function ProfileDialog({ onClose, bank = null, onMoved }) {
         {moving && <p className="mt-3 text-xs text-content-subtle">
           The Bank leaves this profile after verification. Existing promotions stay recorded as history. A recovery copy of the working cache is retained.
         </p>}
+        {bulk && <ul aria-label="Bank Move Results" className="mt-3 max-h-48 space-y-2 overflow-y-auto text-sm">
+          {moveBanks.map((row) => {
+            const result = resultsByBank.get(bankSelectionKey(row))
+            return <li key={bankSelectionKey(row)} className="break-words">
+              <span className="font-medium text-content">{row.name}</span>
+              <span className={`block text-xs ${result?.ok ? 'text-emerald-300' : result ? 'text-rose-200' : 'text-content-subtle'}`}>
+                {result?.ok ? 'Moved' : result ? result.error : 'Pending'}
+              </span>
+            </li>
+          })}
+        </ul>}
+        {targetLocked && <p className="mt-2 text-xs text-content-subtle">Retry skips confirmed moves and keeps this destination.</p>}
+        {networkUnknown && <p role="alert" className="mt-2 text-sm text-amber-200">The last move result is unknown. Retry verifies that Bank before continuing.</p>}
         {error && <p role="alert" className="mt-3 rounded-md border border-rose-500/50 bg-rose-500/10 p-3 text-sm text-rose-200">{error}</p>}
         {destination && !busy && <a href={destination} className="mt-2 inline-flex min-h-10 items-center text-sm text-content underline">Open Profile</a>}
         {busy && <p role="status" aria-live="polite" className="mt-3 text-sm text-content-muted">
-          {busy === 'moving' ? 'Copying and verifying metadata and caches. Keep this dialog open.'
+          {busy === 'moving' ? <>{progress && `${progress.processed} / ${progress.total} banks processed. `}Copying and verifying metadata and caches. Keep this dialog open.</>
             : busy === 'switching' ? 'Restarting the selected profile.' : 'Creating the profile.'}
         </p>}
         <div className="mt-4 flex gap-2">
           <Button type="button" onClick={close} disabled={!!busy} className="flex-1">Cancel</Button>
           <Button type="button" variant="primary" onClick={apply} className="flex-1"
-            disabled={!!busy || !selected || (!moving && !catalog?.can_switch)}>
-            {moving ? 'Move Bank' : 'Switch Profile'}
+            disabled={!!busy || !selected || (bulk && !remaining.length) || (!moving && !catalog?.can_switch)}>
+            {bulk ? targetLocked ? 'Retry Moves' : 'Move Banks' : moving ? 'Move Bank' : 'Switch Profile'}
           </Button>
         </div>
       </section>

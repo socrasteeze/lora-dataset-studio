@@ -106,6 +106,16 @@ Open a Bank and choose **Move to Profile** in its action bar. Select another
 profile, or create one in the popup, then choose **Move Bank**. Finish work and
 save open edits first. The destination profile stays inactive during the move.
 
+To move several Banks, open the Bank list and choose **Select Banks**. Select
+the Banks, then choose **Move to Profile** and **Move Banks**. Selection spans
+pages and filters, up to 500 Banks. Finish running work and clear queues first.
+Each Bank moves independently through the same verified transfer path. The popup
+shows progress and per-Bank results. Confirmed moves leave the source list and
+selection; failed or unconfirmed moves remain available for retry. Retry keeps
+the same destination and operation identities. A failed move or lost response
+stops the batch before the next Bank. Resolve the error and choose **Retry Moves**
+to verify the recorded move before continuing.
+
 The move preserves Bank and image identities, captions, tags, scores, decisions,
 analysis groups, manual collections, folder assertions, saved reports, edit
 history and cached analysis. It copies cleaned, rotated and edited working

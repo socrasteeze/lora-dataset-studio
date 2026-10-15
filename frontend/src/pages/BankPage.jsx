@@ -35,6 +35,7 @@ import BankLaneTabs from '../components/bank/BankLaneTabs'
 import { bankListOverview, bankListSummaryLine } from '../components/bank/bankOverview.js'
 import BankBulkDialog from '../components/bank/BankBulkDialog.jsx'
 import BankBulkDeleteDialog from '../components/bank/BankBulkDeleteDialog.jsx'
+import ProfileDialog from '../components/common/ProfileDialog.jsx'
 import { BANK_BULK_LIMIT, bankSelectionKey, bulkSelectionNote, selectVisibleBanks, successfulBulkKeys } from '../components/bank/bankBulk.js'
 
 const CURRENT_KEY = 'bankCurrentId'
@@ -318,11 +319,11 @@ export default function BankPage() {
   // spun-down drive. The live "queued/running" badge is derived from this snapshot
   // instead, so it stays current for free.
   useEffect(() => {
-    if (currentId != null) return undefined
+    if (currentId != null || bulkDialog === 'profile') return undefined
     refreshQueue()
     const t = setInterval(refreshQueue, 2000)
     return () => clearInterval(t)
-  }, [currentId, refreshQueue])
+  }, [currentId, refreshQueue, bulkDialog])
   // bank_id -> {state, position} from the polled queue, falling back to the
   // server's queue_state on the bank row (first paint, before the first poll).
   const queueStateOf = (bank) => {
@@ -860,9 +861,11 @@ export default function BankPage() {
               <span className="sm:ml-auto">Limit {BANK_BULK_LIMIT}</span>
             </div>
             {selectedBankRows.length > 0 && (
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <button type="button" onClick={() => setBulkDialog('edit')}
                   className={`${btnClass({ size: 'md' })} w-full border-indigo-400/50 text-indigo-200`}>Edit Banks</button>
+                <button type="button" onClick={() => setBulkDialog('profile')}
+                  className={`${btnClass({ size: 'md' })} w-full border-indigo-400/50 text-indigo-200`}>Move to Profile</button>
                 <button type="button" onClick={() => setBulkDialog('delete')}
                   className={`${btnClass({ size: 'md' })} w-full border-rose-500/60 text-rose-200`}>Delete Banks</button>
               </div>
@@ -998,6 +1001,11 @@ export default function BankPage() {
 
       {bulkDialog === 'delete' && (
         <BankBulkDeleteDialog banks={selectedBankRows} onClose={() => setBulkDialog(null)}
+          onResults={(results) => applyBulkResults(results, true)} />
+      )}
+
+      {bulkDialog === 'profile' && (
+        <ProfileDialog banks={selectedBankRows} onClose={() => setBulkDialog(null)}
           onResults={(results) => applyBulkResults(results, true)} />
       )}
 
