@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  TAG_FACETS, facetMenuState, facetOf, groupTags, label, selectedTags, tagsParam,
-  toggleWd14Tag, wd14TagsParam,
+  TAG_FACETS, facetMenuState, facetOf, groupTags, label, matchingTagOptions, selectedTags, tagsParam,
+  selectWd14Tags, toggleWd14Tag, wd14TagsParam,
 } from './bankTagFacets.js';
 
 const counts = (pairs) => pairs.map(([name, count]) => ({ name, count }));
@@ -81,6 +81,52 @@ test('facetOf: unknown tags have no facet', () => {
   assert.equal(facetOf(null), null);
 });
 
+test('Other Tags search accepts canonical and displayed names without changing counts or order', () => {
+  const { other } = groupTags(counts([
+    ['synthetic_blue_scarf', 2], ['synthetic_red_scarf', 8], ['synthetic_blue_boots', 3],
+  ]));
+  const snapshot = structuredClone(other);
+  for (const query of [' BLUE ', 'blue', 'synthetic_blue', 'synthetic   blue']) {
+    assert.deepEqual(matchingTagOptions(other, query).map(({ name, count }) => [name, count]), [
+      ['synthetic_blue_boots', 3], ['synthetic_blue_scarf', 2],
+    ]);
+  }
+  assert.deepEqual(matchingTagOptions(other, ''), other);
+  assert.deepEqual(matchingTagOptions(other, 'no match'), []);
+  assert.deepEqual(matchingTagOptions(null, 'blue'), []);
+  assert.deepEqual(other, snapshot);
+});
+
+test('uncategorized selections remain OR alternatives when the menu search hides them', () => {
+  const { other } = groupTags(counts([
+    ['synthetic_blue_scarf', 2], ['synthetic_red_scarf', 8],
+  ]));
+  const selected = toggleWd14Tag(['blonde_hair'], 'synthetic_blue_scarf');
+  assert.deepEqual(matchingTagOptions(other, 'red').map(({ name }) => name), ['synthetic_red_scarf']);
+  assert.equal(wd14TagsParam(selected), 'blonde_hair,synthetic_blue_scarf');
+  const both = toggleWd14Tag(selected, 'synthetic_red_scarf');
+  assert.equal(wd14TagsParam(both), 'blonde_hair,synthetic_blue_scarf|synthetic_red_scarf');
+  assert.deepEqual(toggleWd14Tag(both, 'synthetic_blue_scarf'), ['blonde_hair', 'synthetic_red_scarf']);
+});
+
+test('Select All adds every search match beyond the visible page and preserves earlier picks', () => {
+  const { other } = groupTags(counts([
+    ...Array.from({ length: 150 }, (_, index) => [`synthetic_blue_${index}`, 1]),
+    ['synthetic_red_scarf', 4],
+  ]));
+  const matching = matchingTagOptions(other, 'blue');
+  const earlier = ['blonde_hair', 'synthetic_red_scarf', matching[0].name];
+  const selected = selectWd14Tags(earlier, matching.map(({ name }) => name));
+  assert.equal(matching.length, 150);
+  assert.equal(selected.length, 152);
+  assert.ok(matching.every(({ name }) => selected.includes(name)));
+  assert.ok(selected.includes('synthetic_red_scarf'));
+  assert.equal(wd14TagsParam(selected).split(',').length, 2);
+  assert.deepEqual(selectWd14Tags(selected, matching.map(({ name }) => name)), selected);
+  assert.deepEqual(earlier, ['blonde_hair', 'synthetic_red_scarf', matching[0].name]);
+  assert.deepEqual(selectWd14Tags([' SHIRT '], ['shirt', '', ' CUSTOM_TAG ']), ['shirt', 'custom_tag']);
+});
+
 test('selectedTags: empty picks are dropped, values are canonical and deduped', () => {
   assert.deepEqual(
     selectedTags({ hair_color: 'Blonde_Hair', top: '', eye_color: null }, [' shirt ', 'shirt']),
@@ -104,8 +150,10 @@ test('wd14TagsParam ORs one facet and ANDs different facets', () => {
   assert.equal(
     wd14TagsParam(['shirt', 'brown_hair', 'blonde_hair']),
     'brown_hair|blonde_hair,shirt');
-  // A tag no facet claims stays its own AND term.
+  // Uncategorized tags form one OR group, separate from the categories.
   assert.equal(wd14TagsParam(['blonde_hair', 'A_Custom']), 'blonde_hair,a_custom');
+  assert.equal(wd14TagsParam(['A_Custom', 'B_Custom']), 'a_custom|b_custom');
+  assert.equal(wd14TagsParam(['shirt', 'A_Custom', 'B_Custom']), 'shirt,a_custom|b_custom');
   assert.equal(wd14TagsParam(['blonde_hair', 'Blonde_Hair']), 'blonde_hair');
 });
 

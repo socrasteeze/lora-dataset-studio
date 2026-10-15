@@ -44,10 +44,12 @@ function wd14Parts(names) {
     if (words.length === 1) out.push(`🔖 ${words[0]}`)
     else if (words.length > 1) out.push(`🔖 ${words.join(' or ')}`)
   }
+  const other = []
   for (const raw of names || []) {
     const name = String(raw || '')
-    if (name && !claimed.has(name)) out.push(`🔖 ${name.replace(/_/g, ' ')}`)
+    if (name && !claimed.has(name)) other.push(name.replace(/_/g, ' '))
   }
+  if (other.length) out.push(`🔖 ${other.join(' or ')}`)
   return out
 }
 

@@ -16,13 +16,14 @@ test('the rail renders each tag facet as a multiselect menu', () => {
   assert.match(rail, /type="checkbox"/)
   assert.match(rail, /onToggle\(option\.name\)/)
   assert.match(rail, /tagGroups\.facets/)
+  assert.match(rail, /other=\{tagGroups\.other\}/)
   assert.doesNotMatch(rail, /All other tags/)
   assert.doesNotMatch(rail, /long tail trimmed/)
 })
 
 test('the workspace hands the rail its tag state and handlers', () => {
   for (const prop of ['tagFiltersShown={tagFiltersShown}', 'tagGroups={grouped}',
-    'toggleFacetTag={toggleFacetTag}', 'wd14Tags={filter.wd14Tags}']) {
+    'toggleFacetTag={toggleFacetTag}', 'selectFacetTags={selectFacetTags}', 'wd14Tags={filter.wd14Tags}']) {
     assert.ok(workspace.includes(prop), `BankWorkspace passes ${prop}`)
   }
   assert.equal(workspace.includes('setFacetTag='), false)

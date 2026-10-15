@@ -344,6 +344,49 @@ def test_two_values_in_one_facet_match_either(app, client, tmp_path, monkeypatch
         'i0.png', 'i1.png']
 
 
+@pytest.mark.parametrize('tag_count', [2, 1100])
+def test_other_tag_alternatives_match_any_whole_tag_in_grid_ids_and_pool(
+        app, client, tmp_path, tag_count):
+    from app.extensions import db
+    from app.models import BankImage
+    from app.services import image_bank_service as banks
+
+    bank_id, _src = _mkbank(client, tmp_path, n=5)
+    names = [f'synthetic_tag_{i:04d}' for i in range(tag_count)]
+    names.append('synthetic_literal.+')
+    per_image = {
+        'i0.png': ['shirt', names[0]],
+        'i1.png': [names[-2]],
+        'i2.png': ['shirt', names[-1]],
+        'i3.png': [names[-2] + '_extra', 'synthetic_literalAB'],
+        'i4.png': ['synthetic_unselected'],
+    }
+    with app.app_context():
+        for row in BankImage.query.filter_by(bank_id=bank_id):
+            row.tags_text = ',' + ','.join(per_image[row.relpath]) + ','
+        db.session.commit()
+
+    packed = '|'.join(names)
+    response = client.get(f'/api/bank/{bank_id}/images', query_string={'wd14_tags': packed})
+    assert response.status_code == 200
+    assert sorted(row['relpath'] for row in response.get_json()['images']) == [
+        'i0.png', 'i1.png', 'i2.png']
+
+    scoped = 'shirt,' + packed
+    response = client.get(f'/api/bank/{bank_id}/images', query_string={'wd14_tags': scoped})
+    assert response.status_code == 200
+    images = response.get_json()['images']
+    assert sorted(row['relpath'] for row in images) == ['i0.png', 'i2.png']
+    ids = client.get(f'/api/bank/{bank_id}/images', query_string={
+        'wd14_tags': scoped, 'ids_only': '1',
+    })
+    assert ids.status_code == 200
+    assert set(ids.get_json()['ids']) == {row['id'] for row in images}
+    with app.app_context():
+        pool = banks._pool_query(bank_id, banks.thresholds(), wd14_tags=scoped).all()
+        assert sorted(row.relpath for row in pool) == ['i0.png', 'i2.png']
+
+
 def test_an_untagged_image_matches_no_tag_filter(app, client, tmp_path, monkeypatch):
     bank_id = _tagged_bank(app, client, tmp_path, monkeypatch, {'i0.png': {'shirt': 0.8}})
     r = client.get(f'/api/bank/{bank_id}/images?wd14_tags=shirt')
@@ -379,6 +422,32 @@ def test_tag_facets_count_only_what_is_still_in_play(app, client, tmp_path, monk
         payload = banks.tag_facets_payload(LOCAL_USER, bank_id)
     by_name = {t['name']: t['count'] for t in payload['tags']}
     assert by_name == {'shirt': 1, 'hat': 1}
+    assert payload['truncated'] is False
+
+
+def test_tag_facets_include_the_full_vocabulary_and_keep_explicit_limits(app, client, tmp_path):
+    from app.extensions import db
+    from app.models import BankImage
+    from app.services import image_bank_service as banks
+
+    bank_id, _src = _mkbank(client, tmp_path, n=1)
+    names = [f'synthetic_tag_{i:04d}' for i in range(450)]
+    with app.app_context():
+        row = BankImage.query.filter_by(bank_id=bank_id).one()
+        row.tags_text = ',' + ','.join(names) + ','
+        db.session.commit()
+        bounded = banks.tag_facets_payload(LOCAL_USER, bank_id, limit=400)
+
+    assert len(bounded['tags']) == 400
+    assert bounded['distinct'] == 450
+    assert bounded['truncated'] is True
+    response = client.get(f'/api/bank/{bank_id}/tags/facets')
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert {tag['name'] for tag in payload['tags']} == set(names)
+    assert all(tag['count'] == 1 for tag in payload['tags'])
+    assert payload['distinct'] == 450
+    assert payload['tagged'] == 1
     assert payload['truncated'] is False
 
 

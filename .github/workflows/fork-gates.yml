@@ -62,10 +62,26 @@ jobs:
         run: ./scripts/gates.ps1 -Phase Gates -ScratchRoot D:/lds-gates
 
       - name: Save Gate Receipts
+        # The browser check below writes a second receipt on the same exact head.
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: fork-gates-${{ github.event.pull_request.head.sha || github.sha }}
           path: .git/lds-gates-validation/*.json
+          include-hidden-files: true
+          if-no-files-found: warn
+
+      - name: Install Browser for Bank Checks
+        run: node frontend/node_modules/playwright-core/cli.js install chromium
+
+      - name: Check Bank Other Tags in Browser
+        run: node frontend/scripts/bankOtherTagsProbe.mjs
+
+      - name: Save Browser Receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bank-other-tags-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .git/lds-gates-validation/other-tags.json
           include-hidden-files: true
           if-no-files-found: warn

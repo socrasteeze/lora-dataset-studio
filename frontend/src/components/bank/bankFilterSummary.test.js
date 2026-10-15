@@ -93,6 +93,14 @@ test('several values in one tag facet read as or, and count as one part', () => 
   assert.equal(bankFilterCount({ wd14Tags: ['brown_hair', 'blonde_hair'] }), 1)
 })
 
+test('uncategorized tags read as one OR filter alongside a category', () => {
+  const filter = { wd14Tags: ['shirt', 'synthetic_blue_scarf', 'synthetic_red_scarf'] }
+  assert.deepEqual(bankFilterParts(filter), [
+    '🔖 shirt', '🔖 synthetic blue scarf or synthetic red scarf',
+  ])
+  assert.equal(bankFilterCount(filter), 2)
+})
+
 test('caption tags (comma-joined) split into one part each', () => {
   assert.deepEqual(bankFilterParts({ tags: 'red,dress' }, { labels: LABELS }),
     ['🏷️ red', '🏷️ dress'])
