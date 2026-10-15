@@ -65,7 +65,27 @@ try {
     const errors = [];
     page.on('pageerror', (error) => { errors.push(error.message); console.error(error.message); });
     await page.addInitScript((id) => localStorage.setItem('bankCurrentId', String(id)), ready.bank_id);
-    await page.goto(`${url}/#/bank`);
+    // Hold the source check open. Saved images and metadata must render before
+    // it finishes, even when the original folder is slow to enumerate.
+    let releaseSource;
+    const sourceGate = new Promise((resolve) => { releaseSource = resolve; });
+    await context.route('**/folder-sync', async (route) => {
+      await sourceGate;
+      await route.continue();
+    });
+    const sourceRequested = page.waitForRequest((request) => new URL(request.url()).pathname.endsWith('/folder-sync'));
+    const sourceResponse = page.waitForResponse((response) => new URL(response.url()).pathname.endsWith('/folder-sync'));
+    try {
+      await page.goto(`${url}/#/bank`);
+      await page.locator(`img[src^="/api/bank/${ready.bank_id}/thumb/"]`).first().waitFor();
+      await page.getByRole('heading', { name: 'Demo', exact: true }).waitFor();
+      await sourceRequested;
+      assert.equal(await page.locator(`img[src^="/api/bank/${ready.bank_id}/thumb/"]`).count(), 4);
+    } finally {
+      releaseSource();
+    }
+    assert.equal((await sourceResponse).status(), 200);
+    await context.unroute('**/folder-sync');
     const drawer = page.locator('[aria-controls="bank-filter-rail"]:visible');
     await page.getByRole('button', { name: /^Other Tags/ }).or(drawer).first().waitFor();
     if (await drawer.count()) await drawer.click();
@@ -112,7 +132,7 @@ try {
     await panel.waitFor({ state: 'detached' });
     assert.equal(await trigger.getAttribute('aria-expanded'), 'false');
     assert.deepEqual(errors, []);
-    outcomes.push({ width, height, passed: true });
+    outcomes.push({ width, height, firstPageBeforeSourceCheck: true, passed: true });
     await context.close();
   }
   const probe = await run(process.execPath, ['scripts/responsiveProbe.mjs', '--url', `${url}/#/bank`,

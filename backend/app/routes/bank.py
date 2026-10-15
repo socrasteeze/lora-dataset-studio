@@ -198,7 +198,10 @@ def bank_create():
     reused = banks.bank_for_source(LOCAL_USER, data.get('folder')) is not None
     try:
         bank, added = banks.create_bank(LOCAL_USER, data.get('name'),
-                                        data.get('folder'))
+                                        data.get('folder'),
+                                        excluded_folders=data.get('excluded_folders'))
+    except bank_jobs.BankJobBusy as e:
+        return _busy(e)
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     # Nested folders mean two banks over the same files: harmless while triaging
@@ -206,6 +209,7 @@ def bank_create():
     # Say it now, once, rather than at the destructive click only.
     return jsonify({'ok': True, 'id': bank.id, 'added': added, 'reused': reused,
                     'name': bank.name,
+                    'excluded_folders': banks._excluded_prefixes(bank.id),
                     'overlaps': banks.overlapping_banks(LOCAL_USER, bank.id)})
 
 
@@ -216,7 +220,8 @@ def bank_split_preview():
     nothing. 400 on a missing/unreadable folder."""
     data = request.get_json(silent=True) or {}
     try:
-        return jsonify(banks.split_folder_preview(data.get('folder')))
+        return jsonify({**banks.split_folder_preview(data.get('folder')),
+                        'single_bank_exclusions': True})
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
 
@@ -289,17 +294,27 @@ def bank_scrape_import():
 
 @bp.get('/bank/<int:bank_id>')
 def bank_get(bank_id):
-    """The workspace payload. The source folder is re-walked first so images
-    added to it show up while the bank is open — cooldown-limited, because this
-    route is ALSO the 2 s job poll. ?refresh=1 forces the walk (the workspace
-    sends it when it opens the bank). The outcome rides in ``folder_sync``."""
-    sync = banks.refresh_bank(LOCAL_USER, bank_id,
-                              force=request.args.get('refresh') == '1')
+    """Workspace statistics. sync=0 reads saved inventory without a disk walk.
+
+    Older clients keep the cooldown-limited walk; refresh=1 forces that walk.
+    The current workspace checks the source separately after its first page.
+    """
+    sync = (banks._sync_cached(bank_id) if request.args.get('sync') == '0'
+            else banks.refresh_bank(LOCAL_USER, bank_id,
+                                    force=request.args.get('refresh') == '1'))
     payload = banks.bank_payload(LOCAL_USER, bank_id)
     if payload is None:
         return jsonify({'error': 'not found'}), 404
     payload['folder_sync'] = sync
     return jsonify(payload)
+
+
+@bp.get('/bank/<int:bank_id>/folder-sync')
+def bank_folder_sync(bank_id):
+    """Check for source changes without repeating the workspace statistics."""
+    if banks.get_bank(LOCAL_USER, bank_id) is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(banks.refresh_bank(LOCAL_USER, bank_id, force=True))
 
 
 @bp.post('/bank/<int:bank_id>/rename')

@@ -302,7 +302,7 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
         title="Face similarity"
         help="Every image is scored against the reference face (InsightFace). These thresholds set where the badges flip."
       >
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="face-threshold-green" className="block text-sm font-medium text-content">
               Face score — green threshold
@@ -348,7 +348,7 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
         title="Image bank triage"
         help="Thresholds for the Bank quality flags. Raw scores are stored per image, so changing a threshold re-sorts an already-scanned bank instantly — no rescan."
       >
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="bank-sharpness-min" className="block text-sm font-medium text-content">
               Sharpness minimum

@@ -85,6 +85,27 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-14-faster-bank-opening',
+    date: '2026-10-14',
+    title: 'Open Banks Faster',
+    blurb: 'Saved images load before the source-folder check finishes. Bank statistics use fewer database queries, and changing filters cancels the previous grid request.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-14-single-bank-import-exclusions',
+    date: '2026-10-14',
+    title: 'Choose Import Folders',
+    blurb: 'Open Subfolders before importing to leave folders out while keeping one bank. Exclusions stay saved across rescans. Turn on Separate Banks when you want one bank per checked subfolder.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-14-wider-settings-forms',
+    date: '2026-10-14',
+    title: 'Wider Settings Forms',
+    blurb: 'Settings use more of the page width, with two field columns on larger screens and one on phones. Tables, explanations and diagnostics keep a full row.',
+    to: '/settings/captioning',
+  },
+  {
     id: '2026-10-14-bank-other-tags',
     date: '2026-10-14',
     title: 'Browse Uncategorized Tags',

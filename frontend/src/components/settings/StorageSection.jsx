@@ -333,7 +333,7 @@ export default function StorageSection({
         </div>
         {/* The table scrolls inside its own box: a long Windows path must never
             make the whole page scroll sideways on a phone. */}
-        <div className="-mx-2 overflow-x-auto px-2">
+        <div className="settings-wide -mx-2 overflow-x-auto px-2">
           <ul className="min-w-[18rem] space-y-2">
             {rows.map((row) => (
               <li key={row.key} className="rounded-lg border border-border bg-surface-raised p-3">

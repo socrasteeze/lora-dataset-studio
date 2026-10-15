@@ -1,5 +1,33 @@
 # HANDOFF
 
+## Delivery Preparation (2026-10-14)
+
+- The operator authorized clean delivery to main if the changes are qualified. That supersedes the earlier request to keep PR #3 open once the required cloud checks pass. Local tests remain pending. Permission to resume the previously stopped cloud checks has been requested and is awaiting a response.
+- Delivery scope: Other Tags OR selection, wider two-column Settings forms, persistent single-bank import exclusions, and Bank loading/query improvements. The caption review required no code change: the inspected saved run did not request Caption, which stays optional in Launch All.
+- Source and generated frontend bundle are prepared separately on `noble/other-bank-tags`. Origin/main is unchanged at `d20878b90`; fetching found no new main commits. Build, Ruff and ESLint passed, with 32 existing ESLint warnings. The privacy scan covered 2,982 tracked/untracked text files with zero findings. Attribution matches are technical references, caption provenance and regression fixtures; no attribution removal or credential rotation is needed.
+- Keep main unchanged until exact-head cloud Gates and rendered checks cover the new Settings and import behavior. Do not restart tests without the pending permission. Historical status notes below describe earlier points in the work.
+
+## Bank Opening Performance Pending (2026-10-14)
+
+- Opening a Bank now reads saved inventory and the first image page before a separate source-folder check. The new folder-sync endpoint reuses additive refresh and its mutation lease; the existing workspace endpoint keeps its old behavior for older clients. New files trigger a grid/statistics refresh. Source-check failure keeps saved inventory usable.
+- Headline counters use one conditional aggregate plus the existing promotion read. Flag totals and pending subsets use one aggregate. Person covers use one ranked query for all displayed clusters; style covers ride along as minimum image IDs. The list's four per-card counters use one grouped query. Group definitions, cluster IDs, cover ranking, hidden-folder scope, vetoes and stored decisions retain their existing meaning.
+- Grid changes abort superseded image requests. Dashboard responses reject stale requests/bank IDs. Periodic statistics reads do not start while one is pending; the initial successful load starts the refresh clock. Activity polling avoids overlapping requests across effect restarts. Late tag/subfolder reads cannot replace another bank's choices. After accepted actions, grid and dashboard refreshes run in parallel; confirmed-save review behavior is preserved.
+- Added unrun regression cases for source-check separation, additive refresh, counter equality/query budgets, cover ranking and ownership. The existing cloud browser probe now holds folder-sync open and requires the saved first page and name to render before release at all five sizes. No timing benchmark, fixture test, rendered check, live data access, runtime restart or cloud run was performed. Tests remain stopped.
+- Frontend build, Ruff and ESLint passed; ESLint retains 32 warnings in unchanged files. No speedup is claimed from those static checks. Changes remain local and uncommitted alongside the Settings and import work. Keep PR #3 open and main unchanged.
+
+## Single-Bank Import Exclusions Pending (2026-10-14)
+
+- Subfolders now opens an inclusion preview independently of Separate Banks. The default keeps one named parent bank; checked subfolders stay within it. Separate Banks retains the old split import. Source folders are never moved or changed.
+- Single-bank exclusions persist through the existing hidden-folder scope. Rows stay indexed for recovery through Exclude Folder, while grid/counts/passes/curation exclude them across rescans. Re-import adds exclusions and preserves earlier exclusions and decisions; busy banks reject the scope write through the mutation lease.
+- An older running backend cannot silently ignore the new exclusions: the preview advertises support, and the form requires a Studio restart when support is absent. The existing inventory limit still applies to all indexed images.
+- Regression cases cover one-bank counts, persistent exclusions and recovery, unchanged source bytes, preserved decisions, malformed/empty scopes and busy-bank protection. Tests and rendered checks remain stopped and unrun. Frontend build, Ruff and ESLint passed; ESLint retains 32 warnings in unchanged files. These changes and the Settings layout remain local and uncommitted; keep PR #3 open and main unchanged.
+
+## Settings Layout Pending (2026-10-14)
+
+- Settings and plugin Settings use the existing wide page shell. Shared Settings cards arrange fields in two columns from 640 px and one column on phones. Descriptions, tables, compound preset panels and diagnostics keep full-width rows. Captioning's three-column grid is now two columns; settings values and save handlers are unchanged.
+- Tests remain stopped under the user's standing instruction. No local tests, rendered checks or cloud runs are authorized by this layout request. Local build, Ruff and ESLint passed; ESLint retains 32 warnings in unchanged files. Rendered layout acceptance remains pending.
+- The layout changes are local and uncommitted on the existing task branch. Keep PR #3 open and main unchanged. Do not push or restart tests without a new instruction.
+
 ## Other Tags Delivery Hold (2026-10-14)
 
 - Branch `noble/other-bank-tags` adds a full-width Other Tags menu to the Bank filter rail, using the existing controls and theme. Search accepts spaces/underscores. Select All is the first option for a typed search and selects all matches, including hidden rows, in one update. Other Tags share one OR group; categories still combine with AND. Show More reveals 100 matches at a time, and long labels wrap.

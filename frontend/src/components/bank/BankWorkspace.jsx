@@ -267,6 +267,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const activeBankRef = useRef(bankId)
   activeBankRef.current = bankId
   const imageRequestRef = useRef(0)
+  const imageAbortRef = useRef(null)
+  const payloadRequestRef = useRef(0)
+  const payloadPendingRef = useRef(new Map())
+  const activityPendingRef = useRef(new Set())
   const [comparisonLoading, setComparisonLoading] = useState(false)
   const [collectionsOpen, setCollectionsOpen] = useState(false)
   const [collectionDraftIds, setCollectionDraftIds] = useState([])
@@ -418,12 +422,17 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const refreshImagesRef = useRef(null)
 
   const refreshPayload = useCallback(async (opts = {}) => {
+    if (activeBankRef.current !== bankId) return null
+    const requestNumber = ++payloadRequestRef.current
+    payloadPendingRef.current.set(bankId, (payloadPendingRef.current.get(bankId) || 0) + 1)
     try {
-      // ?refresh=1 forces the source-folder re-walk (the bank was just opened);
-      // a plain poll lets the server's cooldown decide, so the 2 s job poll
-      // doesn't hammer the disk.
-      const d = await apiFetch(`/api/bank/${bankId}${opts.force ? '?refresh=1' : ''}`,
+      // Opening reads saved inventory first. A separate source check follows
+      // the first grid page, so the filesystem walk cannot delay that page.
+      const query = opts.force ? '?refresh=1' : opts.skipSync ? '?sync=0' : ''
+      const d = await apiFetch(`/api/bank/${bankId}${query}`,
         { background: !!opts.background })
+      if (activeBankRef.current !== bankId || requestNumber !== payloadRequestRef.current) return null
+      fullPayloadAt.current = Date.now()
       // First payload of this bank: record its finished-activity generation
       // WITHOUT announcing it — the snapshot can be a job up to 5 min old, and
       // toasting stale news on every open is worse than silence. From here on
@@ -441,8 +450,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       if ((d.folder_sync?.added || 0) > 0) refreshImagesRef.current?.()
       return d
     } catch (e) {
+      if (activeBankRef.current !== bankId || requestNumber !== payloadRequestRef.current) return null
       if (String(e?.message || '').includes('not found')) { onGone?.(); return null }
       return null
+    } finally {
+      const remaining = (payloadPendingRef.current.get(bankId) || 1) - 1
+      if (remaining) payloadPendingRef.current.set(bankId, remaining)
+      else payloadPendingRef.current.delete(bankId)
     }
   }, [bankId, onGone, toast])
 
@@ -497,6 +511,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const refreshImages = useCallback(async (f = filter, off = offset, view) => {
     if (activeBankRef.current !== bankId) return
     const requestNumber = ++imageRequestRef.current
+    imageAbortRef.current?.abort()
+    const controller = new AbortController()
+    imageAbortRef.current = controller
     // `view` (optional) lets a caller drive the fetch with values it just set,
     // dodging state-closure lag; otherwise read the current selection view.
     const on = view ? view.on : showSelected
@@ -505,7 +522,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       ? { ids: (order || []).join(','), offset: String(off), limit: String(PAGE_SIZE) }
       : { ...filterParams(f), offset: String(off), limit: String(PAGE_SIZE) }
     try {
-      const d = await apiFetch(`/api/bank/${bankId}/images?${new URLSearchParams(params)}`)
+      const d = await apiFetch(`/api/bank/${bankId}/images?${new URLSearchParams(params)}`,
+        { signal: controller.signal })
       if (activeBankRef.current === bankId && requestNumber === imageRequestRef.current) {
         setPage(d)
         return true
@@ -515,6 +533,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   }, [bankId, filter, offset, filterParams, showSelected, selectedOrder])
 
   useEffect(() => { refreshImagesRef.current = refreshImages }, [refreshImages])
+  useEffect(() => () => {
+    imageAbortRef.current?.abort()
+    imageRequestRef.current += 1
+    payloadRequestRef.current += 1
+  }, [bankId])
 
   // The chip counters, re-measured whenever the filter — or the data under it —
   // moves. Skipped entirely while nothing is filtered: there the payload's
@@ -548,10 +571,28 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     // A new bank starts a new announcement history: without this reset, the
     // first payload of the next bank could re-toast its old finished snapshot.
     announcedActivityAt.current = undefined
-    refreshPayload({ force: true }); refreshImages(f)
-    apiFetch(`/api/bank/${bankId}/subfolders`)
-      .then((d) => setSubfolders(d.subfolders || []))
-      .catch(() => setSubfolders([]))
+    let dropped = false
+    setPayload(null); setSubfolders([]); setTagFacets(null)
+    fullPayloadAt.current = 0
+    Promise.all([refreshPayload({ skipSync: true }), refreshImages(f)]).then(async ([initial]) => {
+      if (dropped || !initial) return
+      try {
+        const sync = await apiFetch(`/api/bank/${bankId}/folder-sync`, { background: true })
+        if (dropped) return
+        const note = folderSyncToast(sync)
+        if (note) toast[note.type](note.text)
+        setPayload((p) => p ? { ...p, folder_sync: sync } : p)
+        if ((sync?.added || 0) > 0) {
+          refreshPayload({ skipSync: true, background: true })
+          refreshImagesRef.current?.()
+        }
+      } catch { /* Existing inventory stays usable when the source check fails. */ }
+      if (dropped) return
+      apiFetch(`/api/bank/${bankId}/subfolders`, { background: true })
+        .then((d) => { if (!dropped) setSubfolders(d.subfolders || []) })
+        .catch(() => { /* A transient error leaves the current folder choices. */ })
+    })
+    return () => { dropped = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bankId])
 
@@ -590,16 +631,20 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     // the job lands so the final counts are never a poll behind.
     let dropped = false
     const tick = async () => {
+      if (activityPendingRef.current.has(bankId)) return
+      activityPendingRef.current.add(bankId)
       let next = null
       try {
         // background: this tick is the one that stacked ten "Connection lost"
         // banners over the whole app when the phone's connection dropped.
         next = await apiFetch(`/api/bank/${bankId}/activity`, { background: true })
       } catch { return }               // transient — the next tick retries
+      finally { activityPendingRef.current.delete(bankId) }
       if (dropped) return
       setPayload((p) => (p ? { ...p, activity: next.activity } : p))
       const landed = !next.activity || next.activity.finished
-      if (landed || Date.now() - fullPayloadAt.current >= FULL_PAYLOAD_MS) {
+      if (landed || (!payloadPendingRef.current.has(bankId)
+          && Date.now() - fullPayloadAt.current >= FULL_PAYLOAD_MS)) {
         fullPayloadAt.current = Date.now()
         refreshPayload({ background: true })
       }
@@ -620,9 +665,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const taggedCount = payload?.counts?.tagged || 0
   useEffect(() => {
     if (!taggedCount) { setTagFacets(null); return }
+    let alive = true
     apiFetch(`/api/bank/${bankId}/tags/facets`)
-      .then(setTagFacets)
+      .then((d) => { if (alive) setTagFacets(d) })
       .catch(() => { /* transient — the next tagged-count change retries */ })
+    return () => { alive = false }
   }, [bankId, taggedCount])
 
   // Keep the coverage panel current: refetch when it opens, and whenever the kept
@@ -859,6 +906,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const adoptActivity = async () => {
     try {
       const next = await apiFetch(`/api/bank/${bankId}/activity`, { background: true })
+      if (activeBankRef.current !== bankId) return null
       setPayload((p) => (p ? { ...p, activity: next.activity } : p))
       return next.activity
     } catch { return null }
@@ -871,7 +919,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       // The bar first, the dashboard after: a 202 means a job is running RIGHT
       // NOW, and the heavy payload it rides in can be half a minute away.
       await adoptActivity()
-      await refreshPayload(); await refreshImages()
+      await Promise.all([refreshPayload(), refreshImages()])
       return d
     } catch (e) {
       // ONE bank, ONE background job: every action here can be refused because
@@ -1151,7 +1199,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       toast[msg.type === 'error' ? 'error' : msg.type](msg.text)
       setSelected(new Set())
       if (showSelected) exitSelectionView()
-      await refreshPayload(); await refreshImages()
+      await Promise.all([refreshPayload(), refreshImages()])
     } catch (e) {
       toast.error(e?.message || 'Undo failed — nothing was changed.')
       await refreshPayload()
@@ -1971,7 +2019,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             onPassOpen={setPassOpen} onPassRedo={setPassRedoFor}
             onPickPython={setPythonPickerFor}
             onSemanticEngineChange={changeSemanticEngine}
-            onChanged={async () => { await refreshPayload(); await refreshImages() }}
+            onChanged={async () => { await Promise.all([refreshPayload(), refreshImages()]) }}
             passGate={passGate} passDevice={passDevice}
             tagsState={tagsState} tagsLabel={tagsButtonLabel(counts)}
             onPassDevice={setPassDevice} onPassDeviceObj={setPassDeviceObj}
@@ -2598,14 +2646,14 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               onCompareGroup={(groupId) => openComparison({ params: { group: String(groupId) }, kind: 'exact', groupId, title: `Duplicate Group ${groupId}` }).catch(() => {})}
               onSaveCollection={(groupId) => openGroupCollection({ group: String(groupId) })}
               notDuplicates={payload?.dup?.not_duplicates ?? 0}
-              onChanged={async () => { await refreshPayload(); await refreshImages() }} />
+              onChanged={async () => { await Promise.all([refreshPayload(), refreshImages()]) }} />
           ) : filter.flag === 'semantic_dups' ? (
             <DupGroupsPanel bankId={bankId} live={live} kind="semantic"
               onCompareGroup={(groupId) => openComparison({ params: { semantic_group: String(groupId) }, kind: 'semantic', groupId, title: `Same Shot ${groupId}` }).catch(() => {})}
               onSaveCollection={(groupId) => openGroupCollection({ semantic_group: String(groupId) })}
               semanticLabel={semanticState.label}
               notDuplicates={payload?.semantic_dup?.not_duplicates ?? 0}
-              onChanged={async () => { await refreshPayload(); await refreshImages() }} />
+              onChanged={async () => { await Promise.all([refreshPayload(), refreshImages()]) }} />
           ) : (
             <>
             {/* The grid owns the width now, so it earns denser columns on a big

@@ -795,10 +795,14 @@ def bank_for_source(user_id, folder, *, root_only=False) -> ImageBank | None:
     return None
 
 
-def create_bank(user_id, name, folder):
+def create_bank(user_id, name, folder, *, excluded_folders=None):
     """Register a folder as a bank: walk it recursively and create one row per
     image file. Instant (no decode) — scoring is the separate scan pass.
     Returns (bank, added). ValueError on a missing folder / too many files.
+
+    Optional folder exclusions use the existing persistent visibility scope.
+    Their rows stay indexed for recovery; re-import adds exclusions without
+    removing any exclusions or decisions the bank already has.
 
     A folder that is ALREADY a bank is refreshed and returned instead of
     registered a second time (see bank_for_source for why a duplicate costs
@@ -807,6 +811,8 @@ def create_bank(user_id, name, folder):
     tell the two apart by asking bank_for_source BEFORE this — the return shape
     is deliberately unchanged, because dozens of callers unpack the pair."""
     name = (name or '').strip()
+    if excluded_folders is not None and not isinstance(excluded_folders, list):
+        raise ValueError('excluded_folders must be a list of folders')
     # Windows "Copy as path" pastes the path quoted — unquote so
     # the direct paste works first try (same nicety as the dataset folder import).
     folder = (folder or '').strip().strip('"\'')
@@ -827,7 +833,15 @@ def create_bank(user_id, name, folder):
     # folder cost anything, and refresh_bank walks it once by itself.
     existing = bank_for_source(user_id, folder)
     if existing is not None:
-        res = refresh_bank(user_id, existing.id, force=True) or {}
+        if excluded_folders:
+            with bank_jobs.mutation_lease(existing.id, 'folder_exclusions') as lease:
+                res = refresh_bank(user_id, existing.id, force=True, _bank_lease=lease) or {}
+                known = _known_folders(_bank_relpaths(existing.id))
+                requested = _normalize_excluded(excluded_folders, known)
+                combined = list(dict.fromkeys(_excluded_prefixes(existing.id) + requested))
+                set_excluded_folders(user_id, existing.id, combined)
+        else:
+            res = refresh_bank(user_id, existing.id, force=True) or {}
         return existing, int(res.get('added') or 0)
     rels = []
     for rel in _walk_image_relpaths(folder):
@@ -838,10 +852,16 @@ def create_bank(user_id, name, folder):
             raise ValueError(
                 f'this folder holds more than {BANK_MAX_FILES:,} images '
                 '— point the bank at a subfolder, or split it in two')
+    cleaned = _normalize_excluded(excluded_folders, _known_folders(rels)) if excluded_folders else []
+    excluded_set = set(cleaned)
+    if cleaned and not any(not _rel_under_excluded(rel, excluded_set) for rel in rels):
+        raise ValueError('every image is excluded — select at least one folder')
+    if cleaned:
+        return _register_bank(user_id, name, folder, rels, excluded_folders=cleaned)
     return _register_bank(user_id, name, folder, rels)
 
 
-def _register_bank(user_id, name, source_path, rels, root_only=False):
+def _register_bank(user_id, name, source_path, rels, root_only=False, *, excluded_folders=None):
     """Persist one ImageBank rooted at ``source_path`` with a BankImage per rel
     (each relative to ``source_path``). Shared by create_bank and the per-
     subfolder split. Assumes name/folder are validated and ``rels`` is within
@@ -850,8 +870,12 @@ def _register_bank(user_id, name, source_path, rels, root_only=False):
     ``root_only`` marks a bank that owns ONLY the files sitting directly in
     ``source_path`` (the split's loose-files bank), so the live folder re-walk
     never recurses into the subfolders its sibling banks own."""
+    import json as _json
+    # Persist the scope before the first commit exposes this bank to other tabs.
+    # Excluded rows remain recoverable through the existing folder controls.
     bank = ImageBank(user_id=user_id, name=name, source_path=source_path,
-                     root_only=bool(root_only))
+                     root_only=bool(root_only),
+                     excluded_folders=_json.dumps(excluded_folders) if excluded_folders else None)
     db.session.add(bank)
     # COMMIT, not flush (upstream flushes here). A flush OPENS the write
     # transaction, and everything below it — including one os.path.getsize
@@ -2655,28 +2679,24 @@ def _flag_counts(bank_id, th) -> tuple[dict, dict]:
     rejected by the first pass. Reading that as "the feature is broken" is the
     only reasonable conclusion, and it was the counter's fault, not the pass's.
 
-    One query per flag, not two: the pending half rides along as a conditional
-    SUM, so telling the truth costs nothing extra on a 100 000-image bank."""
-    flags, actionable = {}, {}
+    One query covers every flag and its pending subset. Each predicate is the
+    same one used by the filter and auto-reject paths."""
+    columns, keys = [], []
     for flag in _QUALITY_FLAGS + _SCORE_FLAGS:
         crit = _flag_filter(flag, th)
-        if crit is None:
-            flags[flag] = actionable[flag] = 0
-            continue
-        total, pending = (
-            db.session.query(
-                func.count(BankImage.id),
-                func.coalesce(
-                    func.sum(case((BankImage.status == 'pending', 1), else_=0)), 0))
-            .filter(_curated(bank_id)).filter(crit).one())
-        flags[flag] = int(total or 0)
-        actionable[flag] = int(pending or 0)
+        keys.append(flag)
+        columns.extend((
+            func.sum(case((crit if crit is not None else False, 1), else_=0)),
+            func.sum(case((and_(crit if crit is not None else False,
+                               BankImage.status == 'pending'), 1), else_=0))))
     # ✨ Clean rides along: the one chip of the Quality row that had no number,
     # which read as "not a filter" next to six counted neighbours. Facet count
     # only — "auto-reject the clean ones" is not an action anything offers.
-    flags['clean'] = int(
-        db.session.query(func.count(BankImage.id))
-        .filter(_curated(bank_id), _clean_criterion(th)).scalar() or 0)
+    columns.append(func.sum(case((_clean_criterion(th), 1), else_=0)))
+    values = db.session.query(*columns).filter(_curated(bank_id)).one()
+    flags = {key: int(values[index * 2] or 0) for index, key in enumerate(keys)}
+    actionable = {key: int(values[index * 2 + 1] or 0) for index, key in enumerate(keys)}
+    flags['clean'] = int(values[-1] or 0)
     return flags, actionable
 
 
@@ -2734,24 +2754,46 @@ def _bp_counts(base, total, todo_keep, todo_pending, todo_reject,
     coverage with its named blind spot, promotion (back-link OR legacy
     flag OR dataset rows that point here), per-pass coverage, edits split
     by which gesture produced them, and the angle backfill offer."""
+    # Read headline coverage in one pass over the scoped rows. Keep promotion's
+    # backlink subquery separate; it does not belong in every conditional sum.
+    predicates = {
+        'scanned': BankImage.quality_state.isnot(None),
+        'unscanned': BankImage.quality_state.is_(None),
+        'unscanned_scannable': and_(BankImage.quality_state.is_(None), BankImage.status != 'reject'),
+        'pending': BankImage.status == 'pending',
+        'keep': BankImage.status == 'keep',
+        'reject': BankImage.status == 'reject',
+        'scored': or_(BankImage.aesthetic_score.isnot(None), BankImage.nsfw_score.isnot(None)),
+        'tagged': BankImage.tags_state == 'ok',
+        'watermark_scanned': and_(BankImage.watermark_state.isnot(None),
+                                  ~_watermark_history_inactive_clause()),
+        'framing_classified': BankImage.framing.isnot(None),
+        'cropped': BankImage.edit_method == 'crop',
+        'improved': BankImage.edit_method == 'improve',
+        'medium_classified': BankImage.medium.isnot(None),
+        'angle_measured': BankImage.face_yaw.isnot(None),
+        'angle_backfillable': and_(BankImage.face_state.isnot(None), BankImage.face_yaw.is_(None)),
+    }
+    values = base.with_entities(*(
+        func.sum(case((criterion, 1), else_=0)) for criterion in predicates.values())).one()
+    measured = {key: int(value or 0) for key, value in zip(predicates, values)}
     counts = {
         'total': total,
-        'scanned': base.filter(BankImage.quality_state.isnot(None)).count(),
+        'scanned': measured['scanned'],
         # The blind spot, named. An image no quality pass ever measured carries
         # no verdict, and EVERY quality flag is gated on `quality_state == 'ok'`
         # (see _flag_filter) — so these rows are structurally unreachable by
         # 🧹 Auto-reject. That is not "they are clean": it is "we know nothing
         # about them", and the two must never render as the same 0.
-        'unscanned': base.filter(BankImage.quality_state.is_(None)).count(),
+        'unscanned': measured['unscanned'],
         # ...and how many of those a 🔎 Scan would actually pick up. Rejected
         # rows are out of the scan pool (_scan_pool), so the two numbers differ
         # by exactly the images that were thrown away before being measured. The
         # UI offers the gesture, so it quotes the number the gesture moves.
-        'unscanned_scannable': base.filter(BankImage.quality_state.is_(None),
-                                           BankImage.status != 'reject').count(),
-        'pending': base.filter_by(status='pending').count(),
-        'keep': base.filter_by(status='keep').count(),
-        'reject': base.filter_by(status='reject').count(),
+        'unscanned_scannable': measured['unscanned_scannable'],
+        'pending': measured['pending'],
+        'keep': measured['keep'],
+        'reject': measured['reject'],
         # …and the caption-pass sizes of the two scopes it can be aimed at.
         'caption_todo_keep': int(todo_keep or 0),
         'caption_todo_pending': int(todo_pending or 0),
@@ -2781,34 +2823,30 @@ def _bp_counts(base, total, todo_keep, todo_pending, todo_reject,
         )).count(),
         # V2 pass progress — how many images the scoring / watermark passes reached
         # (so the UI can show "scored 0/9000" and enable the threshold facets).
-        'scored': base.filter(or_(BankImage.aesthetic_score.isnot(None),
-                                  BankImage.nsfw_score.isnot(None))).count(),
+        'scored': measured['scored'],
         # 🔖 The workspace shows the tag filter, and fetches the tag vocabulary,
         # once this is non-zero. It was only ever counted for the pipeline
         # report, so the filter could never appear.
-        'tagged': base.filter(BankImage.tags_state == 'ok').count(),
-        'watermark_scanned': base.filter(
-            BankImage.watermark_state.isnot(None),
-            ~_watermark_history_inactive_clause()).count(),
-        'framing_classified': base.filter(BankImage.framing.isnot(None)).count(),
+        'tagged': measured['tagged'],
+        'watermark_scanned': measured['watermark_scanned'],
+        'framing_classified': measured['framing_classified'],
         # ✂/✨ edited HERE, split by which edit produced the blob. Two numbers
         # rather than one total: ↩ Revert undoes both, but "12 cropped" and "12
         # upscaled" are answers to different questions, and a single figure would
         # let a GPU pass hide behind a hand crop.
-        'cropped': base.filter(BankImage.edit_method == 'crop').count(),
-        'improved': base.filter(BankImage.edit_method == 'improve').count(),
+        'cropped': measured['cropped'],
+        'improved': measured['improved'],
         # 🎨 Medium — how many rows the pass has a verdict for ('unsure'
         # included: it IS a verdict). Drives the chip row's appearance and the
         # Sort menu's "run 🎨 Medium first" state.
-        'medium_classified': base.filter(BankImage.medium.isnot(None)).count(),
+        'medium_classified': measured['medium_classified'],
         # ⤢ Angle — how many rows carry a measured yaw…
-        'angle_measured': base.filter(BankImage.face_yaw.isnot(None)).count(),
+        'angle_measured': measured['angle_measured'],
         # …and how many were face-scanned by a build that computed the yaw and
         # threw it away. This is the ONLY number that can offer the backfill
         # honestly: it is the exact size of the re-measure job, so the UI can
         # price the click before the user makes it instead of after.
-        'angle_backfillable': base.filter(BankImage.face_state.isnot(None),
-                                          BankImage.face_yaw.is_(None)).count(),
+        'angle_backfillable': measured['angle_backfillable'],
     }
     return counts
 
@@ -2963,33 +3001,34 @@ def _bp_similarity_summaries(bank_id, base):
                .order_by(func.count(BankImage.id).desc(),
                          BankImage.face_cluster.asc())
                .limit(40).all())
-    clusters = []
-    for cid, size in cl_rows:
-        cover = (BankImage.query
-                 .filter(_curated(bank_id), BankImage.face_cluster == cid)
-                 .order_by(BankImage.face_det.desc().nullslast(),
-                           BankImage.id.asc())
-                 .first())
-        clusters.append({'id': cid, 'size': size,
-                         'cover_image_id': cover.id if cover else None})
+    covers = {}
+    if cl_rows:
+        ranked = (db.session.query(
+            BankImage.face_cluster.label('cluster'), BankImage.id.label('image_id'),
+            func.row_number().over(
+                partition_by=BankImage.face_cluster,
+                order_by=(BankImage.face_det.desc().nullslast(), BankImage.id.asc())
+            ).label('rank'))
+            .filter(_curated(bank_id), BankImage.face_cluster.in_([cid for cid, _size in cl_rows]))
+            .subquery())
+        covers = dict(db.session.query(ranked.c.cluster, ranked.c.image_id)
+                      .filter(ranked.c.rank == 1).all())
+    clusters = [{'id': cid, 'size': size, 'cover_image_id': covers.get(cid)}
+                for cid, size in cl_rows]
     faces_scanned = base.filter(BankImage.face_state.isnot(None)).count()
     # Style clusters (group by visual style), biggest first — the "group by
     # style" counterpart to the person clusters above. Cover = the lowest id of
     # the cluster (stable, no per-image quality signal to rank by here).
-    st_rows = (db.session.query(BankImage.style_cluster, func.count(BankImage.id))
+    st_rows = (db.session.query(BankImage.style_cluster, func.count(BankImage.id),
+                                func.min(BankImage.id))
                .filter(_curated(bank_id),
                        BankImage.style_cluster.isnot(None))
                .group_by(BankImage.style_cluster)
                .order_by(func.count(BankImage.id).desc(),
                          BankImage.style_cluster.asc())
                .limit(40).all())
-    style_clusters = []
-    for cid, size in st_rows:
-        cover = (BankImage.query
-                 .filter(_curated(bank_id), BankImage.style_cluster == cid)
-                 .order_by(BankImage.id.asc()).first())
-        style_clusters.append({'id': cid, 'size': size,
-                               'cover_image_id': cover.id if cover else None})
+    style_clusters = [{'id': cid, 'size': size, 'cover_image_id': cover_id}
+                      for cid, size, cover_id in st_rows]
     return dup, semantic_dup, clusters, faces_scanned, style_clusters
 
 
@@ -3240,18 +3279,29 @@ def list_banks(user_id, dataset_id=None) -> list:
     # counts ride along: per-bank it would be banks × passes COUNT(*)s to render
     # one list.
     coverage = bank_pass_coverage(user_id)
+    # Four per-card counters share one grouped read across this user's banks.
+    # Keep the existing inventory scope, including hidden rows, on these cards.
+    counters = {
+        bank_id: {'total': int(total), 'keep': int(kept or 0),
+                  'reject': int(rejected or 0), 'scanned': int(scanned or 0)}
+        for bank_id, total, kept, rejected, scanned in (
+            db.session.query(
+                BankImage.bank_id, func.count(BankImage.id),
+                func.sum(case((BankImage.status == 'keep', 1), else_=0)),
+                func.sum(case((BankImage.status == 'reject', 1), else_=0)),
+                func.sum(case((BankImage.quality_state.isnot(None), 1), else_=0)))
+            .join(ImageBank, ImageBank.id == BankImage.bank_id)
+            .filter(ImageBank.user_id == user_id)
+            .group_by(BankImage.bank_id).all())
+    }
     out = []
     for bank in (ImageBank.query.filter_by(user_id=user_id)
                  .order_by(ImageBank.created_at.desc()).all()):
-        base = BankImage.query.filter_by(bank_id=bank.id)
         row = {
             'id': bank.id, 'instance_id': bank.instance_id,
             'name': bank.name, 'source_path': bank.source_path,
             'created_at': bank.created_at.isoformat() if bank.created_at else None,
-            'total': base.count(),
-            'keep': base.filter_by(status='keep').count(),
-            'reject': base.filter_by(status='reject').count(),
-            'scanned': base.filter(BankImage.quality_state.isnot(None)).count(),
+            **counters.get(bank.id, {'total': 0, 'keep': 0, 'reject': 0, 'scanned': 0}),
             'preview_ids': _preview_ids(bank.id),
             'activity': bank_jobs.get(bank.id),
             'queue_state': bank_queue.state_for(bank.id),

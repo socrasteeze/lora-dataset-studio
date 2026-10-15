@@ -9,6 +9,8 @@ first here on purpose.
 Exclusions apply to ONE import and are not persisted: each bank created is rooted
 at its own subfolder, so its live re-walk never sees the excluded ones anyway.
 """
+import os
+
 import pytest
 from PIL import Image
 
@@ -186,3 +188,86 @@ def test_the_route_400s_when_everything_was_excluded(app, client, tmp_path):
                     json={'folder': str(root), 'exclude': ['a']})
     assert r.status_code == 400
     assert 'nothing left to create' in r.get_json()['error']
+
+
+def test_single_bank_import_persists_exclusions_without_splitting_or_touching_sources(
+        app, client, tmp_path):
+    from app.models import ImageBank
+    from app.services import image_bank_service as banks
+
+    root = _tree(tmp_path, {'alpha': 2, 'beta': 2, 'beta_extra': 1})
+    _loose(root, 1)
+    original = (root / 'beta' / '0.jpg').read_bytes()
+    response = client.post('/api/bank/create', json={
+        'name': 'Demo Parent', 'folder': str(root), 'excluded_folders': ['beta'],
+    })
+    assert response.status_code == 200
+    bank_id = response.get_json()['id']
+    assert response.get_json()['excluded_folders'] == ['beta']
+    with app.app_context():
+        assert ImageBank.query.count() == 1
+        assert banks.get_bank('local', bank_id).name == 'Demo Parent'
+    images = client.get(f'/api/bank/{bank_id}/images').get_json()['images']
+    assert len(images) == 4
+    assert any(row['relpath'].replace('\\', '/').startswith('beta_extra/') for row in images)
+    assert not any(row['relpath'].replace('\\', '/').startswith('beta/') for row in images)
+    Image.new('RGB', (32, 32)).save(root / 'beta' / 'new.jpg')
+    with app.app_context():
+        banks.refresh_bank('local', bank_id, force=True)
+    assert len(client.get(f'/api/bank/{bank_id}/images').get_json()['images']) == 4
+    assert (root / 'beta' / '0.jpg').read_bytes() == original
+    assert client.put(f'/api/bank/{bank_id}/folder-exclusions', json={'excluded': []}).status_code == 200
+    assert len(client.get(f'/api/bank/{bank_id}/images').get_json()['images']) == 7
+
+
+def test_single_bank_reimport_adds_exclusions_and_keeps_prior_decisions(app, client, tmp_path):
+    from app.extensions import db
+    from app.models import BankImage, ImageBank
+
+    root = _tree(tmp_path, {'alpha': 1, 'beta': 1})
+    _loose(root, 1)
+    bank_id = client.post('/api/bank/create', json={
+        'name': 'Demo Parent', 'folder': str(root), 'excluded_folders': ['alpha'],
+    }).get_json()['id']
+    with app.app_context():
+        row = BankImage.query.filter_by(bank_id=bank_id, relpath=os.path.join('beta', '0.jpg')).one()
+        row.status = 'keep'
+        image_id = row.id
+        db.session.commit()
+    response = client.post('/api/bank/create', json={
+        'name': 'Demo Parent', 'folder': str(root), 'excluded_folders': ['beta'],
+    })
+    assert response.status_code == 200
+    assert response.get_json()['reused'] is True
+    assert response.get_json()['id'] == bank_id
+    assert response.get_json()['excluded_folders'] == ['alpha', 'beta']
+    with app.app_context():
+        assert ImageBank.query.count() == 1
+        assert db.session.get(BankImage, image_id).status == 'keep'
+
+
+@pytest.mark.parametrize('excluded', ['alpha', ['../escape'], ['missing'], ['alpha']])
+def test_invalid_or_empty_single_bank_scope_creates_nothing(app, client, tmp_path, excluded):
+    from app.models import ImageBank
+
+    root = _tree(tmp_path, {'alpha': 1})
+    response = client.post('/api/bank/create', json={
+        'name': 'Demo Parent', 'folder': str(root), 'excluded_folders': excluded,
+    })
+    assert response.status_code == 400
+    with app.app_context():
+        assert ImageBank.query.count() == 0
+
+
+def test_reimport_exclusions_cannot_change_a_busy_bank(app, client, tmp_path):
+    from app.services import bank_jobs
+
+    root = _tree(tmp_path, {'alpha': 1})
+    bank_id = client.post('/api/bank/create', json={
+        'name': 'Demo Parent', 'folder': str(root),
+    }).get_json()['id']
+    with app.app_context(), bank_jobs.mutation_lease(bank_id, 'fixture_busy'):
+        response = client.post('/api/bank/create', json={
+            'name': 'Demo Parent', 'folder': str(root), 'excluded_folders': ['alpha'],
+        })
+    assert response.status_code == 409

@@ -79,7 +79,7 @@ export default function PromptPreview({ subject, identityPrompts }) {
   }
 
   return (
-    <div id="prompt-preview" className="border-t border-border pt-4">
+    <div id="prompt-preview" className="settings-wide border-t border-border pt-4">
       <h4 className="text-sm font-medium text-content">What actually gets sent</h4>
       <p className="mt-1 mb-2 text-xs text-content-muted">
         The full prompt for one real shot, assembled from every box on this card, as the
@@ -89,7 +89,7 @@ export default function PromptPreview({ subject, identityPrompts }) {
 
       {/* Two columns from 400px (the two selects), the toggle on its own row. A
           three-across row of selects is what overflows a phone card. */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <div>
           <label htmlFor="prompt-preview-engine" className="block text-2xs font-medium text-content-muted">
             Engine

@@ -95,7 +95,7 @@ export function Card({ title, help, children, id }) {
     <section id={id} className="lds-section scroll-mt-24 py-4">
       <h2 className="text-base font-semibold text-content">{title}</h2>
       {help && <p className="mt-1 text-sm text-content-muted">{help}</p>}
-      <div className="mt-3 space-y-3">{children}</div>
+      <div className="settings-fields mt-3 space-y-3">{children}</div>
     </section>
   )
 }
