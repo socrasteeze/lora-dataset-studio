@@ -2,10 +2,10 @@
 
 ## Delivery Preparation (2026-10-14)
 
-- The operator authorized clean delivery to main if the changes are qualified. That supersedes the earlier request to keep PR #3 open once the required cloud checks pass. Local tests remain pending. Permission to resume the previously stopped cloud checks has been requested and is awaiting a response.
+- The operator authorized clean delivery to main if the changes are qualified, then explicitly authorized resuming the required cloud checks. That supersedes the earlier request to keep PR #3 open once the required cloud checks pass. Local tests remain pending.
 - Delivery scope: Other Tags OR selection, wider two-column Settings forms, persistent single-bank import exclusions, and Bank loading/query improvements. The caption review required no code change: the inspected saved run did not request Caption, which stays optional in Launch All.
 - Source and generated frontend bundle are prepared separately on `noble/other-bank-tags`. Origin/main is unchanged at `d20878b90`; fetching found no new main commits. Build, Ruff and ESLint passed, with 32 existing ESLint warnings. The privacy scan covered 2,982 tracked/untracked text files with zero findings. Attribution matches are technical references, caption provenance and regression fixtures; no attribution removal or credential rotation is needed.
-- Keep main unchanged until exact-head cloud Gates and rendered checks cover the new Settings and import behavior. Do not restart tests without the pending permission. Historical status notes below describe earlier points in the work.
+- Keep main unchanged until exact-head cloud Gates and rendered checks cover the new Settings and import behavior. The cloud browser check covers one-bank exclusions and all core Settings routes at five sizes, plus the existing responsive probe. Historical status notes below describe earlier points in the work.
 
 ## Bank Opening Performance Pending (2026-10-14)
 
