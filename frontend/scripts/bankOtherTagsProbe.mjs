@@ -19,6 +19,7 @@ const outcomes = [];
 let server;
 let browser;
 let serverOutput = '';
+let serverUrl;
 
 async function run(command, args) {
   const child = spawn(command, args, { cwd: path.join(root, 'frontend'), windowsHide: true });
@@ -39,6 +40,7 @@ try {
   const port = socket.address().port;
   await new Promise((resolve, reject) => socket.close((error) => error ? reject(error) : resolve()));
   const url = `http://127.0.0.1:${port}`;
+  serverUrl = url;
   const python = path.join(root, '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
   server = spawn(python, [path.join(root, 'backend/tests/bank_other_tags_server.py'), runtime, String(port)],
     { cwd: root, windowsHide: true, env: { ...process.env, PYTHONUTF8: '1' } });
@@ -61,7 +63,7 @@ try {
     const context = await browser.newContext({ viewport: { width, height } });
     const page = await context.newPage();
     const errors = [];
-    page.on('pageerror', (error) => errors.push(error.message));
+    page.on('pageerror', (error) => { errors.push(error.message); console.error(error.message); });
     await page.addInitScript((id) => localStorage.setItem('bankCurrentId', String(id)), ready.bank_id);
     await page.goto(`${url}/#/bank`);
     const drawer = page.locator('[aria-controls="bank-filter-rail"]:visible');
@@ -118,14 +120,30 @@ try {
   fs.mkdirSync(receipts, { recursive: true });
   await writeFile(path.join(receipts, 'other-tags.json'), JSON.stringify({ outcomes, responsive: probe }, null, 2));
   console.log(`Other Tags browser checks passed at ${outcomes.length} viewport sizes.\n${probe}`);
+} catch (error) {
+  console.error(error.stack || error);
+  for (const context of browser?.contexts() || []) {
+    for (const page of context.pages()) {
+      console.error(JSON.stringify({ url: page.url(),
+        headings: await page.locator('h1').allTextContents(),
+        buttons: await page.getByRole('button').allTextContents() }));
+    }
+  }
+  throw error;
 } finally {
   await browser?.close();
   if (server && server.exitCode === null) {
-    const exited = new Promise((resolve) => server.once('exit', resolve));
-    server.kill();
-    await exited;
+    const exited = new Promise((resolve) => server.once('exit', () => resolve(true)));
+    try {
+      await fetch(`${serverUrl}/test/shutdown`, { method: 'POST', signal: AbortSignal.timeout(5000) });
+    } catch { /* A failed startup may not have opened the fixture endpoint. */ }
+    if (!await Promise.race([exited, delay(10000, false, { ref: false })])) {
+      if (process.platform === 'win32') await run('taskkill', ['/PID', String(server.pid), '/T', '/F']);
+      else server.kill();
+      await exited;
+    }
   }
   const parent = path.resolve(tmpdir()) + path.sep;
   assert.ok(path.resolve(runtime).startsWith(parent) && path.basename(runtime).startsWith('lds-other-tags-'));
-  await rm(runtime, { recursive: true, force: true });
+  await rm(runtime, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }
