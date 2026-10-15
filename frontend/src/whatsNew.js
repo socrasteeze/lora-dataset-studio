@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-15-bank-queue-active-work',
+    date: '2026-10-15',
+    title: 'Visible Bank Work',
+    blurb: 'A pass started inside a Bank now appears under Active Passes above the shared queue. Queued pipelines wait for that machine\'s active Bank work through every phase, including time between GPU steps. Stop running covers both direct passes and queued pipelines.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-15-bulk-bank-profile-moves',
     date: '2026-10-15',
     title: 'Move Banks Together',

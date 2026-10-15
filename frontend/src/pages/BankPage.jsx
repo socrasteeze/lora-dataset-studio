@@ -327,6 +327,9 @@ export default function BankPage() {
   // bank_id -> {state, position} from the polled queue, falling back to the
   // server's queue_state on the bank row (first paint, before the first poll).
   const queueStateOf = (bank) => {
+    if (queue?.active_jobs?.some((job) => (job.bank_ids || [job.bank_id]).includes(bank.id))) {
+      return { state: 'running' }
+    }
     const it = queue?.items?.find((i) => i.bank_id === bank.id)
     return it ? { state: it.state, position: it.position } : (queue ? null : bank.queue_state)
   }
@@ -643,13 +646,22 @@ export default function BankPage() {
     try { await postJson('/api/bank-queue/clear', { pending_only: true }) } catch (e) { toast.error(e?.message || 'Could not clear the queue.') }
     refreshQueue()
   }
-  // One entry runs per machine, so there can be more than one to stop. Each is
-  // the same per-entry cancel the ✕ uses; the next waiting bank then starts.
+  const stopDirect = async (id) => {
+    if (!window.confirm(`Stop ${nameOf(id)}? Finished work stays saved.`)) return
+    try { await postJson(`/api/bank/${id}/cancel`, {}) }
+    catch (e) { toast.error(e?.message || 'Could not stop the Bank pass.') }
+    refreshQueue()
+  }
+  // Stop queued pipelines and direct workspace passes through their owning
+  // API. Waiting pipelines keep their entries and advance after work stops.
   const stopRunning = async () => {
     const ask = stopRunningConfirm(queue, nameOf)
     if (!ask || !window.confirm(ask)) return
     for (const it of runningItems(queue)) {
-      try { await del(`/api/bank-queue/${it.bank_id}`) } catch (e) { toast.error(e?.message || 'Could not stop the bank.') }
+      try {
+        if (it.direct) await postJson(`/api/bank/${it.bank_id}/cancel`, {})
+        else await del(`/api/bank-queue/${it.bank_id}`)
+      } catch (e) { toast.error(e?.message || 'Could not stop the bank.') }
     }
     refreshQueue()
   }
@@ -798,7 +810,7 @@ export default function BankPage() {
           "GPU busy" flag — every bank is skipped and the night is wasted. The
           notice is silent unless the server says the flag has nothing behind it. */}
       <GpuBusyNotice onCleared={refreshQueue} />
-      <BankQueuePanel queue={queue} nameOf={nameOf} onCancel={cancelQueued}
+      <BankQueuePanel queue={queue} nameOf={nameOf} onCancel={cancelQueued} onStopDirect={stopDirect}
         onClearWaiting={clearWaiting} onStopRunning={stopRunning} />
       {/* Second way in: the scraper's own destination. A bank no longer needs a
           folder you prepared by hand — you can fill one straight from the web. */}

@@ -168,8 +168,13 @@ test('both destructive queue actions, and the running row ✕, ask first', () =>
   assert.match(page, /live = await apiFetch\('\/api\/bank-queue'\)/);
   assert.match(page, /const ask = removeQueuedConfirm\(live, nameOf, id\)/);
   assert.match(page, /if \(ask && !window\.confirm\(ask\)\) return/);
-  // Stop running uses the per-entry cancel, one per running entry (one per machine).
-  assert.match(page, /for \(const it of runningItems\(queue\)\)[\s\S]{0,80}del\(`\/api\/bank-queue\/\$\{it\.bank_id\}`\)/);
+  // Each running item uses its owning API. Workspace passes have no queued
+  // entry to delete; queued pipelines keep their per-entry cancellation.
+  const stopStart = page.indexOf('const stopRunning = async ()');
+  const stopBody = page.slice(stopStart, page.indexOf('if (currentId != null)', stopStart));
+  assert.match(stopBody, /for \(const it of runningItems\(queue\)\)/);
+  assert.match(stopBody, /if \(it\.direct\) await postJson\(`\/api\/bank\/\$\{it\.bank_id\}\/cancel`, \{\}\)/);
+  assert.match(stopBody, /else await del\(`\/api\/bank-queue\/\$\{it\.bank_id\}`\)/);
 });
 
 test('hovering, focusing or pressing a queue row tints the WHOLE row', () => {

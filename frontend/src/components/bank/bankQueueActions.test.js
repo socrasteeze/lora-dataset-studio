@@ -18,6 +18,15 @@ test('waiting and running are split by state', () => {
   assert.deepEqual(waitingItems(undefined), [])
 })
 
+test('Stop running includes direct workspace work while Clear waiting keeps it', () => {
+  const q = { items: [{ bank_id: 2, state: 'pending' }],
+    active_jobs: [{ bank_id: 1, kind: 'score', direct: true, state: 'running' }] }
+  assert.deepEqual(runningItems(q).map((job) => job.bank_id), [1])
+  assert.deepEqual(waitingItems(q).map((job) => job.bank_id), [2])
+  assert.equal(clearWaitingConfirm(q), 'Remove 1 waiting bank? The running bank keeps going.')
+  assert.match(stopRunningConfirm(q, nameOf), /Stop Alpha/)
+})
+
 test('Clear waiting names the count and says the running bank keeps going', () => {
   assert.equal(clearWaitingConfirm(queue('running', 'pending', 'pending')),
     'Remove 2 waiting banks? The running bank keeps going.')

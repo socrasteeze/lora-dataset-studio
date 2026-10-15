@@ -281,7 +281,7 @@ def _adopt_reservation_locked(reservation, keys, kind):
 
 
 def start(app, bank_id, kind, fn, total=0, reserve_ids=None,
-          reservation=None, device_label=None):
+          reservation=None, device_label=None, device_id=None):
     """Run ``fn(job)`` in a daemon thread under an app context. One live job
     per bank — raises BankJobBusy otherwise. ``fn`` reports through
     ``progress``/``bump`` and should poll ``cancelled(job)`` between items.
@@ -298,7 +298,14 @@ def start(app, bank_id, kind, fn, total=0, reserve_ids=None,
     events. Upstream's reservation rewrite landed on top of it and the three
     _log calls below still read it, so dropping the parameter would be a
     NameError on the first failed or finished pass, not a lost label.
+    ``device_id`` keeps the matching machine identity for queue coordination;
+    display labels alone are not unique machine identifiers.
     """
+    if device_id is not None:
+        from .cluster import LOCAL_DEVICE_ID, normalize_device_id
+        device_id = normalize_device_id(device_id)
+        if device_id == LOCAL_DEVICE_ID:
+            device_id = None
     keys = _reservation_keys(bank_id, reserve_ids)
     with _lock:
         cur = _jobs.get(_key(bank_id))
@@ -324,6 +331,7 @@ def start(app, bank_id, kind, fn, total=0, reserve_ids=None,
         # Stamped at LAUNCH, not at reservation: a reservation does not yet know
         # which machine will run it (Divergence 6).
         job['device'] = device_label or None
+        job['device_id'] = device_id
         job['_touched'] = time.time()
     _log(bank_id, f'{kind} started', 'info',
          detail=f'{total} image(s)' if total else None, device=device_label)
@@ -585,6 +593,30 @@ def get(bank_id):
 def running(bank_id) -> bool:
     snap = get(bank_id)
     return bool(snap and not snap['finished'])
+
+
+def active_bank_jobs() -> list:
+    """Small snapshots of running image-Bank work, including direct launches.
+
+    Reservations have not started work yet. Multi-Bank aliases describe one
+    job, and namespaced video jobs belong to the video's own activity surface.
+    """
+    with _lock:
+        now, seen, result = time.time(), set(), []
+        for key, job in list(_jobs.items()):
+            if id(job) in seen:
+                continue
+            seen.add(id(job))
+            keys = tuple(job.get('_keys') or (key,))
+            if not isinstance(keys[0], int) or job.get('finished') or not job.get('_launched', True):
+                continue
+            if now - job.get('_touched', now) > _STALE_TTL:
+                _drop_job_locked(job)
+                continue
+            result.append({'bank_id': keys[0], 'bank_ids': keys,
+                           'kind': job.get('kind'), 'started_at': job.get('started_at'),
+                           'device_id': job.get('device_id'), 'device_label': job.get('device')})
+        return result
 
 
 def live_bank_ids() -> list:
