@@ -4,9 +4,9 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import {
-  PASSES_PANEL_DEFAULT_OPEN, RAIL_FOLDED_GROUPS, RAIL_PRIMARY_GROUPS,
+  RAIL_FOLDED_GROUPS, RAIL_PRIMARY_GROUPS,
   RAIL_SIDE_BY_SIDE_PX, RAIL_STORAGE_KEY,
-  bankPaneHeight, foldedCount, loadRailOpen, passesButtonLabel, passesPanelStartsOpen,
+  bankPaneHeight, foldedCount, loadRailOpen, passesButtonLabel,
   railDefaultOpen, railGroups, railIsColumn, saveRailOpen,
 } from './bankLayout.js'
 
@@ -130,23 +130,6 @@ test('the passes button says the bank is busy, because the panel can be closed o
   assert.equal(passesButtonLabel(true), '⚙ Passes (running)')
 })
 
-test('the passes panel starts closed on a bank that has already been scanned', () => {
-  assert.equal(passesPanelStartsOpen({ total: 9000, scanned: 9000 }), false)
-  assert.equal(passesPanelStartsOpen({ total: 9000, scanned: 1 }), false)
-})
-
-test('a freshly imported dump opens the panel — the grid alone offers nothing to do', () => {
-  assert.equal(passesPanelStartsOpen({ total: 9000, scanned: 0 }), true)
-})
-
-test('an unloaded payload does not pop the panel open under the user', () => {
-  assert.equal(passesPanelStartsOpen(null), PASSES_PANEL_DEFAULT_OPEN)
-  assert.equal(passesPanelStartsOpen(undefined), PASSES_PANEL_DEFAULT_OPEN)
-  assert.equal(passesPanelStartsOpen({}), PASSES_PANEL_DEFAULT_OPEN)
-  // An empty bank has nothing to scan either — the passes cannot help it.
-  assert.equal(passesPanelStartsOpen({ total: 0, scanned: 0 }), false)
-})
-
 /* ── The drawer is painted, not tinted ──────────────────────────────────────
    Same trap the Canvas already fell into (canvasChromeLayering.test.js):
    `bg-surface` and `bg-surface-overlay` read as synonyms and are not. The
@@ -167,21 +150,4 @@ test('the filter drawer floats on an OPAQUE panel, never on the card tint', () =
   // …and never the bare tint, nor the opaque token thinned back into glass.
   assert.doesNotMatch(drawer, /\bbg-surface\b(?!-)/)
   assert.doesNotMatch(drawer, /bg-surface-overlay\/\d/)
-})
-
-/* The panel opens itself only where it has room to. Measured by the responsive
-   probe on a fresh bank at 360 px: ~1 550 px of panel — the eight pass buttons,
-   the semantic-engine card, the watermark and edit panels and the overview, all
-   stacked — put the first image two screens down. The ⚙ Passes button is in the
-   header on every width; below lg it stays a button. */
-test('the passes panel does not open itself on a phone, and still does on a desktop', () => {
-  const fresh = { total: 9000, scanned: 0 }
-  assert.equal(passesPanelStartsOpen(fresh, 360), false)
-  assert.equal(passesPanelStartsOpen(fresh, 844), false)
-  assert.equal(passesPanelStartsOpen(fresh, 1023), false)
-  assert.equal(passesPanelStartsOpen(fresh, 1024), true)
-  assert.equal(passesPanelStartsOpen(fresh, 1440), true)
-  // no width given (server, tests, old callers) = the historical answer
-  assert.equal(passesPanelStartsOpen(fresh), true)
-  assert.equal(passesPanelStartsOpen(fresh, undefined), true)
 })

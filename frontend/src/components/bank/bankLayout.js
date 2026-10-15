@@ -177,10 +177,6 @@ export function foldedCount(availability = {}) {
    existing dialogs untouched — the panel is a container, not a rewrite of what
    the buttons do. */
 
-/** The passes panel starts CLOSED. It is the step you do once per bank, and it
- *  was occupying the top third of a screen whose subject is the grid. */
-export const PASSES_PANEL_DEFAULT_OPEN = false;
-
 /**
  * The label of the ⚙ Passes button. It carries the state of the work rather
  * than just naming the panel: while a pass is running the button is the only
@@ -189,30 +185,4 @@ export const PASSES_PANEL_DEFAULT_OPEN = false;
  */
 export function passesButtonLabel(live) {
   return live ? '⚙ Passes (running)' : '⚙ Passes';
-}
-
-/**
- * Should the passes panel be forced open? Yes exactly when a bank has nothing
- * measured yet: on a freshly imported dump the grid is a wall of unscanned
- * images and every useful action is inside that panel, so starting it closed
- * would hide the only thing there is to do.
- *
- * `counts` is the payload's own counter block. An absent payload answers
- * "don't force" — while it is still loading we know nothing, and popping a
- * panel open under the user a second after the page settles is worse than
- * leaving it shut.
- */
-/** Below this width the panel does NOT open itself. Measured by the responsive
- *  probe on a fresh bank: at 360 px the panel is ~1 550 px tall — the eight pass
- *  buttons, the semantic-engine card, the watermark and edit panels and the
- *  overview, all stacked — so "opens itself once" put the first image two
- *  screens down. The ⚙ Passes button is in the header on every width; on a
- *  phone it stays a button. Same breakpoint as the rail (`lg`). */
-export const PASSES_AUTO_OPEN_MIN_PX = 1024;
-
-export function passesPanelStartsOpen(counts, viewportWidth = Infinity) {
-  if (typeof viewportWidth === 'number' && viewportWidth < PASSES_AUTO_OPEN_MIN_PX) return false;
-  if (!counts || typeof counts.total !== 'number') return PASSES_PANEL_DEFAULT_OPEN;
-  if (counts.total <= 0) return PASSES_PANEL_DEFAULT_OPEN;
-  return (counts.scanned || 0) <= 0;
 }

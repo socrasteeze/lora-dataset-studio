@@ -22,7 +22,6 @@ const rail = read('./BankFilterRail.jsx');
 const lightbox = read('./BankReviewLightbox.jsx');
 const dupCompare = read('./DupCompareLightbox.jsx');
 const passes = read('./BankPassesPanel.jsx');
-const layout = read('./bankLayout.js');
 const page = read('../../pages/BankPage.jsx');
 const probe = read('../../../scripts/responsiveProbe.mjs');
 
@@ -48,10 +47,10 @@ test('the passes panel is a READING surface: asked for, one tap away, used again
   assert.match(workspace, /compact=\{!railIsColumnNow\}/);
 });
 
-test('the passes panel does not open itself below lg', () => {
-  assert.match(layout, /export const PASSES_AUTO_OPEN_MIN_PX = 1024;/);
-  assert.match(layout, /export function passesPanelStartsOpen\(counts, viewportWidth = Infinity\)/);
-  assert.match(workspace, /passesPanelStartsOpen\(counts, viewportWidth\(\)\)/);
+test('statistics cannot open the passes panel at any viewport width', () => {
+  assert.match(workspace, /const \[passesOpen, setPassesOpen\] = useState\(false\)/);
+  assert.match(workspace, /setPassesOpen\(\(v\) => !v\)/);
+  assert.doesNotMatch(workspace, /passesPanelStartsOpen|passesShouldOpen|setPassesOpen\(true\)/);
 });
 
 test('the rail is a layer when it is a drawer, and a panel always', () => {

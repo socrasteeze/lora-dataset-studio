@@ -3056,7 +3056,30 @@ def _bp_similarity_summaries(bank_id, base):
     return dup, semantic_dup, clusters, faces_scanned, style_clusters
 
 
-def bank_payload(user_id, bank_id) -> dict | None:
+def _bank_workspace_fields(bank, th):
+    """Control metadata without image aggregates, source walks or ML probes."""
+    return {
+        'id': bank.id, 'instance_id': bank.instance_id, 'name': bank.name,
+        'source_path': bank.source_path,
+        'excluded_folders': _excluded_prefixes(bank.id),
+        'semantic_engine': _selected_semantic_engine(bank),
+        'created_at': bank.created_at.isoformat() if bank.created_at else None,
+        'activity': bank_jobs.get(bank.id),
+        'queue_state': bank_queue.state_for(bank.id),
+        'undo': bank_undo.peek(bank.id),
+        'pipeline_report': _load_pipeline_report(bank),
+        'last_passes': last_passes(bank),
+        'folder_sync': _sync_cached(bank.id),
+        'thresholds': th,
+    }
+
+
+def bank_workspace_payload(user_id, bank_id) -> dict | None:
+    bank = get_bank(user_id, bank_id)
+    return _bank_workspace_fields(bank, thresholds()) if bank else None
+
+
+def bank_payload(user_id, bank_id, *, include_runtime=True) -> dict | None:
     """Everything the bank workspace needs on one poll: counts, flag totals,
     duplicate/cluster summaries, live job, thresholds."""
     bank = get_bank(user_id, bank_id)
@@ -3086,11 +3109,9 @@ def bank_payload(user_id, bank_id) -> dict | None:
     counts['semantic_indexed'] = int(
         semantic['counts']['ok'] if semantic else 0)
     return {
-        'id': bank.id, 'instance_id': bank.instance_id, 'name': bank.name, 'source_path': bank.source_path,
-        'excluded_folders': _excluded_prefixes(bank_id),
+        **_bank_workspace_fields(bank, th),
         'semantic_engine': (semantic['engine'] if semantic else
                             _selected_semantic_engine(bank)),
-        'created_at': bank.created_at.isoformat() if bank.created_at else None,
         'counts': counts, 'flags': flags,
         # Per-pass × per-pile run sizes — see the comment where they are built.
         'pass_scopes': pass_scopes,
@@ -3117,16 +3138,7 @@ def bank_payload(user_id, bank_id) -> dict | None:
         'semantic': semantic,
         'clusters': clusters, 'faces_scanned': faces_scanned,
         'style_clusters': style_clusters,
-        'activity': bank_jobs.get(bank_id),
-        'queue_state': bank_queue.state_for(bank_id),
-        # ↩ the one-step-back offer, so the bar survives a reload (the decision
-        # it takes back is in the database, not in a tab).
-        'undo': bank_undo.peek(bank_id),
-        'pipeline_report': _load_pipeline_report(bank),
-        # When each pass last completed here — what lets a screen answer "already
-        # done, on this many images" instead of offering an identical re-run.
-        'last_passes': last_passes(bank),
-        'score_device': score_device_info(bank_id),
+        **({'score_device': score_device_info(bank_id)} if include_runtime else {}),
         # Non-null only on a bank created before the create-time guard, whose
         # folder IS a dataset's storage. The workspace turns it into a standing
         # banner and disables 🗑 Delete rejected, which the server refuses anyway.

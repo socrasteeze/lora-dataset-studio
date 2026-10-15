@@ -437,7 +437,8 @@ const TOPICS = [
      'measure head angles', 'caption', 'watermark', 'semantic index',
      // The words someone types when the passes are not where they left them.
      'where are the passes', 'passes gone', 'cannot find scan', 'missing buttons',
-     'no scan button', 'where is score', 'analyze zone', 'bank', 'triage'],
+     'no scan button', 'where is score', 'analyze zone', 'bank', 'triage',
+     'slow toolbar', 'loading stats', 'controls loading', 'retry statistics'],
     '/bank', 'using-the-app', 'the-image-bank-triage-a-big-folder'),
   action('bank-filter-rail', 'The filter rail beside the bank grid',
     ['filters', 'filter rail', 'rail', 'sidebar', 'left column', 'chips',

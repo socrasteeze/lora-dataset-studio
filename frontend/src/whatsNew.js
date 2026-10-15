@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-15-bank-toolbar-background-stats',
+    date: '2026-10-15',
+    title: 'Faster Bank Controls',
+    blurb: 'Bank controls appear while statistics load in the background. Counter rows keep their height, and background results no longer open Passes or move the toolbars.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-15-protected-duplicate-survivor',
     date: '2026-10-15',
     title: 'Keep A Copy',

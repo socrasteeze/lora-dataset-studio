@@ -1,6 +1,33 @@
 # HANDOFF
 
-**Updated:** 2026-10-15 | **Target:** main | **Delivery base:** 1a0ce279b | **Task branch:** noble/duplicate-action-sizing
+**Updated:** 2026-10-15 | **Target:** main | **Delivery base:** 4728f9846 | **Task branch:** noble/bank-toolbar-loading
+
+## Toolbar loading delivery
+
+- Bank controls use a lightweight `/workspace` read with no image aggregates, source walk, semantic inspection or runtime probe. Statistics request `sync=0&runtime=0`; scoring-device readiness uses its own read. The original full payload retains its runtime field for older callers.
+- Metadata, statistics and images load independently. The source check follows images without waiting for statistics. Runtime reads are deduplicated, cancelled on exit and refreshed after a Python change. Request generations reject old-bank and superseded replies; late metadata preserves newer fields and statistics preserve a newer folder-check result.
+- Source controls render from the first paint and enable after metadata arrives. Header counters and action rows reserve their height, including scrollbar space. Unknown quality counts show a dash. Failed statistics offer Retry. Promotion, deletion and auto-reject still wait for their required information.
+- Passes opens only on an explicit click and scrolls inside a bounded viewport area. Analysis buttons use fixed cells so late counts and readiness labels cannot resize them. Statistics cannot open the panel. Folder/conflict notices and the last pipeline report sit in the results pane below the toolbars, so they cannot move the rail or either toolbar. Live progress and Stop remain above the scrolling panes. Bank-specific endpoints do not change Dataset loading or shared control behavior.
+- Added synthetic backend cases for the lightweight/no-probe contract, separate statistics/runtime reads, legacy compatibility and missing-bank checks. Added frontend cases for delayed/out-of-order data and stable loading/error markup. Updated obsolete auto-open expectations. None of these tests ran.
+- Ruff, ESLint and the frontend build passed. ESLint retains 32 existing warnings. The scrub checked 3,009 publishable text files, including the rebuilt bundle, with zero privacy findings and no new source attribution. Existing attribution-pattern hits are technical references, policy filenames, scanner patterns or synthetic fixtures. No credential rotation or history rewrite is indicated by the scans.
+- The operator authorized a clean commit and push to main without tests. No tests, cloud tasks, responsive probes, fixture servers, application imports or production jobs ran. Source and rebuilt frontend/dist use separate `[skip ci]` commits. Verify final publication against origin/main. No production restart or measured latency qualification was performed.
+
+## UI stability evidence
+
+```text
+# UI Stability Audit — Bank Workspace
+Scope: /bank controls and loading | Viewports: not rendered | Runtime: static-only
+
+## Verdict
+SHIP under the explicit no-test exception. Runtime layout remains unqualified.
+
+## Findings
+| # | Check | Status | Severity | Evidence | Fix |
+| 1 | Loading/final geometry | WARN | SHIFT | frontend/src/components/bank/BankStatsStrip.jsx:7 | Reserve the counter height for loading, populated and error states. |
+| 2 | Late panel expansion | WARN | SHIFT | frontend/src/components/bank/BankWorkspace.jsx:2094 | Require a click to open Passes and bound its scrolling height. |
+| 3 | Background notices above controls | WARN | SHIFT | frontend/src/components/bank/BankWorkspace.jsx:2742 | Keep folder/conflict notices and reports inside the results pane. |
+| 4 | CLS, overflow and touch targets | NOT RUN | SHIFT | No rendered session or fixture server was started. | Operator verification remains open. |
+```
 
 ## Duplicate and scroll delivery
 

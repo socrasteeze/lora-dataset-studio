@@ -295,15 +295,34 @@ def bank_get(bank_id):
 
     Older clients keep the cooldown-limited walk; refresh=1 forces that walk.
     The current workspace checks the source separately after its first page.
+    runtime=0 leaves scoring-runtime checks to the separate score-device read.
     """
     sync = (banks._sync_cached(bank_id) if request.args.get('sync') == '0'
             else banks.refresh_bank(LOCAL_USER, bank_id,
                                     force=request.args.get('refresh') == '1'))
-    payload = banks.bank_payload(LOCAL_USER, bank_id)
+    payload = (banks.bank_payload(LOCAL_USER, bank_id, include_runtime=False)
+               if request.args.get('runtime') == '0'
+               else banks.bank_payload(LOCAL_USER, bank_id))
     if payload is None:
         return jsonify({'error': 'not found'}), 404
     payload['folder_sync'] = sync
     return jsonify(payload)
+
+
+@bp.get('/bank/<int:bank_id>/workspace')
+def bank_workspace(bank_id):
+    """Load controls independently of statistics and scoring-runtime probes."""
+    payload = banks.bank_workspace_payload(LOCAL_USER, bank_id)
+    if payload is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(payload)
+
+
+@bp.get('/bank/<int:bank_id>/score-device')
+def bank_score_device(bank_id):
+    if banks.get_bank(LOCAL_USER, bank_id) is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify({'id': bank_id, 'score_device': banks.score_device_info(bank_id)})
 
 
 @bp.get('/bank/<int:bank_id>/folder-sync')

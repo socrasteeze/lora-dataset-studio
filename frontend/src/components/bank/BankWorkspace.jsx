@@ -13,6 +13,7 @@ import { loadSavedDeviceId } from '../common/DevicePicker'
 import { stepGate } from './passDeviceGate.js'
 import GpuBusyNotice from '../common/GpuBusyNotice'
 import BankDecisionBar from './BankDecisionBar.jsx'
+import BankStatsStrip from './BankStatsStrip.jsx'
 // Fork-side imports the Encre split dropped from this file: the logic below is
 // this fork's (peer dispatch, the 🔖 Tags pass, the filter summary) and it did not
 // move into upstream's new components, so its imports belong here still.
@@ -55,8 +56,9 @@ import {
 // Structure B's own logic — rail folding, facet groups, the passes panel.
 import {
   FOLD_KEYS, bankPaneHeight, loadDismissedReport, loadFold, loadRailOpen, passesButtonLabel,
-  passesPanelStartsOpen, railIsColumn, saveDismissedReport, saveFold, saveRailOpen,
+  railIsColumn, saveDismissedReport, saveFold, saveRailOpen,
 } from './bankLayout.js'
+import { mergeWorkspacePayload } from './bankWorkspaceLoading.js'
 import PromoteDialog from './PromoteDialog'
 import DeleteRejectedDialog from './DeleteRejectedDialog'
 import LaunchAllDialog from './LaunchAllDialog'
@@ -212,6 +214,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const coverageRequestRef = useRef(0)
   const textStatusRequestRef = useRef(0)
   const [payload, setPayload] = useState(null)
+  const [metadataError, setMetadataError] = useState(false)
+  const [statsError, setStatsError] = useState(false)
   // The chip counters measured under the ACTIVE filter (null = nothing filtered,
   // so the payload's bank-wide numbers are the honest answer). See
   // bankFacetCounts.js for why these are two maps and not one.
@@ -274,6 +278,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const imageRequestRef = useRef(0)
   const imageAbortRef = useRef(null)
   const payloadRequestRef = useRef(0)
+  const metadataRequestRef = useRef(0)
+  const runtimeRequestRef = useRef(0)
+  const runtimeAbortRef = useRef(null)
   const payloadPendingRef = useRef(new Map())
   const activityPendingRef = useRef(new Set())
   const [comparisonLoading, setComparisonLoading] = useState(false)
@@ -409,7 +416,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // must never render as "no job running".
   const connection = useConnectionStatus()
 
-  const desktopPanes = railOpen && railIsColumnNow && Boolean(payload)
+  const desktopPanes = railOpen && railIsColumnNow
   useLayoutEffect(() => {
     const panes = bankPanesRef.current
     if (!desktopPanes || !panes) return undefined
@@ -461,16 +468,56 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // any poll, and refreshImages is defined after refreshPayload.
   const refreshImagesRef = useRef(null)
 
+  const refreshMetadata = useCallback(async (opts = {}) => {
+    const requestNumber = ++metadataRequestRef.current
+    setMetadataError(false)
+    try {
+      const metadata = await apiFetch(`/api/bank/${bankId}/workspace`, opts)
+      if (activeBankRef.current !== bankId || requestNumber !== metadataRequestRef.current) return
+      if (announcedActivityAt.current === undefined) {
+        announcedActivityAt.current = metadata?.activity?.finished
+          ? metadata.activity.started_at ?? null : null
+      }
+      setPayload((current) => mergeWorkspacePayload(current, metadata, { metadata: true }))
+    } catch {
+      if (opts.signal?.aborted || activeBankRef.current !== bankId
+          || requestNumber !== metadataRequestRef.current) return
+      // The legacy statistics route decides whether the Bank is gone. An
+      // older backend can lack this new route until Studio is restarted.
+      setMetadataError(true)
+    }
+  }, [bankId])
+
+  const refreshRuntime = useCallback(async (force = false) => {
+    if (runtimeAbortRef.current && !force) return
+    const requestNumber = ++runtimeRequestRef.current
+    runtimeAbortRef.current?.abort()
+    const controller = new AbortController()
+    runtimeAbortRef.current = controller
+    try {
+      const runtime = await apiFetch(`/api/bank/${bankId}/score-device`,
+        { background: true, signal: controller.signal })
+      if (activeBankRef.current === bankId && requestNumber === runtimeRequestRef.current) {
+        setPayload((current) => mergeWorkspacePayload(current, runtime))
+      }
+    } catch { /* Runtime readiness must not delay the controls or statistics. */ }
+    finally {
+      if (requestNumber === runtimeRequestRef.current) runtimeAbortRef.current = null
+    }
+  }, [bankId])
+
   const refreshPayload = useCallback(async (opts = {}) => {
     if (activeBankRef.current !== bankId) return null
     const requestNumber = ++payloadRequestRef.current
     payloadPendingRef.current.set(bankId, (payloadPendingRef.current.get(bankId) || 0) + 1)
+    setStatsError(false)
+    refreshRuntime(!!opts.force)
     try {
       // Opening reads saved inventory first. A separate source check follows
       // the first grid page, so the filesystem walk cannot delay that page.
-      const query = opts.force ? '?refresh=1' : opts.skipSync ? '?sync=0' : ''
+      const query = opts.force ? '?refresh=1&runtime=0' : '?sync=0&runtime=0'
       const d = await apiFetch(`/api/bank/${bankId}${query}`,
-        { background: !!opts.background })
+        { background: !!opts.background, signal: opts.signal })
       if (activeBankRef.current !== bankId || requestNumber !== payloadRequestRef.current) return null
       fullPayloadAt.current = Date.now()
       // First payload of this bank: record its finished-activity generation
@@ -482,7 +529,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         announcedActivityAt.current = (d?.activity?.finished
           ? d.activity.started_at ?? null : null)
       }
-      setPayload(d)
+      setPayload((current) => mergeWorkspacePayload(current, opts.force ? d
+        : { ...d, folder_sync: current?.folder_sync ?? d.folder_sync }))
       // Images dropped in the folder show up on their own — say it, and pull
       // them into the grid, so the counters never move without a reason.
       const note = folderSyncToast(d.folder_sync)
@@ -490,15 +538,17 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       if ((d.folder_sync?.added || 0) > 0) refreshImagesRef.current?.()
       return d
     } catch (e) {
+      if (opts.signal?.aborted) return null
       if (activeBankRef.current !== bankId || requestNumber !== payloadRequestRef.current) return null
       if (String(e?.message || '').includes('not found')) { onGone?.(); return null }
+      setStatsError(true)
       return null
     } finally {
       const remaining = (payloadPendingRef.current.get(bankId) || 1) - 1
       if (remaining) payloadPendingRef.current.set(bankId, remaining)
       else payloadPendingRef.current.delete(bankId)
     }
-  }, [bankId, onGone, toast])
+  }, [bankId, onGone, toast, refreshRuntime])
 
   const filterParams = useCallback((f) => {
     const params = {}
@@ -577,6 +627,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     imageAbortRef.current?.abort()
     imageRequestRef.current += 1
     payloadRequestRef.current += 1
+    metadataRequestRef.current += 1
+    runtimeRequestRef.current += 1
+    runtimeAbortRef.current?.abort()
+    runtimeAbortRef.current = null
   }, [bankId])
 
   // The chip counters, re-measured whenever the filter — or the data under it —
@@ -612,16 +666,20 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     // first payload of the next bank could re-toast its old finished snapshot.
     announcedActivityAt.current = undefined
     let dropped = false
+    const controller = new AbortController()
     setPayload(null); setSubfolders([]); setTagFacets(null)
+    setStatsError(false); setMetadataError(false)
     fullPayloadAt.current = 0
-    Promise.all([refreshPayload({ skipSync: true }), refreshImages(f)]).then(async ([initial]) => {
-      if (dropped || !initial) return
+    refreshMetadata({ signal: controller.signal, background: true })
+    refreshPayload({ signal: controller.signal, background: true })
+    refreshImages(f).then(async (loaded) => {
+      if (dropped || !loaded) return
       try {
         const sync = await apiFetch(`/api/bank/${bankId}/folder-sync`, { background: true })
         if (dropped) return
         const note = folderSyncToast(sync)
         if (note) toast[note.type](note.text)
-        setPayload((p) => p ? { ...p, folder_sync: sync } : p)
+        setPayload((p) => mergeWorkspacePayload(p, { id: bankId, folder_sync: sync }))
         if ((sync?.added || 0) > 0) {
           refreshPayload({ skipSync: true, background: true })
           refreshImagesRef.current?.()
@@ -632,15 +690,16 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         .then((d) => { if (!dropped) setSubfolders(d.subfolders || []) })
         .catch(() => { /* A transient error leaves the current folder choices. */ })
     })
-    return () => { dropped = true }
+    return () => { dropped = true; controller.abort() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bankId])
 
   // Poll waiting jobs too: another Bank can finish and release this job's turn.
   const live = payload?.activity && !payload.activity.finished
   const queuedJob = payload?.queue_state
+  const workspaceReady = payload?.source_path != null
   const watchingJob = live || queueJobActive(queuedJob)
-  const bankBusy = live || !!queuedJob
+  const bankBusy = !workspaceReady || live || !!queuedJob
   useEffect(() => {
     if (!watchingJob) {
       /* The landing is announced PER JOB GENERATION (started_at), not per
@@ -1417,13 +1476,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const semanticOperationBusy = diverseBusy || balanceBusy || similarBusy || textPending
 
   const counts = payload?.counts
-  /* A freshly imported dump has nothing measured: the grid is a wall of
-     unscanned images and every useful action is inside the passes panel, so it
-     opens ITSELF once. Guarded on the computed boolean rather than on `counts`,
-     so the first scan flipping it to false never re-runs this — and so a user
-     who closes the panel on such a bank is not fought by the effect. */
-  const passesShouldOpen = passesPanelStartsOpen(counts, viewportWidth())
-  useEffect(() => { if (passesShouldOpen) setPassesOpen(true) }, [passesShouldOpen])
+  // Statistics never open a panel or change the operator's layout choice.
   // The Sort menu greys an entry out when its pass has measured NOTHING. Face
   // confidence is the one whose progress the payload reports outside `counts`
   // (faces_scanned, a sibling key), so it is folded in here rather than by
@@ -1892,6 +1945,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   }
   const excludeFolderButton = (extraClass) => (
     <Button type="button" size="md" noShrink onClick={() => setExcludingFolders(true)}
+      disabled={!workspaceReady}
       title="Hide nested folders from this bank. The files stay on disk, and you can show them again."
       className={extraClass}>
       <FolderMinus aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />
@@ -1920,22 +1974,22 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           counter rows and most of its padding, and becomes a one-line toolbar. */}
       <header data-probe-chrome="header"
         className="space-y-2 pb-2 [@media(max-height:500px)]:flex [@media(max-height:500px)]:flex-nowrap [@media(max-height:500px)]:items-center [@media(max-height:500px)]:gap-3 [@media(max-height:500px)]:space-y-0 [@media(max-height:500px)]:pb-1">
-        <div className="flex flex-wrap items-center gap-2 [@media(max-height:500px)]:min-w-0 [@media(max-height:500px)]:shrink">
+        <div className="flex min-w-0 flex-nowrap items-center gap-2 [@media(max-height:500px)]:shrink">
           <Button type="button" size="md" onClick={onBack}>
             ← Banks
           </Button>
-          <h1 className="flex items-center gap-2 text-xl font-semibold text-content"><Archive aria-hidden="true" className="h-4 w-4" /> {payload?.name || `Bank #${bankId}`}</h1>
-          {payload?.source_path && (
+          <h1 className="flex min-w-0 items-center gap-2 text-xl font-semibold text-content sm:max-w-[25%]"><Archive aria-hidden="true" className="h-4 w-4 shrink-0" /><span className="truncate">{payload?.name || `Bank #${bankId}`}</span></h1>
+          {(
             /* hidden below sm: opening or moving the folder is a gesture on the
                machine that serves the app, and on a 360-px screen this row alone
                cost 60 px of a fold the header was already taking 38 % of. */
             <div className="hidden min-w-0 grow items-center gap-2 sm:flex [@media(max-height:500px)]:!hidden">
               <p className="min-w-0 grow truncate font-mono text-xs text-content-subtle"
-                title={payload.source_path}>
-                {payload.source_path}
+                title={payload?.source_path}>
+                {payload?.source_path || '\u00a0'}
               </p>
               <Button type="button" size="md" noShrink onClick={openSourceFolder}
-                disabled={openingSourceFolder} aria-busy={openingSourceFolder}
+                disabled={openingSourceFolder || !workspaceReady} aria-busy={openingSourceFolder}
                 title="Open this Bank's source folder in the system file explorer."
                 className="disabled:cursor-wait">
                 <FolderOpen aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{openingSourceFolder ? 'Opening' : 'Open folder'}
@@ -1945,6 +1999,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                   for the option before you drag 30 000 files to another drive, not
                   after breaking the bank to discover it could have been repaired. */}
               <Button type="button" size="md" noShrink onClick={() => setRelocating(true)}
+                disabled={bankBusy}
                 title="Moving this folder to another disk? Point the bank at its new location.">
                 <FolderInput aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Move folder
               </Button>
@@ -1952,14 +2007,17 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             </div>
           )}
         </div>
-        {counts && (
+        {(
           /* Folded into ⚙ Passes below sm. Eight counters wrapping to four rows
              were a quarter of a phone's fold; even as one scrolling line they
              pushed the header to 32 % of a 360×800 fold, over the 28 % budget.
              They are mostly pass coverage, and the rail's status tiles repeat
              the undecided / kept / rejected counts. */
-          <div className="hidden items-baseline gap-x-4 gap-y-1 border-t border-border pt-2 text-sm sm:flex sm:flex-wrap [@media(max-height:500px)]:!hidden">
-            {counterStats}
+          <div className="hidden min-w-0 border-t border-border pt-2 sm:block [@media(max-height:500px)]:!hidden">
+            <BankStatsStrip loading={!counts} error={statsError || (!workspaceReady && metadataError)}
+              onRetry={() => { refreshMetadata({ background: true }); refreshPayload({ background: true }) }}>
+              {counterStats}
+            </BankStatsStrip>
           </div>
         )}
         {/* The decisive actions. ⚙ Passes opens the analysis panel; the other
@@ -1967,7 +2025,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             shrink-0 + whitespace-nowrap: allowed to shrink, the scrolling line
             squeezed them instead and "Delete rejected from disk" wrapped to five
             lines, a 123-px row on a 360-px phone. */}
-        <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto border-t border-border pt-2 sm:flex-wrap sm:overflow-visible [@media(max-height:500px)]:ml-auto [@media(max-height:500px)]:flex-nowrap [@media(max-height:500px)]:overflow-x-auto [@media(max-height:500px)]:border-t-0 [@media(max-height:500px)]:pt-0">
+        <div className="flex h-14 min-w-0 flex-nowrap items-center gap-2 overflow-x-auto overflow-y-hidden border-t border-border pt-2 lg:h-12 [scrollbar-width:thin] [@media(max-height:500px)]:ml-auto [@media(max-height:500px)]:h-12 lg:[@media(max-height:500px)]:h-10 [@media(max-height:500px)]:border-t-0 [@media(max-height:500px)]:pt-0">
           {/* The path row above is hidden on a phone and in a short landscape
               window. Exclude folder is curation, so it stays reachable there. */}
           {excludeFolderButton('sm:hidden [@media(max-height:500px)]:!inline-flex')}
@@ -2021,37 +2079,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         </div>
       </header>
 
-      {/* A bank created before this was refused can still point at a dataset's
-          own image folder. Nothing is repaired behind the user's back — the
-          bank stays fully readable — but the fact is stated every time it is
-          opened, because the click that hurts (🗑 Delete rejected) is right
-          here on this page. */}
-      {payload?.dataset_conflict && (
-        <div role="alert"
-          className="rounded-md border border-rose-500/70 bg-rose-500/15 p-3 text-sm text-rose-100 space-y-1">
-          <p className="font-semibold">⛔ This bank sits on a dataset’s image folder</p>
-          <p className="text-rose-100/90">{payload.dataset_conflict.message}</p>
-          <p className="text-rose-100/90">
-            Delete rejected is disabled here. Use Move folder to point this
-            bank at a folder of its own, or remove the bank — removing a bank never
-            touches files.
-          </p>
-        </div>
-      )}
-      <FolderSyncNote sync={payload?.folder_sync}
-        onRelocate={() => setRelocating(true)}
-        onForget={() => setForgettingMissing(true)} />
-
       <ProgressBar activity={payload?.activity} onCancel={cancelJob} offline={!connection.online} />
       <BankQueuedJob entry={queuedJob} live={live} onCancel={cancelQueuedJob}
         onRetry={() => act(() => postJson(`/api/bank-queue/${bankId}/retry`, {}), null)} />
-
-      {!live && payload?.pipeline_report
-        && payload.pipeline_report.finished_at !== dismissedReportAt && (
-        <PipelineReport report={payload.pipeline_report}
-          onDismiss={() => setDismissedReportAt(
-            saveDismissedReport(bankId, payload.pipeline_report.finished_at))} />
-      )}
 
       {/* ⚙ The analysis passes, opened on demand. All eight are here with their
           own dialogs untouched — only the door changed. */}
@@ -2061,10 +2091,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
            it (every pass opens its own window) — so it is measured for targets,
            truncation and fill, and charged to no fold budget. Plain comment: this
            is an EXPRESSION position (inside `{passesOpen && ( … )}`). */
-        <div id="bank-passes-panel" data-probe-chrome="passes" data-probe-panel="passes" data-probe-reading>
-          {counts && (
-            <div className="mb-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm sm:hidden">
-              {counterStats}
+        <div id="bank-passes-panel" className="h-[min(24rem,40svh)] overflow-y-auto [scrollbar-gutter:stable]" data-probe-chrome="passes" data-probe-panel="passes" data-probe-reading>
+          {(
+            <div className="mb-2 sm:hidden">
+              <BankStatsStrip loading={!counts} error={statsError || (!workspaceReady && metadataError)}
+                onRetry={() => { refreshMetadata({ background: true }); refreshPayload({ background: true }) }}>
+                {counterStats}
+              </BankStatsStrip>
             </div>
           )}
           {/* Silent in every normal state; it appears exactly where the "GPU busy"
@@ -2214,7 +2247,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           {/* Bulk-reject undecided images by quality flag — a triage shortcut that
               leaves your manual ✓/✕ untouched and deletes nothing off disk. */}
           <div className="relative min-w-0">
-            <button type="button" onClick={() => setShowAutoReject((v) => !v)} disabled={live}
+            <button type="button" onClick={() => setShowAutoReject((v) => !v)} disabled={bankBusy || !counts}
               aria-expanded={showAutoReject}
               title="Bulk-reject the still-undecided images carrying the chosen quality flags"
               className={`${TOOLBAR_CELL} border ${showAutoReject ? FILTER_ACTIVE : FILTER_IDLE} ${FILTER_HOVER} ${CONTROL_DISABLED}`}>
@@ -2706,6 +2739,31 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             balanceReason={balanceReady.reason} />
         )}
 
+          {/* Background notices belong to the results pane, so they cannot
+              reposition the filter rail or either toolbar when they arrive.
+              Live progress and Stop remain above the independently scrolled panes. */}
+          {payload?.dataset_conflict && (
+            <div role="alert"
+              className="rounded-md border border-rose-500/70 bg-rose-500/15 p-3 text-sm text-rose-100 space-y-1">
+              <p className="font-semibold">⛔ This bank sits on a dataset’s image folder</p>
+              <p className="text-rose-100/90">{payload.dataset_conflict.message}</p>
+              <p className="text-rose-100/90">
+                Delete rejected is disabled here. Use Move folder to point this
+                bank at a folder of its own, or remove the bank — removing a bank never
+                touches files.
+              </p>
+            </div>
+          )}
+          <FolderSyncNote sync={payload?.folder_sync}
+            onRelocate={() => setRelocating(true)}
+            onForget={() => setForgettingMissing(true)} />
+          {!live && payload?.pipeline_report
+            && payload.pipeline_report.finished_at !== dismissedReportAt && (
+            <PipelineReport report={payload.pipeline_report}
+              onDismiss={() => setDismissedReportAt(
+                saveDismissedReport(bankId, payload.pipeline_report.finished_at))} />
+          )}
+
           {filter.flag === 'dups' ? (
             <DupGroupsPanel bankId={bankId} live={live} kind="exact"
               onCompareGroup={(groupId) => openComparison({ params: { group: String(groupId) }, kind: 'exact', groupId, title: `Duplicate Group ${groupId}` }).catch(() => {})}
@@ -2859,6 +2917,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             // The passes read bank_scoring_gpu_available() /
             // bank_siglip2_gpu_available(); force both probes so the CPU warning
             // and the "holds the GPU" tooltip agree at once.
+            refreshRuntime(true)
             await refreshCaps(true)
             await refreshPayload()
           }} />
