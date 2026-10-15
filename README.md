@@ -9,6 +9,10 @@ This fork runs local workflows. Online publishing, scraping, Civitai browsing an
 
 **A complete, self-hosted LoRA workflow in one browser tab:** source or generate a Character, Concept or Style dataset, curate it, caption it, clean watermarks, train it on your own GPU, then compare checkpoints before export.
 
+Use named [instance profiles](docs/guide/settings-reference.md#instance-profiles)
+to keep separate databases, settings and training files in one installation.
+The current instance stays **Default**. One profile runs at a time.
+
 The core and the ten bundled plugins are free under the [PolyForm Noncommercial license](LICENSE). The core needs no account. This fork does not send usage statistics, rent a GPU, or install extra plugins.
 
 <table>

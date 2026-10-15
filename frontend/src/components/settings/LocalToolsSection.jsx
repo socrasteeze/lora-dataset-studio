@@ -331,7 +331,7 @@ function ComfyFolderRow({ comfy, setField, state, fieldKey, id }) {
 
 export default function LocalToolsSection(props) {
   const { config, setField, testResults, recordTestResult, saveConfigSection, caps, refreshCaps, toast,
-          configDefaults, saveSecretIfPending } = props
+          configDefaults, saveSecretIfPending, runtime } = props
   // Shipped values come from the server payload, never retyped here.
   const ollamaDefault = (key) => defaultValueAt(configDefaults, 'ollama', key)
   const lmstudioDefault = (key) => defaultValueAt(configDefaults, 'lmstudio', key)
@@ -694,18 +694,25 @@ export default function LocalToolsSection(props) {
             Advanced: ai-toolkit overrides
           </summary>
           <div className="mt-3 space-y-4">
+            {runtime?.profile?.training?.datasets && (
+              <p className="text-xs text-content-muted">
+                This profile keeps training exports, outputs and job files separate.
+              </p>
+            )}
             <TextField
               id="aitoolkit-datasets-dir"
               label="Datasets directory override"
-              value={config.aitoolkit.datasets_dir}
+              value={runtime?.profile?.training?.datasets || config.aitoolkit.datasets_dir}
               onChange={(v) => setField('aitoolkit', 'datasets_dir', v)}
+              readOnly={!!runtime?.profile?.training?.datasets}
               placeholder="Defaults to <ai-toolkit>/datasets"
             />
             <TextField
               id="aitoolkit-output-dir"
               label="Output directory override"
-              value={config.aitoolkit.output_dir}
+              value={runtime?.profile?.training?.output || config.aitoolkit.output_dir}
               onChange={(v) => setField('aitoolkit', 'output_dir', v)}
+              readOnly={!!runtime?.profile?.training?.output}
               placeholder="Defaults to <ai-toolkit>/output"
             />
             <TextField

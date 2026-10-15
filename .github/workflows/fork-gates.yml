@@ -78,6 +78,23 @@ jobs:
       - name: Install Browser for Bank Checks
         run: node frontend/node_modules/playwright-core/cli.js install chromium
 
+      - name: Check Profile Ownership and Training Isolation
+        shell: pwsh
+        env:
+          LDS_DATA_DIR: ${{ runner.temp }}/lds-profiles-data
+          LDS_CONFIG: ${{ runner.temp }}/lds-profiles-config.json
+          LDS_ENV: ${{ runner.temp }}/lds-profiles.env
+          LDS_PLUGINS_DIR: ${{ runner.temp }}/lds-profiles-plugins
+          LDS_EXTENSIONS_DIR: ${{ runner.temp }}/lds-profiles-extensions
+          LDS_PROFILES_HOME: ${{ runner.temp }}/lds-profile-registry
+        run: >-
+          .venv/Scripts/python.exe -X utf8 -m pytest
+          backend/tests/test_instance_profiles.py backend/tests/test_profile_launcher.py
+          backend/tests/test_profile_training_isolation.py backend/tests/test_single_instance.py
+          backend/tests/test_supervise.py backend/tests/test_restart_supervised.py
+          backend/tests/test_lora_deploy_extra_paths.py backend/tests/test_no_personal_data.py
+          backend/tests/test_fork_outbound_gate.py -q --basetemp "${{ runner.temp }}/lds-profile-checks"
+
       - name: Check Bank Imports and Settings in Browser
         run: node frontend/scripts/bankOtherTagsProbe.mjs
 

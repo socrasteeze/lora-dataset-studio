@@ -82,6 +82,7 @@ try {
     const sourceResponse = page.waitForResponse((response) => new URL(response.url()).pathname.endsWith('/folder-sync'));
     try {
       await page.goto(`${url}/#/bank`);
+    await page.waitForFunction(() => document.querySelector('[aria-label="Active Profile"]')?.textContent === 'Default');
       await page.locator(`img[src^="/api/bank/${ready.bank_id}/thumb/"]`).first().waitFor();
       await page.getByRole('heading', { name: 'Demo', exact: true }).waitFor();
       await sourceRequested;

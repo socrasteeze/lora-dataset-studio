@@ -617,8 +617,11 @@ def _trigger_match_checkpoints(ds, family=None) -> list[dict]:
         return []
     fam = (family or getattr(ds, 'train_type', None) or 'zimage').lower()
     pool = _pool_for_family(fam)
+    from instance_profiles import lora_belongs_to_profile
     out = []
     for lora in pool:
+        if not lora_belongs_to_profile(lora['filename']):
+            continue
         base = _basename(lora['filename'])
         stem = base.rsplit('.', 1)[0]
         norm = stem.lower()

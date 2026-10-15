@@ -39,6 +39,55 @@ For scripted setups, a handful of environment variables override paths and binds
 | `LDS_EXTENSIONS_DIR` | Directory the extension loader scans (default `backend/extensions/`, which is gitignored and never ships). Mostly for tests and unusual layouts. |
 | `FLASK_DEBUG` | `1` enables Flask debug mode. |
 
+## Instance Profiles
+
+Run `start.bat` to open **Studio Profiles**. Select **Default** to open the current
+instance. Its existing database, settings, credentials, dataset folders and training
+paths remain in place. No database or media is moved or copied.
+
+Choose **Create Profile**, enter a name, then choose **Open Profile**. New profiles
+start with empty settings and a separate database, credentials file, plugin data,
+datasets, caches and training storage. Complete Setup for each new profile. Tool
+installations and model weights may be shared. Profile names are shown below the
+Studio title. **Open Browser** reopens the selected profile's local page.
+
+Only one profile can run per installation. To switch:
+
+1. Save browser edits and finish or clear the active profile's work queues.
+2. Stop Studio with `Ctrl+C` in its server window after its work has finished.
+3. Return to **Studio Profiles**, select the other profile and choose **Open Profile**.
+
+The launcher never terminates work to make a switch. Closing the picker leaves
+Studio running. A live server, surviving training fence, unresolved generation or
+queued Bank work blocks another profile. Reopen the original profile to recover
+or clear that work. Old browser tabs keep their local drafts on their original
+profile's port; switching does not reuse that tab for a different database.
+
+Named profiles own their training export, output and generated-job directories.
+Their dataset/output overrides in **Local Tools** are read-only. Deployed LoRAs
+use a separate profile subfolder within each model-family folder. Dataset deletion
+and trigger renaming stay within the active profile's files. Default retains its
+original paths and can still find its existing checkpoints.
+
+The private profile registry and named instance files live under `.lds-profiles/`
+beside the installation. The registry captures Default's existing environment
+overrides when the first profile is created. Profile ports are fixed by the
+launcher to keep browser storage separate. If a port is occupied, close the
+conflicting service before retrying; Studio does not silently move to another port.
+
+Terminal access does not require the desktop picker:
+
+```powershell
+.venv/Scripts/python.exe backend/profile_launcher.py --list
+.venv/Scripts/python.exe backend/profile_launcher.py --create "Example"
+.venv/Scripts/python.exe backend/profile_launcher.py --profile default
+```
+
+Use the ID from `--list` to open a named profile. The graphical picker uses the
+Tk library included with normal Windows Python installations. If Tk is absent,
+use these terminal commands. `LDS_PROFILE_PICKER=0` keeps the direct `start.bat`
+launch path. The backend still checks profile ownership before importing the app.
+
 ## Overview
 
 The Overview section has **no settings of its own**. Its capabilities grid shows the shared tools that LDS can currently use. Optional product controls and their preparation belong to each plugin's **Settings** button in **Plugins**.

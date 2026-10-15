@@ -54,6 +54,16 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+if __name__ == '__main__':
+    # Claim the installation before any app import can migrate or recover state.
+    from instance_profiles import ProfileError, prepare_runtime
+    try:
+        _profile_lease = prepare_runtime()
+    except ProfileError as exc:
+        print(f'[LDS] {exc}', flush=True)
+        sys.exit(0)
+    atexit.register(_profile_lease.__exit__)
+
 from bootstrap_dependencies import _pinned_pillow_version, incompatible_pillow_plugins
 
 # Must run before importing ``app`` (which eventually imports PIL). Detects

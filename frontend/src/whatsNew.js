@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-15-named-instance-profiles',
+    date: '2026-10-15',
+    title: 'Separate Studio Profiles',
+    blurb: 'Choose a named profile when starting Studio. Default keeps the current instance. New profiles have separate databases, settings, credentials and training files. Only one profile can run at a time. Finish work and close its server before switching.',
+    to: '/settings/local-tools',
+  },
+  {
     id: '2026-10-15-dataset-folder-padding',
     date: '2026-10-15',
     title: 'Choose Dataset Storage',
