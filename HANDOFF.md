@@ -5,7 +5,7 @@
 ## State
 
 Named profiles and dataset storage are implemented; code head `51ef21b88` is on origin and draft PR #4.
-The operator stopped further suites and will validate on another machine. Main and the live runtime remain unchanged.
+Cloud runs `38777264998` and `38777264930` are confirmed cancelled. The operator will validate on another machine. Main and the live runtime remain unchanged.
 
 ## Done this session
 
@@ -18,10 +18,9 @@ The operator stopped further suites and will validate on another machine. Main a
 
 ## Open
 
-1. Cancel cloud runs `38777264998` and `38777264930`. The connector has no cancellation action. AGENTS.md prohibits personal gh writes; a narrow exception has been requested. Cancellation is not yet confirmed.
-2. The operator will test on another machine. Do not start or resume local or cloud suites without a new instruction. Commands below are for that machine only.
-3. Backend/profile isolation, full Gates and populated responsive checks remain unqualified. The optional private-name check is unverified. Keep draft PR #4 and main held until required evidence exists.
-4. Desktop picker, physical phone/PWA acceptance and the live restart remain operator checks. Save edits and finish work before stopping Studio and selecting another profile.
+1. The operator will test on another machine. Do not start or resume local or cloud suites without a new instruction. Commands below are for that machine only.
+2. Backend/profile isolation, full Gates and populated responsive checks remain unqualified. The optional private-name check is unverified. Keep draft PR #4 and main held until required evidence exists.
+3. Desktop picker, physical phone/PWA acceptance and the live restart remain operator checks. Save edits and finish work before stopping Studio and selecting another profile.
 
 ## Decisions
 
