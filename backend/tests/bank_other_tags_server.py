@@ -48,10 +48,20 @@ def main():
             ))
         db.session.commit()
         bank_id = bank.id
+        import_folders = []
+        for index in range(5):
+            folder = runtime / f'import-{index + 1:02d}'
+            for child, count in (('alpha', 2), ('beta', 3), ('', 1)):
+                target = folder / child
+                target.mkdir(parents=True, exist_ok=True)
+                for image_index in range(count):
+                    Image.new('RGB', (64, 64), (40, 60, 80)).save(
+                        target / f'image-{image_index + 1:02d}.png')
+            import_folders.append(str(folder))
 
     @app.get('/test/ready')
     def ready():
-        return {'bank_id': bank_id}
+        return {'bank_id': bank_id, 'import_folders': import_folders}
 
     @app.post('/test/shutdown')
     def shutdown():

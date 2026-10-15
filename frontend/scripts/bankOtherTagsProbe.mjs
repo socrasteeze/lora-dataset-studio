@@ -16,6 +16,9 @@ const runtime = await mkdtemp(path.join(tmpdir(), 'lds-other-tags-'));
 const receipts = path.join(root, '.git', 'lds-gates-validation');
 const viewports = [[360, 800], [412, 915], [844, 390], [768, 1024], [1280, 800]];
 const outcomes = [];
+const settingsOutcomes = [];
+const settingsSections = [...fs.readFileSync(path.join(root, 'frontend/src/components/settings/registry.js'), 'utf8')
+  .matchAll(/\{ id: '([^']+)'/g)].map((match) => match[1]);
 let server;
 let browser;
 let serverOutput = '';
@@ -59,7 +62,7 @@ try {
   const executablePath = findHeadlessShell(fs, path);
   assert.ok(executablePath, 'Install the cloud Chromium headless shell before running this check.');
   browser = await chromium.launch({ executablePath });
-  for (const [width, height] of viewports) {
+  for (const [viewportIndex, [width, height]] of viewports.entries()) {
     const context = await browser.newContext({ viewport: { width, height } });
     const page = await context.newPage();
     const errors = [];
@@ -131,15 +134,71 @@ try {
     await search.press('Escape');
     await panel.waitFor({ state: 'detached' });
     assert.equal(await trigger.getAttribute('aria-expanded'), 'false');
+
+    // Import an isolated source with one excluded child. The parent must stay
+    // one bank, with its loose images and checked child together.
+    await page.evaluate(() => localStorage.removeItem('bankCurrentId'));
+    await page.reload();
+    await page.locator('#bank-name').fill(`Demo Import ${viewportIndex + 1}`);
+    await page.locator('#bank-folder').fill(ready.import_folders[viewportIndex]);
+    await page.getByRole('button', { name: 'Choose Subfolders', exact: true }).click();
+    assert.equal(await page.getByRole('checkbox', { name: 'Separate Banks', exact: true }).isChecked(), false);
+    await page.getByRole('checkbox', { name: /^beta\b/ }).uncheck();
+    await page.getByText('One Bank · 3 Images', { exact: true }).waitFor();
+    const created = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/bank/create');
+    await page.getByRole('button', { name: 'Create Bank', exact: true }).click();
+    const createdResponse = await created;
+    assert.equal(createdResponse.status(), 200);
+    const imported = await createdResponse.json();
+    assert.deepEqual(imported.excluded_folders, ['beta']);
+    await page.getByRole('heading', { name: `Demo Import ${viewportIndex + 1}`, exact: true }).waitFor();
+    const imageResponse = await context.request.get(`${url}/api/bank/${imported.id}/images`);
+    assert.equal((await imageResponse.json()).total, 3);
+
+    // Check the actual field boxes on every core Settings route. This inspects
+    // the rendered CSS, including nested grids, instead of matching classes.
+    for (const section of settingsSections) {
+      await page.goto(`${url}/#/settings/${section}`);
+      await page.locator('.settings-page h1').waitFor();
+      await page.waitForFunction(() => document.querySelector('.settings-page .lds-section'));
+      const measured = await page.locator('.settings-page').evaluate((element) => {
+        const visible = (node) => !!(node.getClientRects().length && getComputedStyle(node).visibility !== 'hidden');
+        const fieldGrids = element.querySelectorAll('.settings-fields, .settings-fields > div.grid');
+        const grids = [...(fieldGrids.length ? fieldGrids : element.querySelectorAll('.lds-section > div.grid'))]
+          .filter(visible).map((grid) => ({
+            columns: getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length,
+            fields: [...grid.children].filter(visible).length,
+          }));
+        const controls = [...element.querySelectorAll('input, select, textarea, button')]
+          .filter(visible).map((node) => {
+            const box = node.getBoundingClientRect();
+            const clipping = node.closest('[class*="overflow-x-auto"]');
+            return { left: box.left, right: box.right, width: box.width,
+              scrollable: !!clipping };
+          });
+        return { width: element.getBoundingClientRect().width, grids, controls };
+      });
+      assert.ok(measured.grids.length > 0, `${section}: no rendered settings card`);
+      assert.ok(measured.grids.every((grid) => grid.columns === (width >= 640 ? 2 : 1)),
+        `${section}: field grid has the wrong column count at ${width}px`);
+      assert.ok(measured.controls.every((control) => control.width > 0
+        && (control.scrollable || (control.left >= -1 && control.right <= width + 1))),
+      `${section}: a control is clipped or outside the viewport at ${width}px`);
+      if (width >= 1280) assert.ok(measured.width > width * 0.85, 'Settings must use the wide shell');
+      settingsOutcomes.push({ section, width, height, passed: true });
+    }
     assert.deepEqual(errors, []);
-    outcomes.push({ width, height, firstPageBeforeSourceCheck: true, passed: true });
+    outcomes.push({ width, height, firstPageBeforeSourceCheck: true, singleBankExclusions: true, passed: true });
     await context.close();
   }
   const probe = await run(process.execPath, ['scripts/responsiveProbe.mjs', '--url', `${url}/#/bank`,
     '--states', 'resting,rail,other-tags,other-tags-drawer', '--json']);
   fs.mkdirSync(receipts, { recursive: true });
-  await writeFile(path.join(receipts, 'other-tags.json'), JSON.stringify({ outcomes, responsive: probe }, null, 2));
-  console.log(`Other Tags browser checks passed at ${outcomes.length} viewport sizes.\n${probe}`);
+  const settingsProbe = await run(process.execPath, ['scripts/responsiveProbe.mjs', '--url', `${url}/#/settings/captioning`,
+    '--states', 'resting', '--json']);
+  await writeFile(path.join(receipts, 'other-tags.json'), JSON.stringify({ outcomes, settingsOutcomes,
+    responsive: probe, settingsResponsive: settingsProbe }, null, 2));
+  console.log(`Bank checks passed at ${outcomes.length} sizes; ${settingsOutcomes.length} Settings route checks passed.\n${probe}\n${settingsProbe}`);
 } catch (error) {
   console.error(error.stack || error);
   for (const context of browser?.contexts() || []) {
