@@ -15,6 +15,7 @@ import SetupHealthNotice from './components/setup/SetupHealthNotice'
 import SetupJourneyNotice from './components/setup/SetupJourneyNotice'
 import ComfyRecoveryBanner from './components/common/ComfyRecoveryBanner'
 import GenerationQueueDock from './components/common/GenerationQueueDock'
+import InstanceProfile from './components/common/InstanceProfile'
 import { lazyPage } from './utils/lazyPage'
 
 // Each page is its own chunk, fetched on first navigation — the entry bundle
@@ -289,6 +290,7 @@ function NavBar() {
         <NavLink to="/datasets" title="Back to the datasets page" onClick={goHome}
           className="shrink-0 whitespace-nowrap bg-gradient-primary bg-clip-text text-base font-bold text-transparent no-underline">
           LoRA Dataset Studio
+          <InstanceProfile />
         </NavLink>
         {/* Desktop: workspaces on the left, utilities grouped into icon menus
             on the right (Guide/Help under ?, Setup/Settings under ⚙). */}

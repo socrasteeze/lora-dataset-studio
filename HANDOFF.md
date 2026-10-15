@@ -1,5 +1,12 @@
 # HANDOFF
 
+## Named Profiles Pending (2026-10-15)
+
+- Work is on `noble/named-profiles`, following the two local dataset-storage commits. `start.bat` opens the new `backend/profile_launcher.py` picker. Default retains existing paths; new profiles start empty under the ignored `.lds-profiles/` directory. No registry was created and no live data or runtime was touched during implementation.
+- `backend/instance_profiles.py` owns the private registry, stable ports, child environments and OS lease. `run.py` acquires the lease before application imports. Live legacy servers and other profiles' persisted training, generation and Bank queues block switching. Reopening the same stopped profile permits recovery. The picker never stops work; finish queues, save edits, stop the server, then open another profile.
+- Named training exports, outputs and job files use profile-owned directories regardless of configured overrides. Family deployment folders and automatic trained-checkpoint discovery use the profile ID; cleanup and trigger renaming stay in those folders. Default preserves historical paths. Model installations can be shared.
+- Ruff, ESLint, frontend build and whitespace checks passed. ESLint retains 32 existing warnings. The privacy scan checked 2,991 files with zero findings. No local tests or browser/desktop acceptance ran. The new cloud profile step covers ownership, process exclusion, training isolation, legacy deployment, restart and privacy. Full cloud Gates and populated responsive checks remain required before main publication. Keep source and bundle commits separate.
+
 ## Dataset Storage Pending (2026-10-15)
 
 - Work is on `noble/dataset-storage-padding`, based on `1b226c740`. The operator requested local commits before validation, with source and bundle separated. New image-dataset folders use a minimum of five digits. Existing unpadded folders retain priority and are not renamed. Checkpoint provenance and backup restore use the same resolver.

@@ -1601,6 +1601,11 @@ def aitoolkit_path(kind: str):
     if not root:
         return None
     root = Path(root)
+    if kind in ('datasets', 'output', 'jobs'):
+        from instance_profiles import training_path
+        owned = training_path(kind)
+        if owned is not None:
+            return owned
     if kind == 'dir':
         return root
     if kind == 'datasets':

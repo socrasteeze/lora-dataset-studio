@@ -24,6 +24,19 @@ def _paste_safe(line):
 bp = Blueprint('settings', __name__, url_prefix='/api')
 
 
+def _instance_profile():
+    from instance_profiles import public_profile, training_path
+    return {**public_profile(), 'training': {
+        kind: str(path) for kind in ('datasets', 'output', 'jobs')
+        if (path := training_path(kind)) is not None}}
+
+
+@bp.get('/instance-profile')
+def instance_profile():
+    from instance_profiles import public_profile
+    return jsonify(public_profile())
+
+
 @bp.before_request
 def _reject_unknown_plugin_scope():
     scope = request.args.get('plugin') or None
@@ -171,6 +184,7 @@ def _settings_payload() -> dict:
         # "running vs saved" diff instead of showing a misleading n/a:n/a.
         'runtime': {'host': current_app.config.get('LDS_BOUND_HOST'),
                     'port': current_app.config.get('LDS_BOUND_PORT'),
+                    'profile': _instance_profile(),
                     # LDS_BIND_MANAGED means the launcher owns the listen
                     # address. The UI hides controls that cannot take effect.
                     'bind_managed': os.environ.get('LDS_BIND_MANAGED', '').strip().lower()

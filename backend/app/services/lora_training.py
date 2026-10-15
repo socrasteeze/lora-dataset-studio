@@ -302,27 +302,32 @@ _FAMILY_SUBDIR = {'zimage': 'z image', 'sdxl': 'sdxl', 'krea': 'krea',
 
 
 def _lora_dest_dir_zimage():
-    return os.path.join(_loras_root(), 'z image')
+    return os.path.join(_loras_root(), _profile_lora_subfolder('z image'))
 
 
 def _lora_dest_dir_sdxl():
-    return os.path.join(_loras_root(), 'sdxl')
+    return os.path.join(_loras_root(), _profile_lora_subfolder('sdxl'))
 
 
 def _lora_dest_dir_krea():
-    return os.path.join(_loras_root(), 'krea')
+    return os.path.join(_loras_root(), _profile_lora_subfolder('krea'))
 
 
 def _lora_dest_dir_flux():
-    return os.path.join(_loras_root(), 'flux')
+    return os.path.join(_loras_root(), _profile_lora_subfolder('flux'))
 
 
 def _lora_dest_dir_flux2klein():
-    return os.path.join(_loras_root(), 'flux2klein')
+    return os.path.join(_loras_root(), _profile_lora_subfolder('flux2klein'))
 
 
 def _lora_dest_dir_anima():
-    return os.path.join(_loras_root(), 'anima')
+    return os.path.join(_loras_root(), _profile_lora_subfolder('anima'))
+
+
+def _profile_lora_subfolder(folder):
+    from instance_profiles import lora_subfolder
+    return lora_subfolder(folder)
 
 
 def _lora_family_dirs(fam: str) -> list[str]:
@@ -334,7 +339,7 @@ def _lora_family_dirs(fam: str) -> list[str]:
     under `<base>/models/loras` — still on disk, still loadable by ComfyUI, but
     gone from the "IN COMFYUI" list and undeletable from the app."""
     from . import comfy_model_paths
-    sub = _FAMILY_SUBDIR.get((fam or '').lower(), 'z image')
+    sub = _profile_lora_subfolder(_FAMILY_SUBDIR.get((fam or '').lower(), 'z image'))
     roots = []
     try:
         roots.append(_loras_root())
@@ -361,7 +366,10 @@ def _resolve_deployed_path(fam: str, filename: str) -> str | None:
         return None
     for d in _lora_family_dirs(fam):
         root = os.path.abspath(d)
-        cand = os.path.abspath(os.path.join(os.path.dirname(root), rel))
+        base = root
+        for _part in Path(_profile_lora_subfolder(_FAMILY_SUBDIR.get(fam, 'z image'))).parts:
+            base = os.path.dirname(base)
+        cand = os.path.abspath(os.path.join(base, rel))
         try:
             inside = os.path.commonpath([cand, root]) == root
         except ValueError:            # different drives
@@ -585,7 +593,7 @@ def _lora_dest_dir(ds, family=None) -> str:
     if fam == 'anima':
         return str(_lora_dest_dir_anima())
     if fam == 'qwenimage21':
-        return os.path.join(_loras_root(), 'qwenimage21')
+        return os.path.join(_loras_root(), _profile_lora_subfolder('qwenimage21'))
     return str(_lora_dest_dir_zimage())
 
 
@@ -6008,7 +6016,7 @@ def list_imported_checkpoints(user_id, dataset_id, family=None) -> list[dict]:
             cloud_prefixes.add(f'lds{r.id}_')
     except Exception:
         pass   # best-effort prefix harvest: one broken row must not hide the others
-    subfolder = _FAMILY_SUBDIR.get(fam, 'z image')
+    subfolder = _profile_lora_subfolder(_FAMILY_SUBDIR.get(fam, 'z image'))
     out, seen = [], set()
     for dest_dir, fn in sorted(((d, fn) for d in dirs for fn in os.listdir(d)),
                                key=lambda pair: pair[1]):

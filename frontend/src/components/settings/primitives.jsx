@@ -104,7 +104,7 @@ export function Card({ title, help, children, id }) {
    will not work — a folder that isn't on disk, say. Distinct from `help` (above the
    input, always-on guidance) so a real problem can't read as documentation.
    `children` renders after it, for a field that needs its own action button. */
-export function TextField({ id, label, value, onChange, placeholder, help, warn, children }) {
+export function TextField({ id, label, value, onChange, placeholder, help, warn, children, readOnly = false }) {
   return (
     <div>
       <label htmlFor={id} className="block text-sm font-medium text-content">{label}</label>
@@ -113,6 +113,7 @@ export function TextField({ id, label, value, onChange, placeholder, help, warn,
         id={id}
         type="text"
         value={value ?? ''}
+        readOnly={readOnly}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className={INPUT_CLASS}
