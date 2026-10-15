@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-15-whole-state-resume-cache-compat',
+    date: '2026-10-15',
+    title: 'Reliable Training Resume',
+    blurb: 'Resume with current AI Toolkit cache formats. Full-state checkpoints preserve saved latent and text caches, including caption dropout and preservation variants.',
+    to: '/cloud',
+  },
+  {
     id: '2026-10-15-caption-tags-spacing',
     date: '2026-10-15',
     title: 'Tidier Caption Tags',

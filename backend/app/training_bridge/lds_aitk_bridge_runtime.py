@@ -52,6 +52,7 @@ try:
         ENV_STRICT,
         SHAPE_REVISION,
         STATE_SCHEMA,
+        TEXT_CACHE_METHODS as _TEXT_CACHE_METHODS,
         atomic_json_nofollow,
         load_identity,
         probe_aitoolkit_source,
@@ -75,6 +76,7 @@ except ImportError:  # Package import used by unit tests.
         ENV_STRICT,
         SHAPE_REVISION,
         STATE_SCHEMA,
+        TEXT_CACHE_METHODS as _TEXT_CACHE_METHODS,
         atomic_json_nofollow,
         load_identity,
         probe_aitoolkit_source,
@@ -939,6 +941,28 @@ def _cache_file_state(
     }
 
 
+def _text_cache_kinds(dataset: Any, item: Any) -> tuple[str, ...]:
+    """Enumerate every cache read by the recognised text-target lifecycle."""
+    if not bool(getattr(dataset, "is_caching_text_embeddings", False)):
+        return ()
+    kinds = ["text_embedding"]
+    if _SOURCE_PROBE.get("text_cache_layout") != "targets":
+        return tuple(kinds)
+    config = getattr(item, "dataset_config", dataset.dataset_config)
+    dropout = float(getattr(config, "caption_dropout_rate", 0) or 0) > 0
+    if dropout:
+        kinds.append("text_embedding_dropout")
+    if bool(getattr(config, "diff_output_preservation", False)):
+        kinds.append("text_embedding_dop")
+        if dropout:
+            kinds.append("text_embedding_dop_dropout")
+    if bool(getattr(item, "dopsd_self_ref", False)):
+        kinds.append("text_embedding_dopsd")
+        if dropout:
+            kinds.append("text_embedding_dopsd_dropout")
+    return tuple(kinds)
+
+
 def _file_cache_state(
     dataset: Any,
     item: Any,
@@ -963,15 +987,15 @@ def _file_cache_state(
             label=f"{label} latent cache",
             cache_sources=cache_sources,
         )
-    if bool(getattr(dataset, "is_caching_text_embeddings", False)):
+    for kind in _text_cache_kinds(dataset, item):
         if not bool(getattr(item, "is_text_embedding_cached", False)):
             raise StateBridgeError(f"{label} text embedding cache is not ready")
-        method = getattr(item, "get_text_embedding_path", None)
+        method = getattr(item, _TEXT_CACHE_METHODS[kind], None)
         if not callable(method):
-            raise StateBridgeError(f"{label} has no text cache path seam")
-        result["text_embedding"] = _cache_file_state(
+            raise StateBridgeError(f"{label} has no {kind} cache path seam")
+        result[kind] = _cache_file_state(
             method(),
-            kind="text_embedding",
+            kind=kind,
             label=f"{label} text embedding cache",
             cache_sources=cache_sources,
         )
@@ -1071,7 +1095,9 @@ def _capture_aitk_dataset_state(
     config_state = _dataset_config_state(dataset, label=dataset_label)
     expected_cache_kinds = _expected_cache_kinds(config_state)
     for index, file_state in enumerate(files):
-        if set(file_state["cache"]) != expected_cache_kinds:
+        if set(file_state["cache"]) != (
+            expected_cache_kinds | frozenset(_text_cache_kinds(dataset, file_list[index]))
+        ):
             raise StateBridgeError(
                 f"{dataset_label} file #{index + 1} preprocessing cache "
                 "does not match its dataset configuration"
@@ -1326,7 +1352,7 @@ def _validate_saved_file_state(
     ):
         raise StateBridgeError(f"{label} saved cache state is invalid")
     for cache_kind, descriptor in cache.items():
-        if cache_kind not in ("latent", "text_embedding"):
+        if cache_kind != "latent" and cache_kind not in _TEXT_CACHE_METHODS:
             raise StateBridgeError(f"{label} saved cache kind is unsupported")
         if (
             not isinstance(descriptor, Mapping)
@@ -1459,7 +1485,9 @@ def _restore_aitk_dataset_state(
             saved_file,
             current_file,
             label=f"{label} dataset #{leaf_index + 1} file #{index + 1}",
-            expected_cache_kinds=expected_cache_kinds,
+            expected_cache_kinds=(
+                expected_cache_kinds | frozenset(_text_cache_kinds(dataset, current_item))
+            ),
         )
         reordered_items.append(current_item)
     if any(current_by_identity.values()):
@@ -1769,6 +1797,11 @@ def _cache_descriptors(saved: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]
         for descriptor in cache.values():
             if not isinstance(descriptor, Mapping):
                 raise StateBridgeError("saved dataset cache descriptor is invalid")
+            # Different text variants can share one content-addressed file.
+            # The kind belongs to the per-file mapping, not the archive object.
+            descriptor = {
+                key: descriptor.get(key) for key in ("entry", "sha256", "size_bytes")
+            }
             entry = descriptor.get("entry")
             previous = descriptors.get(entry)
             if previous is not None and previous != descriptor:
@@ -1858,8 +1891,8 @@ def _safe_cache_destination(item: Any, kind: str) -> Path:
     if kind == "latent":
         method_name = "get_latent_path"
         directory_name = "_latent_cache"
-    elif kind == "text_embedding":
-        method_name = "get_text_embedding_path"
+    elif kind in _TEXT_CACHE_METHODS:
+        method_name = _TEXT_CACHE_METHODS[kind]
         directory_name = "_t_e_cache"
     else:
         raise StateBridgeError(f"unsupported preprocessing cache kind {kind!r}")
@@ -2781,14 +2814,12 @@ def _patched_cache_latents(self: Any, *args: Any, **kwargs: Any):
 def _patched_cache_text(self: Any, *args: Any, **kwargs: Any):
     pending = getattr(self, "_lds_pending_dataset_restore", None)
     if isinstance(pending, Mapping):
-        _materialize_saved_cache_kind(
-            self, pending["state"], kind="text_embedding"
-        )
+        for kind in _TEXT_CACHE_METHODS:
+            _materialize_saved_cache_kind(self, pending["state"], kind=kind)
     result = _ORIGINAL_AITK_CACHE_TEXT(self, *args, **kwargs)
     if isinstance(pending, Mapping):
-        _verify_materialized_cache_kind(
-            self, pending["state"], kind="text_embedding"
-        )
+        for kind in _TEXT_CACHE_METHODS:
+            _verify_materialized_cache_kind(self, pending["state"], kind=kind)
         self._lds_text_cache_restored = True
     return result
 

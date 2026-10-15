@@ -8,6 +8,7 @@ temporary ``PYTHONPATH`` overlay.
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import os
@@ -20,7 +21,7 @@ from typing import Any, Mapping
 
 
 BRIDGE_NAME = "lds-aitoolkit-state-bridge"
-BRIDGE_VERSION = "1.1.0"
+BRIDGE_VERSION = "1.2.0"
 BRIDGE_PROTOCOL = 2
 STATE_SCHEMA = "lds.training-state/v1"
 IDENTITY_SCHEMA = "lds.training-state-context/v1"
@@ -53,6 +54,15 @@ REQUIRED_IDENTITY_FIELDS = (
     "toolkit_revision",
     "runtime",
 )
+
+TEXT_CACHE_METHODS = {
+    "text_embedding": "get_text_embedding_path",
+    "text_embedding_dropout": "get_blank_text_embedding_path",
+    "text_embedding_dop": "get_dop_text_embedding_path",
+    "text_embedding_dop_dropout": "get_dop_blank_text_embedding_path",
+    "text_embedding_dopsd": "get_dopsd_text_embedding_path",
+    "text_embedding_dopsd_dropout": "get_dopsd_blank_text_embedding_path",
+}
 
 ARTIFACT_FILENAMES = {
     "raw_weights": "raw_weights.pt",
@@ -109,12 +119,29 @@ _MIXIN_MARKERS = (
     "self.shuffle_buckets()",
     "self.build_batch_indices()",
     "def cache_latents_all_latents(self",
-    "file_item.get_latent_path(recalculate=True)",
-    "if os.path.exists(latent_path):",
     "def cache_text_embeddings(self",
-    "file_item.get_text_embedding_path(recalculate=True)",
-    "if not os.path.exists(text_embedding_path):",
 )
+
+
+def _method_source(source: str, name: str) -> str:
+    """Limit lifecycle checks to one class method, excluding adjacent methods."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return ""
+    methods = [
+        method for cls in tree.body if isinstance(cls, ast.ClassDef)
+        for method in cls.body
+        if isinstance(method, ast.FunctionDef) and method.name == name
+    ]
+    if len(methods) != 1:
+        return ""
+    return ast.get_source_segment(source, methods[0]) or ""
+
+
+def _ordered_markers(source: str, markers: tuple[str, ...]) -> bool:
+    positions = tuple(source.find(marker) for marker in markers)
+    return min(positions) >= 0 and positions == tuple(sorted(positions))
 
 
 def _is_link_or_reparse(path: Path) -> bool:
@@ -751,33 +778,70 @@ def probe_aitoolkit_source(root: os.PathLike[str] | str) -> dict[str, Any]:
             "bucket creation/shuffle/batch order does not match the supported lifecycle"
         )
 
-    cache_at = mixin_source.find("    def cache_latents_all_latents(self")
-    cache_source = mixin_source[cache_at:] if cache_at >= 0 else ""
-    cache_order = (
-        cache_source.find("file_item.get_latent_path(recalculate=True)"),
-        cache_source.find("if os.path.exists(latent_path):"),
-    )
-    if min(cache_order) < 0 or cache_order != tuple(sorted(cache_order)):
+    cache_source = _method_source(mixin_source, "cache_latents_all_latents")
+    if "def _prep(" in cache_source:
+        # All restored files must exist before the prep pool starts. The pool
+        # must finish before the bridge verifies the cache bytes on return.
+        cache_ok = _ordered_markers(cache_source, (
+            "prep_item.get_latent_path(recalculate=True)",
+            "if os.path.exists(prep_latent_path):",
+            "return prep_item, prep_latent_path, cached_state_dict, False",
+            "prep_item.load_and_process_image(",
+            "ThreadPoolExecutor(max_workers=num_workers)",
+            "executor.submit(_prep, queued_item)",
+            "pending.popleft().result()",
+            "self._cache_one_latent(file_item, latent_path, cached_state_dict, needs_encode, to_disk, to_memory)",
+            "file_item.is_latent_cached = True",
+            "executor.shutdown(wait=True, cancel_futures=True)",
+        )) and _ordered_markers(_method_source(mixin_source, "_cache_one_latent"), (
+            "if not needs_encode:",
+            "state_dict = cached_state_dict",
+            "else:",
+            "self.sd.encode_images(",
+            "save_file(state_dict, latent_path, metadata=meta)",
+        ))
+    else:
+        cache_ok = _ordered_markers(cache_source, (
+            "file_item.get_latent_path(recalculate=True)",
+            "if os.path.exists(latent_path):",
+        ))
+    if not cache_ok:
         result["reasons"].append(
             "latent cache lookup order does not match the supported lifecycle"
         )
 
-    text_cache_at = mixin_source.find("    def cache_text_embeddings(self")
-    text_cache_source = (
-        mixin_source[text_cache_at:] if text_cache_at >= 0 else ""
-    )
-    text_cache_order = (
-        text_cache_source.find(
-            "file_item.get_text_embedding_path(recalculate=True)"
-        ),
-        text_cache_source.find("if not os.path.exists(text_embedding_path):"),
-    )
-    if (
-        min(text_cache_order) < 0
-        or text_cache_order != tuple(sorted(text_cache_order))
-    ):
+    text_cache_source = _method_source(mixin_source, "cache_text_embeddings")
+    if "encode_targets" in text_cache_source:
+        text_cache_ok = _ordered_markers(text_cache_source, (
+            "file_item.get_text_embedding_path(recalculate=True)",
+            "encode_targets = [(text_embedding_path, file_item.caption)]",
+            "encode_targets = [t for t in encode_targets if not os.path.exists(t[0])]",
+            "if len(encode_targets) > 0:",
+            "self.sd.encode_prompt(",
+            "prompt_embeds.save(path)",
+            "file_item.is_text_embedding_cached = True",
+        ))
+        result["text_cache_layout"] = "targets"
+    else:
+        text_cache_ok = _ordered_markers(text_cache_source, (
+            "file_item.get_text_embedding_path(recalculate=True)",
+            "if not os.path.exists(text_embedding_path):",
+        ))
+        result["text_cache_layout"] = "single"
+    if not text_cache_ok:
         result["reasons"].append(
             "text cache lookup order does not match the supported lifecycle"
+        )
+    text_path_methods = {
+        node.func.attr for node in ast.walk(ast.parse(text_cache_source))
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        and node.func.attr.startswith("get_")
+        and node.func.attr.endswith("embedding_path")
+    }
+    unknown_text_paths = text_path_methods - set(TEXT_CACHE_METHODS.values())
+    if unknown_text_paths:
+        result["reasons"].append(
+            "unrecognised text cache variants: " + ", ".join(sorted(unknown_text_paths))
         )
 
     result["source_hashes"] = {

@@ -1,6 +1,20 @@
 # HANDOFF
 
-**Updated:** 2026-10-15 | **Target:** main | **Delivery base:** a48c6677d | **Branch:** main
+**Updated:** 2026-10-15 | **Target:** main | **Delivery base:** 4034ef3b9
+
+## ATK resume compatibility
+
+- The operator authorized the resume-bridge repair and focused local tests, then a clean commit and push to main with further tests skipped. Source and the rebuilt frontend use separate `[skip ci]` commits. Verify publication against the final delivery commit. No service restart or real training job is authorized. Earlier unrelated runtime and delivery gaps below remain open.
+- Bridge 1.2.0 recognises both the previous serial cache lifecycle and the inspected threaded latent/text-target lifecycle. Full-state snapshots now capture and restore caption-dropout, preservation and self-reference text variants, including shared cache files. Unknown cache layouts and unsafe destinations still fail closed.
+- The current installed ATK 0.13.26 source at `89db2ee89a2c8696e019e2f7f128581f6b90ac6f` passes the bridge probe; the unchanged LDS baseline rejects it. Regressions extract its three cache methods, execute them with isolated synthetic files and CPU Torch, and reject encoding attempts. A separate bootstrap test passed using ATK's own interpreter in a disposable CPU process: real trainer classes import and bridge hooks install without constructing a job or loading a model. ATK source is unchanged.
+- Focused backend validation: 102 passed, 10 skipped across cache compatibility (including the installed-interpreter bootstrap), bridge, identity, bundle, cross-interpreter, privacy and outbound-gate tests. Eight skips lack Windows symlink privileges; two privacy checks lack a private-name list. All five LDS runtime paths and profile state were isolated before imports; CUDA visibility and online model access were disabled.
+- Frontend release-note checks: 28 passed. Ruff and ESLint passed; ESLint retains 32 existing warnings. Rebuilt frontend/dist. Full Gates, cloud qualification and GPU training/resume have not run. Restart LDS after saving work to load the repaired backend; this session does not restart services or start training.
+- Delivery privacy scan: 3,010 tracked and untracked text files, zero findings. Attribution matches are legitimate engine references, policy filenames, technical cursor variables or synthetic fixtures. No credential rotation or history rewrite is indicated. Further tests and cloud CI are skipped under the operator's explicit instruction; this delivery is not full Gates qualification.
+- Repeat installed-source checks with `LDS_TEST_AITK_ROOT` set to the operator's checkout. Use a new scratch root, isolate the five runtime paths and profile state, and run the focused files below with the pinned interpreter. The environment setting is test-only and is never saved to production config.
+
+```powershell
+.venv/Scripts/python.exe -m pytest backend/tests/test_aitoolkit_cache_compat.py backend/tests/test_aitoolkit_state_bridge.py backend/tests/test_training_state_identity.py backend/tests/test_training_state_bundle.py backend/tests/test_cross_interpreter_twins.py backend/tests/test_no_personal_data.py backend/tests/test_fork_outbound_gate.py -q
+```
 
 ## Tag-panel spacing delivery
 
