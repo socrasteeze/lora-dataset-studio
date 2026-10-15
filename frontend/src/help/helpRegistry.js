@@ -1818,6 +1818,7 @@ const TOPICS = [
     '/settings/storage', 'settings-reference', 'storage'),
   action('storage-move-location', 'Move dataset images to another drive',
     ['move', 'relocate', 'another drive', 'change folder', 'disk full', 'out of space',
+     'promotion destination', 'dataset location', 'five-digit', 'padding', 'browse',
      'external drive', 'adopt', 'start empty', 'move my datasets'],
     '/settings/storage', 'settings-reference', 'storage'),
 
@@ -2360,7 +2361,8 @@ const TOPICS = [
     ['browser', 'tab', 'launch', 'startup', 'open', 'auto', 'pin', 'new tab']),
   // storage
   setting('paths.dataset_images_root', 'storage', 'dataset-images-root', 'Dataset images root',
-    ['data', 'storage', 'path', 'dataset', 'images', 'root', 'location', 'disk']),
+    ['data', 'storage', 'path', 'dataset', 'images', 'root', 'location', 'disk',
+     'promote', 'promotion destination', 'browse', 'five-digit', 'padding']),
 
   // ---- Action topics (kind 'action') -------------------------------------
   action('action-edit-reference', 'Edit the reference photo',

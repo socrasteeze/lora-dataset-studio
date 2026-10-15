@@ -24,6 +24,7 @@ from ..models import FaceDatasetImage, TrainingRunRecord
 from ..utils.timestamps import naive_utcfromtimestamp
 from . import face_dataset_service as fds
 from . import run_archive, run_snapshot
+from .dataset_storage import dataset_path
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +40,7 @@ def _file_hash(dataset_id, filename) -> str:
     if not filename:
         return '-'
     try:
-        from .. import config as cfg
-        p = cfg.dataset_images_root() / str(dataset_id) / filename
+        p = os.path.join(dataset_path(dataset_id), filename)
         st = os.stat(p)
         return hashlib.sha1(f'{st.st_size}:{int(st.st_mtime)}'.encode()).hexdigest()[:8]
     except OSError:
@@ -127,8 +127,7 @@ def prepare_launch(user_id, dataset_id, base_model=None):
         rows = kept_images(dataset_id)
         manifest = dataset_manifest(dataset_id, rows)
         try:
-            from .. import config as cfg
-            images_dir = str(cfg.dataset_images_root() / str(dataset_id))
+            images_dir = dataset_path(dataset_id)
         except Exception:
             images_dir = ''
         snapshot, sig_updates = run_snapshot.build(

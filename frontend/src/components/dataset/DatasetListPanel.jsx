@@ -9,6 +9,7 @@ import { Button, Chip, Input, btnClass, btnShape, fieldClass } from '../common/C
 import Pagination from '../common/Pagination.jsx';
 import { HelpBadge } from '../../help/HelpMode';
 import { canCreateDataset } from './newDataset';
+import { settingsLinkHref } from '../common/settingsLinkHref';
 import { requestHelpTip } from '../../help/helpTips';
 import { contributions } from '../../plugins/registry.js';
 import { PluginPanel } from '../../plugins/PluginSlot.jsx';
@@ -263,6 +264,14 @@ function NewDatasetForm({ onCreate, onClose }) {
       {creator ? (
         <PluginPanel panelKey={`datasets.create:${media}`} importer={creator.panel} onClose={onClose} />
       ) : (<>
+      <p className="text-xs text-content-subtle">
+        Dataset folders use the shared Storage location.{' '}
+        <a href={settingsLinkHref('storage', 'dataset-images-root')}
+          target="_blank" rel="noreferrer"
+          className="inline-flex min-h-10 items-center underline lg:min-h-0">
+          Dataset Location
+        </a>
+      </p>
       {/*
        * Kind: character (default) or concept. Concept adapts the rest: raw import preserves aspect
        * ratio, captions retain identity, and reference photos and the variation generator are

@@ -4214,7 +4214,7 @@ def _bkp_restore_validated(user_id: int, z: zipfile.ZipFile, manifest,
         ds.ref_filename = _backup_basename(manifest.get('ref_filename'))
         ds.ref_original_filename = _backup_basename(
             manifest.get('ref_original_filename'))
-        final_dir = os.path.join(root, str(ds.id))
+        final_dir = _dataset_path(ds.id)
         if os.path.exists(final_dir):
             # Never merge with or delete a pre-existing orphan directory.
             raise RuntimeError(f'dataset folder already exists for id {ds.id}')

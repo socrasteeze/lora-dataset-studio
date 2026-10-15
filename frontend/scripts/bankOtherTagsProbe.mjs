@@ -191,6 +191,49 @@ try {
       if (width >= 1280) assert.ok(measured.width > width * 0.85, 'Settings must use the wide shell');
       settingsOutcomes.push({ section, width, height, passed: true });
     }
+
+    // Selecting a dataset destination must not save or move anything. Exercise
+    // the shared host browser on every supported size using synthetic folders.
+    await page.goto(`${url}/#/settings/storage?focus=dataset-images-root`);
+    const rootField = page.locator('#dataset-images-root');
+    await rootField.waitFor({ state: 'visible' });
+    const card = page.locator('div').filter({ has: rootField }).filter({
+      has: page.getByRole('button', { name: 'Check Folder', exact: true }),
+    }).last();
+    const beforeSettings = await context.request.get(`${url}/api/settings`);
+    assert.equal(beforeSettings.status(), 200);
+    const beforeConfig = (await beforeSettings.json()).config;
+    await card.getByRole('button', { name: 'Browse', exact: true }).click();
+    const browserDialog = page.getByRole('dialog', { name: 'Choose a folder', exact: true });
+    await browserDialog.locator('ul[aria-busy="false"]').waitFor();
+    const address = browserDialog.getByRole('textbox', { name: 'Folder path', exact: true });
+    await address.fill(ready.import_folders[viewportIndex]);
+    await browserDialog.getByRole('button', { name: 'Go', exact: true }).click();
+    const pick = browserDialog.getByRole('button', { name: 'Use Folder', exact: true });
+    await pick.waitFor();
+    const browserBoxes = await browserDialog.locator('input, button').evaluateAll((nodes) => nodes.map((node) => {
+      const box = node.getBoundingClientRect();
+      return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
+    }));
+    assert.ok(browserBoxes.every((box) => box.left >= -1 && box.right <= width + 1
+      && box.top >= -1 && box.bottom <= height + 1), 'Host browser controls must fit the viewport');
+    await pick.click();
+    await browserDialog.waitFor({ state: 'hidden' });
+    assert.equal(await rootField.inputValue(), ready.import_folders[viewportIndex]);
+    const afterSettings = await context.request.get(`${url}/api/settings`);
+    assert.equal(afterSettings.status(), 200);
+    const afterConfig = (await afterSettings.json()).config;
+    assert.deepEqual(afterConfig.paths, beforeConfig.paths, 'Browse must not save the destination');
+    const checked = page.waitForResponse((response) => response.url().endsWith('/api/storage/validate'));
+    await card.getByRole('button', { name: 'Check Folder', exact: true }).click();
+    assert.equal((await checked).status(), 200);
+    const boxes = await card.locator('input, button').evaluateAll((nodes) => nodes.map((node) => {
+      const box = node.getBoundingClientRect();
+      return { left: box.left, right: box.right, height: box.height };
+    }));
+    assert.ok(boxes.every((box) => box.left >= -1 && box.right <= width + 1),
+      'Dataset destination controls must fit the viewport');
+    settingsOutcomes.push({ section: 'storage-browser', width, height, passed: true });
     assert.deepEqual(errors, []);
     outcomes.push({ width, height, firstPageBeforeSourceCheck: true, singleBankExclusions: true, passed: true });
     // Leave only the tagged demo bank for the existing probe's list primer.

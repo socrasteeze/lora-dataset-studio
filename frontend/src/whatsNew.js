@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-15-dataset-folder-padding',
+    date: '2026-10-15',
+    title: 'Choose Dataset Storage',
+    blurb: 'New dataset folders use five-digit IDs such as 00001, for manual creation and Bank promotion. Existing folders stay readable. Browse the host drives in Settings > Storage to change the shared destination. Bank promotion links directly to that setting.',
+    to: '/settings/storage?focus=dataset-images-root',
+  },
+  {
     id: '2026-10-14-wider-settings-forms',
     date: '2026-10-14',
     title: 'Wider Settings Forms',
