@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { render } from './support/mountJsx.mjs';
+import { createElement, render } from './support/mountJsx.mjs';
+
+const { MemoryRouter } = await import('react-router');
 
 const { default: PromoteDialog } = await import('../src/components/bank/PromoteDialog.jsx');
 const { default: DatasetListPanel } = await import('../src/components/dataset/DatasetListPanel.jsx');
@@ -16,7 +18,8 @@ test('Bank promotion links to dataset storage without discarding the open form',
 });
 
 test('manual creation exposes the same storage setting in a separate tab', () => {
-  const html = render(DatasetListPanel, { datasets: [], onCreate() {} });
+  const html = render(() => createElement(MemoryRouter, null,
+    createElement(DatasetListPanel, { datasets: [], onCreate() {} })));
   assert.match(html, /href="#\/settings\/storage\?focus=dataset-images-root"/);
   assert.match(html, /target="_blank" rel="noreferrer"/);
   assert.match(html, /Dataset Location/);
