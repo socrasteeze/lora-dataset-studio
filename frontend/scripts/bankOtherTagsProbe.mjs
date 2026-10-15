@@ -19,6 +19,7 @@ const outcomes = [];
 const settingsOutcomes = [];
 const settingsSections = [...fs.readFileSync(path.join(root, 'frontend/src/components/settings/registry.js'), 'utf8')
   .matchAll(/\{ id: '([^']+)', title: '([^']+)'/g)].map((match) => ({ id: match[1], title: match[2] }));
+assert.ok(settingsSections.length > 0, 'Settings route discovery must not be empty');
 let server;
 let browser;
 let serverOutput = '';
@@ -63,6 +64,7 @@ try {
   assert.ok(executablePath, 'Install the cloud Chromium headless shell before running this check.');
   browser = await chromium.launch({ executablePath });
   for (const [viewportIndex, [width, height]] of viewports.entries()) {
+    console.log(`Checking Bank at ${width}x${height}`);
     const context = await browser.newContext({ viewport: { width, height } });
     const page = await context.newPage();
     const errors = [];
@@ -134,6 +136,7 @@ try {
     await search.press('Escape');
     await panel.waitFor({ state: 'detached' });
     assert.equal(await trigger.getAttribute('aria-expanded'), 'false');
+    if (await drawer.count()) await page.getByRole('button', { name: 'Close the filters', exact: true }).click();
 
     // Import an isolated source with one excluded child. The parent must stay
     // one bank, with its loose images and checked child together.
@@ -157,6 +160,7 @@ try {
     // Check the actual field boxes on every core Settings route. This inspects
     // the rendered CSS, including nested grids, instead of matching classes.
     for (const { id: section, title } of settingsSections) {
+      console.log(`Checking Settings ${section} at ${width}x${height}`);
       await page.goto(`${url}/#/settings/${section}`);
       await page.locator('.settings-page h1').waitFor();
       await page.waitForFunction((expected) => document.querySelector('.settings-page h1')?.textContent.includes(expected), title);
@@ -196,11 +200,14 @@ try {
   const probe = await run(process.execPath, ['scripts/responsiveProbe.mjs', '--url', `${url}/#/bank`,
     '--states', 'resting,rail,other-tags,other-tags-drawer', '--json']);
   fs.mkdirSync(receipts, { recursive: true });
-  const settingsProbe = await run(process.execPath, ['scripts/responsiveProbe.mjs', '--url', `${url}/#/settings/captioning`,
-    '--states', 'resting', '--json']);
+  const settingsProbe = [];
+  for (const { id: section } of settingsSections) {
+    settingsProbe.push({ section, result: await run(process.execPath, ['scripts/responsiveProbe.mjs',
+      '--url', `${url}/#/settings/${section}`, '--states', 'resting', '--json']) });
+  }
   await writeFile(path.join(receipts, 'other-tags.json'), JSON.stringify({ outcomes, settingsOutcomes,
     responsive: probe, settingsResponsive: settingsProbe }, null, 2));
-  console.log(`Bank checks passed at ${outcomes.length} sizes; ${settingsOutcomes.length} Settings route checks passed.\n${probe}\n${settingsProbe}`);
+  console.log(`Bank checks passed at ${outcomes.length} sizes; ${settingsOutcomes.length} Settings route checks passed.\n${probe}\n${JSON.stringify(settingsProbe)}`);
 } catch (error) {
   console.error(error.stack || error);
   for (const context of browser?.contexts() || []) {
