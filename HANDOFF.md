@@ -1,11 +1,11 @@
 # HANDOFF
 
-**Updated:** 2026-10-15 | **Branch:** noble/named-profiles | **Base:** 1b226c740 | **Tree:** clean after this handoff commit
+**Updated:** 2026-10-15 | **Branch:** main | **Delivery base:** 1b226c740 | **Tree:** clean after this handoff commit
 
 ## State
 
-Named profiles and dataset storage are implemented; code head `51ef21b88` is on origin and draft PR #4.
-Cloud runs `38777264998` and `38777264930` are confirmed cancelled. The operator will validate on another machine. Main and the live runtime remain unchanged.
+Dataset storage and named-profile branches are integrated on main. The operator explicitly authorized a clean main push with tests skipped.
+Cloud runs `38777264998` and `38777264930` are confirmed cancelled. Remaining validation moves to another machine; the live runtime has not been restarted.
 
 ## Done this session
 
@@ -19,22 +19,23 @@ Cloud runs `38777264998` and `38777264930` are confirmed cancelled. The operator
 ## Open
 
 1. The operator will test on another machine. Do not start or resume local or cloud suites without a new instruction. Commands below are for that machine only.
-2. Backend/profile isolation, full Gates and populated responsive checks remain unqualified. The optional private-name check is unverified. Keep draft PR #4 and main held until required evidence exists.
+2. Backend/profile isolation, full Gates and populated responsive checks remain unqualified. The optional private-name check is unverified. This landing is an explicit operator exception, not a full qualification.
 3. Desktop picker, physical phone/PWA acceptance and the live restart remain operator checks. Save edits and finish work before stopping Studio and selecting another profile.
+4. Bank-to-profile transfer and an in-app Profiles popup are not implemented. The operator prefers an embedded popup; it can own a controlled restart. Re-adding a Bank source folder does not transfer saved metadata. Further implementation needs a separate instruction.
 
 ## Decisions
 
 - One installation owns one active profile. Each named profile owns its database, settings, credentials and mutable training files; model installations may be shared.
 - Default uses existing environment overrides and its last recorded server port. No database, media or settings migration was performed.
 - Switching happens outside the running app. The picker refuses live servers and unresolved work; it never terminates jobs.
-- Source and bundles remain separate commits. This handoff commit uses `[skip ci]` and stays local unless the operator requests a push.
+- Source and bundles remain separate commits. This delivery uses `[skip ci]` under the operator's explicit instruction to publish without running tests.
 
 ## Traps
 
 - Keep `.lds-profiles/`, configuration and credentials out of Git. No real profile registry was created during implementation.
 - `create_app()` changes schema/runtime state. Isolate all five LDS runtime paths before imports and clear inherited profile identity for validation.
 - The app serves the rebuilt frontend immediately. The running backend stays old until restart; no production restart was performed.
-- Historical receipts do not qualify this head. Stopping suites does not waive the repository's main publication gate.
+- Historical receipts do not qualify this head. Record the operator's explicit no-test publication exception; do not describe it as passed Gates.
 
 ## Verify
 
@@ -42,8 +43,8 @@ For the other machine only. Use the pinned Python environment and Node >=22.22. 
 
 ```powershell
 git fetch origin
-git switch noble/named-profiles
-git pull --ff-only origin noble/named-profiles
+git switch main
+git pull --ff-only origin main
 ```
 
 Isolate runtime paths before focused checks:
