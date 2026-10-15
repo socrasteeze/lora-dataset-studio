@@ -8232,7 +8232,8 @@ def start_faces(app, user_id, bank_id, device_id=None, angles_only=False,
                            _faces_job(bank_id, device_id if remote else None,
                                       angles_only, want, scope_ids),
                            total=total,
-                           device_label=_device_label(device_id if remote else None))
+                           device_label=_device_label(device_id if remote else None),
+                           device_id=device_id if remote else None)
 
 
 def _asserted_image_count(bank_id) -> int:
@@ -8758,7 +8759,8 @@ def start_score(app, user_id, bank_id, device_id=None, rescore=False):
                            _score_job(bank_id, device_id if remote else None,
                                       rescore),
                            total=total,
-                           device_label=_device_label(device_id if remote else None))
+                           device_label=_device_label(device_id if remote else None),
+                           device_id=device_id if remote else None)
 
 
 # Rows written between two commits in the score write-back. Small enough that a
@@ -9425,7 +9427,7 @@ def start_watermark(app, user_id, bank_id, rescan=False, device_id=None,
                                           note=resolution['detail'] if resolution['fell_back'] else '',
                                           limit=limit),
                            total=total,
-                           device_label=_device_label(device_id))
+                           device_label=_device_label(device_id), device_id=device_id)
 
 
 def _watermark_job(bank_id, rescan, device_id=None, use_detector=False,
@@ -11182,7 +11184,9 @@ def start_watermark_inpaint(app, user_id, bank_id, method='auto', device_id=None
                            # Klein only: LaMa never travels, so a device picked
                            # with method='auto' must not label the pass remote.
                            device_label=(_device_label(device_id)
-                                         if method == 'klein' else None))
+                                         if method == 'klein' else None),
+                           device_id=(cluster_svc.normalize_device_id(device_id)
+                                      if not renders_here else None))
 
 
 def _watermark_inpaint_job(bank_id, method, device_id=None,
@@ -11818,7 +11822,7 @@ def start_framing(app, user_id, bank_id, rescan=False, device_id=None,
     q = _framing_pool(bank_id, rescan, statuses, ids)
     return bank_jobs.start(app, bank_id, 'framing',
                            _framing_job(bank_id, rescan, device_id, statuses, ids),
-                           total=q.count(), device_label=_device_label(device_id))
+                           total=q.count(), device_label=_device_label(device_id), device_id=device_id)
 
 
 # How many images in a row may fail to reach the vision model before the pass
@@ -12637,7 +12641,7 @@ def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None,
                                         backend=engine, ollama_model=model,
                                         statuses=want,
                                         keep_asserted=keep_asserted),
-                           total=total, device_label=_device_label(device_id))
+                           total=total, device_label=_device_label(device_id), device_id=device_id)
 
 
 def _remote_caption(job, device_id, peer_kind, paths, by_path, extra,
@@ -13260,7 +13264,8 @@ def start_pipeline(app, user_id, bank_id, steps=None, reject_flags=None,
         _pipeline_job(user_id, bank_id, steps, reject_flags, bool(resolve_dups),
                       device_id if remote else None),
         total=0,
-        device_label=_device_label(device_id if remote else None))
+        device_label=_device_label(device_id if remote else None),
+        device_id=device_id if remote else None)
 
 
 def _bank_counts(bank_id) -> dict:

@@ -1,4 +1,5 @@
 import { HelpBadge } from '../../help/HelpMode'
+import { jobLabel } from './bankPassRun.js'
 import { runningItems, waitingItems } from './bankQueueActions.js'
 
 /** The cross-bank "Launch all" queue: which bank is running now and what is lined
@@ -19,8 +20,10 @@ const ROW = 'group flex items-center gap-2 rounded-md px-1 text-sm transition-co
   + 'hover:bg-surface-raised focus-within:bg-surface-raised active:bg-surface-raised '
   + 'has-[:active]:bg-surface-raised'
 
-export default function BankQueuePanel({ queue, nameOf, onCancel, onClearWaiting, onStopRunning }) {
-  if (!queue?.items?.length) return null
+export default function BankQueuePanel({ queue, nameOf, onCancel, onClearWaiting, onStopRunning, onStopDirect }) {
+  const active = queue?.active_jobs || []
+  const queued = queue?.items || []
+  if (!queued.length && !active.length) return null
   const waiting = waitingItems(queue).length
   const running = runningItems(queue).length
   return (
@@ -28,7 +31,7 @@ export default function BankQueuePanel({ queue, nameOf, onCancel, onClearWaiting
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-sm font-semibold text-content">⏳ Launch-all queue</h2>
         <HelpBadge topic="bank-launch-queue" />
-        <span className="text-xs text-content-muted">{queue.items.length} in line</span>
+        <span className="text-xs text-content-muted">{queued.length} in line</span>
         <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
           {waiting > 0 && (
             <button type="button" onClick={onClearWaiting}
@@ -46,8 +49,24 @@ export default function BankQueuePanel({ queue, nameOf, onCancel, onClearWaiting
           )}
         </div>
       </div>
+      {active.length > 0 && <div className="space-y-1">
+        <h3 className="text-xs font-semibold text-content-muted">Active Passes</h3>
+        <ul className="space-y-1">
+          {active.map((job) => <li key={`${job.bank_id}:${job.started_at}`} className={ROW}>
+            <div className="flex min-w-0 grow flex-wrap items-center gap-2">
+              <span className="min-w-0 max-w-full truncate font-medium text-content">{nameOf(job.bank_id)}</span>
+              <span className="text-xs text-content-muted">{jobLabel(job.kind)}</span>
+              <span className="rounded bg-emerald-500/15 px-1.5 py-px text-2xs font-semibold text-emerald-300">Running</span>
+              {job.device_label && <span className="min-w-0 max-w-full truncate text-xs text-content-muted">on {job.device_label}</span>}
+            </div>
+            <button type="button" onClick={() => onStopDirect(job.bank_id)}
+              aria-label={`Stop ${nameOf(job.bank_id)}`}
+              className={`${ACTION} shrink-0 border-rose-400/50 text-rose-300`}>Stop</button>
+          </li>)}
+        </ul>
+      </div>}
       <ol className="space-y-1">
-        {queue.items.map((it) => (
+        {queued.map((it) => (
           <li key={it.bank_id} className={ROW}>
             <span className="w-5 shrink-0 text-right text-content-subtle">{it.position}.</span>
             <span className="flex min-w-0 grow flex-wrap items-center gap-x-2 gap-y-0.5">

@@ -7,7 +7,7 @@ GPU pass launched while another is running is simply rejected (503), not queued.
 
 This module is that queue. A module-level FIFO holds "run this bank's pipeline"
 requests; ONE WORKER PER MACHINE drains it, starting each bank's pipeline only
-once the bank has no live job AND (locally) the GPU is free — so a queued bank
+once its machine has no live Bank work AND (locally) the GPU is free — so a queued bank
 WAITS its turn instead of being turned away. Each run reuses the existing
 ``image_bank_service.start_pipeline`` verbatim, so per-bank progress, the Stop
 button and the pipeline report all behave exactly as a direct launch.
@@ -486,6 +486,21 @@ def _lane_has_pending(lane) -> bool:
                    and _lane_of(e) == lane for e in _queue)
 
 
+def _active_work_reason(entry):
+    """A direct Bank pass owns its machine through every phase, not just GPU use."""
+    from . import bank_jobs
+    for job in bank_jobs.active_bank_jobs():
+        if entry['bank_id'] in job['bank_ids']:
+            return 'another pass is running on this bank'
+        if (job.get('device_id') or _LOCAL_LANE) == _lane_of(entry):
+            return 'another Bank operation is running on this machine'
+        group = entry.get('group_key')
+        if group and any(_group_key_of(entry['user_id'], bank_id) == group
+                         for bank_id in job['bank_ids']):
+            return 'another pass is running on this Bank group'
+    return None
+
+
 def _process_next(app) -> bool:
     """Process exactly one queued bank end to end. Returns True if it handled an
     entry (so the loop should continue), False when nothing is left to do."""
@@ -505,7 +520,7 @@ def _process_next(app) -> bool:
         return False
     bank_id = entry['bank_id']
 
-    # Wait until this bank has no live job AND the GPU is free. This is what lets
+    # Wait for live Bank work on this machine AND for the GPU to be free. This lets
     # a queued bank wait its turn behind a manual launch or a training run,
     # rather than being rejected. Aborts early if the entry is cancelled.
     # This loop is unbounded on purpose — a queued bank waits its turn rather
@@ -526,10 +541,11 @@ def _process_next(app) -> bool:
         # that stay here are CPU work.)
         gpu_reason = None if entry.get('device_id') else banks._gpu_busy_reason()
         busy_here = bank_jobs.running(bank_id)
-        if not busy_here and gpu_reason is None:
+        active_reason = _active_work_reason(entry)
+        if not busy_here and gpu_reason is None and active_reason is None:
             break
         why = ('another pass is running on this bank' if busy_here
-               else gpu_reason)
+               else active_reason or gpu_reason)
         if why != said:
             # Once per REASON, not once per 2 s tick: a queue waiting an hour
             # must not write 1800 identical lines.
@@ -644,6 +660,8 @@ def snapshot() -> dict:
     """{running_bank_id, items:[{bank_id, state, position, steps, reject_flags,
     resolve_dups, enqueued_at, device_id, waiting_for}]} — position is 1-based
     over the whole queue."""
+    from . import bank_jobs
+    active = bank_jobs.active_bank_jobs()
     with _lock:
         items = [{'bank_id': e['bank_id'], 'state': e['state'], 'position': i + 1,
                   'steps': list(e['steps']), 'reject_flags': list(e['reject_flags']),
@@ -658,11 +676,15 @@ def snapshot() -> dict:
                   'waiting_for': e.get('waiting_for')}
                  for i, e in enumerate(_queue)]
         running = [e['bank_id'] for e in _queue if e['state'] == 'running']
+    # Direct passes are already executing. Show them without pretending they
+    # are durable queued pipelines or changing pending-entry cancellation.
+    active = [{**job, 'direct': True, 'state': 'running'} for job in active
+              if not any(bank_id in running for bank_id in job['bank_ids'])]
     # running_bank_id stays for every existing reader, but it can only name one
     # bank and there are now as many as there are machines — so publish the list
     # too, and let new readers use it.
     return {'running_bank_id': running[0] if running else None,
-            'running_bank_ids': running, 'items': items}
+            'running_bank_ids': running, 'items': items, 'active_jobs': active}
 
 
 def state_for(bank_id):

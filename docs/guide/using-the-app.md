@@ -794,6 +794,14 @@ running bank, keeps its finished steps and lets the next waiting bank start.
 Both ask first, and so does the ✕ on the running row, because it stops a run.
 Queue three exports before bed and they'll be triaged by morning.
 
+Work started inside a Bank also appears in this panel under **Active Passes**,
+even when no Launch-all pipeline is queued. It keeps its original pass settings
+and is separate from the waiting pipeline entries. A queued pipeline waits for
+active Bank work on the same machine to finish, including CPU work and time
+between GPU steps. A shared Bank or name group stays exclusive across machines.
+Use **Stop** on an active pass to stop that work, or **Stop running** to stop
+all displayed running work. **Clear waiting** leaves active passes running.
+
 **One lane per machine.** Everything aimed at this computer runs strictly in
 order — two banks never share the graphics card. A bank you sent to a compute
 peer gets its own lane and runs *alongside* local work instead of behind it,

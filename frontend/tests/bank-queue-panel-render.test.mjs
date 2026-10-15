@@ -14,15 +14,35 @@ const { MemoryRouter } = await import('react-router')
 
 const noop = () => {}
 const NAMES = { 1: 'Alpha', 2: 'Bravo', 3: 'Charlie' }
-const html = (items) => renderToStaticMarkup(createElement(MemoryRouter, null,
+const html = (items, active_jobs = []) => renderToStaticMarkup(createElement(MemoryRouter, null,
   createElement(BankQueuePanel, {
-    queue: { items }, nameOf: (id) => NAMES[id], onCancel: noop,
+    queue: { items, active_jobs }, nameOf: (id) => NAMES[id], onCancel: noop, onStopDirect: noop,
     onClearWaiting: noop, onStopRunning: noop,
   })))
 const item = (bank_id, state, extra = {}) => ({ bank_id, state, position: bank_id, ...extra })
 
 test('an empty queue renders nothing', () => {
   assert.equal(html([]), '')
+})
+
+test('a workspace pass remains visible when no pipeline is queued', () => {
+  const out = html([], [{ bank_id: 1, kind: 'score', direct: true, state: 'running' }])
+  assert.match(out, />Active Passes</)
+  assert.match(out, />Alpha</)
+  assert.match(out, /Score pass/)
+  assert.match(out, /aria-label="Stop Alpha"/)
+  assert.match(out, />Stop running</)
+  assert.doesNotMatch(out, />Clear waiting</)
+})
+
+test('direct work and a waiting pipeline retain separate controls', () => {
+  const out = html([item(2, 'pending')], [{ bank_id: 1, kind: 'caption', direct: true, state: 'running' }])
+  assert.match(out, />Alpha</)
+  assert.match(out, />Bravo</)
+  assert.match(out, />Captioning</)
+  assert.match(out, /aria-label="Stop Alpha"/)
+  assert.match(out, /aria-label="Remove Bravo from queue"/)
+  assert.match(out, />1 in line</)
 })
 
 test('a running bank with banks waiting offers both actions, and no Clear all', () => {
