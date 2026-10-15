@@ -849,7 +849,12 @@ async function main() {
           // either too short on a cold load or wasted on a warm one, and this
           // now runs thirty times instead of six.
           try {
-            await page.waitForSelector(pageSpec.ready || '[data-probe-chrome]', { timeout: 15000 });
+            // Markerless routes cannot satisfy a chrome selector. Settings
+            // must finish loading its actual section before it is measured.
+            const ready = pageSpec.ready || (pageSpec === UNKNOWN_PAGE
+              ? (new URL(args.url).hash.startsWith('#/settings') ? '.settings-page .lds-section' : '#root > *')
+              : '[data-probe-chrome]');
+            await page.waitForSelector(ready, { timeout: 15000 });
           } catch (first) {
             /* ONE retry, and only for a page whose spec says chrome exists.
                The very first load of a run pays for everything at once — a cold

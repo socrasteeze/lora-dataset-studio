@@ -8,6 +8,7 @@
 - Keep main unchanged until exact-head cloud Gates and rendered checks cover the new Settings and import behavior. The cloud browser check covers one-bank exclusions and all core Settings routes at five sizes, plus the existing responsive probe. Historical status notes below describe earlier points in the work.
 - First resumed cloud head passed all 241 focused Bank regressions and cloud lint. Frontend qualification found two stale sequential-refresh assertions, feed ordering and a loading-text ellipsis; corrections retain the awaiting-both-refreshes contract and existing feed IDs. The new browser fixture returned to its initial bank on reload, so import checks now use the real Banks navigation. Qualify the repaired source and bundle on a new exact head; earlier results do not qualify it.
 - The next browser run passed Bank opening/import checks at all five sizes and all 50 core Settings route/viewport checks. The existing responsive probe then measured a 4 px mobile Settings-tab overflow at 360 and 412 px. The tab strip now matches the shell's 12 px phone padding and 16 px larger-screen padding. Probe thresholds stay unchanged; requalify the corrected source and bundle.
+- Markerless Settings routes now wait for the rendered settings section directly. The existing probe otherwise spent 15 seconds per viewport waiting for absent chrome markers before its page fallback. The 15-second readiness timeout and all measurement limits/coverage remain intact.
 
 ## Bank Opening Performance Pending (2026-10-14)
 
