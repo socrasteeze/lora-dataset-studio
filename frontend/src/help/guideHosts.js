@@ -142,6 +142,7 @@ export const CORE_GUIDE_ANCHORS = {
   "settings-reference": [
     "how-settings-work",
     "advanced-environment-overrides",
+    "instance-profiles",
     "overview",
     "image-engines",
     "trained-image-models",

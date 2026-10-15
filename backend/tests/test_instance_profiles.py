@@ -57,7 +57,8 @@ def test_new_profiles_start_empty_and_do_not_inherit_secrets(store):
         assert all(key not in environment for key in profiles.SECRET_KEYS)
         assert 'LDS_ALLOW_SECOND_INSTANCE' not in environment
         assert environment['LDS_AUTO_PORT'] == '0'
-        assert environment['LDS_BIND_MANAGED'] == '1'
+        assert environment['LDS_PROFILE_PORT'] == str(row['port'])
+        assert 'LDS_BIND_MANAGED' not in environment
         assert json.loads(Path(environment['LDS_CONFIG']).read_text(encoding='utf-8')) == {}
         assert Path(environment['LDS_ENV']).read_bytes() == b''
         assert all(Path(environment[key]).is_dir() for key in (

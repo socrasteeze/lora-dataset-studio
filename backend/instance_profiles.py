@@ -175,7 +175,7 @@ class ProfileStore:
         environment.update(profile['paths'])
         environment.update(LDS_PROFILES_HOME=str(self.home), LDS_PROFILE_ID=ident,
                            LDS_PROFILE_NAME=profile['name'], LDS_PORT=str(profile['port']),
-                           LDS_AUTO_PORT='0', LDS_BIND_MANAGED='1')
+                           LDS_AUTO_PORT='0', LDS_PROFILE_PORT=str(profile['port']))
         environment.pop('LDS_ALLOW_SECOND_INSTANCE', None)
         environment.pop('LDS_SUPERVISOR', None)
         environment.pop('LDS_RESTART_MODE', None)
