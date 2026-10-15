@@ -14,6 +14,9 @@ and deletes nothing, and the count shown before the click comes from a walk
 done NOW, never from the banner's possibly-stale cache.
 """
 import os
+import errno
+
+import pytest
 
 from PIL import Image
 
@@ -132,3 +135,73 @@ def test_nothing_missing_is_a_calm_zero(client, app, tmp_path):
 def test_unknown_bank_is_404(client):
     r = client.post('/api/bank/424242/forget-missing', json={})
     assert r.status_code == 404
+
+
+def test_vanished_unindexed_child_does_not_block_forgetting_real_missing_rows(
+        client, app, tmp_path, monkeypatch):
+    from app.services import image_bank_service as banks
+
+    bank_id, src = _mkbank(client, tmp_path, ['live.png', 'gone.png'])
+    _set_status(app, bank_id, 'live.png', 'keep')
+    original = (src / 'live.png').read_bytes()
+    (src / 'gone.png').unlink()
+    real_walk = banks._walk_image_relpaths
+
+    def walk(folder, *, onerror=None, **kwargs):
+        onerror(FileNotFoundError(errno.ENOENT, 'synthetic missing child', str(src / 'unused')))
+        yield from real_walk(folder, onerror=onerror, **kwargs)
+
+    monkeypatch.setattr(banks, '_walk_image_relpaths', walk)
+    preview = client.post(f'/api/bank/{bank_id}/forget-missing', json={})
+    assert preview.status_code == 200
+    assert (preview.get_json()['missing'], preview.get_json()['present']) == (1, 1)
+    assert len(_rows(app, bank_id)) == 2
+    result = client.post(f'/api/bank/{bank_id}/forget-missing', json={'confirm': True})
+    assert result.status_code == 200
+    assert result.get_json()['removed'] == 1
+    assert _rows(app, bank_id) == [('live.png', 'keep')]
+    assert (src / 'live.png').read_bytes() == original
+
+
+@pytest.mark.parametrize('kind', ['permission', 'indexed', 'root', 'unknown', 'outside'])
+@pytest.mark.parametrize('confirm', [False, True])
+def test_uncertain_walk_still_refuses_without_forgetting_rows(
+        client, app, tmp_path, monkeypatch, kind, confirm):
+    from app.services import image_bank_service as banks
+
+    bank_id, src = _mkbank(client, tmp_path, ['live.png', 'indexed/image.png'])
+    before = _rows(app, bank_id)
+    target = {'permission': src / 'unused', 'indexed': src / 'indexed',
+              'root': src, 'unknown': None, 'outside': tmp_path / 'elsewhere'}[kind]
+
+    def walk(_folder, *, onerror=None, **_kwargs):
+        error = PermissionError if kind == 'permission' else FileNotFoundError
+        onerror(error(errno.EACCES if kind == 'permission' else errno.ENOENT,
+                      'synthetic unreadable directory', str(target) if target else None))
+        yield 'live.png'
+
+    monkeypatch.setattr(banks, '_walk_image_relpaths', walk)
+    response = client.post(f'/api/bank/{bank_id}/forget-missing', json={'confirm': confirm})
+    assert response.status_code == 400
+    assert _rows(app, bank_id) == before
+
+
+@pytest.mark.parametrize('replace', [False, True])
+def test_source_disappearing_or_replaced_during_walk_cannot_erase_triage(
+        client, app, tmp_path, monkeypatch, replace):
+    from app.services import image_bank_service as banks
+
+    bank_id, src = _mkbank(client, tmp_path, ['live.png', 'other.png'])
+    before = _rows(app, bank_id)
+
+    def walk(_folder, *, onerror=None, **_kwargs):
+        src.rename(tmp_path / 'moved')
+        if replace:
+            src.mkdir()
+        onerror(FileNotFoundError(errno.ENOENT, 'synthetic missing child', str(src / 'unused')))
+        return iter(())
+
+    monkeypatch.setattr(banks, '_walk_image_relpaths', walk)
+    response = client.post(f'/api/bank/{bank_id}/forget-missing', json={'confirm': True})
+    assert response.status_code == 400
+    assert _rows(app, bank_id) == before

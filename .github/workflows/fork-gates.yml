@@ -15,7 +15,7 @@ jobs:
   gates:
     name: Full Fork Gates
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       PYTHONUTF8: '1'
       OMP_NUM_THREADS: '1'
@@ -51,7 +51,7 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Replay and Check GPU Heartbeat
+      - name: Check Heartbeat and Missing Rows
         shell: pwsh
         env:
           LDS_DATA_DIR: ${{ runner.temp }}/lds-heartbeat-data
@@ -73,7 +73,7 @@ jobs:
           } finally {
             Remove-Item -LiteralPath $heartbeatBaselinePath -ErrorAction SilentlyContinue
           }
-          .venv/Scripts/python.exe -X utf8 -m pytest backend/tests/test_gpu_window_close_race.py -q --basetemp "$env:RUNNER_TEMP/hb-current"
+          .venv/Scripts/python.exe -X utf8 -m pytest backend/tests/test_gpu_window_close_race.py backend/tests/test_bank_forget_missing.py -q --basetemp "$env:RUNNER_TEMP/hb-current"
 
       - name: Install Browser for Bank Checks
         run: node frontend/node_modules/playwright-core/cli.js install chromium
@@ -96,6 +96,7 @@ jobs:
           backend/tests/test_bank_dup_distinct.py backend/tests/test_image_bank_semantic_dedup.py
           backend/tests/test_bank_payload_poll_cost.py backend/tests/test_bank_split_exclude.py
           backend/tests/test_bank_folder_exclusion.py backend/tests/test_image_bank_refresh.py
+          backend/tests/test_bank_forget_missing.py
           backend/tests/test_gpu_window_close_race.py
           backend/tests/test_klein_path.py -q --basetemp "$env:RUNNER_TEMP/lds-focused-tags"
 

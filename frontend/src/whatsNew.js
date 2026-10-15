@@ -99,6 +99,13 @@ export const WHATS_NEW = [
     to: '/bank',
   },
   {
+    id: '2026-10-14-forget-missing-child-folders',
+    date: '2026-10-14',
+    title: 'Clean Missing Rows',
+    blurb: 'Forget missing can proceed when an unindexed child folder has vanished. Read errors affecting indexed folders and unavailable source storage still block cleanup.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-14-faster-bank-opening',
     date: '2026-10-14',
     title: 'Open Banks Faster',

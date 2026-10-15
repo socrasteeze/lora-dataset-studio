@@ -1,5 +1,11 @@
 # HANDOFF
 
+## Missing-Row Cleanup Follow-Up (2026-10-14)
+
+- The operator reported cleanup being blocked by a missing nested directory. The fail-closed walk previously treated every directory error as affecting indexed images. It now tolerates missing child directories only when no indexed row belongs beneath them. Permission errors, missing indexed subtrees, unknown/outside error paths and unavailable source roots still refuse the operation.
+- A fresh root read and device/inode identity check after traversal prevent a disappearing or replaced root from becoming a destructive missing-image verdict. Cleanup still changes database rows only after confirmation. Added synthetic regressions cover the benign child, preserved source bytes/decisions, unsafe errors, and root disappearance/replacement. Local tests remain pending; cloud qualification must cover this new head before main.
+- The preceding head's CI completed the full backend suite: 9,754 passed / 10 skipped / 8 subtests passed in 34m55s. The gate job now allows 60 minutes overall so browser checks, setup and the full suite have room to finish. Test assertions, worker count and probe limits are unchanged.
+
 ## Delivery Preparation (2026-10-14)
 
 - The operator authorized clean delivery to main if the changes are qualified, then explicitly authorized resuming the required cloud checks. That supersedes the earlier request to keep PR #3 open once the required cloud checks pass. Local tests remain pending.
