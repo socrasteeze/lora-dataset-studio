@@ -25,10 +25,15 @@ def positive_id(value, label='ID'):
     return value
 
 
-def _ids(values):
+def _ids(values, *, allow_tombstones=False):
     if not isinstance(values, list) or len(values) > 200_000:
         raise ValueError('image_ids must be a list of at most 200000 image IDs')
-    return list(dict.fromkeys(positive_id(value, 'image ID') for value in values))
+    # Profile moves assign negative aliases to unavailable members. These are
+    # existing membership identities, never IDs that can add a live image.
+    return list(dict.fromkeys(
+        value if (allow_tombstones and isinstance(value, int)
+                  and not isinstance(value, bool) and value < 0)
+        else positive_id(value, 'image ID') for value in values))
 
 
 def _name(value):
@@ -253,7 +258,8 @@ def mutate(user_id, bank_id, collection_id, data):
         elif operation == 'delete':
             row.deleted = True
         elif operation == 'members':
-            add_ids, remove_ids = _ids(data.get('add_ids', [])), _ids(data.get('remove_ids', []))
+            add_ids = _ids(data.get('add_ids', []))
+            remove_ids = _ids(data.get('remove_ids', []), allow_tombstones=True)
             if set(add_ids) & set(remove_ids):
                 raise ValueError('An image cannot be added and removed in the same change.')
             for start in range(0, len(remove_ids), 500):
@@ -275,7 +281,7 @@ def mutate(user_id, bank_id, collection_id, data):
                 db.session.add(target)
                 db.session.flush()
                 before.append({**_snapshot(target), 'deleted': True})
-            selected = _ids(data.get('image_ids', [])) if operation == 'split' else None
+            selected = _ids(data.get('image_ids', []), allow_tombstones=True) if operation == 'split' else None
             source = _members(row.id).all()
             if selected is not None and (not selected or set(selected) - {member.image_id for member in source}):
                 raise ValueError('Select members of this collection to split.')
