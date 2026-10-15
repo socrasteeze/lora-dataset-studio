@@ -171,6 +171,32 @@ def test_split_moves_only_selected_members_and_preserves_missing_members(app, ba
         assert _ids(bank_id, saved) == ids
 
 
+def test_moved_missing_members_remain_removable_and_splittable(app, bank_rows):
+    from app.extensions import db
+    from app.models import BankCollectionMember, BankImage
+    from app.services import bank_collections as collections
+    bank_id, ids, _ = bank_rows
+    with app.app_context():
+        saved = _create(bank_id, ids[:1])
+        for position in (1, 2):
+            db.session.add(BankCollectionMember(
+                collection_id=saved['id'], image_id=-position,
+                image_instance_id=str(position) * 32, label='Unavailable Example', position=position))
+        db.session.commit()
+        result = _change(bank_id, saved, 'members', remove_ids=[-1])
+        saved = next(row for row in result['collections'] if row['id'] == saved['id'])
+        assert _ids(bank_id, saved) == [ids[0], -2]
+        result = _change(bank_id, saved, 'split', image_ids=[-2], name='Missing Examples')
+        target = next(row for row in result['collections'] if row['id'] == result['collection_id'])
+        assert _ids(bank_id, target) == [-2]
+        assert collections.detail('local', bank_id, target['id'])['members'][0]['missing']
+        assert _ids(bank_id, saved) == ids[:1]
+        assert db.session.get(BankImage, ids[0]).status == 'keep'
+        target = next(row for row in result['collections'] if row['id'] == target['id'])
+        with pytest.raises(ValueError):
+            _change(bank_id, target, 'members', add_ids=[-3])
+
+
 def test_stale_revision_and_partial_merge_undo_roll_back_atomically(app, bank_rows):
     from app.services import bank_collections as collections
     bank_id, ids, _ = bank_rows

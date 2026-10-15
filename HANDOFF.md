@@ -14,6 +14,7 @@ No local or cloud tests, responsive probes, application imports, live profile sw
 - Added a shared admission reservation for profile transitions. It refuses active requests, unsaved edits, running jobs and queued work, and prevents a second backend from starting during a move.
 - Added Move to Profile in the Bank workspace. All persistent Bank tables and columns are copied, identifiers are remapped, and metadata/cache hashes are verified before source records are removed. Source images stay in place, including imported Bank source folders.
 - Preserved cleaned/rotated/edited files, edit histories, manual collection undo, folder assertions/probes, NPZ embeddings and bulk decision undo within its original expiry. Rebound cache paths and folder evidence signatures without rerunning inference.
+- Missing collection members use negative aliases after a move so numeric ID reuse cannot attach unrelated images. Remove and Split accept those existing aliases; adding an image still requires a positive live image ID.
 - Cross-profile promotion links become explicit history; they cannot bind unrelated destination IDs. Source dataset images keep their own files, captions and recorded Bank origin.
 - Added durable retry receipts and retained source working-cache recovery copies under Bank working storage. Destination collisions, unsupported schema, links/junctions and changed copies are refused. Target profiles with old additive columns must be opened once before moving into them.
 - Updated the Guide, help registry, reserved anchors and What's New. Added synthetic regression coverage for moves/recovery and profile API/supervisor behavior. These tests are authored but unrun.
@@ -65,7 +66,7 @@ $env:LDS_EXTENSIONS_DIR = Join-Path $profileScratch 'extensions'
 $env:LDS_PROFILES_HOME = Join-Path $profileScratch 'profiles'
 Remove-Item Env:LDS_PROFILE_ID,Env:LDS_PROFILE_NAME,Env:LDS_PROFILE_PORT -ErrorAction SilentlyContinue
 .venv/Scripts/python.exe -m pytest backend/tests/test_instance_profiles.py backend/tests/test_profile_launcher.py backend/tests/test_profile_training_isolation.py backend/tests/test_single_instance.py backend/tests/test_supervise.py backend/tests/test_restart_supervised.py backend/tests/test_lora_deploy_extra_paths.py backend/tests/test_no_personal_data.py backend/tests/test_fork_outbound_gate.py -q
-.venv/Scripts/python.exe -m pytest backend/tests/test_profiles_api.py backend/tests/test_profile_bank_move.py -q
+.venv/Scripts/python.exe -m pytest backend/tests/test_profiles_api.py backend/tests/test_profile_bank_move.py backend/tests/test_bank_collections.py -q
 .venv/Scripts/python.exe -m pytest backend/tests/test_dataset_storage.py backend/tests/test_dataset_routes.py backend/tests/test_bank_promote_to_new_dataset.py backend/tests/test_checkpoint_registry.py backend/tests/test_run_snapshot_compare.py backend/tests/test_full_backup.py backend/tests/test_storage_locations.py -q
 .venv/Scripts/python.exe -m ruff check .
 ```
