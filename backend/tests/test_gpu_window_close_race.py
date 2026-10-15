@@ -134,19 +134,54 @@ def test_an_exception_inside_the_window_still_clears_the_flag(app, monkeypatch):
 def test_a_long_pass_still_keeps_its_flag_alive(app, monkeypatch):
     """The heartbeat's whole reason for existing must survive the fix: a pass
     that outlives its TTL must NOT have the GPU taken from under it."""
-    from app import gpu_window
+    from types import SimpleNamespace
+
+    from app import gpu_window, job_queue
     from app.job_queue import queue_manager
 
-    monkeypatch.setattr(gpu_window, '_HEARTBEAT_FLOOR_SECONDS', 0.02)
-    monkeypatch.setattr(gpu_window, '_MIN_FLAG_TTL_SECONDS', 0.01)
+    # A 120 ms real-time lease can expire before a loaded runner schedules its
+    # first beat. Advance logical time only between acknowledged DB renewals.
+    # The actual heartbeat thread and persisted expiry checks still run.
+    condition = threading.Condition()
+    clock = {'now': time.time(), 'renewals': 0}
+    started_at = clock['now']
+    ttl = 60
+    real_set = queue_manager._set_system_state
+
+    def now():
+        with condition:
+            return clock['now']
+
+    def observed_set(key, value, ttl_seconds=None):
+        result = real_set(key, value, ttl_seconds=ttl_seconds)
+        if (key == 'vision_in_progress' and value is not None
+                and threading.current_thread().name == 'vision-window-heartbeat'):
+            with condition:
+                clock['renewals'] += 1
+                condition.notify_all()
+        return result
+
+    monkeypatch.setattr(job_queue, 'time', SimpleNamespace(time=now, monotonic=time.monotonic))
+    monkeypatch.setattr(gpu_window, '_heartbeat_interval_seconds', lambda _ttl: 0.01)
+    monkeypatch.setattr(queue_manager, '_set_system_state', observed_set)
     with app.app_context():
         # See the comment in test_a_beat_that_wakes_during_close_can_never_
         # re_arm_the_flag: the heartbeat needs queue_manager._app to push its
         # own context, which TESTING=True never sets up on its own.
         queue_manager.init_app(app)
-        with gpu_window.gpu_exclusive_vision_window(flag_ttl=0.12):
-            time.sleep(0.5)                 # several TTLs' worth
-            assert _flag(app) is not None, 'the flag lapsed under a live pass'
+        with gpu_window.gpu_exclusive_vision_window(flag_ttl=ttl):
+            with gpu_window.GPU_ARBITER_LOCK:
+                token = _flag(app)
+            assert token is not None
+            for _ in range(5):
+                with condition:
+                    previous = clock['renewals']
+                    clock['now'] += ttl / 2
+                    assert condition.wait_for(lambda: clock['renewals'] > previous, timeout=5), \
+                        'the heartbeat did not persist another renewal'
+                with gpu_window.GPU_ARBITER_LOCK:
+                    assert _flag(app) == token, 'the flag lapsed under a live pass'
+            assert clock['now'] - started_at > 2 * ttl
     assert _flag(app) is None
 
 

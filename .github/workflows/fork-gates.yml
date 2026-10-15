@@ -51,6 +51,30 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Replay and Check GPU Heartbeat
+        shell: pwsh
+        env:
+          LDS_DATA_DIR: ${{ runner.temp }}/lds-heartbeat-data
+          LDS_CONFIG: ${{ runner.temp }}/lds-heartbeat-config.json
+          LDS_ENV: ${{ runner.temp }}/lds-heartbeat.env
+          LDS_PLUGINS_DIR: ${{ runner.temp }}/lds-heartbeat-plugins
+          LDS_EXTENSIONS_DIR: ${{ runner.temp }}/lds-heartbeat-extensions
+        run: |
+          git diff --exit-code origin/main -- backend/app/gpu_window.py backend/app/job_queue.py
+          if ($LASTEXITCODE -ne 0) { throw 'GPU runtime differs from the main baseline.' }
+          $heartbeatBaselinePath = 'backend/tests/_gpu_heartbeat_baseline.py'
+          try {
+            .venv/Scripts/python.exe -c "from pathlib import Path; import subprocess; Path('$heartbeatBaselinePath').write_bytes(subprocess.check_output(['git', 'show', 'origin/main:backend/tests/test_gpu_window_close_race.py']))"
+            if ($LASTEXITCODE -ne 0) { throw 'Could not prepare the unchanged baseline.' }
+            .venv/Scripts/python.exe -X utf8 -m pytest "${heartbeatBaselinePath}::test_a_long_pass_still_keeps_its_flag_alive" -q --basetemp "$env:RUNNER_TEMP/hb-main"
+            $heartbeatBaselineExit = $LASTEXITCODE
+            Write-Host "Unchanged main heartbeat replay exit: $heartbeatBaselineExit"
+            if ($heartbeatBaselineExit -notin 0, 1) { throw 'The baseline replay could not execute.' }
+          } finally {
+            Remove-Item -LiteralPath $heartbeatBaselinePath -ErrorAction SilentlyContinue
+          }
+          .venv/Scripts/python.exe -X utf8 -m pytest backend/tests/test_gpu_window_close_race.py -q --basetemp "$env:RUNNER_TEMP/hb-current"
+
       - name: Install Browser for Bank Checks
         run: node frontend/node_modules/playwright-core/cli.js install chromium
 
@@ -72,6 +96,7 @@ jobs:
           backend/tests/test_bank_dup_distinct.py backend/tests/test_image_bank_semantic_dedup.py
           backend/tests/test_bank_payload_poll_cost.py backend/tests/test_bank_split_exclude.py
           backend/tests/test_bank_folder_exclusion.py backend/tests/test_image_bank_refresh.py
+          backend/tests/test_gpu_window_close_race.py
           backend/tests/test_klein_path.py -q --basetemp "$env:RUNNER_TEMP/lds-focused-tags"
 
       - name: Run Fork Gates
