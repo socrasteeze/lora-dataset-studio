@@ -1,0 +1,1 @@
+import{j as s,al as u,dj as a}from"./index-D9B7zLNe.js";function r(){return s.jsx(u,{slot:"runs.hub",surface:"runs",fallback:s.jsx(a,{})})}export{r as default};
