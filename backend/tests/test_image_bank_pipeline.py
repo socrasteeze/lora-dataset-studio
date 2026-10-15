@@ -100,28 +100,41 @@ def test_pipeline_runs_every_step_in_canonical_order(client, tmp_path, monkeypat
 
 # --- auto-reject params ------------------------------------------------------
 def test_pipeline_auto_reject_honors_flags_and_dedup(client, tmp_path, monkeypatch):
-    # Two identical flat images (a duplicate pair) + one photo. 'uniform' flags
-    # the flats; dedup would also target the pair.
+    # Both copies carry the same quality flag. Dedup must protect a survivor
+    # before that flag can reject both; a separate flat image remains rejectable.
     bank_id, _src = _mkbank(client, tmp_path, {
         'flat1.jpg': _flat(value=128), 'flat2.jpg': _flat(value=128),
+        'single.jpg': Image.new('RGB', (128, 128), 'red'),
         'photo.jpg': _photo()})
+    client.post(f'/api/bank/{bank_id}/scan', json={})
+    with client.application.app_context():
+        from app.extensions import db
+        from app.models import BankImage
+        rows = BankImage.query.filter_by(bank_id=bank_id).all()
+        for row in rows:
+            row.dup_group = 1 if row.relpath in ('flat1.jpg', 'flat2.jpg') else None
+        db.session.commit()
     r = client.post(f'/api/bank/{bank_id}/pipeline', json={
-        'steps': ['scan', 'auto_reject'],
+        'steps': ['auto_reject'],
         'reject_flags': ['uniform'], 'resolve_dups': True})
     assert r.status_code == 202, r.get_json()
 
     report = _report(client, bank_id)
     steps = {s['step']: s for s in report['steps']}
-    assert steps['scan']['status'] == 'done'
     ar = steps['auto_reject']
     assert ar['status'] == 'done'
-    # The flats are uniform → rejected; nothing is deleted from disk.
-    assert ar['counts']['rejected'] >= 2
-    assert (_src / 'flat1.jpg').is_file()
+    assert ar['counts']['rejected'] == 2
+    assert ar['counts']['duplicates'] == 1
+    assert ar['counts']['by_flag']['uniform'] == 1
+    assert all((_src / name).is_file() for name in ('flat1.jpg', 'flat2.jpg', 'single.jpg', 'photo.jpg'))
     with client.application.app_context():
-        from app.models import BankImage
-        rej = BankImage.query.filter_by(bank_id=bank_id, status='reject').count()
-        assert rej >= 2
+        pair = BankImage.query.filter_by(bank_id=bank_id, dup_group=1).all()
+        assert sorted(row.status for row in pair) == ['keep', 'reject']
+        assert BankImage.query.filter_by(bank_id=bank_id, relpath='single.jpg').one().status == 'reject'
+        assert BankImage.query.filter_by(bank_id=bank_id, relpath='photo.jpg').one().status == 'pending'
+    response = client.post(f'/api/bank/{bank_id}/apply-flags', json={'flags': ['uniform']})
+    assert sum(response.get_json()['rejected'].values()) == 0
+    assert client.get(f'/api/bank/{bank_id}').get_json()['counts']['keep'] == 1
 
 
 def test_pipeline_never_bulk_rejects_on_a_non_verdict_flag():

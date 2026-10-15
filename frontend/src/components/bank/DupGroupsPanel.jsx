@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { apiFetch, postJson } from '../../api/fetchClient'
 import { useToast } from '../common/Toast'
 import DupCompareLightbox from './DupCompareLightbox'
+import { btnShape } from '../common/controls.js'
 
 const GROUPS_PAGE = 25
+const GROUP_ACTION = `${btnShape({ size: 'sm' })} w-full min-w-0 border font-semibold`
 
 // Two stages share this panel — exact/resized copies (dHash, stage 1) and
 // semantic near-duplicates (crops/variants of the same shot, stage 2). They
@@ -176,34 +178,35 @@ export default function DupGroupsPanel({ bankId, live, onChanged, kind = 'exact'
             <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-content-muted">
               <span className="font-semibold text-content">Group #{g.group}</span>
               <span>{g.images.length} images — {k.cardHint}</span>
-              <span className="ml-auto" />
+              <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
               {onCompareGroup && <button type="button" onClick={() => onCompareGroup(g.group)}
-                className="min-h-10 rounded-md border border-border px-2 font-semibold text-content hover:bg-surface-raised">Compare Group</button>}
+                className={`${GROUP_ACTION} border-border text-content hover:bg-surface-raised`}>Compare Group</button>}
               {onSaveCollection && <button type="button" onClick={() => onSaveCollection(g.group)}
-                className="min-h-10 rounded-md border border-border px-2 font-semibold text-content hover:bg-surface-raised">Save Collection</button>}
+                className={`${GROUP_ACTION} border-border text-content hover:bg-surface-raised`}>Save Collection</button>}
               <button type="button" onClick={() => setComparing(g.group)}
                 title="Compare these copies full screen — side by side or one at a time — then keep one with K"
-                className="min-h-10 lg:min-h-0 rounded-md border border-primary/70 bg-primary/15 px-2 py-0.5 font-semibold text-content hover:bg-primary/25">
+                className={`${GROUP_ACTION} border-primary/70 bg-primary/15 text-content hover:bg-primary/25`}>
                 ⤢ Compare
               </button>
               <button type="button" disabled={busy || live}
                 onClick={() => resolve({ strategy: 'best', group: g.group })}
-                className="min-h-10 lg:min-h-0 rounded-md border border-border px-2 py-0.5 text-content hover:bg-surface-raised disabled:opacity-50">
-                Keep best
+                className={`${GROUP_ACTION} border-border text-content hover:bg-surface-raised`}>
+                Keep Best
               </button>
               <button type="button" disabled={busy || live}
                 onClick={() => resolve({ strategy: 'first', group: g.group })}
-                className="min-h-10 lg:min-h-0 rounded-md border border-border px-2 py-0.5 text-content hover:bg-surface-raised disabled:opacity-50">
-                Keep first
+                className={`${GROUP_ACTION} border-border text-content hover:bg-surface-raised`}>
+                Keep First
               </button>
               {/* The only verb on this card that rejects NOTHING. */}
               <button type="button" disabled={busy || live}
                 onClick={() => distinct({ group: g.group },
                   `Group #${g.group} kept whole — it will not be proposed again.`)}
                 title="These are not duplicates: keep every copy and stop proposing this group. Nothing is rejected, and the line above puts it back."
-                className="min-h-10 lg:min-h-0 rounded-md border border-sky-400/60 bg-sky-500/10 px-2 py-0.5 font-semibold text-content hover:bg-sky-500/20 disabled:opacity-50">
-                ≠ Not duplicates
+                className={`${GROUP_ACTION} border-sky-400/60 bg-sky-500/10 text-content hover:bg-sky-500/20`}>
+                ≠ Not Duplicates
               </button>
+              </div>
             </div>
             {/* The tiles are a little bigger than they were: still stamps, but
                 stamps you can tell apart at a glance — enough to decide whether

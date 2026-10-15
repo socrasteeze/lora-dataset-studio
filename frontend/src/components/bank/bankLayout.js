@@ -24,6 +24,13 @@
  *  `sm`, which every other responsive decision on this screen already uses. */
 export const RAIL_SIDE_BY_SIDE_PX = 1024;
 
+/** Fit normal page padding and the decision bar below the desktop panes.
+ * Use document coordinates so a page scroll cannot grow the panes again.
+ * Tall tool panels still leave a useful scroll area instead of hiding it. */
+export function bankPaneHeight({ viewportHeight, paneTop, scrollY, bottomSpace }) {
+  return Math.max(160, Math.floor(viewportHeight - paneTop - scrollY - bottomSpace));
+}
+
 /** Does the rail sit BESIDE the grid at this width, or over it as a drawer?
  *  A missing/absurd width answers "beside": the desktop layout is the one that
  *  degrades gracefully if it turns out to be wrong, whereas guessing "drawer"

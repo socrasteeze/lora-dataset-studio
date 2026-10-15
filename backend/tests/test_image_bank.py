@@ -365,7 +365,7 @@ def test_duplicate_groups_and_keep_best(client, tmp_path):
           client.get(f'/api/bank/{bank_id}/images').get_json()['images']}
     assert by['copy.jpg']['status'] == 'reject'
     assert by['copy.jpg']['reject_reason'] == 'duplicate'
-    assert by['orig.jpg']['status'] == 'pending'         # keeper untouched
+    assert by['orig.jpg']['status'] == 'keep'            # protected survivor
     assert client.get(f'/api/bank/{bank_id}').get_json()['dup']['unresolved'] == 0
 
 
@@ -383,7 +383,7 @@ def test_resolve_keep_first_and_manual_pick(client, tmp_path, app):
     assert r.get_json()['rejected'] == 2
     by = {i['name']: i for i in
           client.get(f'/api/bank/{bank_id}/images').get_json()['images']}
-    assert by['c_copy.jpg']['status'] == 'pending'
+    assert by['c_copy.jpg']['status'] == 'keep'
     assert by['a_first.jpg']['status'] == 'reject'
     # Reset then keep-first: lowest id (import order) wins.
     client.post(f'/api/bank/{bank_id}/images/status',
@@ -392,7 +392,7 @@ def test_resolve_keep_first_and_manual_pick(client, tmp_path, app):
     assert r.get_json()['rejected'] == 2
     by = {i['name']: i for i in
           client.get(f'/api/bank/{bank_id}/images').get_json()['images']}
-    assert by['a_first.jpg']['status'] == 'pending'
+    assert by['a_first.jpg']['status'] == 'keep'
     assert by['b_copy.jpg']['status'] == 'reject'
 
 
@@ -408,10 +408,76 @@ def test_auto_resolve_never_flips_a_manual_keep(client, tmp_path, app):
                 json={'ids': [ids['b.jpg']], 'status': 'keep'})
     with app.app_context():
         from app.services import image_bank_service as banks
-        assert banks.resolve_dups_keep_best('local', bank_id) == 0   # keep protected
+        assert banks.resolve_dups_keep_best('local', bank_id) == 1
     by = {i['name']: i for i in
           client.get(f'/api/bank/{bank_id}/images').get_json()['images']}
     assert by['b.jpg']['status'] == 'keep'               # manual keep survives auto
+    assert by['a.jpg']['status'] == 'reject'             # no extra survivor
+
+
+def test_auto_resolve_keeps_one_copy_per_group_and_preserves_manual_rejects(client, tmp_path, app):
+    from app.extensions import db
+    from app.models import BankImage
+    from app.services import image_bank_service as banks
+
+    bank_id, src = _mkbank(client, tmp_path, {
+        f'copy{i}.png': checkerboard() for i in range(6)})
+    before_files = {p.name: p.read_bytes() for p in src.iterdir()}
+    with app.app_context():
+        rows = BankImage.query.filter_by(bank_id=bank_id).order_by(BankImage.id).all()
+        for i, row in enumerate(rows):
+            row.dup_group = i // 3 + 1
+            row.aesthetic_score = float(i)
+        rows[-1].status, rows[-1].reject_reason = 'reject', 'manual'
+        db.session.commit()
+        assert banks.resolve_dups_keep_best('local', bank_id) == 3
+        assert banks.resolve_dups_keep_best('local', bank_id) == 0
+        for gid in (1, 2):
+            members = BankImage.query.filter_by(bank_id=bank_id, dup_group=gid).all()
+            assert sum(row.status == 'keep' for row in members) == 1
+            assert sum(row.status == 'reject' for row in members) == 2
+            assert not any(row.status == 'pending' for row in members)
+        assert rows[-1].status == 'reject' and rows[-1].reject_reason == 'manual'
+    assert {p.name: p.read_bytes() for p in src.iterdir()} == before_files
+
+
+def test_auto_resolve_protects_a_survivor_left_pending_by_an_earlier_version(client, tmp_path, app):
+    from app.extensions import db
+    from app.models import BankImage
+    from app.services import image_bank_service as banks
+
+    bank_id, _ = _mkbank(client, tmp_path, {'copy1.png': checkerboard(), 'copy2.png': checkerboard()})
+    with app.app_context():
+        rows = BankImage.query.filter_by(bank_id=bank_id).order_by(BankImage.id).all()
+        for row in rows:
+            row.dup_group = 1
+        rows[0].status, rows[0].reject_reason = 'reject', 'duplicate'
+        db.session.commit()
+        assert banks.resolve_dups_keep_best('local', bank_id) == 0
+        assert rows[0].status == 'reject'
+        assert rows[1].status == 'keep'
+
+
+@pytest.mark.parametrize('attr,route', [
+    ('dup_group', 'dups'), ('semantic_dup_group', 'semantic-dups')])
+def test_a_stale_rejected_keeper_cannot_remove_the_last_copy(client, tmp_path, app, attr, route):
+    from app.extensions import db
+    from app.models import BankImage
+
+    bank_id, _ = _mkbank(client, tmp_path, {'copy1.png': checkerboard(), 'copy2.png': checkerboard()})
+    with app.app_context():
+        rows = BankImage.query.filter_by(bank_id=bank_id).order_by(BankImage.id).all()
+        for row in rows:
+            setattr(row, attr, 1)
+        rows[0].status, rows[0].reject_reason = 'reject', 'manual'
+        ids = [row.id for row in rows]
+        db.session.commit()
+    response = client.post(f'/api/bank/{bank_id}/{route}/resolve', json={'keep_ids': ids[:1]})
+    assert response.status_code == 400
+    assert 'already rejected' in response.get_json()['error']
+    with app.app_context():
+        assert db.session.get(BankImage, ids[0]).status == 'reject'
+        assert db.session.get(BankImage, ids[1]).status == 'pending'
 
 
 def test_explicit_resolve_rejects_kept_losers(client, tmp_path, app):

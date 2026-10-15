@@ -251,6 +251,11 @@ export default function LaunchAllDialog({
                       onChange={(e) => setResolveDups(e.target.checked)} />
                     ≈ Duplicates — keep best
                   </label>
+                  {resolveDups && (
+                    <p className="m-0 text-xs text-content-muted">
+                      Marks a survivor Keep before applying quality flags. Uses your existing kept copy when available.
+                    </p>
+                  )}
                 </div>
               )}
             </li>

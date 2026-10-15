@@ -85,6 +85,26 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-15-protected-duplicate-survivor',
+    date: '2026-10-15',
+    title: 'Keep A Copy',
+    blurb: 'Duplicate resolution marks its survivor Keep. Launch All protects that copy before quality rejection, preserves your existing decisions, and includes the survivor in Undo.',
+  },
+  {
+    id: '2026-10-15-bank-outer-scroll',
+    date: '2026-10-15',
+    title: 'Stable Bank Page',
+    blurb: 'Desktop Bank panes account for page padding and the decision bar, removing extra background-page scrolling while filters and image results scroll independently.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-15-even-duplicate-actions',
+    date: '2026-10-15',
+    title: 'Consistent Group Buttons',
+    blurb: 'Duplicate and same-shot groups use equally sized action buttons, with matching text size and spacing. Rows wrap into equal columns on smaller screens.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-15-directional-image-culling',
     date: '2026-10-15',
     title: 'Faster Culling Controls',
