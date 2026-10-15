@@ -157,9 +157,11 @@ def test_fetch_output_image_bytes_builds_view_url_and_returns_content(app, monke
 
     class _Resp:
         content = b'PNGDATA'
+        status_code = 200
         def raise_for_status(self): pass
 
-    def fake_get(url, timeout=None):
+    def fake_get(url, timeout=None, allow_redirects=None):
+        assert allow_redirects is False
         seen['url'] = url
         return _Resp()
 
@@ -172,6 +174,10 @@ def test_fetch_output_image_bytes_builds_view_url_and_returns_content(app, monke
         assert 'filename=img_00001_.png' in seen['url']
         assert 'type=output' in seen['url']
         assert 'subfolder=sub+dir' in seen['url']       # urlencoded
+
+        _Resp.status_code = 302
+        assert comfyui.fetch_output_image_bytes('x.png') is None
+        _Resp.status_code = 200
 
         def boom(*a, **k):
             raise ConnectionError('refused')
