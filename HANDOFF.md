@@ -1,5 +1,11 @@
 # HANDOFF
 
+## Peer HTTP Qualification Follow-Up (2026-10-14)
+
+- Head `c7fb45faa` passed Full Fork Gates: 9,767 backend tests passed, 10 skipped and 8 subtests passed; 5,185 core and 1,073 bundled frontend tests passed with 4 bundled skips. The 265 focused Bank tests and all Bank/Settings rendered checks passed.
+- Separate CI passed 9,766 backend tests and failed one peer HTTP assertion: the fake server had not recorded a 403 when the client finished. The test and production peer implementation were unchanged from main. The fake recorded status after sending the response body, allowing the client to inspect the record first. Its status is now recorded before response headers become observable. Production peer code and test assertions are unchanged.
+- The early cloud check now includes the complete peer HTTP file before both full suites. This fixture-only follow-up needs exact-head cloud qualification; main remains held and local tests remain pending. No production restart or missing-row cleanup ran.
+
 ## Missing-Row Cleanup Follow-Up (2026-10-14)
 
 - The operator reported cleanup being blocked by a missing nested directory. The fail-closed walk previously treated every directory error as affecting indexed images. It now tolerates missing child directories only when no indexed row belongs beneath them. Permission errors, missing indexed subtrees, unknown/outside error paths and unavailable source roots still refuse the operation.
