@@ -1,6 +1,12 @@
 # HANDOFF
 
-**Updated:** 2026-10-15 | **Target:** main | **Delivery base:** 4728f9846 | **Task branch:** noble/bank-toolbar-loading
+**Updated:** 2026-10-15 | **Target:** main | **Delivery base:** a48c6677d | **Branch:** main
+
+## Tag-panel spacing delivery
+
+- The operator authorized a clean commit and push to main. Source and the rebuilt frontend bundle use separate `[skip ci]` commits. Verify the final publication SHA against origin/main.
+- Caption Tags has a compact heading, a separate selection count or truncated image name, and Close on the same row with the shared button sizing. Removed the introductory filler and duplicate missing-caption paragraph. Existing counts, filtering, frozen-selection and unread-caption notes remain intact.
+- Updated the affected source expectations without running them. ESLint, the frontend build and diff review passed during implementation; ESLint retains 32 existing warnings. Ruff passed during delivery. Rebuilt frontend/dist. The privacy scan checked 3,009 publishable text files with zero findings. Attribution hits are existing technical references, policy filenames, scanner patterns or synthetic fixtures; there are no new source findings. No credential rotation or history rewrite is indicated. No tests, rendered probes or cloud jobs ran.
 
 ## Toolbar loading delivery
 
@@ -16,7 +22,7 @@
 
 ```text
 # UI Stability Audit — Bank Workspace
-Scope: /bank controls and loading | Viewports: not rendered | Runtime: static-only
+Scope: /bank controls, loading and caption tags | Viewports: not rendered | Runtime: static-only
 
 ## Verdict
 SHIP under the explicit no-test exception. Runtime layout remains unqualified.
@@ -27,6 +33,7 @@ SHIP under the explicit no-test exception. Runtime layout remains unqualified.
 | 2 | Late panel expansion | WARN | SHIFT | frontend/src/components/bank/BankWorkspace.jsx:2094 | Require a click to open Passes and bound its scrolling height. |
 | 3 | Background notices above controls | WARN | SHIFT | frontend/src/components/bank/BankWorkspace.jsx:2742 | Keep folder/conflict notices and reports inside the results pane. |
 | 4 | CLS, overflow and touch targets | NOT RUN | SHIFT | No rendered session or fixture server was started. | Operator verification remains open. |
+| 5 | Caption-tag header wrapping and duplicate empty text | WARN | SHIFT | frontend/src/components/bank/SelectionTagsPanel.jsx:20 | Keep Close beside the compact heading and show the shared missing-caption note once. |
 ```
 
 ## Duplicate and scroll delivery
