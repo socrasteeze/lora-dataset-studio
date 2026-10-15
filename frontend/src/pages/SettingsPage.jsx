@@ -501,7 +501,7 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
               1217 px wide and its chips carry no `.sr-only` label today, so
               nothing escapes yet; adding the LED here (or any badge) without
               `relative` would shrink the whole phone layout to ~73%. */}
-          <nav aria-label="Settings sections" className="relative -mx-4 flex gap-2 overflow-x-auto px-4 pb-3 lg:hidden">
+          <nav aria-label="Settings sections" className="relative -mx-3 flex gap-2 overflow-x-auto px-3 pb-3 sm:-mx-4 sm:px-4 lg:hidden">
             {visibleSections.map((s) => navItem(s, true))}
           </nav>
           {/* Desktop: sticky LED rail */}
