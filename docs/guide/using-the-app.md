@@ -457,15 +457,23 @@ parts, and knowing which is which saves reading the rest of this section twice:
   even when few images or none match;
 - the **grid** filling the rest, with the selection actions directly above it.
 
+The toolbar loads independently of the Bank's statistics and device readiness
+checks. Controls keep their positions while the counter row shows **Loading
+Stats**. Unknown filter counts show a dash. Statistics load in the background;
+if they fail, use **Retry** in the counter row. Actions that need counts or
+safety information stay disabled until that information arrives.
+Folder notices and the last Launch All report appear in the results pane;
+they do not push the toolbars or filter rail down. Live progress and Stop stay
+above the scrolling panes.
+
 The analysis passes live **inside ⚙ Passes** rather than across the top of the
 page: they are the step you run once per bank and then leave alone for days, and
 they were taking up the third of the screen the images now use. All eight are
 still there, and each still opens its own window with its own scope and counts —
-only the door changed. On a bank with nothing scanned yet the panel opens by
-itself, because there is nothing else to do first — **on a desktop-width window
-only**. Measured at 360 px it is about 1 500 px tall, so opening itself there put
-the first image two screens down; below that width ⚙ Passes stays a button you
-press. Below it, the panel also folds everything that is not a pass button — the
+only the door changed. Open **⚙ Passes** when you need it. Background statistics
+never open the panel. The panel scrolls within a fixed, viewport-sized area, so
+late counts and capability checks cannot move the filter and image panes.
+On narrow screens, the panel also folds everything that is not a pass button — the
 semantic engine, watermarks, edits and the overview each sit behind their own
 named fold, one tap away — because the pass buttons are what you came for.
 

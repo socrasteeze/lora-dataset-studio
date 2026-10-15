@@ -421,7 +421,7 @@ export default function BankFilterRail({
               <Chip key={f} active={filter.flag === f}
                 onClick={() => setF({ flag: filter.flag === f ? null : f })}
                 title={FLAG_HINT[f] || 'Sorted worst-first'}>
-                {FLAG_LABEL[f]} {flags[f] ?? 0}
+                {FLAG_LABEL[f]} {payload?.counts ? (flags[f] ?? 0) : '—'}
               </Chip>
             ))}
             {/* Counted like its six neighbours (the backend shares the chip's
@@ -429,7 +429,7 @@ export default function BankFilterRail({
             <Chip active={filter.flag === 'clean'}
               onClick={() => setF({ flag: filter.flag === 'clean' ? null : 'clean' })}
               title="Scanned and carrying none of the quality flags">
-              Clean {flags.clean ?? 0}
+              Clean {payload?.counts ? (flags.clean ?? 0) : '—'}
             </Chip>
           </FilterGroup>
           {/* Coverage, stated where the zeros are. Measured on a real bank:
@@ -456,7 +456,7 @@ export default function BankFilterRail({
         <FilterGroup label="Groups">
           <Chip active={filter.flag === 'dups'} onClick={() => setF({ flag: filter.flag === 'dups' ? null : 'dups' })}
             title="Exact / resized duplicate groups (perceptual hash) with their resolution panel">
-            ≈ Duplicates {payload?.dup?.unresolved ?? 0}
+            ≈ Duplicates {payload?.counts ? (payload?.dup?.unresolved ?? 0) : '—'}
           </Chip>
           {(payload?.semantic_dup?.groups ?? 0) > 0 && (
             <Chip active={filter.flag === 'semantic_dups'}
@@ -517,7 +517,7 @@ export default function BankFilterRail({
                     <Chip key={f} active={filter.flag === f}
                       onClick={() => setF({ flag: filter.flag === f ? null : f })}
                       title={f === 'watermark' ? 'Overlaid watermark detected' : 'Sorted worst-first'}>
-                      {FLAG_LABEL[f]} {flags[f] ?? 0}
+                      {FLAG_LABEL[f]} {payload?.counts ? (flags[f] ?? 0) : '—'}
                     </Chip>
                   ))}
                 </FilterGroup>

@@ -83,7 +83,7 @@ export default function BankPassesPanel({
         {/* Analysis passes — individual, quieter than the primary actions. */}
         <div className="space-y-1.5">
           <GroupLabel>Analysis passes</GroupLabel>
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 [&>button]:h-12 [&>button]:min-w-0 [&>button]:px-2 [&>button]:text-xs [&>button]:leading-tight">
             {/* Every button OPENS ITS WINDOW instead of firing. The window is where
                 the scope, the counts, the settings the calculation really reads and
                 the things it does NOT decide finally have room to be said — and
@@ -106,7 +106,8 @@ export default function BankPassesPanel({
             <PassButton onClick={() => onPassOpen('score')} disabled={live || !passGate.score.ok}
               title={passGate.score.reason || (passGate.score.ok
                 ? `Rate every non-rejected image for aesthetics (1–10), flag NSFW, and group by visual style — one CLIP pass. Powers a smarter "keep best". Already-scored images are reused, so stopping and relaunching costs only what is left. Runs in the background${
-                  holdsTheGpu(scoreDevice) ? ', and holds the GPU (ComfyUI is unloaded and training cannot start) for its duration' : ' on the CPU, leaving the GPU free'}.`
+                  !scoreDevice ? ', while its scoring device is being checked'
+                    : holdsTheGpu(scoreDevice) ? ', and holds the GPU (ComfyUI is unloaded and training cannot start) for its duration' : ' on the CPU, leaving the GPU free'}.`
                 : 'Install the Bank scoring extra (Setup ▸ Quality tools) to score aesthetics / NSFW / style')}>
               Score{!passGate.score.ok && ' (needs setup)'}
             </PassButton>
