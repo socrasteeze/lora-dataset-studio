@@ -291,7 +291,7 @@ test('an occupied-bank refusal is reworded ONCE, for every bank action', () => {
   // and a 202 adopts the live snapshot BEFORE the heavy payload refresh: the
   // job is running right now, the dashboard it rides in can be 25 s away, and
   // the bar must not wait for it. Same lookup, so still no fourth mechanism.
-  assert.match(ws, /await adoptActivity\(\)\s+await refreshPayload\(\)/);
+  assert.match(ws, /await adoptActivity\(\)\s+await Promise\.all\(\[refreshPayload\(\), refreshImages\(\)\]\)/);
   assert.match(ws, /apiFetch\(`\/api\/bank\/\$\{bankId\}\/activity`, \{ background: true \}\)/);
   // The route has to label the refusal for that to be possible: the 409 often
   // lands before the first progress poll, so its body is the only thing that
