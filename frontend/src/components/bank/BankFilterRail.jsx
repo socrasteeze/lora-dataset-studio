@@ -34,7 +34,7 @@ import SelectionTagsPanel from './SelectionTagsPanel.jsx'
 import SubfolderPersonPanel from './SubfolderPersonPanel'
 import { Button, Input, Select, btnClass, controlHeight, fieldClass } from '../common/Controls.jsx'
 import { Chip, FilterGroup, GroupLabel } from './BankAtoms.jsx'
-import { facetMenuState } from './bankTagFacets.js'
+import { facetMenuState, matchingTagOptions } from './bankTagFacets.js'
 import { FLAG_HINT, FLAG_LABEL, ORIGIN_BUCKETS } from './bankFacets.js'
 import { foldedCount } from './bankLayout.js'
 import { angleTitle, mediumTitle } from './bankMedium.js'
@@ -42,8 +42,10 @@ import { assertionFor, folderMarker, scanOffer, suggestionFor } from './folderPe
 
 /** One category menu. Closed, it stays a single compact row and shows how many
  *  values are on. Open, the checkboxes under the grid keep every tick. */
-function TagFacetMenus({ facets, selected, onToggle }) {
+function TagFacetMenus({ facets, other, selected, onToggle, onSelectAll }) {
   const [openId, setOpenId] = useState(null)
+  const [otherSearch, setOtherSearch] = useState('')
+  const [otherLimit, setOtherLimit] = useState(100)
   const rootRef = useRef(null)
   useEffect(() => {
     if (!openId) return undefined
@@ -60,12 +62,19 @@ function TagFacetMenus({ facets, selected, onToggle }) {
       document.removeEventListener('keydown', onKey)
     }
   }, [openId])
-  const open = facets.find((facet) => facet.id === openId) || null
+  const menus = other.length > 0
+    ? [...facets, { id: 'other', label: 'Other Tags', options: other }]
+    : facets
+  const open = menus.find((facet) => facet.id === openId) || null
+  const isOther = open?.id === 'other'
+  const matching = isOther ? matchingTagOptions(other, otherSearch) : open?.options || []
+  const options = isOther ? matching.slice(0, otherLimit) : matching
   return (
     <div ref={rootRef} className="mt-1.5 grid grid-cols-2 gap-1.5 [&>button:nth-child(odd):last-of-type]:col-span-2">
-      {facets.map((facet) => {
+      {menus.map((facet, index) => {
         const { count, title } = facetMenuState(facet, selected)
         const expanded = openId === facet.id
+        const fullWidth = facet.id === 'other' || (index === facets.length - 1 && facets.length % 2 === 1)
         return (
           <button
             key={facet.id}
@@ -75,8 +84,11 @@ function TagFacetMenus({ facets, selected, onToggle }) {
             aria-label={count ? `${facet.label}, ${count} selected: ${title}` : facet.label}
             title={count ? title : undefined}
             onClick={() => setOpenId(expanded ? null : facet.id)}
-            className={`${fieldClass({ size: 'md' })} flex w-full min-w-0 items-center gap-1 text-left ${(count || expanded) ? 'border-indigo-400/60' : ''} ${count ? 'text-indigo-200' : ''}`}>
+            className={`${fieldClass({ size: 'md' })} flex w-full min-w-0 items-center gap-1 text-left ${fullWidth ? 'col-span-2' : ''} ${(count || expanded) ? 'border-indigo-400/60' : ''} ${count ? 'text-indigo-200' : ''}`}>
             <span className="min-w-0 flex-1 truncate">{facet.label}</span>
+            {facet.id === 'other' && (
+              <span className="shrink-0 text-xs tabular-nums text-content-subtle">{other.length}</span>
+            )}
             {count > 0 && (
               <span className="shrink-0 rounded bg-indigo-500/20 px-1 text-xs tabular-nums">{count}</span>
             )}
@@ -86,19 +98,48 @@ function TagFacetMenus({ facets, selected, onToggle }) {
       })}
       {open && (
         <div id={`tag-facet-${open.id}`} role="group" aria-label={open.label}
-          className="col-span-2 max-h-56 overflow-y-auto rounded-md border border-border bg-surface p-1">
-          {open.options.map((option) => {
-            const checked = selected.includes(option.name)
-            return (
-              <label key={option.name}
-                className={`flex min-h-10 lg:min-h-0 lg:h-7 cursor-pointer items-center gap-2 rounded px-1.5 text-xs ${checked ? 'bg-indigo-500/15 text-indigo-200' : 'text-content hover:bg-surface-raised'}`}>
-                <input type="checkbox" className="shrink-0" checked={checked}
-                  onChange={() => onToggle(option.name)} />
-                <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                <span className="shrink-0 tabular-nums text-content-subtle">{option.count}</span>
-              </label>
-            )
-          })}
+          className="col-span-2 rounded-md border border-border bg-surface p-1">
+          {isOther && (
+            <Input type="search" size="md" value={otherSearch}
+              onChange={(event) => { setOtherSearch(event.target.value); setOtherLimit(100) }}
+              aria-label="Find Other Tags" placeholder="Find tags"
+              className="mb-1 w-full min-w-0" />
+          )}
+          {isOther && otherSearch.trim() && (
+            <Button size="sm" className="mb-1 w-full"
+              disabled={!matching.length || matching.every((option) => selected.includes(option.name))}
+              title={`Select all ${matching.length} matching tags`}
+              onClick={() => onSelectAll(matching.map((option) => option.name))}>
+              Select All <span className="tabular-nums">({matching.length})</span>
+            </Button>
+          )}
+          <div className="max-h-56 overflow-y-auto [scrollbar-gutter:stable]">
+            {options.map((option) => {
+              const checked = selected.includes(option.name)
+              return (
+                <label key={option.name}
+                  className={`flex min-h-10 lg:min-h-0 ${isOther ? 'lg:min-h-7 py-1' : 'lg:h-7'} cursor-pointer items-center gap-2 rounded px-1.5 text-xs ${checked ? 'bg-indigo-500/15 text-indigo-200' : 'text-content hover:bg-surface-raised'}`}>
+                  <input type="checkbox" className="shrink-0" checked={checked}
+                    onChange={() => onToggle(option.name)} />
+                  <span className={`min-w-0 flex-1 ${isOther ? 'break-words [overflow-wrap:anywhere]' : 'truncate'}`}>{option.label}</span>
+                  <span className="shrink-0 tabular-nums text-content-subtle">{option.count}</span>
+                </label>
+              )
+            })}
+            {isOther && matching.length === 0 && (
+              <p className="m-0 px-1.5 py-2 text-xs text-content-muted">No matching tags.</p>
+            )}
+            {isOther && options.length < matching.length && (
+              <Button size="sm" className="my-1 w-full" onClick={() => setOtherLimit((limit) => limit + 100)}>
+                Show More
+              </Button>
+            )}
+          </div>
+          {isOther && matching.length > 0 && (
+            <p className="m-0 px-1.5 pt-1 text-2xs tabular-nums text-content-subtle">
+              {options.length} of {matching.length}
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -120,7 +161,7 @@ export default function BankFilterRail({
   thresholdsOpen, setThresholdsOpen, connection, refreshPayload, refreshImages, onRunPass,
   sortGroups, setSort, tileSize, setTileSize,
   moreOpen, setMoreOpen, isDrawer, onClose, onBrowseStyles,
-  tagFiltersShown, tagGroups, wd14Tags, toggleFacetTag, clearWd14Tags,
+  tagFiltersShown, tagGroups, wd14Tags, toggleFacetTag, selectFacetTags, clearWd14Tags,
   filterSummary, clearAllFilters, shownReasons, reasonCounts, reasonHint,
 }) {
   // Which measured axes have data. The conditions are the ones the workspace
@@ -451,7 +492,8 @@ export default function BankFilterRail({
               </Button>
             )}
           </div>
-          <TagFacetMenus facets={tagGroups.facets} selected={wd14Tags} onToggle={toggleFacetTag} />
+          <TagFacetMenus facets={tagGroups.facets} other={tagGroups.other} selected={wd14Tags}
+            onToggle={toggleFacetTag} onSelectAll={selectFacetTags} />
         </section>
       )}
 

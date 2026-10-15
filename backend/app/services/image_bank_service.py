@@ -2088,13 +2088,11 @@ def _framing_counts(bank_id, extra_crit=None) -> dict:
     return {k: int(got.get(k, 0)) for k in _FRAMING_KEYS}
 
 
-# How many tag LIKEs one request may add. Not a safety limit — each one is
-# another LIKE over the same column. A facet may contribute several OR
-# alternatives, and the ten menus together must still fit.
+# Small groups use tag LIKEs. Large bulk selections use one escaped regexp
+# so the full selection fits without SQLite's expression-depth limit.
 _MAX_TAG_FILTERS = 8
 _MAX_TAG_GROUPS = 12
-_MAX_TAGS_IN_GROUP = 32
-_MAX_TAG_ATOMS = 64
+_MAX_TAG_LIKES_IN_GROUP = 32
 
 
 def _clean_tag_filter(tags) -> list:
@@ -2135,26 +2133,24 @@ def _clean_tag_groups(tags) -> list:
     else:
         return []
     groups = []
-    total = 0
     seen = set()
     for chunk in chunks:
         alts = []
+        seen_names = set()
         for part in str(chunk).split('|'):
             name = part.strip().lower().replace(',', '').replace('|', '')
-            if name and name not in alts:
+            if name and name not in seen_names:
+                seen_names.add(name)
                 alts.append(name)
-            if len(alts) >= _MAX_TAGS_IN_GROUP:
-                break
         if not alts:
             continue
         key = tuple(alts)
         if key in seen:
             continue
-        if len(groups) >= _MAX_TAG_GROUPS or total + len(alts) > _MAX_TAG_ATOMS:
+        if len(groups) >= _MAX_TAG_GROUPS:
             break
         seen.add(key)
         groups.append(alts)
-        total += len(alts)
     return groups
 
 
@@ -2165,7 +2161,16 @@ def _wd14_tag_clause(tag):
     return BankImage.tags_text.ilike(f'%,{esc},%', escape='\\')
 
 
-def tag_facets_payload(user_id, bank_id, limit=400) -> dict | None:
+def _wd14_group_clause(group):
+    """Match any whole tag, including bulk picks beyond the old LIKE budget."""
+    if len(group) > _MAX_TAG_LIKES_IN_GROUP:
+        pattern = '(?i),(?:' + '|'.join(re.escape(tag) for tag in group) + '),'
+        return BankImage.tags_text.regexp_match(pattern)
+    clauses = [_wd14_tag_clause(tag) for tag in group]
+    return clauses[0] if len(clauses) == 1 else or_(*clauses)
+
+
+def tag_facets_payload(user_id, bank_id, limit: int | None = None) -> dict | None:
     """Every tag present in the bank, with how many non-rejected images carry it.
 
     Computed on DEMAND, not folded into the bank payload: that payload is polled
@@ -2180,9 +2185,9 @@ def tag_facets_payload(user_id, bank_id, limit=400) -> dict | None:
     so counting what was already thrown away would misdescribe the pile.
 
     Returns {'tags': [{'name', 'count'}...] (most common first), 'tagged': n,
-    'truncated': bool}. `truncated` is not decoration — a bank can carry
-    thousands of distinct tags and the UI must be able to say the long tail was
-    cut rather than imply the list is everything.
+    'truncated': bool}. The default returns every distinct tag so Other Tags
+    can search the full vocabulary. Callers may still request a bounded list
+    with `limit`; `truncated` reports whether that leaves out any tags.
     """
     bank = get_bank(user_id, bank_id)
     if not bank:
@@ -2197,9 +2202,9 @@ def tag_facets_payload(user_id, bank_id, limit=400) -> dict | None:
     for (tags_text,) in rows:
         # The sentinel commas make an empty split, so filter them back out.
         counter.update(t for t in (tags_text or '').split(',') if t)
-    common = counter.most_common(int(limit) + 1)
-    truncated = len(common) > int(limit)
-    return {'tags': [{'name': n, 'count': c} for n, c in common[:int(limit)]],
+    common = counter.most_common(None if limit is None else int(limit))
+    truncated = len(common) < len(counter)
+    return {'tags': [{'name': n, 'count': c} for n, c in common],
             'tagged': len(rows),
             'distinct': len(counter),
             'truncated': truncated}
@@ -3866,8 +3871,7 @@ def list_images(user_id, bank_id, status=None, reason=None, flag=None,
         # Groups AND, names inside a group OR. A second hair colour widens
         # that question; a shirt on top of it still narrows. Whole-tag match
         # only — see _wd14_tag_clause.
-        clauses = [_wd14_tag_clause(tag) for tag in group]
-        q = q.filter(clauses[0] if len(clauses) == 1 else or_(*clauses))
+        q = q.filter(_wd14_group_clause(group))
     explicit = _sort_order(sort)
     if explicit is not None:
         # An explicit sort (resolution / aesthetic / sharpness) wins over the flag
@@ -6603,8 +6607,7 @@ def _pool_query(bank_id, th, *, status=None, flag=None, cluster=None,
         res_bucket=res_bucket, framing=framing, origin=origin,
         medium=medium, angle=angle)
     for group in _clean_tag_groups(wd14_tags):
-        clauses = [_wd14_tag_clause(tag) for tag in group]
-        q = q.filter(clauses[0] if len(clauses) == 1 else or_(*clauses))
+        q = q.filter(_wd14_group_clause(group))
     return q
 
 

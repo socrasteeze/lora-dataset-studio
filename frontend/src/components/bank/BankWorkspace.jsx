@@ -18,7 +18,7 @@ import BankDecisionBar from './BankDecisionBar.jsx'
 import { idsFromResponse } from './bankIds.js'
 import { bankFilterSummary, bankFilterCount } from './bankFilterSummary.js'
 import { showTagFilters, tagsButtonLabel, tagsButtonState } from './wd14Gate.js'
-import { groupTags, toggleWd14Tag, wd14TagsParam } from './bankTagFacets.js'
+import { groupTags, selectWd14Tags, toggleWd14Tag, wd14TagsParam } from './bankTagFacets.js'
 import DupGroupsPanel from './DupGroupsPanel'
 /* 🧪 The Caption Lab, shared with the Dataset side. Lazy for the same reason the
    dataset lazies it: both only exist behind a click, and the bank entry chunk already
@@ -1739,6 +1739,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // A tick adds that tag. A second tick removes it. Several values in one
   // facet stay selected; the query ORs them.
   const toggleFacetTag = (name) => setF({ wd14Tags: toggleWd14Tag(filter.wd14Tags, name) })
+  const selectFacetTags = (names) => setF({ wd14Tags: selectWd14Tags(filter.wd14Tags, names) })
   // Rendered twice: in the header from sm up, and at the top of ⚙ Passes below
   // it (see the header's counter row for why).
   const counterStats = counts && (
@@ -2040,7 +2041,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               onBrowseStyles={() => setStyleBrowserOpen(true)}
               tagFiltersShown={tagFiltersShown} tagGroups={grouped}
               wd14Tags={filter.wd14Tags}
-              toggleFacetTag={toggleFacetTag} clearWd14Tags={() => setF({ wd14Tags: [] })}
+              toggleFacetTag={toggleFacetTag} selectFacetTags={selectFacetTags}
+              clearWd14Tags={() => setF({ wd14Tags: [] })}
               filterSummary={filterSummary} clearAllFilters={clearAllFilters}
               shownReasons={shownReasons} reasonCounts={reasonCounts} reasonHint={reasonHint} />
           </div>

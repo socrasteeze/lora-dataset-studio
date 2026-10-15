@@ -542,6 +542,8 @@ The funnel itself:
    filter bar gains menus for hair, clothing, headwear, setting, pose and how
    many people. Each menu keeps every value you tick: two hair colours match
    pictures with either, and a hair colour plus a top still has to match both.
+   Expand [Other Tags](#other-bank-tags) to browse and filter tags outside
+   these categories.
    They compose with every other filter, and the **search box matches them
    too**, so `red dress` works before you have captioned anything.
    The point is the order of operations: captioning a 9 000-image dump costs
@@ -815,6 +817,19 @@ prerequisite (semantic de-dup wanting ✨ Score first) is the pipeline working a
 designed and is not flagged; a pass the machine refused ("GPU busy", never
 reached) is. When the queue empties, one line says how many finished and how
 many had problems.
+
+## Other Bank Tags
+
+Open **Other Tags** below the Bank tag categories to browse uncategorized tags,
+most common first. Search inside that menu with spaces or underscores.
+Each row shows the number of non-rejected images with that tag. Tick checkboxes
+to filter the grid to images with **any** selected Other Tag (OR).
+After you type a search, **Select All** is the first option. It selects every
+matching tag, including matches beyond the visible rows, and keeps earlier
+selections. Category filters still combine with Other Tags as separate requirements.
+**Show More** reveals the next 100 matches without losing your selections.
+The list includes rare tags beyond the former 400-tag cutoff. Close the menu
+or change its search without clearing your selected filters.
 
 ## Choosing where a bank pass runs
 

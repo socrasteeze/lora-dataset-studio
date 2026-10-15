@@ -1,5 +1,14 @@
 # HANDOFF
 
+## Pending Other Tags (2026-10-14)
+
+- Branch `noble/other-bank-tags` adds a full-width Other Tags menu to the Bank filter rail, using the existing controls and theme. Search accepts spaces/underscores. Select All is the first option for a typed search and selects all matches, including hidden rows, in one update. Other Tags share one OR group; categories still combine with AND. Show More reveals 100 matches at a time, and long labels wrap.
+- The tag-facets endpoint now returns the full vocabulary by default; explicit service limits still report truncation. Added regression cases cover more than 400 tags, search and preserved selections. Guide, help, README and What's New describe the action.
+- The user authorized clean delivery on 2026-10-14: push the scrubbed task branch for exact-head cloud checks, then merge to main only after all required cloud gates pass. Local tests and rendered checks remain pending without new permission. Production data and restart remain outside scope.
+- Build, Ruff and ESLint passed; ESLint reports 32 warnings in unchanged files. Test suites, privacy tests, Gates and rendered checks have not run for this work.
+- Fork Gates now runs `frontend/scripts/bankOtherTagsProbe.mjs` after the full suites. Its isolated synthetic Bank server exercises the real served page at all five required sizes, then runs the existing responsive probe. Regression suites cover bulk selection, OR queries beyond 1,000 tags, exact literal matching and grid/ID/curation parity. Large OR groups use SQLAlchemy's built-in SQLite regexp support. Cloud results are pending; no local runtime verification ran. Keep source and bundle commits separate.
+- Ghost policy additions in AGENTS.md and CLAUDE.md predate this implementation and remain in the working tree. Earlier delivery notes below are historical; their authorizations do not expand this task.
+
 **Updated:** 2026-10-12 | **Delivery target:** main | **Base:** 4b303f302 | **Qualification:** exact-head Fork Gates
 
 ## State

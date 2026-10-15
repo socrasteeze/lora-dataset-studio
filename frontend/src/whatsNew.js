@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-14-bank-other-tags',
+    date: '2026-10-14',
+    title: 'Browse Uncategorized Tags',
+    blurb: 'Open Other Tags below the Bank tag categories to browse and search every uncategorized tag. Select All picks every tag matching your search. Images match any selected Other Tag (OR), including tags beyond the former 400-tag cutoff.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-12-bank-review-progress-repairs',
     date: '2026-10-12',
     title: 'Bank Review Repairs',

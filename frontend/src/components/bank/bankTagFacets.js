@@ -7,10 +7,9 @@
  * enormous open one.
  *
  * So the known tags are grouped into FACETS below. Everything else is returned
- * as `other`, ranked by frequency. The filter menus show the facets only; a
- * tag they do not list is still found by the bank search, which matches the
- * tagger's words. A facet is a shortcut to the common questions, never a
- * claim that the model found nothing else.
+ * as `other`, ranked by frequency, in the searchable Other Tags menu. Bank
+ * search also matches the tagger's words. A facet is a shortcut to the common
+ * questions, never a claim that the model found nothing else.
  *
  * The lists are deliberately partial and will always be. Booru vocabulary is
  * open-ended. Adding a name here only promotes it into a menu.
@@ -118,6 +117,12 @@ export function label(tag) {
   return String(tag || '').replace(/_/g, ' ');
 }
 
+/** Search display names without changing canonical names, counts or order. */
+export function matchingTagOptions(options, query) {
+  const term = label(query).trim().toLowerCase().replace(/\s+/g, ' ');
+  return (options || []).filter((option) => label(option.name).toLowerCase().includes(term));
+}
+
 /**
  * Group the bank's tag counts into facet dropdowns plus the leftovers.
  *
@@ -209,11 +214,17 @@ export function toggleWd14Tag(selected, name) {
   return list;
 }
 
+/** Add a bulk pick once, preserving existing selections and canonical names. */
+export function selectWd14Tags(selected, names) {
+  return [...new Set([...(selected || []), ...(names || [])]
+    .map((name) => String(name || '').trim().toLowerCase()).filter(Boolean))];
+}
+
 /**
  * The `wd14_tags` query value.
  * Tags that share a facet are one OR group (`blonde_hair|brown_hair`), in the
  * order they were selected. Groups are emitted in facet order and joined with
- * commas, which the server ANDs. A tag no facet claims is its own AND group
+ * commas, which the server ANDs. Tags no facet claims share one OR group
  * at the end. '' means nothing is picked, so the caller can omit the parameter.
  */
 export function wd14TagsParam(selected) {
@@ -241,6 +252,6 @@ export function wd14TagsParam(selected) {
     const alts = byFacet.get(facet.id);
     if (alts?.length) groups.push(alts.join('|'));
   }
-  for (const name of loose) groups.push(name);
+  if (loose.length) groups.push(loose.join('|'));
   return groups.join(',');
 }
