@@ -449,7 +449,7 @@ def test_resolve_semantic_keep_best_and_manual(client, tmp_path, app):
     by = _by_name(client, bank_id)
     assert by['smallcrop.jpg']['status'] == 'reject'
     assert by['smallcrop.jpg']['reject_reason'] == 'semantic_dup'
-    assert by['big.jpg']['status'] == 'pending'
+    assert by['big.jpg']['status'] == 'keep'
 
 
 def test_resolve_semantic_manual_keep_ids(client, tmp_path, app):
@@ -460,7 +460,7 @@ def test_resolve_semantic_manual_keep_ids(client, tmp_path, app):
     yid = _by_name(client, bank_id)['y.jpg']['id']
     client.post(f'/api/bank/{bank_id}/semantic-dups/resolve', json={'keep_ids': [yid]})
     by = _by_name(client, bank_id)
-    assert by['y.jpg']['status'] == 'pending'          # the one we kept
+    assert by['y.jpg']['status'] == 'keep'             # the one we kept
     assert by['x.jpg']['status'] == 'reject'
 
 

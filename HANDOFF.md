@@ -1,6 +1,15 @@
 # HANDOFF
 
-**Updated:** 2026-10-15 | **Target:** main | **Delivery base:** 7908be0f5 | **Task branch:** noble/bank-filter-contrast
+**Updated:** 2026-10-15 | **Target:** main | **Delivery base:** 1a0ce279b | **Task branch:** noble/duplicate-action-sizing
+
+## Duplicate and scroll delivery
+
+- The six actions on duplicate and same-shot cards use one shared button shape and equal-width grid columns. Heights are 28 px on desktop and 40 px below lg. Rows use two, three or six equal columns as space permits.
+- Desktop pane sizing now reserves actual shell padding and the selection/Undo bar. It uses document coordinates and no scroll listener, so outer-page scrolling cannot grow the panes again. Tall expanded tools retain a minimum usable pane and allow necessary page scrolling. Rendered behavior remains unverified.
+- Duplicate and same-shot resolution now marks elected survivors Keep. Automatic resolution favors existing kept copies and also protects the lone undecided survivors left by earlier versions. Launch All resolves duplicates before applying quality flags. Manual Keep/Reject decisions remain protected; multiple manual keeps remain kept. A stale rejected keeper without a comparison snapshot is refused before it can reject the last live copy. Source images and group metadata stay in place, and Undo includes the survivor's prior status. Dataset quality triage has no matching Bank duplicate-group resolution action and keeps its existing quality-only contract.
+- Added synthetic regressions for per-group survivors, existing decisions, repeated runs, legacy pending survivors, stale exact/semantic picks, overlapping quality flags, Undo and pane sizing. Tests, visual probes, cloud gates, application imports and live jobs remain unrun under the operator's explicit no-test instruction.
+- Rebuilt frontend/dist. Ruff, ESLint and the build passed; ESLint retains 32 existing warnings. The privacy scan checked 3,004 publishable text files with zero findings. Attribution findings are existing technical references, policy filenames, scanner patterns or synthetic fixtures; changed source adds no attribution. No credential rotation or history rewrite is indicated by the scans.
+- The operator authorized a clean commit and push to main with tests skipped. Source and frontend/dist use separate commits marked `[skip ci]`. Verify the final publication SHA against origin/main. The earlier UI delivery below is on main at the delivery base above.
 
 ## UI delivery
 
@@ -30,7 +39,7 @@ The operator explicitly authorized a clean push to main without tests. Source an
 ## Open
 
 1. The operator will test on another machine. Do not start or resume local or cloud suites without a new instruction. Commands below are for that machine only.
-2. Filter layout stability, culling shortcuts, watermark defaults, workspace queue behavior, restart migration, bulk profile moves, full Gates and physical-device behavior remain unqualified by runtime tests. The optional private-name check is unverified. This delivery uses the operator's no-test exception, not a full qualification.
+2. Duplicate survivors and Undo, outer-page scrolling, equal button sizing, filter layout stability, culling shortcuts, watermark defaults, workspace queue behavior, restart migration, bulk profile moves, full Gates and physical-device behavior remain unqualified by runtime tests. The optional private-name check is unverified. This delivery uses the operator's no-test exception, not a full qualification.
 3. Fully stop Studio after saving edits and finishing work, then run `start.bat`. An old supervisor cannot enable the new in-app switching protocol through a backend-only restart. Desktop picker and physical phone/PWA acceptance remain operator checks.
 4. Prior cloud runs `38777264998` and `38777264930` were cancelled. Historical frontend results on `51ef21b88` do not qualify the current delivery.
 5. After current work finishes, fully restart Studio to load the new backend and additive queue columns. Running jobs were not interrupted. The diagnosis is source-based; no live job reproduction ran.
@@ -78,6 +87,7 @@ Remove-Item Env:LDS_PROFILE_ID,Env:LDS_PROFILE_NAME,Env:LDS_PROFILE_PORT -ErrorA
 .venv/Scripts/python.exe -m pytest backend/tests/test_instance_profiles.py backend/tests/test_profile_launcher.py backend/tests/test_profile_training_isolation.py backend/tests/test_single_instance.py backend/tests/test_supervise.py backend/tests/test_restart_supervised.py backend/tests/test_lora_deploy_extra_paths.py backend/tests/test_no_personal_data.py backend/tests/test_fork_outbound_gate.py -q
 .venv/Scripts/python.exe -m pytest backend/tests/test_profiles_api.py backend/tests/test_profile_bank_move.py backend/tests/test_bank_collections.py -q
 .venv/Scripts/python.exe -m pytest backend/tests/test_bank_queue_workspace.py backend/tests/test_bank_queue_direct_work.py backend/tests/test_bank_queue.py backend/tests/test_bank_queue_durable.py backend/tests/test_bank_queue_lanes.py backend/tests/test_bank_queue_device.py backend/tests/test_bank_waits_between_banks.py -q
+.venv/Scripts/python.exe -m pytest backend/tests/test_image_bank.py backend/tests/test_image_bank_pipeline.py backend/tests/test_image_bank_semantic_dedup.py backend/tests/test_image_bank_undo.py backend/tests/test_bank_dup_live_badge.py backend/tests/test_bank_dup_distinct.py backend/tests/test_bank_write_holds.py backend/tests/test_bank_collections.py -q
 .venv/Scripts/python.exe -m pytest backend/tests/test_dataset_storage.py backend/tests/test_dataset_routes.py backend/tests/test_bank_promote_to_new_dataset.py backend/tests/test_checkpoint_registry.py backend/tests/test_run_snapshot_compare.py backend/tests/test_full_backup.py backend/tests/test_storage_locations.py -q
 .venv/Scripts/python.exe -m ruff check .
 ```
@@ -88,6 +98,7 @@ From frontend:
 node --import ./scripts/registerSdk.mjs --test tests/instance-profile-render.test.mjs tests/dataset-storage-render.test.mjs
 node --import ./scripts/registerSdk.mjs --test src/components/bank/bankProfileMove.test.js src/components/bank/bankBulk.test.js
 node --import ./scripts/registerSdk.mjs --test tests/bank-queue-panel-render.test.mjs src/components/bank/bankQueueActions.test.js
+node --import ./scripts/registerSdk.mjs --test src/components/bank/bankLayout.test.js
 node --import ./scripts/registerSdk.mjs --test src/components/shared/reviewShortcuts.test.js src/components/dataset/DatasetLightbox.test.js src/components/bank/pipelineSteps.test.js src/components/bank/pipeline-ui.test.js tests/bank-review-lightbox-contract.test.mjs tests/bank-decision-bar-contract.test.mjs
 npm test
 npm run lint

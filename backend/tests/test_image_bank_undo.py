@@ -138,8 +138,8 @@ def test_duplicate_resolution_is_undoable(client, tmp_path):
     assert rejected >= 1
 
     offer = _offer(client, bank_id)
-    assert offer and offer['count'] == rejected
-    assert client.post(f'/api/bank/{bank_id}/undo', json={}).get_json()['restored'] == rejected
+    assert offer and offer['count'] == rejected + 1    # includes the new Keep
+    assert client.post(f'/api/bank/{bank_id}/undo', json={}).get_json()['restored'] == rejected + 1
     assert all(s == 'pending' for s in _statuses(client, bank_id).values())
 
 
@@ -160,10 +160,10 @@ def test_launch_all_auto_reject_offers_one_undo_for_the_whole_step(client, tmp_p
     assert rejected >= 2, _statuses(client, bank_id)   # the small one AND a dup
 
     offer = _offer(client, bank_id)
-    assert offer and offer['count'] == rejected
+    assert offer and offer['count'] == rejected + 1    # includes the new Keep
     assert 'launch all' in offer['label'].lower()
     out = client.post(f'/api/bank/{bank_id}/undo', json={}).get_json()
-    assert out['restored'] == rejected
+    assert out['restored'] == rejected + 1
     assert all(s == 'pending' for s in _statuses(client, bank_id).values())
 
 

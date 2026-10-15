@@ -6003,7 +6003,8 @@ def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
     never a file deletion, so it's reversible). strategy 'best'|'first' applies to
     one group or, when ``group`` is None, to every unresolved group at once;
     explicit ``keep_ids`` (manual pick) applies to their own groups. Only
-    non-rejected members are touched. ``col``/``attr``/``reason`` pick the stage:
+    non-rejected members are touched, and the survivor is marked Keep so later
+    quality rejection cannot remove it. ``col``/``attr``/``reason`` pick the stage:
     dup_group (exact/'duplicate') or semantic_dup_group (crops/'semantic_dup').
 
     ``respect_existing_keep`` (default True) protects members the user already
@@ -6045,6 +6046,8 @@ def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
                 for r in rows:
                     g = getattr(r, attr)
                     if g is not None:
+                        if expected_ids is None and r.status == 'reject':
+                            raise ValueError('Selected keeper is already rejected. Reload the group before resolving copies.')
                         keep_by_group.setdefault(g, set()).add(r.id)
             gids = list(keep_by_group)
         elif group is not None:
@@ -6056,6 +6059,15 @@ def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
             # ``group=`` still resolves whatever it names: naming a group IS ruling
             # on it again, and the user is allowed to change their mind.
             gids = unresolved_dup_group_ids(bank_id, col)
+            if respect_existing_keep:
+                # Earlier resolves left the last copy pending. Protect those
+                # survivors too when auto-reject runs again. Groups with two
+                # or more live members still obey the user's distinct veto.
+                gids = sorted(set(gids) | {
+                    gid for (gid,) in db.session.query(col)
+                    .filter(_curated(bank_id), col.isnot(None),
+                            BankImage.status != 'reject')
+                    .group_by(col).having(func.count(BankImage.id) == 1)})
         # EVERY group's members in one pass, BEFORE a single mutation.
         #
         # This used to be one SELECT per group interleaved with the rejects, and
@@ -6079,10 +6091,14 @@ def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
         resolved = rejected = 0
         for gid in gids:
             rows = by_group.get(gid, [])
-            if len(rows) < 2 and gid not in keep_by_group:
+            if not rows or (len(rows) < 2 and gid not in keep_by_group and not respect_existing_keep):
                 continue
             if gid in keep_by_group:
                 keep = keep_by_group[gid]
+            elif respect_existing_keep and any(r.status == 'keep' for r in rows):
+                # A manual pick already supplies this group's survivor. Reject
+                # the pending copies instead of promoting another one beside it.
+                keep = {r.id for r in rows if r.status == 'keep'}
             elif strategy == 'first':
                 keep = {rows[0].id}
             else:
@@ -6090,12 +6106,9 @@ def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
             changed = False
             for r in rows:
                 if r.id in keep:
-                    if expected_ids is not None:
-                        # The comparison's explicit keeper choice is a Keep
-                        # decision. Legacy automatic resolves leave its status alone.
-                        changed = changed or r.status != 'keep'
-                        snap.note(r, 'keep', None)
-                        r.status, r.reject_reason = 'keep', None
+                    changed = changed or r.status != 'keep'
+                    snap.note(r, 'keep', None)
+                    r.status, r.reject_reason = 'keep', None
                     continue
                 if (respect_existing_keep and r.status == 'keep') or (expected_ids is not None and r.status == 'reject'):
                     continue
@@ -13458,13 +13471,14 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups,
         # this one leaves them consistent.
         snap = bank_undo.Snapshot('Launch all — auto-reject')
         capability = _job_bank_capability(job)
-        rejected = (apply_flags(user_id, bank_id, reject_flags, snapshot=snap,
-                                _bank_lease=capability)
-                    if reject_flags else {})
         dup_rejected = 0
         if resolve_dups:
             dup_rejected = resolve_dups_keep_best(
                 user_id, bank_id, snapshot=snap, _bank_lease=capability)
+        # Elect and protect a survivor before flags can reject the whole group.
+        rejected = (apply_flags(user_id, bank_id, reject_flags, snapshot=snap,
+                                _bank_lease=capability)
+                    if reject_flags else {})
         snap.commit(bank_id)
         n = sum(rejected.values()) + dup_rejected
         entry['counts'] = {'rejected': n, 'by_flag': rejected,

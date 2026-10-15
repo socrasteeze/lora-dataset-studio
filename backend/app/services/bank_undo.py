@@ -63,7 +63,7 @@ class Snapshot:
     genuinely flipped rather than the size of the selection.
 
     One snapshot can span several mutators (the pipeline's auto-reject step is
-    ``apply_flags`` followed by a duplicate resolution): the earliest ``before``
+    duplicate resolution followed by ``apply_flags``): the earliest ``before``
     wins and the latest ``after`` is kept, so the pair still describes the whole
     step end to end.
     """

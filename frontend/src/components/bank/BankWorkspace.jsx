@@ -54,7 +54,7 @@ import {
 } from './bankFacets.js'
 // Structure B's own logic — rail folding, facet groups, the passes panel.
 import {
-  FOLD_KEYS, loadDismissedReport, loadFold, loadRailOpen, passesButtonLabel,
+  FOLD_KEYS, bankPaneHeight, loadDismissedReport, loadFold, loadRailOpen, passesButtonLabel,
   passesPanelStartsOpen, railIsColumn, saveDismissedReport, saveFold, saveRailOpen,
 } from './bankLayout.js'
 import PromoteDialog from './PromoteDialog'
@@ -414,12 +414,14 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     const panes = bankPanesRef.current
     if (!desktopPanes || !panes) return undefined
     const header = document.querySelector('.app-header')
+    const shell = panes.closest('#main-content') || panes.parentElement
     let frame = null
     const measure = () => {
       const gap = parseFloat(getComputedStyle(panes).rowGap) || 0
-      const top = Math.max(panes.getBoundingClientRect().top,
-        (header?.getBoundingClientRect().bottom || 0) + gap)
-      const height = `${Math.max(0, Math.floor(window.innerHeight - top - gap))}px`
+      const bounds = panes.getBoundingClientRect()
+      const bottomSpace = Math.max(gap, (shell?.getBoundingClientRect().bottom ?? bounds.bottom) - bounds.bottom)
+      const height = `${bankPaneHeight({ viewportHeight: window.innerHeight,
+        paneTop: bounds.top, scrollY: window.scrollY, bottomSpace })}px`
       if (panes.style.getPropertyValue('--bank-pane-height') !== height) {
         panes.style.setProperty('--bank-pane-height', height)
       }
@@ -430,14 +432,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     }
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule)
     if (panes.parentElement) observer?.observe(panes.parentElement)
+    if (shell) observer?.observe(shell)
     if (header) observer?.observe(header)
     measure()
     window.addEventListener('resize', schedule)
-    window.addEventListener('scroll', schedule, { passive: true })
     return () => {
       observer?.disconnect()
       window.removeEventListener('resize', schedule)
-      window.removeEventListener('scroll', schedule)
       if (frame != null) cancelAnimationFrame(frame)
       panes.style.removeProperty('--bank-pane-height')
     }

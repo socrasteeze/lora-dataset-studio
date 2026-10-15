@@ -724,7 +724,12 @@ auto-reject → score → find watermarks → group by person → classify frami
 (optional) caption* in that exact order. Auto-reject and watermark scanning are
 **off by default**. Select **Find watermarks** when you want that scan in the run.
 When you select Auto-reject, it starts with only
-**≈ Duplicates** on (keep the best, reject the rest); Blurry / Noisy / Flat /
+**≈ Duplicates** on (mark the best copy **Keep**, reject the rest). Duplicate
+resolution runs before quality rejection, so the survivor stays protected even
+when every copy has a selected quality flag. An existing kept copy takes priority;
+multiple copies you already kept stay kept. Manual rejections stay rejected.
+Earlier duplicate groups with one undecided survivor also get that protection.
+Blurry / Noisy / Flat /
 Small are there, off, so an overnight run does not bin soft or plain shots
 unless you tick them. Two things make it safe to run overnight: a pass whose
 tool isn't installed, or a moment when the GPU is busy with a training run, is
@@ -1630,6 +1635,10 @@ thumbnails. The first two are verdicts you take on trust; the third asks you to
 tell two copies of the same shot apart in a 96-pixel stamp. **⤢ Compare** — on
 the group's card, or *⤢ Compare & pick* at the top for the whole list — opens
 those same copies at a size where the choice can actually be made.
+
+Keep Best, Keep First and a manual keeper choice mark the survivor **Keep**.
+Losers receive a reversible Reject status. **Undo** restores both decisions,
+including the survivor's earlier status. Source images stay in place.
 
 - **Side by side** puts every copy of the group on screen at once, each as big
   as the screen allows. This is the view that settles *framing* — which one is

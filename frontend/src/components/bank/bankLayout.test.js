@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path'
 import {
   PASSES_PANEL_DEFAULT_OPEN, RAIL_FOLDED_GROUPS, RAIL_PRIMARY_GROUPS,
   RAIL_SIDE_BY_SIDE_PX, RAIL_STORAGE_KEY,
-  foldedCount, loadRailOpen, passesButtonLabel, passesPanelStartsOpen,
+  bankPaneHeight, foldedCount, loadRailOpen, passesButtonLabel, passesPanelStartsOpen,
   railDefaultOpen, railGroups, railIsColumn, saveRailOpen,
 } from './bankLayout.js'
 
@@ -21,6 +21,21 @@ function fakeStore(initial = {}, { failing = false } = {}) {
     get size() { return data.size },
   }
 }
+
+test('desktop panes leave room for shell padding instead of creating page overflow', () => {
+  const height = bankPaneHeight({ viewportHeight: 900, paneTop: 300, scrollY: 0, bottomSpace: 24 });
+  assert.equal(300 + height + 24, 900);
+  assert.equal(bankPaneHeight({ viewportHeight: 900, paneTop: 288, scrollY: 12, bottomSpace: 24 }), height);
+});
+
+test('the decision bar fits below panes without adding a second page scroll', () => {
+  const height = bankPaneHeight({ viewportHeight: 900, paneTop: 300, scrollY: 0, bottomSpace: 144 });
+  assert.equal(300 + height + 144, 900);
+});
+
+test('a tall tools section retains a usable pane and permits necessary page scrolling', () => {
+  assert.equal(bankPaneHeight({ viewportHeight: 600, paneTop: 560, scrollY: 0, bottomSpace: 24 }), 160);
+});
 
 test('the rail sits beside the grid only once the grid still has room', () => {
   assert.equal(railIsColumn(1440), true)
