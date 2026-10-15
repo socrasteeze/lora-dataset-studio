@@ -50,13 +50,16 @@ def test_an_old_supervisor_cannot_accept_a_switch(profiles_app, monkeypatch):
     assert not (store.home / 'switch.json').exists()
 
 
-def test_switch_records_the_target_before_scheduling_restart(profiles_app, monkeypatch):
+@pytest.mark.parametrize('remote,host_override', [('127.0.0.1', None), ('198.51.100.9', '0.0.0.0')])
+def test_switch_records_the_target_before_scheduling_restart(profiles_app, monkeypatch, remote, host_override):
     from app.routes import profiles
     from app.services import updater
     app, store = profiles_app
     target = store.create('Example')
     monkeypatch.setenv('LDS_RESTART_MODE', 'supervisor')
     monkeypatch.setenv('LDS_PROFILE_SWITCH_SUPPORTED', '1')
+    if host_override:
+        monkeypatch.setenv('LDS_HOST', host_override)
     finished = threading.Event()
     finished.set()
     gate = SimpleNamespace(finished=finished, release=lambda: None)
@@ -68,7 +71,8 @@ def test_switch_records_the_target_before_scheduling_restart(profiles_app, monke
         return True
 
     monkeypatch.setattr(updater, 'schedule_restart', schedule)
-    response = app.test_client().post('/api/profiles/switch', json={'profile_id': target['id']})
+    response = app.test_client().post('/api/profiles/switch', json={'profile_id': target['id']},
+                                      environ_overrides={'REMOTE_ADDR': remote})
     assert response.status_code == 200
     assert response.get_json()['profile_id'] == target['id']
     assert seen == [({'source': 'default', 'target': target['id']}, {'block_during_update': True})]

@@ -87,7 +87,7 @@ def switch_profile():
         if target['id'] == source:
             return jsonify(error='This profile is already open.'), 409
         target_settings = json.loads(Path(target['paths']['LDS_CONFIG']).read_text(encoding='utf-8'))
-        target_host = target_settings.get('server', {}).get('host', '127.0.0.1')
+        target_host = os.environ.get('LDS_HOST') or target_settings.get('server', {}).get('host', '127.0.0.1')
         if request.remote_addr not in ('127.0.0.1', '::1') and target_host in ('127.0.0.1', 'localhost', '::1'):
             return jsonify(error='This profile is local only. Enable its LAN access from the host before switching remotely.'), 409
         gate = freeze_profile_work()
