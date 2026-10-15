@@ -1456,8 +1456,9 @@ def _rows_missing_on_disk(bank):
 
     Fail closed, unlike refresh_bank's walk: refresh is additive and can afford
     to shrug at an unreadable subfolder, but the caller HERE is about to delete
-    rows for every file the walk did not find — a directory it could not read
-    must abort the whole verdict, never read as "those files are gone"."""
+    rows for every file the walk did not find. Unreadable indexed directories
+    must abort the verdict. A vanished, unindexed child cannot hide any of
+    those rows, so it need not block cleanup elsewhere."""
     folder = bank.source_path
     if not folder or not os.path.isdir(folder):
         raise BankFolderUnavailable(
@@ -1465,17 +1466,39 @@ def _rows_missing_on_disk(bank):
             'disconnected drive) — nothing was forgotten. Reconnect it, or use '
             'Move folder… if it lives somewhere else now.')
 
+    rows = (db.session.query(BankImage.id, BankImage.relpath)
+            .filter_by(bank_id=bank.id).all())
+    root = os.path.normcase(os.path.abspath(folder))
+    known = _known_folders(os.path.normcase(rel) for _rid, rel in rows)
+
     def _abort(err):
+        if isinstance(err, FileNotFoundError) and err.filename:
+            failed = os.path.normcase(os.path.abspath(err.filename))
+            try:
+                if failed != root and os.path.commonpath((root, failed)) == root:
+                    relative = _posix_rel(os.path.relpath(failed, root))
+                    if relative not in known:
+                        return
+            except ValueError:
+                pass
         raise err
     try:
+        before = os.stat(folder)
         seen = {os.path.normcase(rel)
                 for rel in _walk_image_relpaths(folder, onerror=_abort)}
+        # A missing child is benign only while the same source root remains
+        # readable. Do not turn a disconnected or replaced root into deletions.
+        with os.scandir(folder) as entries:
+            next(entries, None)
+        after = os.stat(folder)
+        if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+            raise BankFolderUnavailable(
+                'the source folder changed during the check — nothing was forgotten. '
+                'Try again when the folder is stable.')
     except OSError as e:
         raise BankFolderUnavailable(
             'part of the source folder could not be read '
             f'({e}) — nothing was forgotten.') from e
-    rows = (db.session.query(BankImage.id, BankImage.relpath)
-            .filter_by(bank_id=bank.id).all())
     gone = sorted(((rid, rel) for rid, rel in rows
                    if os.path.normcase(rel) not in seen), key=lambda t: t[1])
     return gone, len(rows) - len(gone)
@@ -1510,7 +1533,7 @@ def forget_missing(user_id, bank_id, *, _bank_lease=None) -> dict:
     dialog says out loud. Rows whose file IS on disk are never touched.
 
     The verdict comes from a fresh fail-closed walk (see _rows_missing_on_disk):
-    an unavailable folder or a read error refuses the whole operation, because
+    an unavailable root or a read error affecting indexed folders refuses the whole operation, because
     an unplugged drive must never be able to erase a triage. Deletion commits
     chunk by chunk like delete_rejected, so an interruption leaves a consistent
     bank that has simply forgotten fewer rows. Returns {'removed', 'remaining'}."""

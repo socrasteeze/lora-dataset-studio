@@ -507,7 +507,11 @@ The funnel itself:
    missing (unplugged drive, renamed folder) is still flagged from the list
    without any rescan. Files you removed from the folder are reported at the top
    of the bank, never deleted from it, so an unplugged drive can't wipe your
-   triage. One bank holds up to **200,000 images**; past that the refresh adds as
+   triage. **Forget missing** previews the rows whose files are gone and removes
+   those rows only after confirmation. A vanished child folder with no indexed
+   images does not block that check. Permission errors, unreadable indexed
+   folders and a source root that disappears or changes still refuse cleanup.
+   One bank holds up to **200,000 images**; past that the refresh adds as
    many as fit and tells you how many it left out, so nothing you already
    triaged stops working. That ceiling counts what is in the folder now — files
    you deleted from it don't count against it.
