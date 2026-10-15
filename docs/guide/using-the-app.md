@@ -2771,6 +2771,18 @@ a prefix or a suffix. Review the resulting names before saving. The grouping
 option can leave grouping unchanged, keep banks separate, or group matching
 names. Changes affect bank labels and grouping, not folder names or images.
 
+Choose **Move to Profile** to transfer the selected Banks to another profile.
+Select or create a destination, then choose **Move Banks**. Metadata, saved
+decisions, collections, edit history and analysis caches move with each Bank.
+Source images stay in place, including imported source folders. Each Bank is
+verified before its source record is removed. Finish running work and clear
+queues first. The popup shows progress and per-Bank results. Retry keeps the
+same destination and skips confirmed moves. A failed or unconfirmed move stops
+the batch before the next Bank; resolve it and choose **Retry Moves** to continue.
+Keep the popup open while resolving a lost connection. See
+[Bank Profile Moves](settings-reference.md#bank-profile-moves) for recovery and
+cross-profile promotion history.
+
 Choose **Delete Banks** to review and confirm the selected names. Deletion
 removes bank records, decisions, scores and caches. External source folders and
 images stay in place. Copies created by LDS inside its managed bank storage go

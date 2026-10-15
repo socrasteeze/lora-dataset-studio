@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-15-bulk-bank-profile-moves',
+    date: '2026-10-15',
+    title: 'Move Banks Together',
+    blurb: 'Choose Select Banks in the Bank list, then Move to Profile. Move up to 500 selected Banks with metadata and caches preserved while source images stay in place. Progress and per-Bank results stay visible; retry skips confirmed moves and reuses the same destination.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-15-bank-profile-moves',
     date: '2026-10-15',
     title: 'Move Between Profiles',
