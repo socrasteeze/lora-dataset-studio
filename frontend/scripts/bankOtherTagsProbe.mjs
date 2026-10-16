@@ -213,7 +213,6 @@ try {
     // Storage metadata can arrive after navigation inside the browser. Hold it
     // until the user opens a different folder, then verify navigation survives.
     // A hash-only navigation can reuse an already loaded Settings section.
-    await page.goto('about:blank');
     let releaseLocations;
     const locationsGate = new Promise((resolve) => { releaseLocations = resolve; });
     await page.route('**/api/storage/locations', async (route) => {
@@ -222,7 +221,7 @@ try {
     });
     await Promise.all([
       page.waitForRequest((request) => new URL(request.url()).pathname === '/api/storage/locations'),
-      page.goto(`${url}/#/settings/storage?focus=dataset-images-root`),
+      page.goto(`${url}/?storage-probe=${viewportIndex}#/settings/storage?focus=dataset-images-root`),
     ]);
     const rootField = page.locator('#dataset-images-root');
     await rootField.waitFor({ state: 'visible' });
