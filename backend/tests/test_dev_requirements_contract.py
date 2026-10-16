@@ -313,3 +313,28 @@ def test_isolated_plugin_contracts_prepare_temp_parent_and_run_before_core(workf
     assert '-p no:flask "--basetemp=D:/pt/$($plugin.Name)"' in plugin_step
     assert "if ($LASTEXITCODE -ne 0) { throw" in plugin_step
     assert "if ($tested -eq 0) { throw" in plugin_step
+
+
+def test_hosted_suites_bound_nested_threads_and_keep_file_grouping():
+    for workflow in (_CI, _RELEASE, _ROOT / '.github/workflows/fork-gates.yml'):
+        text = workflow.read_text(encoding='utf-8')
+        for name in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS'):
+            assert re.search(rf"(?m)^\s+{name}:\s*'1'\s*$", text), workflow.name
+    for workflow in (_CI, _RELEASE):
+        text = workflow.read_text(encoding='utf-8')
+        assert '-n 4 --dist loadfile' in text
+
+
+def test_pull_requests_keep_one_complete_windows_qualification():
+    ci = _CI.read_text(encoding='utf-8')
+    backend_job = ci.split('  backend-tests:', 1)[1].split('  frontend-quality:', 1)[0]
+    assert "github.event_name != 'pull_request'" in backend_job
+    fork = (_ROOT / '.github/workflows/fork-gates.yml').read_text(encoding='utf-8')
+    assert re.search(r'(?m)^  pull_request:', fork)
+    assert './scripts/gates.ps1 -Phase Gates' in fork
+    assert 'node frontend/scripts/bankOtherTagsProbe.mjs' in fork
+    # Targeted pytest replays belong in diagnosis, not before the same full suite.
+    assert '-m pytest' not in fork
+    driver = (_ROOT / 'scripts/gates.ps1').read_text(encoding='utf-8')
+    assert 'pytest backend/tests scripts/tests -q -rf -n 8 --dist loadfile' in driver
+    assert 'Invoke-Quick -FullSuiteFollows' in driver

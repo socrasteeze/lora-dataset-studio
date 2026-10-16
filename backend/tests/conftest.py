@@ -157,6 +157,20 @@ def _no_live_comfyui_queue_interrupt(request, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_incidental_ml_imports(request, monkeypatch):
+    """Route and service tests do not need cold Torch imports in child processes.
+
+    Keep cache and readiness logic real; only replace the raw import transport.
+    Probe tests opt in and supply their own subprocess doubles. Later patches
+    still win, including tests of positive, negative and unknown cache entries.
+    """
+    if request.node.get_closest_marker('runtime_imports'):
+        return
+    from app import capabilities
+    monkeypatch.setattr(capabilities, '_import_ok', lambda *a, **k: False)
+
+
+@pytest.fixture(autouse=True)
 def _no_real_nvidia_smi_vram_reading(request, monkeypatch):
     """Every local training launch reads the card twice around its ComfyUI /free
     (`system_stats.gpu_vram_used_gb`, one fresh nvidia-smi fork each). Where the

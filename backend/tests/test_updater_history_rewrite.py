@@ -69,9 +69,10 @@ def _commit(repo, name, text, message):
     _must(repo, 'commit', '-m', message)
 
 
-@pytest.fixture()
-def checkout(tmp_path):
-    """An 'upstream' repo plus a clone of it, the way a user's install looks."""
+@pytest.fixture(scope='module')
+def history_templates(tmp_path_factory):
+    """Prepare real histories once; every test receives independent copies."""
+    tmp_path = tmp_path_factory.mktemp('rewrite-template')
     upstream = tmp_path / 'upstream'
     upstream.mkdir()
     _must(upstream, 'init', '-b', 'main')
@@ -84,7 +85,31 @@ def checkout(tmp_path):
     _must(tmp_path, 'clone', str(upstream), str(clone))
     _must(clone, 'config', 'user.email', 't@example.com')
     _must(clone, 'config', 'user.name', 'Test')
+    rewritten = tmp_path / 'rewritten'
+    shutil.copytree(upstream, rewritten)
+    _rewrite_upstream(rewritten)
+    return upstream, rewritten, clone
+
+
+def _copy_checkout(tmp_path, history_templates, *, rewritten=False):
+    original, rewritten_upstream, old_clone = history_templates
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    upstream, clone = tmp_path / 'upstream', tmp_path / 'clone'
+    shutil.copytree(rewritten_upstream if rewritten else original, upstream)
+    shutil.copytree(old_clone, clone)
+    # The copied clone must fetch its own mutable remote, never the template.
+    _must(clone, 'remote', 'set-url', 'origin', str(upstream))
     return upstream, clone
+
+
+@pytest.fixture()
+def checkout(tmp_path, history_templates):
+    return _copy_checkout(tmp_path, history_templates)
+
+
+@pytest.fixture()
+def rewritten_checkout(tmp_path, history_templates):
+    return _copy_checkout(tmp_path, history_templates, rewritten=True)
 
 
 def _rewrite_upstream(upstream):
@@ -123,19 +148,17 @@ def test_a_failing_setup_command_names_itself(tmp_path):
     assert 'git rev-parse HEAD failed' in str(excinfo.value)
 
 
-def test_pull_ff_only_really_does_break_after_a_rewrite(checkout):
+def test_pull_ff_only_really_does_break_after_a_rewrite(rewritten_checkout):
     """The premise, verified rather than assumed — otherwise the fix guards nothing."""
-    upstream, clone = checkout
-    _rewrite_upstream(upstream)
+    upstream, clone = rewritten_checkout
     _run(clone, 'fetch', 'origin', 'main')
     pull = _run(clone, 'pull', '--ff-only', 'origin', 'main')
     assert pull.returncode != 0
 
 
-def test_apply_update_recovers_from_a_rewritten_upstream(checkout):
-    upstream, clone = checkout
+def test_apply_update_recovers_from_a_rewritten_upstream(rewritten_checkout):
+    upstream, clone = rewritten_checkout
     before = _run(clone, 'rev-parse', 'HEAD').stdout.strip()
-    _rewrite_upstream(upstream)
 
     out = updater.apply_update(root=clone)
     assert out['ok'] is True and out['changed'] is True
@@ -150,10 +173,9 @@ def test_apply_update_recovers_from_a_rewritten_upstream(checkout):
     assert 'Co-Authored-By' not in _run(clone, 'log', '--format=%B').stdout
 
 
-def test_recovery_refuses_to_discard_uncommitted_work(checkout):
+def test_recovery_refuses_to_discard_uncommitted_work(rewritten_checkout):
     """A failing update is better than a destroyed edit."""
-    upstream, clone = checkout
-    _rewrite_upstream(upstream)
+    upstream, clone = rewritten_checkout
     (clone / 'a.txt').write_text('locally edited', encoding='utf-8')
 
     out = updater.apply_update(root=clone)
@@ -161,11 +183,10 @@ def test_recovery_refuses_to_discard_uncommitted_work(checkout):
     assert (clone / 'a.txt').read_text() == 'locally edited'
 
 
-def test_recovery_refuses_when_the_user_has_real_local_commits(checkout):
+def test_recovery_refuses_when_the_user_has_real_local_commits(rewritten_checkout):
     """Local work makes HEAD's tree absent from the remote — the very case the tree
     check exists to catch, since commit COUNTS cannot tell it from a rewrite."""
-    upstream, clone = checkout
-    _rewrite_upstream(upstream)
+    upstream, clone = rewritten_checkout
     _commit(clone, 'mine.txt', 'my work', 'my local commit')
 
     out = updater.apply_update(root=clone)
@@ -173,11 +194,10 @@ def test_recovery_refuses_when_the_user_has_real_local_commits(checkout):
     assert (clone / 'mine.txt').exists()          # nothing destroyed
 
 
-def test_untracked_files_do_not_block_the_recovery(checkout):
+def test_untracked_files_do_not_block_the_recovery(rewritten_checkout):
     """reset --hard never removes untracked files, so they must not veto the update
     (a user's stray notes.txt would otherwise strand them forever)."""
-    upstream, clone = checkout
-    _rewrite_upstream(upstream)
+    upstream, clone = rewritten_checkout
     (clone / 'notes.txt').write_text('scratch', encoding='utf-8')
 
     out = updater.apply_update(root=clone)
@@ -195,22 +215,32 @@ def test_a_normal_fast_forward_update_still_works(checkout):
     assert (clone / 'c.txt').read_text() == 'three'
 
 
-def test_status_does_not_claim_a_rewrite_is_hundreds_of_commits_behind(checkout):
+def test_status_does_not_claim_a_rewrite_is_hundreds_of_commits_behind(rewritten_checkout):
     """Someone perfectly up to date must not be told the whole history is pending
     just because the remote was rewritten — the count is re-measured by content."""
-    upstream, clone = checkout
-    _rewrite_upstream(upstream)
+    upstream, clone = rewritten_checkout
 
     s = updater.git_update_status(root=clone)
     assert s['behind'] == 0 and s['update_available'] is False
     assert s.get('history_rewritten') is True
 
 
-def test_status_still_counts_real_pending_commits_after_a_rewrite(checkout):
+def test_status_still_counts_real_pending_commits_after_a_rewrite(rewritten_checkout):
     """And a genuine new commit on top of a rewrite still reads as exactly one."""
-    upstream, clone = checkout
-    _rewrite_upstream(upstream)
+    upstream, clone = rewritten_checkout
     _commit(upstream, 'c.txt', 'three', 'third')
 
     s = updater.git_update_status(root=clone)
     assert s['behind'] == 1 and s['update_available'] is True
+
+
+def test_copied_histories_have_independent_files_and_remotes(tmp_path, history_templates):
+    first_remote, first_clone = _copy_checkout(tmp_path / 'first', history_templates)
+    second_remote, second_clone = _copy_checkout(tmp_path / 'second', history_templates)
+    (first_remote / 'a.txt').write_text('remote edit', encoding='utf-8')
+    (first_clone / 'a.txt').write_text('clone edit', encoding='utf-8')
+    assert (second_remote / 'a.txt').read_text() == 'one'
+    assert (second_clone / 'a.txt').read_text() == 'one'
+    assert (history_templates[0] / 'a.txt').read_text() == 'one'
+    for remote, clone in ((first_remote, first_clone), (second_remote, second_clone)):
+        assert _must(clone, 'remote', 'get-url', 'origin').stdout.strip() == str(remote)

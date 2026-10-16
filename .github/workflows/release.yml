@@ -11,6 +11,12 @@ on:
 permissions:
   contents: write   # create the release + upload the asset
 
+# Avoid nested BLAS/OpenMP pools inside each pytest worker.
+env:
+  OMP_NUM_THREADS: '1'
+  MKL_NUM_THREADS: '1'
+  OPENBLAS_NUM_THREADS: '1'
+
 jobs:
   build-and-release:
     runs-on: windows-latest
@@ -171,14 +177,14 @@ jobs:
       - name: Run backend and release tooling tests
         # Parallel: xdist workers are separate processes and this suite was
         # hardened for it (in-memory SQLite per app instance, shared registries
-        # reset by fixtures). `auto` sizes to the runner rather than pinning a
-        # count — the local dev box uses 8, a 4-vCPU runner should use 4.
+        # reset by fixtures). Four workers bound resource use on hosted runners;
+        # numerical libraries stay single-threaded inside each worker.
         # --basetemp: SHORT on purpose. The default runner temp path is already
         # deep, and xdist appends /popen-gwN per worker on top. A test asserts
         # on a message PowerShell wraps by path length: it fails at the default
         # path and passes at a short one. D: is the runner's workspace drive.
         # pytest also discovers the unittest cases and pytest functions in scripts/tests.
-        run: python -X utf8 -m pytest backend/tests scripts/tests -q -n auto --dist loadfile --basetemp=D:/t
+        run: python -X utf8 -m pytest backend/tests scripts/tests -q -n 4 --dist loadfile --basetemp=D:/t
 
       - name: Build the Windows source ZIP
         shell: pwsh

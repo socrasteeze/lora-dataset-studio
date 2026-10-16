@@ -104,8 +104,8 @@ def _adversarial_pools(d):
                   for i in range(12)],
         'ties at the threshold': [base] + [_flip(base, d, rnd) for _ in range(6)]
                                  + [_flip(base, d + 1, rnd) for _ in range(6)],
-        # Bigger than one comparison block, so the blocked path really blocks.
-        'one huge bucket': [base] * 900 + [_flip(base, 1, rnd) for _ in range(900)],
+        # The test lowers the block ceiling so this still spans several blocks.
+        'one huge bucket': [base] * 40 + [_flip(base, 1, rnd) for _ in range(40)],
         'zero and all ones': [0, 0, MASK64, MASK64, 1, MASK64 - 1],
     }
 
@@ -123,13 +123,26 @@ def test_the_rewritten_grouping_returns_the_legacy_groups_exactly(d):
 
 
 @pytest.mark.parametrize('d', [0, 1, 5, 12])
-def test_the_rewritten_grouping_survives_the_shapes_random_data_never_makes(d):
-    from app.services.image_bank_service import _dup_groups_from_hashes
+def test_the_rewritten_grouping_survives_the_shapes_random_data_never_makes(d, monkeypatch):
+    from app.services import image_bank_service as banks
     from app.services.face_dataset_service import _hamming
 
+    monkeypatch.setattr(banks, '_DUP_BLOCK_CELLS', 80 * 20)
     for name, pool in _adversarial_pools(d).items():
-        assert _dup_groups_from_hashes(pool, d) == legacy_groups(pool, d, _hamming), (
+        assert banks._dup_groups_from_hashes(pool, d) == legacy_groups(pool, d, _hamming), (
             f'{name!r} grouped differently at dup_distance={d}')
+
+
+def test_a_large_bucket_crosses_the_production_block_ceiling():
+    from app.services import image_bank_service as banks
+
+    base = 0x0123456789ABCDEF
+    rnd = random.Random(99)
+    pool = [base] * 900 + [_flip(base, 1, rnd) for _ in range(900)]
+    assert len(pool) ** 2 > banks._DUP_BLOCK_CELLS
+    # Every variant is one bit from the base, so the exact connected component
+    # is known without repeating the quadratic legacy oracle at this scale.
+    assert banks._dup_groups_from_hashes(pool, 1) == [list(range(len(pool)))]
 
 
 def test_the_block_ceiling_is_really_crossed_by_the_big_pool(monkeypatch):

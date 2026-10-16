@@ -56,20 +56,17 @@ def test_a_beat_that_wakes_during_close_can_never_re_arm_the_flag(app, monkeypat
     from app import gpu_window
     from app.job_queue import queue_manager
 
-    # Timing is forced by three constants that cannot all be shrunk:
-    #   beat interval = max(floor, flag_ttl/3)   -> a short TTL means a short wait
-    #   the close's join timeout is 5s, hardcoded -> the stall must exceed it
-    #   the flag's own TTL must outlive the whole sequence, or it self-expires
-    #   and the assertion passes for the wrong reason (this is what made the
-    #   THIRD version of this test green against the unfixed code).
-    # flag_ttl=18 gives a 6s beat interval and a flag alive until t=18s.
-    monkeypatch.setattr(gpu_window, '_HEARTBEAT_FLOOR_SECONDS', 0.05)
+    # Keep the real 6s write stall beyond the old close's 5s join timeout.
+    # Only shorten the interval before the first beat. The flag must outlive
+    # the sequence so expiry cannot make the unfixed code pass.
+    monkeypatch.setattr(gpu_window, '_heartbeat_interval_seconds', lambda _ttl: 0.01)
     # gpu_window._normalise_flag_ttl floors flag_ttl at _MIN_FLAG_TTL_SECONDS
     # (30, a production safety floor upstream added); without lowering it here
     # too, flag_ttl=18 below would silently become 30 and this test's whole
     # timing derivation (interval, TTL lifetime) would no longer hold.
     monkeypatch.setattr(gpu_window, '_MIN_FLAG_TTL_SECONDS', 0.01)
     beat_writing = threading.Event()
+    beat_finished = threading.Event()
     real_set = queue_manager._set_system_state
     held = {'once': False}
 
@@ -80,7 +77,11 @@ def test_a_beat_that_wakes_during_close_can_never_re_arm_the_flag(app, monkeypat
             held['once'] = True
             beat_writing.set()
             # Longer than the close's join timeout — a contended SQLite write.
-            time.sleep(6)
+            try:
+                time.sleep(6)
+                return real_set(key, value, ttl_seconds=ttl_seconds)
+            finally:
+                beat_finished.set()
         return real_set(key, value, ttl_seconds=ttl_seconds)
 
     with app.app_context():
@@ -94,8 +95,8 @@ def test_a_beat_that_wakes_during_close_can_never_re_arm_the_flag(app, monkeypat
         monkeypatch.setattr(queue_manager, '_set_system_state', stalled_set)
         with gpu_window.gpu_exclusive_vision_window(flag_ttl=18):
             assert beat_writing.wait(timeout=12), 'no beat ever reached its write'
-        # The window has closed. Give the stalled beat time to land its write.
-        time.sleep(7)
+        # Observe completion rather than always sleeping another seven seconds.
+        assert beat_finished.wait(timeout=5), 'the stalled beat did not finish'
 
     assert _flag(app) is None, \
         'a beat that finished after the close re-armed a flag nothing is holding'

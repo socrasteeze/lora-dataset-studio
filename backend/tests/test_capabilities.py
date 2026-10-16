@@ -4,6 +4,8 @@ import pathlib
 import struct
 import pytest
 
+pytestmark = pytest.mark.runtime_imports
+
 # Smallest structurally-valid safetensors: 8-byte LE header length + a 2-byte empty
 # JSON object ('{}'). model_integrity now reads a 0-byte touch()ed stub as a broken
 # file, so a fixture that needs a PRESENT-and-VALID model writes these bytes. It is
