@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: fork-gates-${{ github.ref }}
+  group: fork-gates-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -57,9 +57,12 @@ jobs:
         run: node frontend/node_modules/playwright-core/cli.js install chromium
 
       - name: Check Bank Imports and Settings in Browser
+        id: browser_checks
         run: node frontend/scripts/bankOtherTagsProbe.mjs
 
       - name: Run Fork Gates
+        # Preserve the browser failure while collecting the independent full gate.
+        if: ${{ !cancelled() && (steps.browser_checks.outcome == 'success' || steps.browser_checks.outcome == 'failure') }}
         shell: pwsh
         env:
           LDS_DATA_DIR: ${{ runner.temp }}/lds-gates-data

@@ -333,6 +333,8 @@ def test_pull_requests_keep_one_complete_windows_qualification():
     assert re.search(r'(?m)^  pull_request:', fork)
     assert './scripts/gates.ps1 -Phase Gates' in fork
     assert 'node frontend/scripts/bankOtherTagsProbe.mjs' in fork
+    assert "steps.browser_checks.outcome == 'failure'" in fork
+    assert 'github.head_ref || github.ref_name' in fork
     # Targeted pytest replays belong in diagnosis, not before the same full suite.
     assert '-m pytest' not in fork
     driver = (_ROOT / 'scripts/gates.ps1').read_text(encoding='utf-8')
