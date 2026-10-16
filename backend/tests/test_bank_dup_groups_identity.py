@@ -138,8 +138,11 @@ def test_a_large_bucket_crosses_the_production_block_ceiling():
 
     base = 0x0123456789ABCDEF
     rnd = random.Random(99)
-    pool = [base] * 900 + [_flip(base, 1, rnd) for _ in range(900)]
-    assert len(pool) ** 2 > banks._DUP_BLOCK_CELLS
+    identical = 1500
+    pool = [base] * identical + [_flip(base, 1, rnd) for _ in range(300)]
+    # Buckets, rather than the whole input, are split. The identical hashes
+    # alone exceed one block in every band, regardless of the random variants.
+    assert identical ** 2 > banks._DUP_BLOCK_CELLS
     # Every variant is one bit from the base, so the exact connected component
     # is known without repeating the quadratic legacy oracle at this scale.
     assert banks._dup_groups_from_hashes(pool, 1) == [list(range(len(pool)))]
