@@ -219,6 +219,47 @@ if ($script:calls[2] -notmatch 'backend/tests\\|scripts/tests' -or
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_red_frontend_does_not_hide_python_results_or_report_green(tmp_path):
+    result = run_script(tmp_path, """
+function Invoke-Quick {
+  [void]$script:Results.Add([pscustomobject]@{ Name='Frontend suite (core and bundled)'; Exit=1; Seconds=1 })
+  throw 'frontend red'
+}
+$script:backendRan = $false
+function Invoke-BackendSuites { $script:backendRan = $true; throw 'backend red' }
+function Invoke-AttributionCheck {}
+$failure = ''
+try { Invoke-Gates } catch { $failure = $_.Exception.Message }
+if (-not $script:backendRan -or $failure -notmatch 'frontend red' -or
+    $failure -notmatch 'backend red') { throw 'Independent suite failure was lost' }
+""")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert 'All gates green.' not in result.stdout
+
+
+def test_red_plugin_does_not_hide_other_products_or_the_host_suite(tmp_path):
+    for name in ('alpha', 'bravo'):
+        folder = tmp_path / 'bundled' / name / 'tests'
+        folder.mkdir(parents=True)
+        (folder / 'test_contract.py').write_text('def test_ok(): pass\n')
+    result = run_script(tmp_path, """
+function Get-Python { 'Test-Python' }
+$script:calls = New-Object System.Collections.ArrayList
+function Test-Python {
+  $call = ($args -join '|').Replace([char]92, [char]47)
+  [void]$script:calls.Add($call)
+  $global:LASTEXITCODE = if ($call -match 'bundled/alpha/tests') { 7 } else { 0 }
+}
+$failure = ''
+try { Invoke-BackendSuites } catch { $failure = $_.Exception.Message }
+if ($script:calls.Count -ne 3 -or $script:calls[-1] -notmatch 'backend/tests') {
+  throw 'A failed plugin prevented independent suites'
+}
+if ($failure -notmatch 'Bundled Python: alpha failed') { throw 'Plugin failure was lost' }
+""")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 @pytest.mark.parametrize('phase,fail,expected', [
     ('Gates', False, 'gates'),
     ('Gates', True, 'gates'),
