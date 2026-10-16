@@ -177,6 +177,9 @@ def select(items, E, n, policy, *, mode, isolation, reference_vectors=None,
         raise ValueError('unknown selection mode')
     n = max(1, min(int(n), 2000))
     items = list(items)
+    if (E.ndim != 2 or E.shape[0] != len(items) or not np.isfinite(E).all()
+            or (len(items) and np.any(np.linalg.norm(E, axis=1) <= 1e-8))):
+        raise ValueError('the semantic index contains invalid embeddings; rerun Score or Semantic index')
     by_id = {item['id']: pos for pos, item in enumerate(items)}
     positions = list(range(len(items)))
     requested_locks = p['locked_ids']
@@ -193,12 +196,17 @@ def select(items, E, n, policy, *, mode, isolation, reference_vectors=None,
     if (mode == 'similar' or p['min_similarity'] is not None or p['match'] == 'face') and not refs:
         raise ValueError('select reference images first')
     if refs and any(i not in reference_vectors for i in refs):
-        raise ValueError('a reference has no current matching embedding; run the required analysis pass')
+        if p['match'] == 'face':
+            raise ValueError('a reference has no current usable face; choose a scorable photo, '
+                             'run Group by Person, or use Whole Image')
+        raise ValueError('a reference has no current matching embedding; run Score or Semantic index')
     similarities = None
     unknown_match = []
     if refs:
         # Max supports distinct legitimate poses; averaging can erase a rare view.
         R = np.stack([reference_vectors[i] for i in refs]).astype('float32')
+        if R.ndim != 2 or not np.isfinite(R).all() or np.any(np.linalg.norm(R, axis=1) <= 1e-8):
+            raise ValueError('a reference embedding is invalid; rerun the matching analysis pass')
         R /= np.linalg.norm(R, axis=1, keepdims=True) + 1e-8
         if p['match'] == 'face':
             vectors = match_vectors or {}
@@ -276,7 +284,7 @@ def select(items, E, n, policy, *, mode, isolation, reference_vectors=None,
     ideal = weighted_quotas({key: n for key in sizes}, n, weights)
     quota = weighted_quotas(sizes, n, weights)
     bucket_counts = Counter(assignment[j] for j in picked)
-    min_distance = np.ones(len(items), dtype='float32')
+    min_distance = np.full(len(items), np.inf, dtype='float32')
     if picked:
         for j in picked:
             min_distance = np.minimum(min_distance, 1.0 - E @ E[j])

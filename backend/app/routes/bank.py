@@ -1931,8 +1931,14 @@ def bank_select_similar(bank_id):
     check. Reuses the active CLIP or SigLIP2 cache (no GPU inference). 400 when
     the selected index is unavailable or the reference is invalid."""
     data = request.get_json(silent=True) or {}
+    reference = data.get('ref_id')
+    selection = data.get('selection')
+    if reference is None and isinstance(selection, dict):
+        references = selection.get('reference_ids')
+        if isinstance(references, list) and references:
+            reference = references[0]
     try:
-        ref_id = int(data.get('ref_id'))
+        ref_id = int(reference)
     except (TypeError, ValueError):
         return jsonify({'error': 'ref_id is required'}), 400
     try:

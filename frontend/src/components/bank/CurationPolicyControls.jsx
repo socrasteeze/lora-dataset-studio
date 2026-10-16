@@ -11,7 +11,7 @@ export default function CurationPolicyControls({ policy, onChange, metadata, sel
   const axes = (metadata?.axes || []).filter((axis) => policy.kind === 'character'
     || axis.id !== 'framing+person')
   return (
-    <details className="min-w-0 border-t border-border pt-2">
+    <details className="min-w-0 whitespace-normal break-words border-t border-border pt-2">
       <summary className="min-h-10 cursor-pointer py-2 text-xs font-semibold text-content lg:min-h-0">Selection Policy</summary>
       <fieldset disabled={disabled} className="min-w-0 space-y-2">
       <legend className="sr-only">Selection Policy</legend>

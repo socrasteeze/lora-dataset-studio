@@ -1,16 +1,19 @@
 import { curationSummary } from './curationPolicy.js'
 
-export default function CurationSelectionReport({ result, onDismiss, onReviewUnknown }) {
+export default function CurationSelectionReport({ result, selected, onDismiss, onReviewUnknown }) {
   if (!result) return null
+  const unchanged = selected?.size === result.image_ids.length
+    && result.image_ids.every((id) => selected.has(id))
   return (
     <section aria-label="Selection Report" aria-live="polite"
-      className="mt-2 min-w-0 space-y-2 rounded-lg border border-emerald-400/40 bg-emerald-500/10 p-3 text-xs text-content">
+      className="mt-2 min-w-0 space-y-2 whitespace-normal break-words rounded-lg border border-emerald-400/40 bg-emerald-500/10 p-3 text-xs text-content">
       <div className="flex items-start gap-2">
         <p className="min-w-0 flex-1 break-words">{curationSummary(result)}</p>
         <button type="button" className="min-h-10 shrink-0 rounded-md border border-border px-2 lg:min-h-0 lg:h-8"
           onClick={onDismiss}>Dismiss</button>
       </div>
       <p className="text-content-muted">Selection only. Image status and source files stay unchanged.</p>
+      {!unchanged && <p className="text-content-muted">The current selection has {selected?.size || 0} images. This report describes the last shortlist.</p>}
       {result.shortfall > 0 && <p className="text-amber-300">{result.shortfall} slots remain empty after the current constraints.</p>}
       <p className="text-content-muted">{result.duplicate_omitted} duplicate candidates omitted. {result.below_minimum} below the match cutoff. {result.quality_unknown} without quality measurements.</p>
       {result.missing_locked > 0 && <p className="text-amber-300">{result.missing_locked} pins were unavailable in this filtered, indexed pool.</p>}

@@ -23,6 +23,8 @@ let serverUrl
 let output = ''
 let emptySelectionPassed = false
 let complete = false
+let failure = null
+let responsive = null
 
 try {
   const socket = createServer()
@@ -109,6 +111,23 @@ try {
       }
     }
   }
+  const responsiveOutput = await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ['scripts/responsiveProbe.mjs', '--url', `${serverUrl}/#/bank`,
+      '--states', 'curate-diverse,curate-balanced,curate-similar', '--json'],
+    { cwd: path.join(root, 'frontend'), windowsHide: true })
+    let stdout = ''
+    let stderr = ''
+    child.stdout.on('data', (chunk) => { stdout += chunk })
+    child.stderr.on('data', (chunk) => { stderr += chunk })
+    child.once('error', reject)
+    child.once('exit', (code) => {
+      try { responsive = JSON.parse(stdout) } catch { /* Preserve a failed probe's text below. */ }
+      if (code === 0) resolve(responsive)
+      else reject(new Error(`Responsive probe failed: ${stdout}\n${stderr}`))
+    })
+  })
+  assert.equal(responsiveOutput.measured, 15, 'All three selectors must render at all five sizes')
+  assert.deepEqual(responsiveOutput.skipped, [], 'Skipped curation states are not passes')
   const context = await browser.newContext({ viewport: { width: 412, height: 915 } })
   const page = await context.newPage()
   await page.addInitScript((id) => localStorage.setItem('bankCurrentId', String(id)), ready.bank_id)
@@ -127,11 +146,14 @@ try {
   assert.deepEqual(after, before, 'Selections must not change status or source bytes')
   complete = true
   console.log(`Curation controls passed in ${outcomes.length} populated viewport/kind/selector states; empty selection passed.`)
+} catch (error) {
+  failure = String(error.stack || error)
+  throw error
 } finally {
   fs.mkdirSync(receipts, { recursive: true })
   await writeFile(path.join(receipts, 'curation.json'), JSON.stringify({
     head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim(),
-    outcomes, expectedStates: 45, emptySelectionPassed, complete,
+    outcomes, expectedStates: 45, emptySelectionPassed, responsive, failure, complete,
   }, null, 2))
   await browser?.close()
   if (server && server.exitCode === null) {

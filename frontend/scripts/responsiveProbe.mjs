@@ -168,6 +168,13 @@ const PAGES = {
       // The ☰ button exists only where the rail cannot sit beside the grid, so
       // this state measures the DRAWER on a phone and is skipped on a desktop.
       { name: 'rail', open: ['[aria-controls="bank-filter-rail"]'] },
+      { name: 'curate-diverse', open: ['?[aria-controls="bank-curate"][aria-expanded="false"]',
+        'button:has-text("Pick diverse")', 'summary:has-text("Selection Policy")'] },
+      { name: 'curate-balanced', open: ['?[aria-controls="bank-curate"][aria-expanded="false"]',
+        'button:has-text("Balanced pick")', 'summary:has-text("Selection Policy")'] },
+      { name: 'curate-similar', open: ['button:has(img[src*="/thumb/"])',
+        '?[aria-controls="bank-curate"][aria-expanded="false"]',
+        'button:has-text("Similar to selected")', 'summary:has-text("Selection Policy")'] },
       { name: 'other-tags', open: ['[aria-label="Tag filters"] button:has-text("Other Tags")'] },
       { name: 'other-tags-drawer', open: ['[aria-controls="bank-filter-rail"]',
         '[aria-label="Tag filters"] button:has-text("Other Tags")'] },
