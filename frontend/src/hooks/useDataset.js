@@ -1309,13 +1309,19 @@ export function useDataset() {
   }, [currentId, refresh, toast]);
 
   // Write kohya-style same-stem .txt captions next to the kept images in the
-  // dataset folder (same text as the export ZIP) — for external tools that read
-  // the folder directly instead of downloading the ZIP.
-  const writeCaptionFiles = useCallback(async () => {
-    const d = await postJson(`/api/dataset/${currentId}/captions/write-files`);
-    if (!d.ok) { toast.error(d.error || 'Unexpected error'); return; }
-    toast.success(`${d.written} caption file(s) written`
-      + (d.skipped_uncaptioned ? ` · ${d.skipped_uncaptioned} uncaptioned skipped` : ''));
+  // dataset folder with the selected trigger, including Style datasets.
+  const writeCaptionFiles = useCallback(async (triggerWord) => {
+    try {
+      const d = await postJson(`/api/dataset/${currentId}/captions/write-files`,
+        triggerWord === undefined ? undefined : { trigger_word: triggerWord });
+      if (!d.ok) { toast.error(d.error || 'Could not write caption files.'); return false; }
+      toast.success(`${d.written} caption file(s) written`
+        + (d.skipped_uncaptioned ? ` · ${d.skipped_uncaptioned} uncaptioned skipped` : ''));
+      return true;
+    } catch (error) {
+      toast.error(error?.message || 'Could not write caption files.');
+      return false;
+    }
   }, [currentId, toast]);
 
   // Open the dataset folder (images + .txt sidecars) in the OS file explorer —

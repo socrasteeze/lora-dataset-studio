@@ -24,7 +24,7 @@ const dialog = fs.readFileSync(new URL('./ContinueDialog.jsx', import.meta.url),
 test('the panel offers both boxes with their aria labels', () => {
   assert.match(panel, /aria-label="Preview steps"/);
   assert.match(panel, /aria-label="Preview guidance scale"/);
-  assert.match(panel, /Preview quality/);
+  assert.match(panel, /Preview Quality/);
 });
 
 test('the panel seeds from the STORED override, never from the effective value', () => {

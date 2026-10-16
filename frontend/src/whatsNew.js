@@ -85,6 +85,20 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-15-caption-txt-triggers',
+    date: '2026-10-15',
+    title: 'Triggers in TXT',
+    blurb: 'Write TXT prepends your chosen trigger once to each caption file, including Style datasets. Review or enter an @artist tag in Trigger Word. Stored image captions stay intact.',
+    to: '/datasets?section=captions&panel=tools',
+  },
+  {
+    id: '2026-10-15-training-control-chips',
+    date: '2026-10-15',
+    title: 'Clearer Training Controls',
+    blurb: 'Training uses amber checkbox chips, equal preset-action buttons and aligned launch, base and preview controls. Dropdowns share a consistent width and height. Narrow screens stack fields and wrap action rows.',
+    to: '/datasets?section=training&panel=advanced',
+  },
+  {
     id: '2026-10-15-dataset-caption-alignment',
     date: '2026-10-15',
     title: 'Readable Image Captions',

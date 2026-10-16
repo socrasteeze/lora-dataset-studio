@@ -20,9 +20,9 @@
 export const MEMORY_KEYS = ['quantize', 'quantize_te', 'low_vram'];
 
 export const MEMORY_LABELS = {
-  quantize: 'Quantise base model',
-  quantize_te: 'Quantise text encoder',
-  low_vram: 'Low-VRAM loading',
+  quantize: 'Quantise Base Model',
+  quantize_te: 'Quantise Text Encoder',
+  low_vram: 'Low-VRAM Loading',
 };
 
 /* "NVIDIA GeForce RTX 5090 · 31.4 GB", or whichever half we actually know. */

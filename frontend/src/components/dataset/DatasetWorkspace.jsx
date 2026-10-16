@@ -2127,7 +2127,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
               </div>
 
               <div id="ds-captions-tools" tabIndex={-1} className="scroll-mt-20">
-                <CaptionToolsBar images={images} kind={d.kind || 'character'} mode={effCaptionMode}
+                <CaptionToolsBar key={d.id} images={images} kind={d.kind || 'character'} mode={effCaptionMode}
+                  triggerWord={d.trigger_word || ''}
                   excludes={excludeTags} includes={includeTags}
                   onExclude={toggleExclude} onInclude={toggleInclude}
                   onReplace={ds.replaceCaptions}

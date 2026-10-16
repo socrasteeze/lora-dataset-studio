@@ -1,5 +1,63 @@
 # HANDOFF
 
+## Training controls and caption TXT delivery
+
+- The operator authorized a clean commit and push of all pending changes to main, with tests skipped. Source and the rebuilt frontend bundle use separate `[skip ci]` commits. Verify publication against the final origin/main SHA.
+- Scope: themed Training checkbox chips, aligned dropdowns and launch/preset/base/preview controls, plus trigger-prefixed TXT writing for all Dataset kinds. The preview grid aligns items at the top so the left selector cannot center itself beside the taller quality/help block.
+- Ruff, ESLint, the frontend build and diff review passed. ESLint retains 32 existing warnings. The privacy scan checked 3,014 publishable tracked and untracked text files with zero findings. Attribution-pattern matches are technical project references, policy filenames, scanner patterns, cursor variables or synthetic fixtures. There are no unresolved scrub findings, and no credential rotation or history rewrite is indicated.
+- No tests, cloud suites, browser probes, fixture servers, application imports, production caption-file writes or restarts ran for this delivery. Earlier test results below do not qualify the current changes. Save work and restart Studio after current jobs finish to enable the TXT-writing backend change, then refresh the browser.
+
+## Caption TXT trigger follow-up
+
+- Implemented on noble/training-control-chips alongside the Training UI work below and included in this delivery.
+- The explicit Write TXT action prepends the chosen trigger once for Character, Concept and Style datasets. Trigger Word starts with the saved dataset trigger and accepts an operator-entered prefix, including an @artist tag. This override applies to the written files; stored captions, the dataset trigger and image files stay intact.
+- The caption-tools component is keyed by dataset, so a typed prefix cannot carry into another dataset. Pristine input follows the saved trigger; edits survive background polls and failed requests. Writing disables the input and button, and the button reserves its width for its busy label. Requests surface failures and allow retry.
+- The endpoint accepts an optional trigger_word and retains no-body compatibility. It rejects malformed requests and invalid, empty, multiline or overlong prefixes before writing any files. Repeated writes and existing leading copies of the selected prefix produce one prefix. Existing stale-file cleanup and skip counts remain in place.
+- Style ZIP exports and built-in training still use their existing content-only rules. This request changes the explicit TXT-writing action. Bank captions have no Dataset trigger and use a separate workflow. No Bank behavior was changed.
+- Added synthetic backend regressions for all three dataset kinds, overrides, repeat writes, duplicate prefixes, image/caption/metadata preservation and invalid requests. Updated the existing Style TXT expectation while retaining its content-only ZIP and stale-cleanup assertions. Tests have not run.
+- Updated the Guide, help search, What's New and the README's former blanket no-trigger claim. Ruff, ESLint, the frontend build and diff review passed; ESLint retains 32 existing warnings. Rebuilt frontend/dist. Privacy scan: 3,014 publishable tracked and untracked text files, zero findings. No new source attribution was found.
+- No tests, browser probes, application imports, production TXT writes or restarts ran. Save work and restart Studio after current jobs finish to load the backend change. Refresh the browser for the updated controls.
+
+```text
+# UI Stability Audit - Caption TXT
+Scope: /datasets Captions / Caption Tools | Viewports: not rendered | Runtime: static-only
+
+## Verdict
+SHIP under the no-test exception. Runtime layout remains unqualified.
+
+## Findings
+| # | Check | Status | Severity | Evidence | Fix |
+| 1 | Trigger input, write state and retry | WARN | SHIFT | frontend/src/components/dataset/CaptionToolsBar.jsx:174 | Keep the prefix in place, align the controls and reserve the writer's busy-state width. |
+| 2 | Populated layout and interaction | NOT RUN | SHIFT | No browser or fixture server was started. | Verify on the operator's test machine. |
+```
+
+## Training control-chip follow-up
+
+- Implementation branch: noble/training-control-chips, based on the previous main delivery at 6cb46d0a8. These changes are included in this delivery.
+- Scope is the Training panel shown by the operator. Each native checkbox is in its own clickable chip, including memory saving, gradient checkpointing, Compile, dual captions, differential guidance, face masking and masked training. Native keyboard behavior, settings keys, save handlers and disabled conditions remain intact. Dual-caption, differential-guidance and face-mask help controls sit outside their checkbox labels.
+- Chips use the app's surface, content and amber accent tokens. Checked, hover, focus and disabled states keep the same border width. Chip targets are at least 40 px below lg and 32 px on desktop; labels wrap instead of truncating.
+- Training dropdowns use a common 20 rem preferred width, capped by available space. Heights are 40 px below lg and 32 px on desktop. Advanced and Expert option rows use the same 9 rem label track, place supplementary details beneath the control and stack labels above controls below sm. No dynamic measurement or setting changes were added.
+- Extended the layout to the launch, preset, base and preview rows. Preset actions use equal grid cells with a 9 rem minimum, wrap to available space and use the shared 32 px desktop / 40 px mobile button height. The existing delete action now says Delete Preset. The selector and action group use two columns where space permits.
+- Model Family, Presets, Base and the option rows align on the same label track. Preview numeric inputs and Auto use the shared control height. Use Dataset Captions uses the shared button system in both of its training call sites. The launch summary has a separate full-width line, and Training Defaults follows the controls in DOM order as well as visual order. Launch, save, import/export and preview handlers remain intact.
+- The Bank pass dialog has separate operation choices and is outside this Training styling request. The shared ConceptFaceMaskField has both its enabled and unavailable variants updated; it is used by Training only.
+- ESLint and the frontend build passed; ESLint retains 32 existing warnings. Rebuilt frontend/dist. The privacy scan checked 3,013 publishable text files with zero findings. Diff review passed, with no new source attribution. Updated the affected memory-label, preview-quality and caption-button expectations without running them. No tests, browser probes, fixtures, application imports or service restarts ran.
+
+```text
+# UI Stability Audit - Training Controls
+Scope: /datasets Training launch, Advanced and Expert | Viewports: not rendered | Runtime: static-only
+
+## Verdict
+SHIP under the operator's no-test exception. Runtime layout remains unqualified.
+
+## Findings
+| # | Check | Status | Severity | Evidence | Fix |
+| 1 | Checkbox targets and state geometry | WARN | POLISH | frontend/src/index.css:99 | Use native checkboxes inside themed chips with fixed border widths and visible focus. |
+| 2 | Dropdown dimensions and alignment | WARN | SHIFT | frontend/src/index.css:60; frontend/src/index.css:86 | Apply one preferred width and height, shared label tracks and narrow-screen stacking. |
+| 3 | Disabled face-masking control and help | WARN | POLISH | frontend/src/components/dataset/ConceptFaceMaskField.jsx:177 | Keep the unavailable control visible and move help outside its chip. |
+| 4 | Preset actions and launch summary | WARN | SHIFT | frontend/src/index.css:76; frontend/src/components/dataset/TrainingPanel.jsx:1985 | Use equal action cells and place the run summary below the launch controls. |
+| 5 | Populated layout, keyboard and pointer interaction | NOT RUN | SHIFT | No browser or fixture server was started. | Verify on the operator's test machine. |
+```
+
 ## Training and caption delivery
 
 - The operator authorized a clean commit and push of these follow-ups to main, with tests skipped. Source and the rebuilt frontend bundle use separate `[skip ci]` commits. Verify the final publication SHA against origin/main.
