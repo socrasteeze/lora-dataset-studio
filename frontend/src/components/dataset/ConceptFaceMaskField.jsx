@@ -173,15 +173,16 @@ export default function ConceptFaceMaskField({
   if (!supported) {
     return (
       <div className="flex flex-col gap-0.5">
-        <label className="flex items-center gap-2 flex-wrap">
-          <span className="text-content-muted text-xs w-28 shrink-0 inline-flex items-center gap-1">
-            Mask faces<HelpBadge topic="training.mask_faces" />
-          </span>
-          <input type="checkbox" checked={false} disabled readOnly
-            aria-label="Mask faces while training this concept"
-            className="h-4 w-4 rounded border-border bg-surface accent-indigo-500 opacity-40" />
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="training-toggle-chip">
+            <input type="checkbox" checked={false} disabled readOnly
+              aria-label="Mask faces while training this concept"
+              className="h-4 w-4 rounded border-border bg-surface accent-indigo-500" />
+            <span>Mask Faces</span>
+          </label>
+          <HelpBadge topic="training.mask_faces" />
           <span className="text-content-subtle text-xs">concept datasets only</span>
-        </label>
+        </div>
         <span className="text-content-subtle text-2xs leading-relaxed">
           A character LoRA has to learn the face, and a style LoRA has to learn how faces
           are rendered — weighing faces down would amputate the very thing being trained.
@@ -230,16 +231,17 @@ export default function ConceptFaceMaskField({
 
   return (
     <div className="flex flex-col gap-0.5">
-      <label className="flex items-center gap-2 flex-wrap cursor-pointer">
-        <span className="text-content text-xs w-28 shrink-0 inline-flex items-center gap-1">
-          Mask faces<HelpBadge topic="training.mask_faces" />
-        </span>
-        <input type="checkbox" checked={Boolean(enabled)} disabled={faceCapability === false}
-          onChange={(e) => onToggle(e.target.checked)}
-          aria-label="Mask faces while training this concept"
-          className="h-4 w-4 rounded border-border bg-surface accent-indigo-500 disabled:opacity-40" />
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="training-toggle-chip">
+          <input type="checkbox" checked={Boolean(enabled)} disabled={faceCapability === false}
+            onChange={(e) => onToggle(e.target.checked)}
+            aria-label="Mask faces while training this concept"
+            className="h-4 w-4 rounded border-border bg-surface accent-indigo-500" />
+          <span>Mask Faces</span>
+        </label>
+        <HelpBadge topic="training.mask_faces" />
         <span className="text-content-muted text-xs">keep the act, drop the identities</span>
-      </label>
+      </div>
 
       {/* The dependency is DECLARED where it is ticked, and installable from here.
           It used to point at "the ML extras (Face-similarity scoring) in the Setup

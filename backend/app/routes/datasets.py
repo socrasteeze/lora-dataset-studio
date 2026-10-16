@@ -2148,13 +2148,19 @@ def dataset_captions_replace(dataset_id):
 @bp.post('/dataset/<int:dataset_id>/captions/write-files')
 def dataset_captions_write_files(dataset_id):
     """Write kohya-style same-stem .txt captions NEXT TO the kept images in the
-    dataset folder (same text as the export ZIP: trigger prepended) — for
-    external tools that read the folder directly, no ZIP download needed.
-    Overwrites existing .txt files (resync)."""
+    dataset folder with the chosen trigger prepended, including Style datasets.
+    Overwrites existing .txt files (resync) for external tools."""
     if not svc.get_dataset(LOCAL_USER, dataset_id):
         return jsonify({'error': 'not found'}), 404
+    data = request.get_json(silent=True)
+    if data is None:
+        if request.get_data():
+            return jsonify({'error': 'Expected a caption-file request.'}), 400
+        data = {}
+    if not isinstance(data, dict):
+        return jsonify({'error': 'Expected a caption-file request.'}), 400
     try:
-        res = svc.write_caption_files(LOCAL_USER, dataset_id)
+        res = svc.write_caption_files(LOCAL_USER, dataset_id, data.get('trigger_word'))
     except Exception as e:
         return _map_error(e)
     return jsonify(res)

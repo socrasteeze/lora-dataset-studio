@@ -115,8 +115,8 @@ def test_export_zip_bakes_exif_orientation_without_mutating_masters(app):
             assert not exported.getexif()
 
 
-def test_style_exports_content_only_in_zip_and_sidecars(app):
-    """Style's salted run id never becomes an activation token in public exports."""
+def test_style_zip_is_content_only_and_explicit_txt_includes_trigger(app):
+    """The explicit TXT action prepends the trigger; ZIP keeps its Style policy."""
     from app.services import face_dataset_service as svc
     from app.models import FaceDatasetImage
     from app.config import LOCAL_USER
@@ -148,7 +148,7 @@ def test_style_exports_content_only_in_zip_and_sidecars(app):
         result = svc.write_caption_files(LOCAL_USER, ds.id)
         assert result['written'] == 1
         with open(os.path.join(d, 'ink.txt'), encoding='utf-8') as fh:
-            assert fh.read() == caption
+            assert fh.read() == f'zsty_ink, {caption}'
 
         # A later legacy trigger-only caption resolves to empty. Resync must
         # delete yesterday's content sidecar instead of silently training it.

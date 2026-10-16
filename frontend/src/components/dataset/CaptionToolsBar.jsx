@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { FolderOpen } from 'lucide-react';
 import { captionCategoryCopy, captionFrequencyEntries } from './captionCategory';
 import SettingsLink from '../common/SettingsLink';
@@ -10,10 +10,11 @@ import { btnClass, fieldClass } from '../common/controls';
    concept and style sets. Clicking an entry pre-fills the matching edit mode;
    leaving "replace" empty removes it from every caption.
    Also hosts 💾 Write .txt files (kohya-style sidecar captions written next to
-   the images on disk, same text as the export ZIP) + 📂 open that folder. */
+   the images on disk with an explicit trigger prefix) + 📂 open that folder. */
 export default function CaptionToolsBar({ images, kind = 'character', mode = 'booru',
                                           excludes = [], includes = [], onExclude, onInclude,
                                           onReplace, onWriteFiles, onOpenFolder, busy,
+                                          triggerWord = '',
                                           open: controlledOpen, onOpenChange }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen === undefined ? internalOpen : controlledOpen;
@@ -26,6 +27,13 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
   const [replace, setReplace] = useState('');
   const [filterInput, setFilterInput] = useState('');
   const [tagMode, setTagMode] = useState(mode === 'booru');
+  const triggerInputId = useId();
+  const [fileTrigger, setFileTrigger] = useState(triggerWord);
+  const [fileTriggerEdited, setFileTriggerEdited] = useState(false);
+  const [writingFiles, setWritingFiles] = useState(false);
+  useEffect(() => {
+    if (!fileTriggerEdited) setFileTrigger(triggerWord);
+  }, [triggerWord, fileTriggerEdited]);
   const captioned = useMemo(
     () => images.filter((i) => i.status === 'keep' && (i.caption || '').trim()),
     [images]);
@@ -38,6 +46,12 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
   const apply = async () => {
     if (!find.trim()) return;
     await onReplace(find, replace, tagMode ? 'tag' : 'text');
+  };
+  const writeFiles = async () => {
+    if (busy || writingFiles || !fileTrigger.trim()) return;
+    setWritingFiles(true);
+    try { await onWriteFiles(fileTrigger.trim()); }
+    finally { setWritingFiles(false); }
   };
   // Grid tag-filter: submit the free-text field to exclude/include, then clear it.
   const submitFilter = (fn) => {
@@ -156,11 +170,19 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
           {onWriteFiles && (
             <div className="flex flex-col gap-1">
               <span className="text-content-muted text-xs font-medium">Caption Files</span>
-              <div className="flex items-center gap-2 flex-wrap">
-                <button type="button" onClick={onWriteFiles} disabled={busy}
-                  title="Writes <image>.txt next to each kept image in the dataset folder — same format as the ZIP export, for external tools"
-                  className={btnClass({ size: 'sm' })}>
-                  💾 Write Files
+              <div className="flex items-end gap-2 flex-wrap">
+                <label htmlFor={triggerInputId} className="flex w-full min-w-0 flex-col gap-1 sm:w-auto">
+                  <span className="text-xs text-content-muted">Trigger Word</span>
+                  <input id={triggerInputId} value={fileTrigger}
+                    onChange={(event) => { setFileTriggerEdited(true); setFileTrigger(event.target.value); }}
+                    disabled={busy || writingFiles} placeholder="e.g. @exampleartist"
+                    className={`${fieldClass({ size: 'sm' })} w-full sm:w-64`} />
+                </label>
+                <button type="button" onClick={writeFiles} disabled={busy || writingFiles || !fileTrigger.trim()}
+                  aria-busy={writingFiles}
+                  title="Write a TXT caption beside each kept image with this trigger prepended once. Overwrites existing TXT files."
+                  className={`${btnClass({ size: 'sm' })} min-w-28`}>
+                  💾 {writingFiles ? 'Writing' : 'Write TXT'}
                 </button>
                 {onOpenFolder && (
                   <button type="button" onClick={onOpenFolder}
@@ -170,10 +192,8 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
                     <FolderOpen aria-hidden="true" className="h-3.5 w-3.5" />
                   </button>
                 )}
-                <span className="text-content-subtle text-2xs">
-                  {kind === 'style'
-                    ? 'content-only sidecars · no activation trigger · overwrites existing .txt'
-                    : 'kohya-style sidecar captions, trigger included — overwrites existing .txt'}
+                <span className="basis-full text-content-muted text-xs">
+                  Prepends this trigger to TXT files, including Style datasets. Overwrites existing .txt files.
                 </span>
               </div>
             </div>

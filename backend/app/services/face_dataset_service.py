@@ -12510,9 +12510,8 @@ def style_content_caption(ds, caption) -> str:
 def _export_caption(ds, caption) -> str:
     """The exact text a trainer reads for one image: the dataset trigger prepended
     to the stored caption for character/concept datasets. A style LoRA is always-on:
-    its sidecars contain CONTENT ONLY, with no hidden activation token. Single source
-    of truth shared by the ZIP export and write_caption_files, so on-disk .txt
-    sidecars always match what the ZIP would contain."""
+    its ZIP sidecars contain CONTENT ONLY, with no hidden activation token.
+    The explicit TXT writer applies its operator-selected prefix separately."""
     cap = style_content_caption(ds, caption)
     if is_style(ds):
         return cap
@@ -12579,18 +12578,35 @@ def build_export_zip(user_id: int, dataset_id: int) -> bytes:
     return output.getvalue()
 
 
-def write_caption_files(user_id, dataset_id) -> dict:
-    """Write a kohya/ai-toolkit-style `<image>.txt` sidecar NEXT TO each kept
-    captioned image in the dataset folder (data/datasets/<id>/) — same caption
-    text as the ZIP export (trigger prepended except for content-only Style), for
-    tools that read the folder directly instead of downloading the ZIP. Overwrites
-    existing .txt files (it's a resync after re-captioning/edits); kept images
-    without a caption are counted, not written — they'd get only a bare trigger
-    (character/concept) or an empty Style sidecar, so caption them first. Returns
-    {'ok', 'written', 'skipped_uncaptioned'}."""
+def _caption_file_text(ds, caption, trigger):
+    """Prefix explicit TXT output once without editing the stored caption."""
+    cap = style_content_caption(ds, caption)
+    if not cap:
+        return ''
+    cap = re.sub(rf'^(?:{re.escape(trigger)}\s*[,;:]\s*)+', '', cap,
+                 flags=re.IGNORECASE).strip()
+    if cap.casefold() == trigger.casefold():
+        return trigger
+    return f'{trigger}, {cap}' if cap else trigger
+
+
+def write_caption_files(user_id, dataset_id, trigger_word=None) -> dict:
+    """Write kept-image TXT captions with an explicit trigger for every kind.
+
+    Defaults to the dataset's saved trigger. An override applies to these files
+    only. Existing TXT files are resynced; uncaptioned images are skipped and
+    their stale sidecars removed. Stored captions and image files are preserved.
+    """
     ds = get_dataset(user_id, dataset_id)
     if not ds:
         raise ValueError('dataset not found')
+    trigger = ds.trigger_word if trigger_word is None else trigger_word
+    if not isinstance(trigger, str):
+        raise ValueError('Enter a trigger word before writing caption files.')
+    trigger = trigger.strip()
+    if (not trigger or len(trigger) > 60 or len(trigger.splitlines()) != 1
+            or any(ord(c) < 32 or ord(c) == 127 for c in trigger)):
+        raise ValueError('Use a trigger of 1 to 60 characters on one line.')
     kept = (FaceDatasetImage.query.filter_by(dataset_id=dataset_id, status='keep')
             .order_by(FaceDatasetImage.id.asc()).all())
     written = skipped_uncaptioned = removed_stale = 0
@@ -12605,7 +12621,7 @@ def write_caption_files(user_id, dataset_id) -> dict:
                 removed_stale += 1
             skipped_uncaptioned += 1
             continue
-        body = _export_caption(ds, img.caption)
+        body = _caption_file_text(ds, img.caption, trigger)
         if not body:                      # legacy Style caption = internal id only
             if os.path.isfile(sidecar):
                 os.remove(sidecar)

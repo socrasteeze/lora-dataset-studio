@@ -1699,7 +1699,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   };
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-indigo-500/30 bg-indigo-500/5 p-3">
+    <div className="training-controls flex flex-col gap-2 rounded-lg border border-indigo-500/30 bg-indigo-500/5 p-3">
       {caps.training_visible ? <>
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-content font-semibold text-sm">
@@ -1844,11 +1844,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
        * Essential path: choose the LoRA type and launch. Base/variant, masking, step cap and
        * scheduling stay in Advanced options below, collapsed by default but one click away.
        */}
-      <div className="lds-section flex items-center gap-2 flex-wrap py-2">
-        <span className="text-content-muted text-2xs uppercase">Model family</span>
-        <SettingsLink section="training" focus="training-default-family" className="order-last ml-auto">
-          Training defaults
-        </SettingsLink>
+      <div className="training-launch-bar lds-section flex items-center gap-2 flex-wrap py-2">
+        <span className="w-full shrink-0 text-sm text-content-muted sm:w-36">Model Family</span>
         <select value={trainType} onChange={(e) => onTypeChange(e.target.value)}
           disabled={trainTypeBusy || presetBusy || trainingModeBusy}
           aria-label="Training model family"
@@ -1935,7 +1932,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             await trainWithConfirms({ ...common, fresh: mode === 'fresh' });
             refreshStatus();
           }}
-          className={btnClass({ variant: 'primary' })}>
+          className={`${btnClass({ variant: 'primary' })} min-w-36`}>
           <Rocket aria-hidden="true" className="h-4 w-4" /> Train the LoRA
         </button>}
         {!fullMode && <HelpBadge topic="action-training-launch" />}
@@ -1962,8 +1959,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 await ds.stopTraining();
                 refreshStatus();
               }}
-              className={btnClass({ variant: 'danger' })}>
-              ⏹ Stop training
+              className={`${btnClass({ variant: 'danger' })} min-w-36`}>
+              ⏹ Stop Training
             </button>
             <HelpBadge topic="action-training-stop" />
           </>
@@ -1977,11 +1974,15 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             {queued ? '✓ Queued' : `➕ Add to queue (${baseLabel})`}
           </button>
         )}
+        <SettingsLink section="training" focus="training-default-family"
+          className={`${btnClass()} !text-sm !text-content no-underline`}>
+          Training Defaults
+        </SettingsLink>
         {/*
          * Readable summary of the next run's configuration; the editable settings live in Advanced
          * options.
          */}
-        <span className="ml-auto text-content-subtle text-2xs"
+        <span className="basis-full min-w-0 break-words text-sm leading-relaxed text-content-muted"
           title="The configuration the next run will use — change it in Advanced options below">
           {fullMode ? (
             <>Full model · official Krea 2 Raw · cloud · {stepsOverride.trim() ? `${stepsN} steps` : 'adaptive steps'}</>
@@ -2175,11 +2176,12 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
            * REPLACES explicit dataset settings. Ignore unknown imported keys for version
            * compatibility.
            */}
-          <div className="lds-section flex items-center gap-1.5 flex-wrap py-1.5">
-            <span className="text-content-muted text-2xs uppercase">Presets</span>
+          <div className="lds-section grid grid-cols-1 items-start gap-x-8 gap-y-3 py-1.5 xl:grid-cols-2">
+            <div className="training-form-row">
+            <span className="text-sm text-content-muted">Presets</span>
             <select value={presetSel} onChange={(e) => setPresetSel(e.target.value)}
               aria-label="Training preset"
-              className={`${fieldClass({ size: 'sm' })} max-w-[220px]`}>
+              className={fieldClass()}>
               <option value="">— pick a preset —</option>
               {/* Built-ins are read-only and versioned with the app. Evidence-backed
                   recipes and source-labelled community starters stay visibly separate;
@@ -2210,34 +2212,36 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 </optgroup>
               )}
             </select>
+            </div>
+            <div className="training-preset-actions">
             <button type="button" onClick={applyPreset}
               disabled={!selPreset || presetBusy || trainTypeBusy}
               title="Replace this dataset's advanced settings with the selected preset"
-              className={`${btnShape({ size: 'sm' })} bg-primary/20 border border-primary/40 text-white font-semibold`}>
+              className={`${btnShape()} bg-primary/20 border border-primary/40 text-content font-semibold hover:bg-primary/30`}>
               Apply
             </button>
-            <span className="mx-0.5 text-content-subtle" aria-hidden>·</span>
             <button type="button" onClick={savePreset} disabled={presetBusy || trainTypeBusy}
               title="Save this dataset's current advanced settings as a named preset"
-              className={btnClass({ size: 'sm' })}>
-              <Save aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Save current
+              className={btnClass()}>
+              <Save aria-hidden="true" className="h-4 w-4 shrink-0" />Save Current
             </button>
             <button type="button" onClick={() => presetFileRef.current?.click()}
               disabled={presetBusy || trainTypeBusy}
               title="Import a preset from a JSON file (exported from any app version — unknown options are ignored at apply time)"
-              className={btnClass({ size: 'sm' })}>
+              className={btnClass()}>
               ⬆ Import
             </button>
             <button type="button" onClick={exportPreset} disabled={!selPreset || presetBusy}
               title="Download the selected preset as a shareable JSON file"
-              className={btnClass({ size: 'sm' })}>
+              className={btnClass()}>
               ⬇ Export
             </button>
             <button type="button" onClick={deletePreset} disabled={!selPreset || selPreset.builtin || presetBusy}
               title={selPreset?.builtin ? 'Built-in presets ship with the app and cannot be deleted' : 'Delete the selected preset'}
-              className={`${btnShape({ size: 'sm' })} bg-red-500/15 border border-red-500/40 text-red-300`}>
-              <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+              className={`${btnShape()} bg-red-500/15 border border-red-500/40 text-red-300 hover:bg-red-500/25`}>
+              <Trash2 aria-hidden="true" className="h-4 w-4 shrink-0" />Delete Preset
             </button>
+            </div>
             <input ref={presetFileRef} type="file" accept=".json,application/json" className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -2245,7 +2249,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 e.target.value = '';
               }} />
             {selPreset && (
-              <span role="status" className="basis-full text-content-subtle text-2xs leading-relaxed">
+              <span role="status" className="text-content-muted text-sm leading-relaxed xl:col-span-2">
                 {selPreset.builtin
                   ? selPreset.community
                     ? '◌ reported community starting point — not a result guarantee'
@@ -2265,8 +2269,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
            * base.
            */}
           <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-content-muted text-2xs uppercase">
+            <div className="training-form-row">
+              <span className="text-sm text-content-muted">
                 Base{status.in_progress ? ' (next queued job)' : ''}
               </span>
               <select value={customBase ? CUSTOM_BASE_SENTINEL : base}
@@ -2277,7 +2281,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 }}
                 disabled={trainingModeBusy}
                 aria-label="Base model"
-                className={`${fieldClass({ size: 'sm' })} max-w-[230px]`}>
+                className={fieldClass()}>
                 {(currentBases.length ? currentBases
                   : [{ value: '', label: trainType === 'sdxl' ? (comfyConfigured ? 'No SDXL checkpoint found' : 'ComfyUI not configured') : trainType === 'krea' ? 'Official — Krea 2' : trainType === 'flux' ? 'Official — FLUX.1-dev' : trainType === 'flux2klein' ? 'Official — FLUX.2 Klein' : trainType === 'anima' ? 'Official — Anima' : trainType === 'qwenimage21' ? 'Official — Qwen-Image 2.1' : 'Official — Z-Image-Turbo' }]).map((b) => (
                   <option key={b.value} value={b.value}>
@@ -2473,7 +2477,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
 
           {/* Model & training knobs — researched defaults (see the Research note),
               editable per dataset. Each carries a plain-English "why / how". */}
-          <div className="grid grid-cols-1 gap-x-8 gap-y-4 xl:grid-cols-2 [&>*]:min-w-0 [&>div]:border-t [&>div]:border-border [&>div]:pt-3">
+          <div className="training-option-fields grid grid-cols-1 gap-x-8 gap-y-4 xl:grid-cols-2 [&>*]:min-w-0 [&>div]:border-t [&>div]:border-border [&>div]:pt-3">
             <div className="flex items-center gap-1.5 text-indigo-300/80 text-2xs font-semibold uppercase tracking-wider xl:col-span-2 !border-t-0 !pt-0">
               <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-indigo-400/60" /> Model &amp; training
             </div>
@@ -2553,7 +2557,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               </span>
             </div>
 
-            <div className="grid grid-cols-1 gap-x-8 gap-y-3 xl:col-span-2 xl:grid-cols-2">
+            <div className="grid grid-cols-1 items-start gap-x-8 gap-y-3 xl:col-span-2 xl:grid-cols-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-content text-xs w-28 shrink-0">Preview every</span>
                 <select value={String(advSampleEvery)} onChange={(e) => saveAdv({ sample_every: Number(e.target.value) })}
@@ -2566,8 +2570,9 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               </div>
 
               <div className="flex flex-col gap-0.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-content text-xs w-28 shrink-0">Preview quality</span>
+                <div className="training-form-row">
+                  <span className="text-content text-xs w-28 shrink-0">Preview Quality</span>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <label className="flex items-center gap-1.5">
                     <input type="number" min={advSampleStepsRange[0]} max={advSampleStepsRange[1]} step="1"
                       value={sampleStepsDraft}
@@ -2576,8 +2581,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                       placeholder={String(advSampleStepsDefault)}
                       aria-label="Preview steps"
-                      className={`${fieldClass({ size: 'sm' })} w-16`} />
-                    <span className="text-content-muted text-2xs">steps</span>
+                      className={`${fieldClass()} w-20`} />
+                    <span className="text-content-muted text-sm">Steps</span>
                   </label>
                   <label className="flex items-center gap-1.5">
                     <input type="number" min={advSampleGuidanceRange[0]} max={advSampleGuidanceRange[1]} step="0.5"
@@ -2587,23 +2592,24 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                       placeholder={String(advSampleGuidanceDefault)}
                       aria-label="Preview guidance scale"
-                      className={`${fieldClass({ size: 'sm' })} w-16`} />
-                    <span className="text-content-muted text-2xs">CFG</span>
+                      className={`${fieldClass()} w-20`} />
+                    <span className="text-content-muted text-sm">CFG</span>
                   </label>
                   {advSampleQualityOverridden && (
                     <button type="button"
                       onClick={() => saveAdv({ sample_steps: null, sample_guidance: null })}
-                      className={btnClass({ size: 'sm' })}>
+                      className={btnClass()}>
                       Auto
                     </button>
                   )}
+                  </div>
                 </div>
                 <span className="text-content-subtle text-2xs leading-relaxed">
                   Preview settings do not change training weights. Leave both empty to follow {advFamilyLabel} ({advSampleStepsDefault} steps, CFG {advSampleGuidanceDefault}); distilled bases need fewer steps.
                 </span>
               </div>
               <label className="flex flex-col gap-1 mt-1 xl:col-span-2">
-                <span className="text-content text-xs">Preview prompts</span>
+                <span className="text-content text-xs">Preview Prompts</span>
                 <textarea value={samplePromptsText}
                   onChange={(e) => setSamplePromptsText(e.target.value)}
                   onBlur={saveSamplePrompts}
@@ -2638,7 +2644,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               <span>Expert — last-mile levers</span>
               <span className="ml-auto hidden sm:inline normal-case font-normal tracking-normal text-indigo-300/50">network · alpha · memory{advTimestepSupported ? ' · timestep' : ''} · optimizer · schedule · EMA</span>
             </summary>
-            <div className="grid grid-cols-1 gap-x-8 gap-y-4 px-2.5 pb-2.5 xl:grid-cols-2 [&>div]:min-w-0 [&>div]:border-t [&>div]:border-indigo-400/10 [&>div]:pt-3">
+            <div className="training-option-fields grid grid-cols-1 gap-x-8 gap-y-4 px-2.5 pb-2.5 xl:grid-cols-2 [&>div]:min-w-0 [&>div]:border-t [&>div]:border-indigo-400/10 [&>div]:pt-3">
               {/* Network variant — LoRA (default) or LoKr. LoKr is arch-generic in
                   ai-toolkit, so it's offered on every family; the *_supported guard
                   mirrors the timestep pattern for a future family that can't run it. */}
@@ -2696,16 +2702,14 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                     </select>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <label className="flex items-center gap-2 flex-wrap cursor-pointer">
-                      <span className="text-content text-xs w-28 shrink-0 inline-flex items-center gap-1">
-                        Differential guidance<HelpBadge topic="training.krea_community_recipe" />
-                      </span>
+                    <label className="training-toggle-chip">
                       <input type="checkbox" checked={advDifferentialGuidance}
                         onChange={(e) => saveAdv({ do_differential_guidance: e.target.checked })}
                         aria-label="Enable Krea differential guidance"
                         className="h-4 w-4 rounded border-border bg-surface accent-indigo-500" />
-                      <span className="text-content-muted text-xs">enable</span>
+                      <span>Differential Guidance</span>
                     </label>
+                    <HelpBadge topic="training.krea_community_recipe" />
                     <label className="flex items-center gap-2">
                       <span className="text-content-muted text-2xs">scale</span>
                       <input type="number" min="0.1" max="10" step="0.1"
@@ -2743,16 +2747,17 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               </div>
               {/* Dual captions — train each image with a long AND a short caption */}
               <div className="flex flex-col gap-0.5">
-                <label className="flex items-center gap-2 flex-wrap cursor-pointer">
-                  <span className="text-content text-xs w-28 shrink-0 inline-flex items-center gap-1">
-                    Dual captions<HelpBadge topic="training.dual_captions" />
-                  </span>
-                  <input type="checkbox" checked={advDualCaptions}
-                    onChange={(e) => saveAdv({ dual_captions: e.target.checked })}
-                    aria-label="Dual long + short captions"
-                    className="h-4 w-4 rounded border-border bg-surface accent-indigo-500" />
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="training-toggle-chip">
+                    <input type="checkbox" checked={advDualCaptions}
+                      onChange={(e) => saveAdv({ dual_captions: e.target.checked })}
+                      aria-label="Dual long + short captions"
+                      className="h-4 w-4 rounded border-border bg-surface accent-indigo-500" />
+                    <span>Dual Captions</span>
+                  </label>
+                  <HelpBadge topic="training.dual_captions" />
                   <span className="text-content-muted text-xs">long + short (local training only)</span>
-                </label>
+                </div>
                 {/* Issue #22 (1Tomber): Krea 2 / Anima cache their text embeddings, so the
                     short caption can never be encoded. Say it here rather than let the user
                     believe two wordings are training. Wraps at 400 px — no fixed width. */}
@@ -2801,14 +2806,14 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                     </button>
                   )}
                 </div>
-                <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:gap-x-4">
+                <div className="flex flex-wrap gap-2">
                   {MEMORY_KEYS.map((k) => (
-                    <label key={k} className="flex items-center gap-2 cursor-pointer min-w-0">
+                    <label key={k} className="training-toggle-chip">
                       <input type="checkbox" checked={Boolean(advMemEff[k])}
                         onChange={(e) => saveAdv(memoryPatchFor(k, e.target.checked, advMemDefault))}
                         aria-label={MEMORY_LABELS[k]}
                         className="h-4 w-4 shrink-0 rounded border-border bg-surface accent-indigo-500" />
-                      <span className="text-content-muted text-xs truncate">{MEMORY_LABELS[k]}</span>
+                      <span>{MEMORY_LABELS[k]}</span>
                     </label>
                   ))}
                 </div>
@@ -2869,20 +2874,20 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                       <span className="text-content-subtle text-2xs">quantisation is off above</span>
                     )}
                   </div>
-                  <label className="flex items-center gap-2 cursor-pointer min-w-0">
+                  <label className="training-toggle-chip">
                     <input type="checkbox" checked={advGradCkpt}
                       onChange={(e) => saveAdv({ gradient_checkpointing: e.target.checked })}
                       aria-label="Gradient checkpointing"
                       className="h-4 w-4 shrink-0 rounded border-border bg-surface accent-indigo-500" />
-                    <span className="text-content-muted text-xs truncate">Gradient checkpointing</span>
+                    <span>Gradient Checkpointing</span>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer min-w-0">
+                  <label className="training-toggle-chip">
                     <input type="checkbox" checked={advCompile}
                       onChange={(e) => saveAdv({ compile: e.target.checked })}
                       aria-label="Compile the model (experimental)"
                       className="h-4 w-4 shrink-0 rounded border-border bg-surface accent-indigo-500" />
-                    <span className="text-content-muted text-xs truncate">
-                      Compile the model <span className="text-amber-300">(experimental)</span>
+                    <span>
+                      Compile Model <span className="text-amber-300">(experimental)</span>
                     </span>
                   </label>
                 </div>
@@ -3014,7 +3019,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             </div>
           </details>)}
 
-          <label className="flex items-center gap-1.5 text-2xs text-content-muted cursor-pointer"
+          <label className="training-toggle-chip"
             title={sliderOn
               ? 'Slider mode ignores masks: the slider loss never reads the masked-loss path, so the server trains unmasked regardless of this toggle.'
               : isStyle

@@ -50,9 +50,9 @@ captioning rules and a few guards change with the dataset kind.
    that describes a trait currently set to Omit (face/eyes/skin, and by default
    hair). ⚙️ Options lets you Describe hair, makeup, facial hair or glasses so
    they stay prompt-controllable. Fix every flagged caption. A find/replace +
-   tag-frequency panel sweeps the whole set at once; its **💾 Write .txt
-   files** button drops a kohya-style `<image>.txt` next to each kept image
-   in the dataset folder (same format as the export ZIP) for external tools.
+   tag-frequency panel sweeps the whole set at once; its **💾 Write TXT**
+   button writes a `<image>.txt` next to each captioned kept image, with the
+   chosen trigger prepended. See [Write caption TXT](#write-caption-txt).
 8. **Fix individual shots** — every generated tile has a ✏ button: edit the
    exact prompt that made it and regenerate in place, without losing the rest.
 9. **Train** — the pre-flight check runs the full checklist (count, balance,
@@ -73,6 +73,20 @@ captioning rules and a few guards change with the dataset kind.
     **Selected** lists all step counts that will run, including those off-screen.
 11. **Export** — at any point, **Export ZIP** gives you the curated, captioned
     set as a standard ai-toolkit dataset. Nothing is locked in.
+
+## Write caption TXT
+
+Open **Captions → Caption Tools**. Review **Trigger Word**, which starts with
+the dataset's saved trigger. Enter a different prefix, including an `@artist`
+tag, when needed. Select **Write TXT** to write `trigger, caption` into each
+captioned kept image's TXT file. An existing leading copy of the trigger is not
+duplicated. This includes Style datasets.
+
+The action overwrites existing TXT files. Images without captions are skipped,
+and their stale TXT files are removed. Stored image captions and the dataset's
+saved trigger stay intact. A failed request keeps the typed prefix for retry.
+The typed prefix applies to this TXT action; Style ZIP exports and built-in
+training retain their existing caption rules.
 
 ## Review training duplicates
 
