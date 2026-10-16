@@ -113,6 +113,16 @@ def _busy_after_service_fence(e):
 
 
 _BUSY_WRITE_EXEMPT_ENDPOINTS = frozenset({
+    # Admission records a future job. The queue waits for the live pass before
+    # execution; the active pass must still fence all immediate Bank mutations.
+    'bank.bank_scan', 'bank.bank_faces', 'bank.bank_score',
+    'bank.bank_semantic_index', 'bank.bank_semantic_dedup',
+    'bank.bank_watermark', 'bank.bank_text_scan', 'bank.bank_watermark_crop',
+    'bank.bank_watermark_inpaint', 'bank.bank_improve', 'bank.bank_framing',
+    'bank.bank_tags', 'bank.bank_medium', 'bank.bank_angles',
+    'bank.bank_caption', 'bank.bank_pipeline', 'bank.bank_queue_add',
+    'bank.bank_check_folder_person', 'bank.bank_scan_folder_persons',
+    'bank.bank_person_preflight',
     # Read-only preview despite using POST (it carries unsaved thresholds).
     'bank.bank_flag_preview',
     # Read-only curation queries. They may warm/read the Score cache, but never
@@ -320,9 +330,13 @@ def bank_workspace(bank_id):
 
 @bp.get('/bank/<int:bank_id>/score-device')
 def bank_score_device(bank_id):
-    if banks.get_bank(LOCAL_USER, bank_id) is None:
+    bank = banks.get_bank(LOCAL_USER, bank_id)
+    if bank is None:
         return jsonify({'error': 'not found'}), 404
-    return jsonify({'id': bank_id, 'score_device': banks.score_device_info(bank_id)})
+    semantic = banks.semantic_runtime_info(bank)
+    score = (semantic['device'] if semantic['engine'] == 'clip'
+             else banks.score_device_info(bank_id))
+    return jsonify({'id': bank_id, 'score_device': score, 'semantic': semantic})
 
 
 @bp.get('/bank/<int:bank_id>/folder-sync')
@@ -763,6 +777,9 @@ def _start(fn, *args, **kwargs):
 
 
 def _queued_start(operation, app, user_id, bank_id, *, _reply=None, **options):
+    """Return 202 after durable admission. Runtime failures remain in the queue
+    for Retry or Remove; invalid submissions still return 400 before admission.
+    A busy machine leaves the job pending without starting its service."""
     try:
         position = bank_queue.enqueue_operation(app, user_id, bank_id, operation, options)
     except bank_queue.BankAlreadyQueued as exc:
@@ -1084,10 +1101,10 @@ def bank_improve(bank_id):
     other pass; this one spends GPU-minutes per image, so aiming it matters more
     here than anywhere else.
 
-    202 on launch · 409 when the bank is busy OR an engine is missing (the body
+    202 after queuing · 409 when already queued OR an engine is missing (the body
     then carries the itemized assets and the auto-download that was started, the
-    same structured refusal the dataset routes return) · 400 on an empty pool ·
-    503 when the GPU is already taken by a training or a vision pass."""
+    same structured refusal the dataset routes return) · 400 on an empty pool.
+    A busy GPU leaves the job pending; execution rechecks the pool and engine."""
     data = request.get_json(silent=True) or {}
     gate = _require_no_stalled_comfyui()
     if gate:
@@ -1097,6 +1114,7 @@ def bank_improve(bank_id):
     # starting a pass before the queue grants its turn.
     from ..services import face_dataset_service as fds
     try:
+        banks.improve_scope(LOCAL_USER, bank_id, **_scope(data))
         engine = fds.resolve_improve_engine(engine)
         fds._improve_preflight(engine)
     except Exception as exc:

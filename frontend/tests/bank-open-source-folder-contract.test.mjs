@@ -22,11 +22,11 @@ test('the source-path row carries a clear, request-busy button', () => {
   assert.match(workspace,
     /const \[openingSourceFolder, setOpeningSourceFolder\] = useState\(false\)/)
   const sourceRow = workspace.slice(
-    workspace.indexOf('{payload?.source_path && ('),
-    workspace.indexOf('{/* A bank created before this was refused'),
+    workspace.indexOf('<header data-probe-chrome="header"'),
+    workspace.indexOf('</header>'),
   )
   assert.match(sourceRow, /onClick=\{openSourceFolder\}/)
-  assert.match(sourceRow, /disabled=\{openingSourceFolder\}/)
+  assert.match(sourceRow, /disabled=\{openingSourceFolder \|\| !workspaceReady\}/)
   assert.match(sourceRow, /aria-busy=\{openingSourceFolder\}/)
   assert.match(sourceRow, /openingSourceFolder \? 'Opening' : 'Open folder'/)
 })

@@ -3,6 +3,8 @@ advice panel (idea by @antonp). The framing pass reuses the dataset Qwen3-VL
 classifier (mocked here so the pass is hermetic); coverage is pure DB math over
 the fields the passes persist, so it's seeded directly. Background jobs run inline
 under TESTING (see bank_jobs.start)."""
+
+from bank_queue_assertions import assert_failed_job, assert_waiting_job
 import os
 
 from PIL import Image
@@ -74,24 +76,23 @@ def _wipe(app, bank_id):
 
 
 # --- framing pass (mocked classifier — hermetic) -----------------------------
-def test_framing_gate_503_when_model_absent(client, tmp_path, monkeypatch):
+def test_framing_stays_failed_when_model_absent(client, tmp_path, monkeypatch):
     bank_id, _ = _mkbank(client, tmp_path, {'a.png': _flat()})
     from app import capabilities
     monkeypatch.setattr(capabilities, 'probe_ollama_model',
                         lambda *a, **k: {'ok': False, 'detail': 'not pulled'})
     r = client.post(f'/api/bank/{bank_id}/framing', json={})
-    assert r.status_code == 503
-    assert 'vision model' in r.get_json()['error']
+    error = assert_failed_job(client, bank_id, r)
+    assert 'vision model' in error
 
 
-def test_framing_refuses_when_gpu_busy(client, tmp_path, monkeypatch):
+def test_framing_waits_when_gpu_busy(client, tmp_path, monkeypatch):
     bank_id, _ = _mkbank(client, tmp_path, {'a.png': _flat()})
     from app import capabilities
     monkeypatch.setattr(capabilities, 'probe_ollama_model', lambda *a, **k: {'ok': True})
     monkeypatch.setattr(banks, '_gpu_busy_reason', lambda: 'training is running on the GPU')
     r = client.post(f'/api/bank/{bank_id}/framing', json={})
-    assert r.status_code == 503
-    assert 'training' in r.get_json()['error']
+    assert_waiting_job(client, bank_id, r)
 
 
 def test_framing_job_classifies_persists_and_filters(client, tmp_path, app, monkeypatch):

@@ -156,7 +156,7 @@ test('both selects stay inside a 400 px toolbar', () => {
      one hard-coded size, whereas min-w-0 lets it shrink to whatever the
      rail actually is. min-w-0 is the load-bearing half — without it a
      flex child refuses to go below its content width and overflows. */
-  assert.match(BANK_RAIL, /<Select size="sm" value=\{filter\.sort\}[\s\S]*?className="min-w-0 flex-1"/)
+  assert.match(BANK_RAIL, /<Select size="sm" value=\{filter\.sort\}[\s\S]*?className=\{`min-w-0 flex-1 \$\{FILTER_HOVER\}`\}/)
   assert.match(WORKSPACE, /max-w-\[13rem\]/)
   // The dataset control wraps onto its own line rather than squeezing the chips.
   assert.match(WORKSPACE, /flex flex-wrap items-center gap-x-3 gap-y-1\.5/)

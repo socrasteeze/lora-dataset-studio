@@ -24,6 +24,8 @@ The ✨ pass needs ComfyUI and a GPU, so what is tested here is everything that
 happens BEFORE the render: the pool, the refusals, and the fact that each of
 them is answered once per pass rather than once per image.
 """
+
+from bank_queue_assertions import assert_waiting_job
 import os
 
 import pytest
@@ -589,7 +591,7 @@ def test_improve_refuses_an_empty_pool_before_it_starts_anything(client, app, tm
 
 
 @pytest.mark.plugins('image_upscale')
-def test_improve_refuses_a_busy_gpu_with_503_and_starts_no_job(client, app, tmp_path,
+def test_improve_waits_for_a_busy_gpu_without_starting_work(client, app, tmp_path,
                                                                monkeypatch):
     from app.services import face_dataset_service as fds
     from app.services import image_bank_service as banks
@@ -600,9 +602,8 @@ def test_improve_refuses_a_busy_gpu_with_503_and_starts_no_job(client, app, tmp_
                         lambda: 'a training run is using the GPU')
 
     r = client.post(f'/api/bank/{bank_id}/improve', json={})
-    assert r.status_code == 503
-    assert 'training' in r.get_json()['error']
-    # Nothing was queued: the bank is free for the next pass.
+    assert_waiting_job(client, bank_id, r)
+    # The GPU blocker leaves the saved job pending, without starting work.
     assert client.get(f'/api/bank/{bank_id}').get_json().get('activity') in (None, {})
 
 

@@ -5,6 +5,8 @@ CACHED embeddings — grouping over synthetic embeddings, the stage-1 vs stage-2
 distinction, threshold re-tri with no re-scan, the "run Score first" hint, the
 pipeline step order + skip reason, resolution, and the score-cache staleness guard.
 Background jobs run inline under TESTING (see bank_jobs.start)."""
+
+from bank_queue_assertions import assert_failed_job
 import hashlib
 import importlib.util
 import os
@@ -396,8 +398,8 @@ def test_siglip2_rebuild_invalidates_clip_lanes_from_another_generation(
 def test_hint_when_no_embeddings(client, tmp_path, app):
     bank_id, _ = _mkbank(client, tmp_path, {'a.jpg': _flat()})
     r = client.post(f'/api/bank/{bank_id}/semantic-dedup', json={})
-    assert r.status_code == 400
-    assert 'Score first' in r.get_json()['error']
+    error = assert_failed_job(client, bank_id, r)
+    assert 'Score first' in error
     with app.app_context():
         from app.services import image_bank_service as banks
         assert banks.rebuild_semantic_dup_groups(bank_id) is None

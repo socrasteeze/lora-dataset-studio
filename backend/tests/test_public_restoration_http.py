@@ -111,7 +111,8 @@ def test_seedvr2_plugin_missing_assets_reach_http_banner(factory, tmp_path, monk
     _assert_no_render(app, surface)
 
 
-def test_bank_busy_gpu_keeps_503_after_restoration_mapping(factory, tmp_path, monkeypatch):
+def test_bank_busy_gpu_keeps_the_restoration_pending_without_rendering(factory, tmp_path, monkeypatch):
+    from bank_queue_assertions import assert_waiting_job
     from app.services import image_bank_service as banks
     app = factory({'seedvr2'})
     from lds_seedvr2 import seedvr2_helper as seed
@@ -126,8 +127,8 @@ def test_bank_busy_gpu_keeps_503_after_restoration_mapping(factory, tmp_path, mo
     calls = _object_info_transport(monkeypatch, seed.SEEDVR2_NODE_CLASSES)
     monkeypatch.setattr(banks, '_gpu_busy_reason', lambda: 'A training run is using the GPU')
     url = _source_url(app, tmp_path, 'bank')
-    response = app.test_client().post(url, json={'engine': 'seedvr2'})
-    assert response.status_code == 503
-    assert response.get_json() == {'error': 'A training run is using the GPU'}
+    client = app.test_client()
+    response = client.post(url, json={'engine': 'seedvr2'})
+    assert_waiting_job(client, int(url.split('/')[3]), response)
     assert len(calls) == 1
     _assert_no_render(app, 'bank')

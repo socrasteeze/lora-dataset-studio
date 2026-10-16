@@ -15,6 +15,8 @@ writes files is only safe if two things are nailed down:
      levels is "flagged, geometry attested, something to act on"; a scope can
      only ever pick inside it.
 """
+
+from bank_queue_assertions import assert_failed_job
 import json
 import os
 
@@ -222,8 +224,8 @@ def test_empty_scope_says_the_work_is_in_another_pile(client, tmp_path, app):
     assert client.post(f'/api/bank/{bank_id}/watermark/crop').status_code == 202
 
     r = client.post(f'/api/bank/{bank_id}/watermark/crop', json={'statuses': ['keep']})
-    assert r.status_code == 400
-    assert 'another pile' in (r.get_json() or {}).get('error', '')
+    error = assert_failed_job(client, bank_id, r)
+    assert 'another pile' in error
 
 
 def test_inpaint_empty_scope_says_the_work_is_in_another_pile(client, tmp_path,
@@ -233,9 +235,8 @@ def test_inpaint_empty_scope_says_the_work_is_in_another_pile(client, tmp_path,
 
     r = client.post(f'/api/bank/{bank_id}/watermark/inpaint',
                     json={'method': 'lama', 'statuses': ['keep'],
-                          'image_ids': [-1]})
-    assert r.status_code == 400
-    assert 'another pile' in (r.get_json() or {}).get('error', '')
+                          'image_ids': [_ids[1]]})
+    assert 'another pile' in assert_failed_job(client, bank_id, r)
 
 
 def test_crop_bilan_names_what_the_scope_left_out(client, tmp_path, app):

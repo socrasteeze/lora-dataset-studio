@@ -261,8 +261,8 @@ def test_a_queued_bank_records_enqueue_and_finish(app, tmp_path, monkeypatch):
     messages = [r['message'] for r in activity_log.events()
                 if r['source'] == 'queue']
     assert 'bank queued' in messages
-    assert 'pipeline starting' in messages
-    assert 'pipeline done, dequeued' in messages
+    assert 'queued job starting' in messages
+    assert 'queued job done, dequeued' in messages
     bank_queue.reset()
 
 
