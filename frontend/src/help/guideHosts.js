@@ -11,6 +11,8 @@ export const CORE_GUIDE_ANCHORS = {
   ],
   "using-the-app": [
     "the-character-walkthrough-reference-photo-trained-lora",
+    "write-caption-txt",
+    "review-training-duplicates",
     "retry-a-reference-edit",
     "test-a-run-straight-from-runs",
     "using-a-full-model-you-trained",

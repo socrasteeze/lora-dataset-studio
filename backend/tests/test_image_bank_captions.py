@@ -2,6 +2,8 @@
 same engines the datasets use (here the Ollama vision call is mocked so the pass
 is hermetic), double as the bank's search text, and ride along to the dataset on
 promotion. Background jobs run inline under TESTING (see bank_jobs.start)."""
+
+from bank_queue_assertions import assert_failed_job, assert_waiting_job
 import os
 
 from PIL import Image
@@ -290,24 +292,23 @@ def test_caption_rejects_unknown_vocabulary(client, tmp_path, app):
 
 
 # --- gates -------------------------------------------------------------------
-def test_caption_gate_400_when_backend_none(client, tmp_path, app):
+def test_caption_stays_failed_when_backend_none(client, tmp_path, app):
     bank_id, _ = _mkbank(client, tmp_path, {'a.png': _flat()})
     with app.app_context():
         import app.config as cfg
         cfg.save_config({'captioning': {'backend': 'none'}})
     r = client.post(f'/api/bank/{bank_id}/caption', json={})
-    assert r.status_code == 400
-    assert 'backend' in r.get_json()['error']
+    error = assert_failed_job(client, bank_id, r)
+    assert 'backend' in error
 
 
-def test_caption_refuses_when_gpu_busy(client, tmp_path, app, monkeypatch):
+def test_caption_waits_when_gpu_busy(client, tmp_path, app, monkeypatch):
     _use_ollama_backend(app)
     bank_id, _ = _mkbank(client, tmp_path, {'a.png': _flat()})
     from app.services import image_bank_service as banks
     monkeypatch.setattr(banks, '_gpu_busy_reason', lambda: 'training is running on the GPU')
     r = client.post(f'/api/bank/{bank_id}/caption', json={})
-    assert r.status_code == 503
-    assert 'training' in r.get_json()['error']
+    assert_waiting_job(client, bank_id, r)
 
 
 def test_caption_length_preset_rides_per_run(client, tmp_path, app, monkeypatch):

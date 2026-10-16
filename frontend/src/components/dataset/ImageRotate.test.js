@@ -113,7 +113,7 @@ test('the bank review lightbox rotates without deciding, and updates the tile be
   assert.match(bankReview, /Rotate 90° left \(\[\)/);
   assert.match(bankReview, /Rotate 90° right \(\]\)/);
   assert.doesNotMatch(bankReview, /\[ \] rotate/);
-  assert.match(bankReview, />\s*Back\s*</);
+  assert.match(bankReview, />\s*Back\{shortcut\('↓'\)\}\s*</);
   assert.doesNotMatch(bankReview, /Mark a watermark/);
   assert.match(bankReview, /REVIEW_SHORTCUT_HINT/);
   const decisions = bankReview.slice(bankReview.indexOf('Reject this image and move on'));

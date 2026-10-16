@@ -1,6 +1,8 @@
 """🗃️ Image bank — inventory, quality scan, duplicate groups, triage statuses,
 promotion. The bank references the source folder IN PLACE and must never write
 to it; background jobs run inline under TESTING (see bank_jobs.start)."""
+
+from bank_queue_assertions import assert_failed_job
 import io
 import os
 import random
@@ -873,13 +875,13 @@ def test_promote_requires_dataset(client, tmp_path):
 
 
 # --- faces gate --------------------------------------------------------------
-def test_faces_unavailable_is_503(client, tmp_path, monkeypatch):
+def test_faces_unavailable_stays_failed(client, tmp_path, monkeypatch):
     bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': checkerboard()})
     from app.services import face_similarity
     monkeypatch.setattr(face_similarity, 'is_available', lambda: False)
     r = client.post(f'/api/bank/{bank_id}/faces', json={})
-    assert r.status_code == 503
-    assert 'face scoring' in r.get_json()['error']
+    error = assert_failed_job(client, bank_id, r)
+    assert 'face scoring' in error
 
 
 def test_cluster_assignment_orders_by_size():

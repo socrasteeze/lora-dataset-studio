@@ -3104,7 +3104,7 @@ def bank_payload(user_id, bank_id, *, include_runtime=True) -> dict | None:
     origins = _origin_counts(bank_id)
     (dup, semantic_dup, clusters, faces_scanned,
      style_clusters) = _bp_similarity_summaries(bank_id, base)
-    semantic = semantic_engine_info(user_id, bank_id)
+    semantic = semantic_engine_info(user_id, bank_id, include_runtime=include_runtime)
     counts['semantic_ready'] = bool(semantic and semantic['ready'])
     counts['semantic_indexed'] = int(
         semantic['counts']['ok'] if semantic else 0)
@@ -5470,7 +5470,15 @@ def _semantic_text_status(engine) -> dict:
     return out
 
 
-def semantic_engine_info(user_id, bank_id) -> dict | None:
+def semantic_runtime_info(bank):
+    """Read runtime readiness separately from semantic cache statistics."""
+    engine = _selected_semantic_engine(bank)
+    return {'engine': engine, 'text': _semantic_text_status(engine),
+            'device': (score_device_info(bank.id) if engine == 'clip'
+                       else semantic_device_info())}
+
+
+def semantic_engine_info(user_id, bank_id, *, include_runtime=True) -> dict | None:
     """Selected semantic space and safe cache coverage, with no local paths."""
     bank = get_bank(user_id, bank_id)
     if not bank:
@@ -5491,9 +5499,7 @@ def semantic_engine_info(user_id, bank_id) -> dict | None:
         'needs_index': measured['needs_index'],
         'error': measured['error'],
         'counts': counts,
-        'text': _semantic_text_status(engine),
-        'device': (score_device_info(bank_id) if engine == 'clip'
-                   else semantic_device_info()),
+        **(semantic_runtime_info(bank) if include_runtime else {}),
         # A selected SigLIP2 space never repurposes these CLIP-only products.
         'clip_owned': {'style': True, 'medium': True},
     }
@@ -10932,6 +10938,22 @@ def _publish_edited_bytes(bank_id, row, generation, data: bytes) -> Path:
     return dst
 
 
+def improve_scope(user_id, bank_id, statuses=None, ids=None):
+    """Check the requested pool before engine installation or queue admission."""
+    if not get_bank(user_id, bank_id):
+        raise ValueError('bank not found')
+    want = normalize_pass_statuses(statuses)
+    total = _improve_pool_query(bank_id, want, ids).count()
+    if not total:
+        if _improve_pool_query(bank_id, list(PASS_SCOPES)).count():
+            raise ValueError('nothing to improve in this scope — the images left '
+                             'to improve are in another pile (kept / undecided / '
+                             'unkept)')
+        raise ValueError('every image in this bank has already been improved — '
+                         '↩ Revert one to run it again')
+    return want, total
+
+
 def start_improve(app, user_id, bank_id, statuses=None, ids=None, engine=None):
     """✨ Upscale & improve every image in scope, in the Bank itself.
 
@@ -10947,19 +10969,8 @@ def start_improve(app, user_id, bank_id, statuses=None, ids=None, engine=None):
     the job thread — one refusal per pass, not one per image.
     """
     from . import face_dataset_service as fds
-    bank = get_bank(user_id, bank_id)
-    if not bank:
-        raise ValueError('bank not found')
+    want, total = improve_scope(user_id, bank_id, statuses, ids)
     engine = fds.resolve_improve_engine(engine)
-    want = normalize_pass_statuses(statuses)
-    total = _improve_pool_query(bank_id, want, ids).count()
-    if not total:
-        if _improve_pool_query(bank_id, list(PASS_SCOPES)).count():
-            raise ValueError('nothing to improve in this scope — the images left '
-                             'to improve are in another pile (kept / undecided / '
-                             'unkept)')
-        raise ValueError('every image in this bank has already been improved — '
-                         '↩ Revert one to run it again')
     # Raises KleinNodesMissing / KleinModelsMissing / SeedVR2ModelsMissing, which
     # the route maps to its own actionable 409 — do not flatten them here.
     fds._improve_preflight(engine)
@@ -11141,6 +11152,16 @@ def _improve_job(bank_id, engine, statuses=None, ids=None):
     return run
 
 
+def normalize_inpaint_options(method='auto', target='all'):
+    method = (method or 'auto').lower()
+    if method not in ('auto', 'lama', 'klein'):
+        raise ValueError("method must be 'auto', 'lama' or 'klein'")
+    target = (target or 'all').lower()
+    if target not in ('all', 'text', 'watermark'):
+        raise ValueError("target must be 'all', 'text' or 'watermark'")
+    return method, target
+
+
 def start_watermark_inpaint(app, user_id, bank_id, method='auto', device_id=None,
                             target='all', statuses=None, ids=None,
                             klein_model=None):
@@ -11163,12 +11184,7 @@ def start_watermark_inpaint(app, user_id, bank_id, method='auto', device_id=None
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
-    method = (method or 'auto').lower()
-    if method not in ('auto', 'lama', 'klein'):
-        raise ValueError("method must be 'auto', 'lama' or 'klein'")
-    target = (target or 'all').lower()
-    if target not in ('all', 'text', 'watermark'):
-        raise ValueError("target must be 'all', 'text' or 'watermark'")
+    method, target = normalize_inpaint_options(method, target)
     want = normalize_pass_statuses(statuses)
     total = _clean_pool_query(bank_id, want, ids, target=target).count()
     if not total:

@@ -125,11 +125,19 @@ def test_both_routes_answer_through_the_same_service(app, client, monkeypatch):
     assert r.status_code == 404
 
 
-def test_the_bank_inpaint_route_threads_the_per_run_override(app, client, monkeypatch):
+def test_the_bank_inpaint_route_threads_the_per_run_override(app, client, tmp_path, monkeypatch):
     """The ⚖ dialog's "use for this run" arrives as {klein_model} on the inpaint
     launch — per run, never stored: a bank still has no Klein pick of its own."""
     from app.services import image_bank_service as banks
+    from app.config import LOCAL_USER
+    from app.extensions import db
+    from app.models import ImageBank
     seen = {}
+    with app.app_context():
+        bank = ImageBank(user_id=LOCAL_USER, name='Fixture', source_path=str(tmp_path / 'source'))
+        db.session.add(bank)
+        db.session.commit()
+        bank_id = bank.id
 
     # DIVERGENCE 5 — `**_kw` is this fork's, not upstream's. The bank inpaint
     # route also threads `device_id` (Divergence 6: Klein renders on whichever
@@ -145,7 +153,7 @@ def test_the_bank_inpaint_route_threads_the_per_run_override(app, client, monkey
         return {'ok': True}
 
     monkeypatch.setattr(banks, 'start_watermark_inpaint', _fake_start)
-    r = client.post('/api/bank/1/watermark/inpaint',
+    r = client.post(f'/api/bank/{bank_id}/watermark/inpaint',
                     json={'method': 'klein', 'klein_model': 'jib.safetensors'})
     assert r.status_code in (200, 202)
     assert seen == {'method': 'klein', 'klein_model': 'jib.safetensors'}

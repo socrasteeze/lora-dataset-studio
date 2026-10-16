@@ -11,6 +11,8 @@ forwarded — a pass that receives statuses=['keep'] and captions the whole bank
 the second check and fails the users. The fixtures therefore always hold all three
 statuses, because a bank where everything is 'pending' cannot tell the scopes apart.
 """
+
+from bank_queue_assertions import assert_failed_job
 import os
 
 from PIL import Image
@@ -281,12 +283,14 @@ def test_per_run_choice_never_writes_the_global_settings(client, tmp_path, app,
 
 def test_per_run_engine_rescues_an_install_whose_global_backend_is_none(
         client, tmp_path, app, monkeypatch):
-    """The 400 gate reads the RESOLVED engine, so choosing one for the run is
+    """The queued failure reads the RESOLVED engine, so choosing one for the run is
     enough — otherwise the picker would be unreachable on the very install that
     most needs it."""
     _use_ollama_backend(app, backend='none')
     bank_id, _ = _mkbank(client, tmp_path, {'a.png': _flat()})
-    assert client.post(f'/api/bank/{bank_id}/caption', json={}).status_code == 400
+    response = client.post(f'/api/bank/{bank_id}/caption', json={})
+    assert 'backend' in assert_failed_job(client, bank_id, response)
+    assert client.delete(f'/api/bank-queue/{bank_id}').status_code == 200
     _mock_vision(monkeypatch)
     _run(client, bank_id, backend='ollama')
     assert _captioned(client, bank_id) == {'a.png'}
@@ -296,8 +300,8 @@ def test_per_run_engine_none_is_refused(client, tmp_path, app):
     _use_ollama_backend(app)
     bank_id, _ = _mkbank(client, tmp_path, {'a.png': _flat()})
     r = client.post(f'/api/bank/{bank_id}/caption', json={'backend': 'none'})
-    assert r.status_code == 400
-    assert 'backend' in r.get_json()['error']
+    error = assert_failed_job(client, bank_id, r)
+    assert 'backend' in error
 
 
 def test_invalid_engine_is_400(client, tmp_path, app):

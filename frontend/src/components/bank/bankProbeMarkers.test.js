@@ -36,7 +36,11 @@ test('the Bank header and its sheets are marked for the responsive probe', () =>
 });
 
 test('the passes panel is a READING surface: asked for, one tap away, used against nothing', () => {
-  assert.match(workspace, /<div id="bank-passes-panel" data-probe-chrome="passes" data-probe-panel="passes" data-probe-reading>/);
+  const tag = workspace.match(/<div id="bank-passes-panel"[^>]*>/)?.[0];
+  assert.ok(tag, 'the passes surface is missing');
+  for (const marker of ['data-probe-chrome="passes"', 'data-probe-panel="passes"', 'data-probe-reading']) {
+    assert.ok(tag.includes(marker), `passes lost ${marker}`);
+  }
   // …and below lg it folds everything that is not a pass button: measured at
   // 360 px, the unfolded panel was ~1 500 px tall.
   assert.match(passes, /function Fold\(\{ compact, title, children \}\)/);
@@ -107,11 +111,14 @@ test('the header gives the fold back on a phone', () => {
   // below sm; the action row scrolls on one line and its buttons never shrink
   // into wrapped labels; a phone held sideways gets a one-row header
   assert.match(workspace, /className="hidden min-w-0 grow items-center gap-2 sm:flex \[@media\(max-height:500px\)\]:!hidden"/);
-  assert.match(workspace, /className="hidden items-baseline gap-x-4 gap-y-1 border-t border-border pt-2 text-sm sm:flex sm:flex-wrap \[@media\(max-height:500px\)\]:!hidden"/);
-  assert.match(workspace, /data-probe-reading>\s*\{counts && \(\s*<div className="mb-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm sm:hidden">\s*\{counterStats\}/);
-  assert.match(workspace, /flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto border-t border-border pt-2 sm:flex-wrap sm:overflow-visible/);
+  assert.match(workspace, /className="hidden min-w-0 border-t border-border pt-2 sm:block \[@media\(max-height:500px\)\]:!hidden"/);
+  assert.match(workspace, /data-probe-reading>\s*\{\(\s*<div className="mb-2 sm:hidden">\s*<BankStatsStrip/);
+  const strip = read('./BankStatsStrip.jsx');
+  assert.match(strip, /flex h-10 min-w-0 shrink-0.*overflow-x-auto overflow-y-hidden whitespace-nowrap/);
+  assert.equal((workspace.match(/<BankStatsStrip/g) || []).length, 2);
+  assert.match(workspace, /flex h-14 min-w-0 flex-nowrap items-center gap-2 overflow-x-auto overflow-y-hidden border-t border-border pt-2/);
   const actions = workspace.slice(workspace.indexOf('{/* The decisive actions.'), workspace.indexOf('</header>'));
-  assert.equal((actions.match(/<Button type="button" size="md" noShrink/g) || []).length, 5);
+  assert.equal((actions.match(/<Button type="button" size="md" noShrink/g) || []).length, 6);
   assert.match(workspace, /\[@media\(max-height:500px\)\]:flex \[@media\(max-height:500px\)\]:flex-nowrap/);
 });
 

@@ -122,7 +122,8 @@ test('the workspace disables 🗑 Delete rejected on a bank that sits on a datas
   // The banner promises "Delete rejected is disabled here". A button that still
   // opened the dialog, only to be refused inside it, would make that a lie.
   const src = bankTreeSource();
-  assert.match(src, /disabled=\{live \|\| !\(counts\?\.reject > 0\) \|\| !!payload\?\.dataset_conflict\}/);
+  assert.match(src, /disabled=\{bankBusy \|\| !\(counts\?\.reject > 0\) \|\| !!payload\?\.dataset_conflict\}/);
+  assert.match(src, /const bankBusy = .*live.*queuedJob/);
   assert.match(src, /payload\?\.dataset_conflict && \(/);
 });
 

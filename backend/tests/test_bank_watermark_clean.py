@@ -11,6 +11,8 @@ mtime) after a full clean, and the three known readers are pinned to the single
 resolver, so rebinding one of them back to abs_image_path fails a test instead
 of silently un-shipping the feature.
 """
+
+from bank_queue_assertions import assert_failed_job
 import ast
 import io
 import json
@@ -349,8 +351,8 @@ def test_crop_level_leaves_everything_else_flagged(client, tmp_path, app):
 def test_crop_level_refuses_when_there_is_nothing_flagged(client, tmp_path):
     bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': _photo()})
     r = client.post(f'/api/bank/{bank_id}/watermark/crop')
-    assert r.status_code == 400
-    assert 'watermark scan' in r.get_json()['error']
+    error = assert_failed_job(client, bank_id, r)
+    assert 'watermark scan' in error
 
 
 # --- the readers: promote / thumbnail / file --------------------------------
@@ -641,8 +643,8 @@ def test_inpaint_level_says_what_to_install_instead_of_failing_silently(
     _fake_lama(monkeypatch, available=False)
 
     r = client.post(f'/api/bank/{bank_id}/watermark/inpaint', json={'method': 'lama'})
-    assert r.status_code == 503
-    assert 'not installed' in r.get_json()['error']
+    error = assert_failed_job(client, bank_id, r)
+    assert 'not installed' in error
     assert _row(app, image_id) == ('detected', None)       # nothing half-done
 
 
@@ -695,7 +697,8 @@ def test_dismissed_images_leave_both_levels(client, tmp_path, app):
                     json={'image_ids': [image_id]})
     assert r.status_code == 200 and r.get_json()['dismissed'] == 1
 
-    assert client.post(f'/api/bank/{bank_id}/watermark/crop').status_code == 400
+    response = client.post(f'/api/bank/{bank_id}/watermark/crop')
+    assert 'watermark scan' in assert_failed_job(client, bank_id, response)
     levels = client.get(f'/api/bank/{bank_id}/watermark/levels').get_json()
     assert levels['dismissed'] == 1 and levels['flagged'] == 0
 

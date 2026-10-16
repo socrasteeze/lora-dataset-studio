@@ -35,7 +35,7 @@ function stopTrainingBlock(source) {
 test('the training Stop button is labelled with the stop verb, not the side effect', () => {
   const block = stopTrainingBlock(panel);
   // The visible label — verb first.
-  assert.match(block, /⏹ Stop training/);
+  assert.match(block, /⏹ Stop Training/);
   // The old housekeeping wording must never come back on this button.
   assert.doesNotMatch(block, /Finish \/ re-enable ComfyUI/);
   // Nowhere in the panel either — no second copy hiding elsewhere.

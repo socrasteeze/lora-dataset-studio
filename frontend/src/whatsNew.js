@@ -85,6 +85,20 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-16-storage-folder-selection',
+    date: '2026-10-16',
+    title: 'Keep Folder Selection',
+    blurb: 'The host folder browser keeps the folder you opened when storage information arrives late. Browse fills the destination field without saving or moving files.',
+    to: '/settings/storage?focus=dataset-images-root',
+  },
+  {
+    id: '2026-10-16-bank-queued-controls',
+    date: '2026-10-16',
+    title: 'Queue Bank Passes',
+    blurb: 'Bank passes can wait behind an active pass. Statistics load without probing scoring runtimes, and empty improvement requests stop before checking models.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-15-caption-txt-triggers',
     date: '2026-10-15',
     title: 'Triggers in TXT',

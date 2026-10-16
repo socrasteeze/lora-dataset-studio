@@ -15,6 +15,8 @@ import { useFocusTrap } from '../../hooks/useFocusTrap.js'
  * A host that genuinely cannot fail says so explicitly (see FolderPickerField):
  * silence is not a success. */
 export function FolderBrowserModal({ initial, onPick, onClose }) {
+  // A late parent metadata response must not replace navigation in this dialog.
+  const initialPath = useRef(initial || null)
   // What the user is TYPING, kept apart from `data.path` (where the browser
   // actually is): a half-typed path must not be mistaken for the current folder,
   // and "Use this folder" must keep committing what is on screen, not the draft.
@@ -86,7 +88,7 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
     }
   }, [])
 
-  useEffect(() => { load(initial || null) }, [load, initial])
+  useEffect(() => { load(initialPath.current) }, [load])
 
   const entries = (data?.entries || []).filter((entry) =>
     entry.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()))

@@ -54,7 +54,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "← Back to the last image",
+    "Back",
     1
   ],
   [
@@ -219,7 +219,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Auto-reject",
+    "Auto-Reject",
     1
   ],
   [
@@ -387,7 +387,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Filter thresholds",
+    "Filter Thresholds",
     1
   ],
   [
@@ -444,11 +444,11 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Keep best",
+    "Keep Best",
     1
   ],
   [
-    "Keep first",
+    "Keep First",
     1
   ],
   [
@@ -456,7 +456,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Keep this image and move on (K)",
+    "Keep this image and move on (K or →)",
     1
   ],
   [
@@ -536,7 +536,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Previous image (←) — navigation only, decides nothing",
+    "Previous image (↓). Its saved decision stays in place.",
     1
   ],
   [
@@ -572,7 +572,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Reject this image and move on (R) — reversible, nothing is deleted from disk",
+    "Reject this image and move on (R or ←). Nothing is deleted from disk.",
     1
   ],
   [

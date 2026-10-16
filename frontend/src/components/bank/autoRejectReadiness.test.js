@@ -27,7 +27,7 @@ test('the auto-reject popover counts from flags_actionable, never from flags', (
   assert.doesNotMatch(ws, /\{flags\[f\] \?\? 0\} flagged/);
   // The facet chips keep the OTHER map: "show me every blurry image" rightly
   // includes the ones a previous pass rejected.
-  assert.match(ws, /\{FLAG_LABEL\[f\]\} \{flags\[f\] \?\? 0\}/);
+  assert.match(ws, /\{FLAG_LABEL\[f\]\} \{payload\?\.counts \? \(flags\[f\] \?\? 0\) : '—'\}/);
   // Two maps, two questions — the second was added, not substituted. The chip
   // map now comes from the FILTERED counters (a chip prints the size of the page
   // it opens); the auto-reject map deliberately still comes from the payload,
