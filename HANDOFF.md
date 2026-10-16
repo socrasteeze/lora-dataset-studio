@@ -1,45 +1,41 @@
 # HANDOFF
 
-**Updated:** 2026-10-16 | **Branch:** validation/test-suite-runtime | **Base:** 447864093 | **Tree:** dirty
+**Updated:** 2026-10-16 | **Branch:** validation/test-suite-runtime | **Base:** 447864093
 
 ## State
-Full-suite runtime optimizations are implemented; cloud qualification is pending.
-Main is unchanged. No local tests, application imports or service restarts ran.
+Full-suite optimizations are implemented on the task branch. Cloud receipts carry exact-commit qualification; main is unchanged.
+Application source, production state and the shipped frontend bundle are unchanged.
 
 ## Done this session
-- Added synthetic capability-import defaults with explicit transport-test opt-in.
-- Preserved fresh app/config/database/plugin state; real Torch bridge tests remain enabled.
-- Kept adversarial grouping coverage with smaller oracle inputs and one large production-block case.
-- Prepared Git histories once and copied independent repositories per test; removed idle heartbeat waits.
-- Removed duplicate workflow/preflight runs, bounded numerical-library threads and retained backend JUnit reports.
-- Ruff, ESLint, syntax review and privacy scan passed; ESLint has 32 existing warnings.
+- Bounded numerical-library pools to one thread per worker; retained eight full-gate workers, four ordinary CI/release workers and file-local scheduling.
+- Removed duplicate full/focused checks and collected independent suite failures without hiding them; preserved standalone Quick preflight.
+- Stubbed incidental capability imports with runtime_imports opt-in; added guard and runner regressions.
+- Reset only Bank queue memory between tests; preserved durable rows and within-test restart checks.
+- Reused independent copies of prepared Git histories for updater/migration tests; retained real Git and fresh databases/media fixtures.
+- Reduced quadratic oracle inputs while retaining threshold/seed coverage and a real production-block case; retained the heartbeat write beyond the original timeout.
 
 ## Open
-1. Inspect the exact-commit Fork Gates run after the workflow follow-up; repair suite failures and rerun only as needed.
-2. Record the complete backend/frontend/plugin results, skip reasons, browser receipt and measured timings before claiming qualification.
-3. Keep main unchanged until qualification passes and landing is authorized.
-4. Prior UI, profile moves, queue recovery and physical phone/PWA acceptance remain unqualified beyond the specific cloud checks.
-5. The operator still needs a full Studio stop/start after current work finishes to load earlier backend/profile changes. Do not interrupt jobs.
+1. Before landing, inspect the latest exact-head Fork Gates receipt and repair the remaining baseline test and Bank layout failures. Hold main until required qualification and delivery authorization.
+2. The earlier full run e5a310440 (38959711992) had 198 backend failures, 9721 passes and 14 skips in 912.23s, plus 12 frontend failures and a tablet Bank-name truncation. Those results do not qualify later commits.
+3. The expanded comparison (38964253881) passed: baseline 161.86s/466 cases/159 failures versus optimized 108.08s/480 cases/57 failures, with no new failures, skips or missing cases. Migration coverage passed in both stages: 57.12s/27 cases versus 41.68s/28 cases. These are focused comparison timings, not full-suite speed claims.
+4. Earlier physical phone/PWA and production restart acceptance remain operator checks; no production services or real jobs were started or interrupted here.
 
 ## Decisions
-- One complete Windows qualification per pull request; ordinary CI retains Linux frontend checks.
-- Validation branches run Fork Gates on push; no personally authenticated CLI writes to GitHub APIs.
-- Eight full-gate pytest workers, four ordinary hosted CI/release workers; numerical-library threads are one per worker.
-- Plugin contracts stay in separate processes; no shared app, database or mutable capability caches.
-- Real import transport tests opt in with runtime_imports; ordinary tests can override the raw seam.
-- Existing profile ownership, move receipts and one-entry-per-Bank queue contracts remain intact.
+- Fresh apps, databases, config, plugin state and mutable caches remain per test; no shared application shortcuts.
+- Prepared Git templates are immutable. Every test copies its own refs, files and settings and rewires its own local remote.
+- Real Torch bridge/quantization coverage remains; ordinary capability import transport is synthetic unless a test opts in or overrides it.
+- Independent suites all finish, but any failure keeps the gate red. Lint, build and startup failures still stop dependent work.
+- Source, tests and bundle stay separate where a bundle changes; this tooling-only frontend rebuild left dist unchanged.
+- Diagnostic workflow/helper/manifest live only on diagnostic/test-suite-runtime and must not land with this implementation.
 
 ## Traps
-- Tests and fixture-backed probes require a cloud checkout; implementation does not authorize local test execution.
-- create_app changes schema/runtime state; isolate all LDS runtime paths and inherited profile identity before imports.
-- Optional private-name checks can skip without an external list; cloud gates do not prove physical-device or real GPU behavior.
-- Earlier no-test deliveries and historical receipts do not qualify this head. Prior detail remains in Git at the recorded base.
-- Cloud run 38958289726 stopped at an existing tablet Bank-name truncation before pytest; application source and bundle are unchanged on this branch. The workflow now preserves that failure while collecting full-gate evidence.
-- Run 38958834328 also exposed unchanged frontend source/guide assertion failures before Python ran. The driver now collects every independent suite and retains all failures; lint/build/startup still stop dependent work.
-- Keep configuration, profile registries, data and credentials out of Git. Do not restart production services.
+- Do not run tests or fixture-backed probes locally without explicit permission. Local lint, build, syntax and privacy checks passed; ESLint retains 32 warnings.
+- create_app changes schema/runtime state. Isolate all LDS runtime paths and inherited profile identity before imports.
+- Optional private-name checks skip without an external list. Installed-source, real GPU and physical-device gates are separate from synthetic cloud coverage.
+- Keep configuration, profile registries, data and credentials out of Git. No history rewrite, release or main push was performed.
 
 ## Verify
-Run in the cloud checkout with the pinned dev and CPU Torch overlays and Node 24:
+Cloud checkout only, using the pinned dev/CPU Torch overlays and Node 24:
 
 ```powershell
 ./scripts/gates.ps1 -Phase Gates -ScratchRoot D:/lds-gates
