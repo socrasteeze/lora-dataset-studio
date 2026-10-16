@@ -1861,6 +1861,13 @@ def _curation_filters(data):
     }
 
 
+@bp.get('/bank/curation-options')
+def bank_curation_options():
+    """Shared shortlist defaults. No image data or runtime inference."""
+    from ..services import bank_curation
+    return jsonify(bank_curation.describe())
+
+
 @bp.post('/bank/<int:bank_id>/select-diverse')
 def bank_select_diverse(bank_id):
     """Farthest-point selection of the N most VARIED images in the current filter,
@@ -1882,7 +1889,7 @@ def bank_select_diverse(bank_id):
         typ = banks._TYPICALITY_DEFAULT
     try:
         out = banks.select_diverse(LOCAL_USER, bank_id, n=n, typicality=typ,
-                                   filters=_curation_filters(data))
+                                   filters=_curation_filters(data), selection=data.get('selection'))
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, **out})
@@ -1911,7 +1918,7 @@ def bank_select_balanced(bank_id):
         out = banks.select_balanced(LOCAL_USER, bank_id, n=n,
                                     axis=data.get('axis') or 'framing',
                                     typicality=typ,
-                                    filters=_curation_filters(data))
+                                    filters=_curation_filters(data), selection=data.get('selection'))
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, **out})
@@ -1940,7 +1947,7 @@ def bank_select_similar(bank_id):
     try:
         out = banks.select_similar(LOCAL_USER, bank_id, ref_id, n=n,
                                    min_score=min_score,
-                                   filters=_curation_filters(data))
+                                   filters=_curation_filters(data), selection=data.get('selection'))
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, **out})

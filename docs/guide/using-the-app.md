@@ -659,32 +659,22 @@ offers two selectors that cost no extra inference. The row starts folded to one
 line; click **Curate** to open it, and the Bank remembers whether you left it
 open or closed:
 
-- **🎨 Pick diverse** — enter a number and it selects the images that best
-  *cover the variety* of what you're looking at (varied angles, outfits, scenes),
-  instead of that many near-identical frames. It's the antidote to a dump of
-  4 000 shots of the same pose: ask for 60 and you get 60 that actually differ.
-  **Skip the odd ones out** (the slider under the number) is why they are the
-  *right* 60. "Most varied" is computed as "farthest from everything already
-  picked", and the image that is farthest from everything in a collected bank is
-  usually not a nice unusual shot of your subject — it's the meme, the screenshot,
-  the botched frame, the one photo of somebody else. The slider discounts an image
-  for being *alone in the bank*: at the default **50%** an image that resembles
-  nothing else has to be far more interesting than a normal one to earn a slot,
-  and at **100%** it is all but excluded. It never works the other way round —
-  anything as typical as the median of the bank is left completely alone, so this
-  cannot turn your 60 into 60 look-alikes. Set it to **0** for the pure-coverage
-  behaviour the button had before this setting existed. On a very large bank the
-  first click takes a few seconds (it reads every image's neighbourhood once);
-  the button says *Sampling* while it does.
+- **🎨 Pick diverse** — start with a quality-weighted representative, then add
+  images that cover different parts of the visual space. Pins enter first.
+  **Outlier Guard**, default 50%, discounts isolation. Zero disables only that
+  penalty; quality preferences, duplicate limits and pins still apply. An unusual
+  image can be valid. Pin rare views that must remain. The guard reads exact
+  neighbourhoods and can take time on large pools. It is disabled below 32 images
+  or when the density variation is too small to measure reliably.
 - **⚖ Balanced pick** — see [Pick a balanced set](#pick-a-balanced-set) below: the
-  same sampling, but spread evenly over your **framings** instead of taken off
-  the top of one ranking.
-- **🎯 Similar to selected** — select **one** image as a reference, and it ranks
-  everything by how much it looks like that image and selects the closest N — the
-  fast way to pull one person or one look out of a mixed export.
+  same sampling, with editable target proportions for the chosen LoRA kind.
+- **🎯 Similar to selected** — select one reference, or save several with
+  **Use References**. Each candidate uses its closest reference. Technical quality
+  preferences and duplicate limits also affect the final ranking. The optional
+  minimum compares raw similarity. Pin a reference if it must remain selected.
 
-Both honour whatever filter and 🔍 search are active ("the 60 most diverse of
-*this* subfolder"), and both just **select** — the images light up and you review
+All three honour whatever filter and 🔍 search are active ("the 60 most diverse of
+*this* subfolder"), and all three just **select** — the images light up and you review
 them with the same ✓ Keep / ✕ Reject / ⬆ Promote bar. Nothing is auto-kept or
 deleted, so a selection you don't like costs one click to clear.
 
@@ -1122,6 +1112,43 @@ after all** undoes it exactly as if you had clicked it by hand.
 While the check is running you can stop it with **👥 Analyze everything anyway**;
 it lets the sampling go and launches the full pass.
 
+## Choose a selection policy
+
+Open **Selection Policy** inside Similar, Diverse or Balanced. The settings are
+shared by those three selectors in this Bank workspace. They reset when another
+Bank opens or the page reloads. They do not change an existing dataset's kind.
+
+1. Choose **LoRA Kind**. Character prioritizes framing and character variation.
+   Concept covers views and contexts. Style covers subject content, settings and
+   compositions without a face-identity constraint. Use filters and references
+   to isolate the intended character, concept or style before sampling.
+2. Optionally select up to 16 images in the grid and press **Use References**.
+   For Character, **Face Similarity** can read current cached face vectors from
+   Group by Person. It compares the face recorded by that pass, not a guaranteed
+   identity. Drawings and missing/stale faces remain unmeasured. **Review Unmeasured**
+   selects those candidates for manual review, with an explicit 2,000-image limit.
+3. Set **Minimum Similarity** only if a cutoff suits this engine and material.
+   It requires references and can leave slots empty. Switching the semantic
+   engine or match type clears the cutoff. There is no universal valid threshold.
+4. Keep **Prefer Quality** to lower priority for measured technical flags. Missing
+   measurements remain unknown. Aesthetic and NSFW scores do not affect this
+   preference. These checks do not prove anatomy or target fidelity.
+5. Set **Duplicate Limit**, default 1. It applies to both measured duplicate
+   partitions. Zero disables it. Existing distinct-image decisions remain valid.
+   The selector does not reject or delete omitted candidates.
+6. Use **Pin Selected** for rare views or references that must stay. Pins override
+   ranking, match cutoffs, targets and duplicate limits, but not filters, missing
+   embeddings or unreadable images. The report counts unavailable pins.
+
+The **Selection Report** shows the chosen count, shortfall, per-image reasons,
+raw match scores, technical penalties, duplicate omissions and coverage. Caption
+and tag coverage uses a fixed lexicon. It can miss details and misread negation.
+Unknown labels stay explicit. Review the shortlist before Keep or Promote.
+
+The algorithm uses cached analysis only. It starts no model, download or job.
+Older API clients that omit the `selection` object retain the legacy selector
+behavior. New clients send the shared policy to all three selection endpoints.
+
 ## Pick a balanced set
 
 Advice is only half the gesture, so **📊 Coverage advice** ends with **⚖️ Pick a
@@ -1129,32 +1156,26 @@ balanced set**. It opens **⚖️ Balanced pick** in the **Curate** row, unfoldi
 the row first if it is closed. It answers a question no per-image score can ask:
 *does my set cover what I want to be able to generate?*
 
-Ask **🎨 Pick diverse** for 20 images out of a bank that is 47% full body, 35%
-bust, 12% face and 6% back views, and you get roughly those proportions — on a
-synthetic reproduction of exactly that shape it returned **0 face shots and 0
-back views**. The LoRA then renders one shot type well and the rest badly, and
-nothing ever said so. **⚖️ Balanced pick** returns **5 face, 5 bust, 5 body, 5
-back** out of the same pool, each bucket filled with the *same* most-varied
-sampling — and the same **Skip the odd ones out** guard — that 🎨 Pick diverse
-uses.
+Balanced uses editable, relative **Target Weights** and fills the groups with
+diverse candidates under the shared policy. Character starts with framing weights
+4 face, 3 bust, 2 body and 1 back. These are starting heuristics, not validated
+optimal training ratios. Concept starts with caption view labels. Style starts
+with broad caption/tag subject categories. Neither applies a face constraint.
 
-- **Balance on** — **Framing** by default. It is the axis that carries real
-  information: on a one-subject bank, person groups are sparse and split into
-  many small, arbitrary clusters, so balancing on them spreads a selection over
-  noise. **Framing × person** is there for a dump that genuinely holds several
-  subjects.
-- **When an axis can't be satisfied**, it says so instead of quietly filling the
-  gap: *"Only 3 back images exist in this filter — an even split wanted 15"*. The
-  freed picks go to the buckets that have room, so asking for 60 still gives you
-  60 — the deficit is reported as a number, never hidden. If even that isn't
-  enough, it says how many you actually got and why.
-- **The result is always stated** — *"Selected 60 of 60 requested, spread over
-  framing: 15 face, 15 bust, 15 body, 15 back"* — as text, per bucket, next to
-  what each bucket had available. There is no chart you have to read.
-- **An unlabelled bank is the normal state**, not an error. Nothing has a framing
-  until the 📐 Framing pass has run, so the button says which pass is missing and
-  how many images it would bring in, rather than returning an empty or misleading
-  selection. 🎨 Pick diverse keeps working without it.
+- **Balance Axis** also offers lighting, setting, outfit, expression and camera
+  labels. Framing × Person is Character-only. It can be sparse or unreliable
+  without reviewed person groups.
+- **Target Weights** are relative. Weight 2 asks for twice the share of weight 1.
+  Zero excludes a group unless a candidate is pinned. Each caption-labelled image
+  gets one stable primary bucket; the coverage report retains all its mentions.
+- **Shortages remain visible.** Weighted allocation respects actual availability.
+  Other allowed groups fill available slots. Duplicate limits or a match cutoff
+  can still leave a shortfall. The report shows actual, available and target counts.
+- **Unknowns remain reviewable.** Unlabelled images enter an explicit Unknown group.
+  Run Framing or Caption to improve the relevant labels. Its weight is editable.
+- **Other Coverage** reports variation outside the main axis. It avoids a sparse
+  quota for every possible combination. The outlier penalty is measured across
+  the whole eligible pool and then applied to candidates within each allocation.
 
 Like the other selectors it honours the current filter and search, and it only
 **selects** — nothing is kept, rejected or deleted.

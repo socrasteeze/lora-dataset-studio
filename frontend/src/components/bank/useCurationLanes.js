@@ -5,13 +5,15 @@
 // engine-switch flow resets three of their states (the setters ride back
 // in the return for exactly that). Moved VERBATIM from BankWorkspace.jsx
 // (2026-08-24, hook series wave 7).
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiFetch, postJson } from '../../api/fetchClient';
-import { BALANCE_DEFAULT_AXIS, summarizeBalance } from './bankBalance.js';
+import { BALANCE_DEFAULT_AXIS } from './bankBalance.js';
 import {
   semanticEnginePatchBody, semanticPayloadMatches,
 } from './bankSemanticEngine.js';
 import { PUSH_DOWN_DEFAULT_STRENGTH, summarize } from './bankTextSearch.js';
+import { curationSummary, emptyCurationPolicy, policyForKind, selectionContextKey,
+  selectionRequest } from './curationPolicy.js';
 
 export function useCurationLanes({
   bankId, filter, filterParams, selected, toast, showCuratedSelection,
@@ -53,23 +55,62 @@ export function useCurationLanes({
   const [textStatus, setTextStatus] = useState(null)
   const [textPending, setTextPending] = useState(false)
   const [textResult, setTextResult] = useState(null)
+  const [curationMetadata, setCurationMetadata] = useState(null)
+  const [curationPolicy, setCurationPolicy] = useState(emptyCurationPolicy)
+  const [selectionResult, setSelectionResult] = useState(null)
+  const selectionRunRef = useRef(0)
+  const contextKey = selectionContextKey({ bankId, filter, engine: semanticState.engine,
+    modelKey: semanticState.modelKey, policy: curationPolicy })
+  const selectionContextRef = useRef(contextKey)
+  selectionContextRef.current = contextKey
+
+  useEffect(() => {
+    let active = true
+    setCurationMetadata(null)
+    setCurationPolicy(emptyCurationPolicy())
+    setSelectionResult(null)
+    apiFetch('/api/bank/curation-options').then((metadata) => {
+      if (!active) return
+      setCurationMetadata(metadata)
+      setCurationPolicy((previous) => policyForKind(previous, previous.kind, metadata))
+    }).catch(() => { if (active) toast.error('Selection settings did not load. Reopen the Bank to retry.') })
+    return () => { active = false; selectionRunRef.current += 1 }
+  }, [bankId, toast])
+
+  useEffect(() => {
+    setCurationPolicy((previous) => ({ ...previous, min_similarity: '' }))
+  }, [semanticState.engine])
+  useEffect(() => { setSimilarLast(null); setSelectionResult(null) }, [contextKey])
+
+  const updateCurationPolicy = (next) => {
+    const value = next.resetKind ? policyForKind(curationPolicy, next.kind, curationMetadata) : next
+    setCurationPolicy(value)
+    setBalanceAxis(value.axis)
+    setBalanceResult(null)
+  }
+
+  const captureSelection = () => ({ key: contextKey, run: ++selectionRunRef.current })
+  const selectionCurrent = (request) => request.key === selectionContextRef.current
+    && request.run === selectionRunRef.current
 
   const pickDiverse = async () => {
+    const request = captureSelection()
     const requestEngine = semanticState.engine
     const requestModelKey = semanticState.modelKey
     setCurateOpen(null)
     setDiverseBusy(true)
     try {
       const d = await postJson(`/api/bank/${bankId}/select-diverse`,
-        { n: diverseN, typicality: diverseTypicality, ...filterParams(filter) })
-      if (semanticEngineRef.current !== requestEngine
+        { n: diverseN, typicality: diverseTypicality,
+          selection: selectionRequest(curationPolicy), ...filterParams(filter) })
+      if (!selectionCurrent(request) || semanticEngineRef.current !== requestEngine
           || !semanticPayloadMatches(d, requestEngine, requestModelKey)) return
+      setSelectionResult(d)
       if (!d.image_ids?.length) {
-        toast.info(`Nothing to sample — no ${semanticState.label}-indexed images match the current filter.`)
-        return
+        toast.info('No images met the selection policy. Review the report or change the constraints.')
       }
       showCuratedSelection(d.image_ids)
-      toast.info(`Showing the ${d.image_ids.length} most diverse of ${d.pool}. Review, then ✓ Keep or ⬆ Promote — or “Show all” to leave this view.`)
+      if (d.image_ids?.length) toast.info(curationSummary(d))
     } catch (e) {
       toast.error(e?.message || 'Diversity sampling failed.')
     } finally {
@@ -82,6 +123,7 @@ export function useCurationLanes({
   // INSIDE each bucket. The result is only useful if the user can see its shape,
   // so the distribution is kept on screen (numbers, aria-live) after the click.
   const pickBalanced = async () => {
+    const request = captureSelection()
     const requestEngine = semanticState.engine
     const requestModelKey = semanticState.modelKey
     setCurateOpen(null)
@@ -89,16 +131,17 @@ export function useCurationLanes({
     try {
       const d = await postJson(`/api/bank/${bankId}/select-balanced`,
         { n: balanceN, axis: balanceAxis, typicality: diverseTypicality,
+          selection: selectionRequest(curationPolicy),
           ...filterParams(filter) })
-      if (semanticEngineRef.current !== requestEngine
+      if (!selectionCurrent(request) || semanticEngineRef.current !== requestEngine
           || !semanticPayloadMatches(d, requestEngine, requestModelKey)) return
+      setSelectionResult(d)
       if (!d.image_ids?.length) {
-        toast.info('Nothing to balance — no labelled images match the current filter.')
-        return
+        toast.info('No images met the selection policy. Review the report or change the constraints.')
       }
       setBalanceResult(d)
       showCuratedSelection(d.image_ids)
-      toast.info(summarizeBalance(d))
+      if (d.image_ids?.length) toast.info(curationSummary(d))
     } catch (e) {
       // A missing pass is the DEFAULT state of a fresh bank, not a failure: the
       // backend names the pass, so show that sentence rather than "failed".
@@ -109,26 +152,29 @@ export function useCurationLanes({
   }
 
   const findSimilar = async () => {
+    const request = captureSelection()
     const requestEngine = semanticState.engine
     const requestModelKey = semanticState.modelKey
     setCurateOpen(null)
     const ref = [...selected][0]
-    if (ref == null) return
+    const referenceIds = curationPolicy.reference_ids.length ? curationPolicy.reference_ids : ref == null ? [] : [ref]
+    if (!referenceIds.length) return
+    const policy = selectionRequest({ ...curationPolicy, reference_ids: referenceIds })
     setSimilarBusy(true)
     try {
       const d = await postJson(`/api/bank/${bankId}/select-similar`,
-        { ref_id: ref, n: similarN, ...filterParams(filter) })
-      if (semanticEngineRef.current !== requestEngine
+        { ref_id: referenceIds[0], n: similarN, selection: policy, ...filterParams(filter) })
+      if (!selectionCurrent(request) || semanticEngineRef.current !== requestEngine
           || !semanticPayloadMatches(d, requestEngine, requestModelKey)) return
+      setSelectionResult(d)
       if (!d.image_ids?.length) {
-        toast.info(`No matches — no ${semanticState.label}-indexed images match the current filter.`)
-        return
+        toast.info('No images met the selection policy. Review the report or change the constraints.')
       }
-      // Backend returns the ids ranked by similarity (reference first); keep that
-      // order so the view reads closest→farthest instead of by id.
+      // Pins lead. The remainder follows relevance with the technical-quality
+      // preference. The receipt exposes raw similarity separately.
       showCuratedSelection(d.image_ids)
-      setSimilarLast({ refId: ref, taken: d.image_ids.length })
-      toast.info(`Showing the ${d.image_ids.length} most similar to the reference (of ${d.pool}), closest first. Review, then ✓ Keep or ⬆ Promote — or “Show all” to leave this view.`)
+      setSimilarLast({ refId: referenceIds[0], taken: d.image_ids.length, policy, contextKey })
+      if (d.image_ids?.length) toast.info(curationSummary(d))
     } catch (e) {
       toast.error(e?.message || 'Similarity search failed.')
     } finally {
@@ -144,24 +190,25 @@ export function useCurationLanes({
   // same ranking, extended" — which also means an image hand-unselected in
   // between comes back; the wording on the panel says so out loud.
   const addMoreSimilar = async () => {
-    if (!similarLast) return
+    if (!similarLast || similarLast.contextKey !== contextKey) return
+    const request = captureSelection()
     const requestEngine = semanticState.engine
     const requestModelKey = semanticState.modelKey
     setCurateOpen(null)
     setSimilarBusy(true)
     try {
-      const want = similarLast.taken + similarAddN
+      const want = Math.min(2000, similarLast.taken + similarAddN)
       const d = await postJson(`/api/bank/${bankId}/select-similar`,
-        { ref_id: similarLast.refId, n: want, ...filterParams(filter) })
-      if (semanticEngineRef.current !== requestEngine
+        { ref_id: similarLast.refId, n: want, selection: similarLast.policy, ...filterParams(filter) })
+      if (!selectionCurrent(request) || semanticEngineRef.current !== requestEngine
           || !semanticPayloadMatches(d, requestEngine, requestModelKey)) return
+      setSelectionResult(d)
       if (!d.image_ids?.length) {
-        toast.info(`No matches — no ${semanticState.label}-indexed images match the current filter.`)
-        return
+        toast.info('No images met the selection policy. Review the report or change the constraints.')
       }
       const gained = d.image_ids.length - similarLast.taken
       showCuratedSelection(d.image_ids)
-      setSimilarLast({ refId: similarLast.refId, taken: d.image_ids.length })
+      setSimilarLast({ ...similarLast, taken: d.image_ids.length })
       toast.info(gained > 0
         ? `Added ${gained} more — ${d.image_ids.length} selected, closest first (of ${d.pool}).`
         : `Nothing left to add — the ranking already covers every match in this filter (${d.image_ids.length} of ${d.pool}).`)
@@ -252,6 +299,7 @@ export function useCurationLanes({
     }
   }
   return {
+    curationMetadata, curationPolicy, updateCurationPolicy, selectionResult, setSelectionResult,
     curateOpen, setCurateOpen, diverseN, setDiverseN, diverseTypicality,
     setDiverseTypicality, diverseBusy, balanceN, setBalanceN, balanceAxis,
     setBalanceAxis, balanceBusy, balanceResult, setBalanceResult, similarN,
