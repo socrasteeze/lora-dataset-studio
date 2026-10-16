@@ -140,7 +140,7 @@ function Invoke-Step {
   $result = [pscustomobject]@{ Name = $Name; Exit = $code; Log = $log; Seconds = $timer.Elapsed.TotalSeconds }
   [void]$script:Results.Add($result)
   if ($code -ne 0) {
-    throw "$Name failed (exit $code). Stop here; replay the named failures before the full gate."
+    throw "$Name failed (exit $code). Replay the named failures before rerunning this suite."
   }
   Write-Ok ("{0} ({1:N2}s)" -f $Name, $result.Seconds)
   $result
