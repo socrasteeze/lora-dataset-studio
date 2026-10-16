@@ -1,6 +1,8 @@
 """🗃️ Image bank — inventory, quality scan, duplicate groups, triage statuses,
 promotion. The bank references the source folder IN PLACE and must never write
 to it; background jobs run inline under TESTING (see bank_jobs.start)."""
+
+from bank_queue_assertions import assert_failed_job
 import io
 import os
 import random
@@ -873,13 +875,13 @@ def test_promote_requires_dataset(client, tmp_path):
 
 
 # --- faces gate --------------------------------------------------------------
-def test_faces_unavailable_is_503(client, tmp_path, monkeypatch):
+def test_faces_unavailable_stays_failed(client, tmp_path, monkeypatch):
     bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': checkerboard()})
     from app.services import face_similarity
     monkeypatch.setattr(face_similarity, 'is_available', lambda: False)
     r = client.post(f'/api/bank/{bank_id}/faces', json={})
-    assert r.status_code == 503
-    assert 'face scoring' in r.get_json()['error']
+    error = assert_failed_job(client, bank_id, r)
+    assert 'face scoring' in error
 
 
 def test_cluster_assignment_orders_by_size():
@@ -932,7 +934,7 @@ def test_delete_bank_never_touches_source(client, tmp_path, app):
         assert not (cfg.banks_root() / str(bank_id)).exists()
 
 
-def test_busy_bank_answers_409(client, tmp_path, app):
+def test_busy_bank_keeps_its_active_job_and_queues_the_next_pass(client, tmp_path, app):
     bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': checkerboard()})
     from app.services import bank_jobs
     bank_jobs._jobs[bank_id] = {'kind': 'scan', 'done': 0, 'total': 1,
@@ -941,6 +943,11 @@ def test_busy_bank_answers_409(client, tmp_path, app):
                                 'started_at': 0, '_touched': __import__('time').time(),
                                 '_cancel_hook': None}
     r = client.post(f'/api/bank/{bank_id}/scan', json={})
-    assert r.status_code == 409
-    # cancel works, then the job is startable again
+    assert r.status_code == 202 and r.json['queued']
+    activity = client.get(f'/api/bank/{bank_id}/activity').json
+    assert activity['activity']['kind'] == 'scan'
+    assert activity['queue_state']['state'] == 'pending'
+    # Stop targets the current pass and preserves the next queued request.
     assert client.post(f'/api/bank/{bank_id}/cancel', json={}).get_json()['ok'] is True
+    assert bank_jobs.get(bank_id)['cancelled']
+    assert client.get(f'/api/bank/{bank_id}/activity').json['queue_state']['state'] == 'pending'

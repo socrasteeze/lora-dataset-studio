@@ -314,9 +314,9 @@ test('the review bar appears only when a verdict can actually be written', () =>
   // …and in the tooltip AND the aria-label of each button, not in one channel:
   // a title is invisible to a screen reader and unreachable on a touch screen.
   const keep = buttonAround(html, '✓ Keep')
-  assert.match(keep, /title="Keep this image and move on \(K\)/)
+  assert.match(keep, /title="Keep this image and move on \(K or →\)/)
   assert.match(keep, /aria-label="Keep bust and move to the next image"/)
-  assert.match(buttonAround(html, '✕ Reject'), /title="Reject this image and move on \(R\)/)
+  assert.match(buttonAround(html, '✕ Reject'), /title="Reject this image and move on \(R or ←\)/)
   assert.match(buttonAround(html, '⏭ Skip'), /title="Decide later \(S\)/)
 })
 

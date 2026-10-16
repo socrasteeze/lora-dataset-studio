@@ -40,3 +40,24 @@ test('a runtime response that arrives first survives subsequent metadata and sta
   assert.equal(payload.name, 'Example Bank')
   assert.equal(payload.counts.total, 3)
 })
+
+for (const runtimeFirst of [true, false]) {
+  test(`semantic counts and runtime readiness survive either arrival order (${runtimeFirst})`, () => {
+    const stats = { id: 7, semantic: { engine: 'siglip2', counts: { ok: 3 }, ready: true } }
+    const runtime = { id: 7, semantic: { engine: 'siglip2', device: { gpu: true }, text: { available: true } } }
+    const [first, last] = runtimeFirst ? [runtime, stats] : [stats, runtime]
+    const merged = mergeWorkspacePayload(first, last)
+    assert.equal(merged.semantic.counts.ok, 3)
+    assert.equal(merged.semantic.ready, true)
+    assert.equal(merged.semantic.device.gpu, true)
+    assert.equal(merged.semantic.text.available, true)
+    assert.equal(stats.semantic.device, undefined)
+    assert.equal(runtime.semantic.counts, undefined)
+  })
+}
+
+test('a selected engine never inherits another engine runtime or cache counts', () => {
+  const current = { id: 7, semantic: { engine: 'clip', device: { gpu: false }, counts: { ok: 4 } } }
+  const next = { id: 7, semantic: { engine: 'siglip2', counts: { ok: 0 } } }
+  assert.deepEqual(mergeWorkspacePayload(current, next).semantic, next.semantic)
+})

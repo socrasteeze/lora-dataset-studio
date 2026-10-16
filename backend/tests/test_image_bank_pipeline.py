@@ -238,7 +238,7 @@ def test_the_bank_list_keeps_counts_blocked_and_superseded(client, app, tmp_path
     assert steps['score']['counts'] == {}
 
 
-def test_pipeline_skips_gpu_step_when_gpu_busy(client, tmp_path, monkeypatch):
+def test_running_pipeline_skips_gpu_step_when_gpu_becomes_busy(app, client, tmp_path, monkeypatch):
     from app.services import image_bank_service as svc
     log = []
     monkeypatch.setattr(svc, '_score_prereq', lambda: None)
@@ -246,8 +246,11 @@ def test_pipeline_skips_gpu_step_when_gpu_busy(client, tmp_path, monkeypatch):
     monkeypatch.setattr(svc, '_score_job', _fake_pass(log, 'score'))
 
     bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': _photo()})
-    client.post(f'/api/bank/{bank_id}/pipeline', json={
-        'steps': ['scan', 'score'], 'reject_flags': [], 'resolve_dups': False})
+    # Exercise an already admitted pipeline. HTTP admission waits for a free
+    # GPU; a GPU taken after admission must still mark the skipped step blocked.
+    with app.app_context():
+        svc.start_pipeline(app, 'local', bank_id, steps=['scan', 'score'],
+                           reject_flags=[], resolve_dups=False)
     report = _report(client, bank_id)
     score = next(s for s in report['steps'] if s['step'] == 'score')
     assert score['status'] == 'skipped'

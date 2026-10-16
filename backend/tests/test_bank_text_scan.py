@@ -11,6 +11,8 @@ The OCR engine itself is monkeypatched at the seam the job imports
 (`video_safe_zone.read_text_boxes`) — these tests exercise the pass, not
 onnxruntime; the seam's own child is covered by the video lane's tests.
 """
+
+from bank_queue_assertions import assert_failed_job
 import json
 import os
 
@@ -220,13 +222,13 @@ class TestTextScan:
         states = {k: v['text_state'] for k, v in _rows(app, bank_id).items()}
         assert states == {'a.jpg': 'detected', 'b.jpg': 'detected'}
 
-    def test_engine_missing_is_a_503_before_any_row_is_touched(
+    def test_missing_engine_stays_failed_before_any_row_is_touched(
             self, app, client, tmp_path, monkeypatch):
         bank_id, _src = _mkbank(client, tmp_path, ['page.jpg'])
         _ocr_ready(monkeypatch, ok=False)
         r = client.post(f'/api/bank/{bank_id}/text', json={})
-        assert r.status_code == 503
-        assert 'Setup' in r.get_json()['error']
+        error = assert_failed_job(client, bank_id, r)
+        assert 'Setup' in error
         assert _rows(app, bank_id)['page.jpg']['text_state'] is None
 
     def test_engine_dying_mid_pass_leaves_unscanned_rows_untouched(
@@ -666,8 +668,8 @@ class TestCleanTarget:
         assert client.post(f'/api/bank/{bank_id}/text', json={}).status_code == 202
         r = client.post(f'/api/bank/{bank_id}/watermark/inpaint',
                         json={'target': 'watermark'})
-        assert r.status_code == 400
-        msg = r.get_json()['error']
+        error = assert_failed_job(client, bank_id, r)
+        msg = error
         assert 'watermark family' in msg
         assert 'text-flagged' in msg and 'What to clean' in msg
 
