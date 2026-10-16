@@ -18,10 +18,10 @@ def git(root, *args):
     return subprocess.check_output(['git', '-C', str(root), *args], stderr=subprocess.PIPE).decode().strip()
 
 
-@pytest.fixture
-def installation(tmp_path, monkeypatch):
-    for key in migration.ENV_KEYS | {'LDS_RUNTIME'}:
-        monkeypatch.delenv(key, raising=False)
+@pytest.fixture(scope='module')
+def repository_templates(tmp_path_factory):
+    """Build the old checkout and newer remote once, without any user state."""
+    tmp_path = tmp_path_factory.mktemp('migration-template')
     source = tmp_path / 'upstream'
     source.mkdir()
     git(source, 'init', '-q', '-b', 'main')
@@ -41,6 +41,19 @@ def installation(tmp_path, monkeypatch):
     git(source, 'checkout', '-qb', 'v2')
     (source / 'backend/run.py').write_text('# V2 app\n')
     git(source, 'commit', '-qam', 'V2 public version')
+    return source, root
+
+
+@pytest.fixture
+def installation(tmp_path, monkeypatch, repository_templates):
+    for key in migration.ENV_KEYS | {'LDS_RUNTIME'}:
+        monkeypatch.delenv(key, raising=False)
+    template_source, template_root = repository_templates
+    source = tmp_path / 'upstream'
+    root = tmp_path / 'LDS installation with spaces'
+    shutil.copytree(template_source, source)
+    shutil.copytree(template_root, root)
+    git(root, 'remote', 'set-url', 'origin', str(source))
     data = root / 'data'
     data.mkdir()
     with sqlite3.connect(data / 'studio.db') as db:
@@ -62,6 +75,17 @@ def installation(tmp_path, monkeypatch):
     monkeypatch.setattr(migration, 'official_remote', lambda value: Path(value) == source)
     monkeypatch.setattr(migration, 'ensure_stopped', lambda *args: None)
     return root, source
+
+
+def test_installation_copies_do_not_change_template_refs_or_files(installation, repository_templates):
+    root, source = installation
+    template_source, template_root = repository_templates
+    git(source, 'checkout', '-q', 'main')
+    git(source, 'branch', '-D', 'v2')
+    assert git(template_source, 'rev-parse', '--verify', 'v2')
+    (root / 'backend/run.py').write_text('# local edit\n')
+    assert (template_root / 'backend/run.py').read_text() == '# old app\n'
+    assert git(root, 'remote', 'get-url', 'origin') == str(source)
 
 
 def snapshot(root):
