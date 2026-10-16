@@ -244,6 +244,19 @@ def test_queued_options_are_not_exposed_in_activity_or_queue_snapshots(app, clie
     assert 'image_instances' not in client.get(f'/api/bank/{bank.id}/activity').json['queue_state']
 
 
+@pytest.mark.parametrize('path,options', [
+    ('caption', {'ollama_model': False}), ('caption', {'ollama_model': 0}),
+    ('caption', {'ollama_model': []}), ('caption', {'ollama_model': {}}),
+    ('watermark/inpaint', {'method': 1}), ('watermark/inpaint', {'target': []}),
+])
+def test_invalid_saved_options_never_enter_the_queue(client, rows, path, options):
+    _first, bank, _image = rows
+    response = client.post(f'/api/bank/{bank.id}/{path}', json=options)
+    assert response.status_code == 400, response.json
+    assert bank_queue.state_for(bank.id) is None
+    assert BankQueueEntry.query.count() == 0
+
+
 def test_admission_during_worker_exit_restarts_the_lane(app, rows, monkeypatch):
     _first, bank, _image = rows
     restarted = []
