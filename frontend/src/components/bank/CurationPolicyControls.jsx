@@ -17,7 +17,7 @@ export default function CurationPolicyControls({ policy, onChange, metadata, sel
       <legend className="sr-only">Selection Policy</legend>
       <label className="block space-y-1 text-xs text-content">
         <span>LoRA Kind</span>
-        <select className={inputClass} value={policy.kind}
+        <select aria-label="LoRA Kind" className={inputClass} value={policy.kind}
           onChange={(event) => onChange({ ...policy, kind: event.target.value, resetKind: true })}>
           {(metadata?.kinds || []).map((kind) => <option key={kind.id} value={kind.id}>{kind.label}</option>)}
         </select>
@@ -39,7 +39,7 @@ export default function CurationPolicyControls({ policy, onChange, metadata, sel
       {policy.kind === 'character' && (
         <label className="block space-y-1 text-xs text-content">
           <span>Reference Match</span>
-          <select className={inputClass} value={policy.match} onChange={(event) => update({ match: event.target.value, min_similarity: '' })}>
+          <select aria-label="Reference Match" className={inputClass} value={policy.match} onChange={(event) => update({ match: event.target.value, min_similarity: '' })}>
             <option value="image">Whole Image</option><option value="face">Face Similarity</option>
           </select>
         </label>
@@ -75,7 +75,7 @@ export default function CurationPolicyControls({ policy, onChange, metadata, sel
       {mode === 'balanced' && <>
         <label className="block space-y-1 text-xs text-content">
           <span>Balance Axis</span>
-          <select className={inputClass} value={policy.axis}
+          <select aria-label="Balance Axis" className={inputClass} value={policy.axis}
             onChange={(event) => update({ axis: event.target.value, weights: {} })}>
             {axes.map((axis) => <option key={axis.id} value={axis.id}>{axis.label}</option>)}
           </select>
@@ -85,7 +85,7 @@ export default function CurationPolicyControls({ policy, onChange, metadata, sel
           <p className="mb-2 text-2xs text-content-muted">Relative weights, not optimal training ratios. Zero excludes a bucket unless an image is pinned.</p>
           <div className="grid grid-cols-2 gap-2">
             {targetRows(policy, metadata, result).map((row) => <label key={row.key} className="min-w-0 space-y-1 text-xs text-content">
-              <span className="block break-words capitalize">{row.label}</span>
+              <span className="block break-words">{row.label}</span>
               <input type="number" min={0} max={100} step={0.5} className={inputClass}
                 value={row.weight} onChange={(event) => update({ weights: { ...policy.weights, [row.key]: Number(event.target.value) } })} />
             </label>)}

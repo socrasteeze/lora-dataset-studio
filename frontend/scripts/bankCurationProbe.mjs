@@ -67,7 +67,10 @@ try {
         await page.getByRole('button', { name: { diverse: 'Pick diverse', balanced: '⚖️ Balanced pick',
           similar: 'Similar to selected' }[mode], exact: true }).click()
         const panel = page.locator(`[data-probe-panel="curate-${mode}"]`)
-        await panel.getByText('Selection Policy', { exact: true }).first().click()
+        const policySummary = panel.locator('summary').filter({ hasText: /^Selection Policy$/ })
+        await policySummary.click()
+        assert.equal(await policySummary.evaluate((node) => node.parentElement.open), true,
+          'Selection Policy must be open before its controls are exercised')
         await panel.getByLabel('LoRA Kind', { exact: true }).selectOption(kind)
         await panel.getByRole('button', { name: 'Use References', exact: true }).click()
         await panel.getByRole('button', { name: 'Pin Selected', exact: true }).click()
