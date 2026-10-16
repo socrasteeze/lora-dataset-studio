@@ -51,6 +51,17 @@ def test_representative_seed_does_not_follow_import_id():
     assert result['results'][0]['reason'] == 'representative seed'
 
 
+def test_pinned_seed_keeps_the_full_cosine_distance_range():
+    result = _select([_item(1), _item(2), _item(3)],
+                     [[1, 0], [-0.6, 0.8], [-1, 0]], policy={'locked_ids': [1]})
+    assert result['image_ids'] == [1, 3]
+
+
+def test_invalid_embeddings_never_produce_an_arbitrary_shortlist():
+    with pytest.raises(ValueError, match='invalid embeddings'):
+        _select([_item(1)], [[float('nan'), 0]])
+
+
 def test_unmeasured_quality_is_not_bad_quality():
     result = _select([_item(1, quality_state=None), _item(2, flags=['blur'])],
                      [[1, 0], [1, 0]], n=1)
@@ -233,6 +244,19 @@ def test_foreign_references_are_refused(client, tmp_path, app):
     })
     assert response.status_code == 400
     assert 'this bank' in response.get_json()['error']
+
+
+def test_similar_accepts_reference_list_without_legacy_single_reference_field(client, tmp_path, app):
+    bank_id, _ = _mkbank(client, tmp_path, ['image-01.png'])
+    _write_score_cache(app, bank_id, {'image-01.png': _emb(1, 0)})
+    with app.app_context():
+        from app.models import BankImage
+        iid = BankImage.query.filter_by(bank_id=bank_id).one().id
+    response = client.post(f'/api/bank/{bank_id}/select-similar', json={
+        'selection': {'reference_ids': [iid]},
+    })
+    assert response.status_code == 200, response.get_json()
+    assert response.get_json()['image_ids'] == [iid]
 
 
 def test_metadata_defaults_have_one_owner(client):

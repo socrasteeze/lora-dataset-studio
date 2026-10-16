@@ -1149,6 +1149,21 @@ The algorithm uses cached analysis only. It starts no model, download or job.
 Older API clients that omit the `selection` object retain the legacy selector
 behavior. New clients send the shared policy to all three selection endpoints.
 
+The ranking is deterministic. Pins enter first. Technical quality contributes
+`0.5 ** flag_count` when enabled; this counts blur, noise, flatness, small size,
+soft detail, letterbox bars and active watermarks. Unmeasured values do not add
+flags. Similar takes the maximum cosine similarity over its references, applies
+the raw minimum if set, and ranks by `((1 + similarity) / 2) * quality_factor`.
+This adjusted score is not a probability or an identity verdict.
+
+Diverse starts with the quality- and typicality-weighted image closest to the
+pool's mean vector, unless pins already provide a starting set. Later picks use
+nearest-selected cosine distance, multiplied by quality and
+`10 ** (-3 * guard * isolation)`. A small diminishing bonus rewards coverage of
+known, kind-relevant labels: `1 + 0.1 * sum(1 / (1 + selected_mentions))` over
+each candidate's labels. Balanced applies this ranking within target allocations.
+These weights are selection heuristics, not measured predictions of training gain.
+
 ## Pick a balanced set
 
 Advice is only half the gesture, so **📊 Coverage advice** ends with **⚖️ Pick a

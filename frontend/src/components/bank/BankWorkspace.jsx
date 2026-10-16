@@ -2692,7 +2692,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           )}
         </div>
 
-        <CurationSelectionReport result={selectionResult} onDismiss={() => setSelectionResult(null)}
+        <CurationSelectionReport result={selectionResult} selected={selected} onDismiss={() => setSelectionResult(null)}
           onReviewUnknown={showCuratedSelection} />
         {/* ⚖️ What the balanced pick actually GAVE you. A repartition the user
             cannot see is indistinguishable from an unbalanced one, so this is

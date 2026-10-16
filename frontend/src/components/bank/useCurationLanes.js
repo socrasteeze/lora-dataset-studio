@@ -79,7 +79,7 @@ export function useCurationLanes({
 
   useEffect(() => {
     setCurationPolicy((previous) => ({ ...previous, min_similarity: '' }))
-  }, [semanticState.engine])
+  }, [semanticState.engine, semanticState.modelKey])
   useEffect(() => { setSimilarLast(null); setSelectionResult(null) }, [contextKey])
 
   const updateCurationPolicy = (next) => {
