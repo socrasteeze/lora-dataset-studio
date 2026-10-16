@@ -17,7 +17,7 @@ Main is unchanged. No local tests, application imports or service restarts ran.
 ## Open
 1. Inspect the next Test Runtime Comparison workflow on diagnostic/test-suite-runtime. The previous comparison (38962818062) took 106.7s baseline versus 63.22s optimized, with 188 failures each but three changed failure identities. A missing Bank queue memory reset was found and fixed; validate it before accepting the comparison.
 2. The full run 38959711992 has 12 unchanged frontend failures and a tablet Bank-name truncation. Six bundled Python suites passed. This is not full qualification; do not claim a safe full-suite speedup yet.
-3. Return to validation/test-suite-runtime after diagnosis. Diagnostic workflow, manifest and helper are temporary verification transport and must not land on main. The task branch has the strengthened large-bucket fixture and memory-only queue reset at 099fc782b, not yet pushed.
+3. Return to validation/test-suite-runtime after diagnosis. Diagnostic workflow, manifest and helper are temporary verification transport and must not land on main. The task branch adds the strengthened large-bucket fixture, queue-memory reset and immutable migration history templates through 9e54d3db0. The expanded diagnostic includes migration, queue persistence and bulk queue tests.
 4. Prior UI, profile moves, queue recovery and physical phone/PWA acceptance remain unqualified beyond the specific cloud checks.
 5. The operator still needs a full Studio stop/start after current work finishes to load earlier backend/profile changes. Do not interrupt jobs.
 

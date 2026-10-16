@@ -18,6 +18,7 @@ MODULES = (
     'backend/tests/test_updater_history_rewrite.py',
     'backend/tests/test_dev_requirements_contract.py',
     'scripts/tests/test_gates_driver.py',
+    'scripts/tests/test_migrate_to_v2.py',
     'backend/tests/test_suite_runtime_imports.py',
     'backend/tests/test_suite_queue_isolation.py',
     'backend/tests/test_bank_queue.py',
@@ -26,6 +27,7 @@ MODULES = (
     'backend/tests/test_bank_queue_device.py',
     'backend/tests/test_bank_queue_workspace.py',
     'backend/tests/test_bank_queue_direct_work.py',
+    'backend/tests/test_bank_queue_all.py',
 )
 
 
