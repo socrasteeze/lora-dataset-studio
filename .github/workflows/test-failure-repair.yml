@@ -1,0 +1,61 @@
+name: Focused Failure Repair
+
+on:
+  push:
+    branches: [diagnostic/test-failure-repair]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: focused-failure-repair-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      PYTHONUTF8: '1'
+      OMP_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install Focused Environment
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          .venv/Scripts/python.exe -m pip install --disable-pip-version-check -r backend/requirements-dev.txt
+          npm ci --prefix frontend
+      - name: Check Affected Backend Modules
+        run: .venv/Scripts/python.exe -X utf8 scripts/cloud_repair_checks.py
+      - name: Check Frontend Contracts
+        if: ${{ !cancelled() }}
+        working-directory: frontend
+        run: npm test
+      - name: Install Browser
+        if: ${{ !cancelled() }}
+        run: node frontend/node_modules/playwright-core/cli.js install chromium
+      - name: Check Bank and Settings in Browser
+        if: ${{ !cancelled() }}
+        run: node frontend/scripts/bankOtherTagsProbe.mjs
+      - name: Save Repair Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-repair-${{ github.sha }}
+          path: .git/lds-gates-validation/*
+          include-hidden-files: true
