@@ -68,7 +68,8 @@ def prepare(operation, user_id, bank_id, options):
             value = banks._caption_name_option(key, options.get(key))
             if value and value not in allowed:
                 raise ValueError(f'invalid caption {key}: {value}')
-        normalize_ollama_model_ref(options.get('ollama_model') or '', allow_empty=True)
+        if options.get('ollama_model') is not None:
+            normalize_ollama_model_ref(options['ollama_model'], allow_empty=True)
     if operation == 'watermark_inpaint':
         banks.normalize_inpaint_options(options.get('method'), options.get('target'))
     if operation == 'semantic_dedup':

@@ -11153,9 +11153,13 @@ def _improve_job(bank_id, engine, statuses=None, ids=None):
 
 
 def normalize_inpaint_options(method='auto', target='all'):
+    if method is not None and not isinstance(method, str):
+        raise ValueError("method must be 'auto', 'lama' or 'klein'")
     method = (method or 'auto').lower()
     if method not in ('auto', 'lama', 'klein'):
         raise ValueError("method must be 'auto', 'lama' or 'klein'")
+    if target is not None and not isinstance(target, str):
+        raise ValueError("target must be 'all', 'text' or 'watermark'")
     target = (target or 'all').lower()
     if target not in ('all', 'text', 'watermark'):
         raise ValueError("target must be 'all', 'text' or 'watermark'")
