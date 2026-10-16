@@ -1,0 +1,51 @@
+name: Test Runtime Comparison
+
+on:
+  push:
+    branches: [diagnostic/test-suite-runtime]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-runtime-comparison-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compare:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: '1'
+      OMP_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Declared Test Environment
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          .venv/Scripts/python.exe -m pip install --disable-pip-version-check -r backend/requirements-dev.txt
+          .venv/Scripts/python.exe -m pip install --disable-pip-version-check --no-cache-dir -r backend/requirements-torch-tests.txt
+      - name: Compare Isolated Baseline and Optimized Tests
+        shell: pwsh
+        run: .venv/Scripts/python.exe -X utf8 scripts/compare_suite_runtime.py
+      - name: Save Comparison Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-comparison-${{ github.sha }}
+          path: .git/lds-gates-validation/runtime-comparison/*
+          include-hidden-files: true

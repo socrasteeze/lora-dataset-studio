@@ -1,9 +1,9 @@
 # HANDOFF
 
-**Updated:** 2026-10-16 | **Branch:** validation/test-suite-runtime | **Base:** 447864093 | **Tree:** dirty
+**Updated:** 2026-10-16 | **Branch:** diagnostic/test-suite-runtime | **Base:** 447864093 | **Tree:** dirty
 
 ## State
-Full-suite runtime optimizations are implemented; cloud qualification is pending.
+Optimization full run e5a310440 completed: 198 failed, 9721 passed, 14 skipped in 912.23s. All 160 cases in modified backend/tooling modules passed. The separate diagnostic branch compares the unchanged base with optimized source using the failure cohort and changed modules, four workers per sequential stage.
 Main is unchanged. No local tests, application imports or service restarts ran.
 
 ## Done this session
@@ -15,9 +15,9 @@ Main is unchanged. No local tests, application imports or service restarts ran.
 - Ruff, ESLint, syntax review and privacy scan passed; ESLint has 32 existing warnings.
 
 ## Open
-1. Inspect the exact-commit Fork Gates run after the workflow follow-up; repair suite failures and rerun only as needed.
-2. Record the complete backend/frontend/plugin results, skip reasons, browser receipt and measured timings before claiming qualification.
-3. Keep main unchanged until qualification passes and landing is authorized.
+1. Inspect the Test Runtime Comparison workflow on diagnostic/test-suite-runtime; classify any new failures against baseline before changing tests.
+2. The full run 38959711992 has 12 unchanged frontend failures and a tablet Bank-name truncation. Six bundled Python suites passed. This is not full qualification; do not claim a safe full-suite speedup yet.
+3. Return to validation/test-suite-runtime after diagnosis. Diagnostic workflow, manifest and helper are temporary verification transport and must not land on main. The task branch has the strengthened large-bucket fixture at 89855f022, not yet pushed.
 4. Prior UI, profile moves, queue recovery and physical phone/PWA acceptance remain unqualified beyond the specific cloud checks.
 5. The operator still needs a full Studio stop/start after current work finishes to load earlier backend/profile changes. Do not interrupt jobs.
 
