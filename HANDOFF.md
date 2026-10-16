@@ -4,7 +4,7 @@
 
 ## State
 Full-suite optimizations and the remaining failure repairs are implemented. Main and production state are unchanged. Tests remain cloud-only.
-Focused cloud run 38969411582 cleared all 57 original backend failures, all 12 frontend failures, and the browser check. Full run 38970245011 at 8dff8c7a7 finished with five new malformed-input failures (9929 passed, 14 skipped, 756.25s); all original and adjacent failures passed. Frontend: 5222 core and 1073 bundled passes, 4 bundled skips. All six bundled Python suites passed. The browser timed out waiting for delayed storage metadata after a hash-only route reused Settings.
+Focused retry 38972514249 passed all 81 backend cases (22.31s), all five browser sizes and 55 Settings checks with the full CPU test overlay installed. The Bank responsive probe measured 14 applicable states with zero findings and six breakpoint-specific skips. Its application source and bundle match 8c7d14ebb; only diagnostic helpers differ. Final full qualification remains required.
 
 ## Done this session
 - Bounded numerical-library pools to one thread per worker; retained eight full-gate workers, four ordinary CI/release workers and file-local scheduling.
@@ -20,8 +20,8 @@ Focused cloud run 38969411582 cleared all 57 original backend failures, all 12 f
 - Reconciled schema, queue, shared keyboard, help-anchor and extracted-component contracts without dropping cases or probe limits. Rebuilt dist separately.
 
 ## Open
-1. Validate the latest route forwarding and browser-fixture corrections with the prepared focused diagnostic workflow, then run the full gate. Do not overlap cloud jobs. Hold main until required qualification and delivery authorization.
-2. Focused run 38969411582 tested 601 backend cases in 83.68s: 591 passed, 8 failed and 2 optional private-name checks skipped. Seven failures were adjacent synchronous expectations; their follow-ups are implemented. The remaining failure was the diagnostic checkout's missing origin/main; Fork Gates already fetches full history. Core frontend: 5222 passed. Browser: all five sizes and 55 Settings checks passed. Full-gate dependency overlays remain required.
+1. Run final exact-head Fork Gates. Do not overlap cloud jobs. Hold main until required qualification and delivery authorization.
+2. Previous full run 38970245011 at 8dff8c7a7 had 9929 passes, five new malformed-input failures and 14 skips in 756.25s. All original and adjacent failures passed. Core frontend: 5222 passes; bundled frontend: 1073 passes and four skips; all six bundled Python suites passed. The five route-forwarding failures and the cached-document browser wait are repaired and covered by the successful focused retry. The new redundant source-regex test was removed in favour of that rendered regression.
 3. The expanded comparison (38964253881) passed: baseline 161.86s/466 cases/159 failures versus optimized 108.08s/480 cases/57 failures, with no new failures, skips or missing cases. Migration coverage passed in both stages: 57.12s/27 cases versus 41.68s/28 cases. These are focused comparison timings, not full-suite speed claims.
 4. Earlier physical phone/PWA and production restart acceptance remain operator checks; no production services or real jobs were started or interrupted here.
 
