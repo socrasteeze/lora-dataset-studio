@@ -15,7 +15,7 @@ Main is unchanged. No local tests, application imports or service restarts ran.
 - Ruff, ESLint, syntax review and privacy scan passed; ESLint has 32 existing warnings.
 
 ## Open
-1. Push the scrubbed validation branch and inspect its exact-commit Fork Gates run; repair failures and rerun only as needed.
+1. Inspect the exact-commit Fork Gates run after the workflow follow-up; repair suite failures and rerun only as needed.
 2. Record the complete backend/frontend/plugin results, skip reasons, browser receipt and measured timings before claiming qualification.
 3. Keep main unchanged until qualification passes and landing is authorized.
 4. Prior UI, profile moves, queue recovery and physical phone/PWA acceptance remain unqualified beyond the specific cloud checks.
@@ -34,6 +34,7 @@ Main is unchanged. No local tests, application imports or service restarts ran.
 - create_app changes schema/runtime state; isolate all LDS runtime paths and inherited profile identity before imports.
 - Optional private-name checks can skip without an external list; cloud gates do not prove physical-device or real GPU behavior.
 - Earlier no-test deliveries and historical receipts do not qualify this head. Prior detail remains in Git at the recorded base.
+- Cloud run 38958289726 stopped at an existing tablet Bank-name truncation before pytest; application source and bundle are unchanged on this branch. The workflow now preserves that failure while collecting full-gate evidence.
 - Keep configuration, profile registries, data and credentials out of Git. Do not restart production services.
 
 ## Verify
