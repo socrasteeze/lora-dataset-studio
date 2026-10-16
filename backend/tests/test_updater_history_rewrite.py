@@ -150,14 +150,14 @@ def test_a_failing_setup_command_names_itself(tmp_path):
 
 def test_pull_ff_only_really_does_break_after_a_rewrite(rewritten_checkout):
     """The premise, verified rather than assumed — otherwise the fix guards nothing."""
-    upstream, clone = rewritten_checkout
+    _, clone = rewritten_checkout
     _run(clone, 'fetch', 'origin', 'main')
     pull = _run(clone, 'pull', '--ff-only', 'origin', 'main')
     assert pull.returncode != 0
 
 
 def test_apply_update_recovers_from_a_rewritten_upstream(rewritten_checkout):
-    upstream, clone = rewritten_checkout
+    _, clone = rewritten_checkout
     before = _run(clone, 'rev-parse', 'HEAD').stdout.strip()
 
     out = updater.apply_update(root=clone)
@@ -175,7 +175,7 @@ def test_apply_update_recovers_from_a_rewritten_upstream(rewritten_checkout):
 
 def test_recovery_refuses_to_discard_uncommitted_work(rewritten_checkout):
     """A failing update is better than a destroyed edit."""
-    upstream, clone = rewritten_checkout
+    _, clone = rewritten_checkout
     (clone / 'a.txt').write_text('locally edited', encoding='utf-8')
 
     out = updater.apply_update(root=clone)
@@ -186,7 +186,7 @@ def test_recovery_refuses_to_discard_uncommitted_work(rewritten_checkout):
 def test_recovery_refuses_when_the_user_has_real_local_commits(rewritten_checkout):
     """Local work makes HEAD's tree absent from the remote — the very case the tree
     check exists to catch, since commit COUNTS cannot tell it from a rewrite."""
-    upstream, clone = rewritten_checkout
+    _, clone = rewritten_checkout
     _commit(clone, 'mine.txt', 'my work', 'my local commit')
 
     out = updater.apply_update(root=clone)
@@ -197,7 +197,7 @@ def test_recovery_refuses_when_the_user_has_real_local_commits(rewritten_checkou
 def test_untracked_files_do_not_block_the_recovery(rewritten_checkout):
     """reset --hard never removes untracked files, so they must not veto the update
     (a user's stray notes.txt would otherwise strand them forever)."""
-    upstream, clone = rewritten_checkout
+    _, clone = rewritten_checkout
     (clone / 'notes.txt').write_text('scratch', encoding='utf-8')
 
     out = updater.apply_update(root=clone)
@@ -218,7 +218,7 @@ def test_a_normal_fast_forward_update_still_works(checkout):
 def test_status_does_not_claim_a_rewrite_is_hundreds_of_commits_behind(rewritten_checkout):
     """Someone perfectly up to date must not be told the whole history is pending
     just because the remote was rewritten — the count is re-measured by content."""
-    upstream, clone = rewritten_checkout
+    _, clone = rewritten_checkout
 
     s = updater.git_update_status(root=clone)
     assert s['behind'] == 0 and s['update_available'] is False
