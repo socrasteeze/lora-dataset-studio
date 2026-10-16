@@ -1,9 +1,9 @@
 # HANDOFF
 
-**Updated:** 2026-10-16 | **Branch:** noble/lora-curation | **Base:** 447864093 | **Tree:** dirty
+**Updated:** 2026-10-16 | **Branch:** noble/lora-curation | **Base:** 447864093 | **Tree:** clean
 
 ## State
-Kind-aware Similar, Diverse and Balanced selection is implemented. Cloud qualification is pending. Main and production state are unchanged.
+Kind-aware Similar, Diverse and Balanced selection is implemented. Cloud qualification is pending. Main is unchanged by this task.
 The task starts from a89f935c1 and retains the existing test-runtime work on that branch.
 
 ## Done this session
@@ -11,9 +11,11 @@ The task starts from a89f935c1 and retains the existing test-runtime work on tha
 - Added current-cache face matching for Character, representative seeding, explicit unknowns and per-image selection receipts.
 - Added synthetic backend regressions and a cloud browser probe for all three selectors, all three kinds and five viewport sizes.
 - Updated the Guide, settings reference, help registry and What's New. The frontend bundle ships in a separate commit.
+- Cloud b6a6efca7 passed all 45 kind/selector/viewport interactions. The standard probe reached all 15 states; its only findings were the inherited tablet Bank title. Reused that header hunk from 1352589c2.
+- Earlier exact-head focused checks passed 125 backend and 23 frontend cases. Three skips: optional SciPy BLAS and two unconfigured private-name checks. No local tests or application imports ran.
 
 ## Open
-1. Inspect exact-head Fork Gates, targeted curation tests and the curation browser receipt. Repair feature regressions before claiming qualification.
+1. Inspect the newest validation/noble-lora-curation Fork Gates after the header repair. Require a complete curation receipt, including empty-selection behavior, 45 interaction states and 15 standard responsive states with no skips.
 2. Keep main unchanged until required gates pass and landing is authorized. The inherited baseline has 57 backend failures, 12 frontend failures and a Bank browser failure; see the handoff at a89f935c1.
 3. Physical phone/PWA and real GPU/training comparisons remain separate operator checks. No training quality improvement is measured yet.
 
@@ -26,6 +28,7 @@ The task starts from a89f935c1 and retains the existing test-runtime work on tha
 ## Traps
 - Tests and fixture-backed browser probes run only in cloud unless the operator explicitly authorizes a local run.
 - The current branch includes prior suite-runtime commits. Do not land them blindly or treat their baseline failures as feature validation.
+- The original validation/test-suite-runtime checkout has newer independent repairs and a handoff edit. Preserve them. Only its Bank header hunk was reused here.
 - Caption coverage is lexical and can miss details or misread negation. Subject/style relevance still requires filters and references.
 - Local lint, build and privacy checks are allowed. No production application imports, restarts, data changes or real jobs are authorized by validation.
 

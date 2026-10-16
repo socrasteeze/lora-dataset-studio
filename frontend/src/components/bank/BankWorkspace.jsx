@@ -1985,7 +1985,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           <Button type="button" size="md" onClick={onBack}>
             ← Banks
           </Button>
-          <h1 className="flex min-w-0 items-center gap-2 text-xl font-semibold text-content sm:max-w-[25%]"><Archive aria-hidden="true" className="h-4 w-4 shrink-0" /><span className="truncate">{payload?.name || `Bank #${bankId}`}</span></h1>
+          <h1 className="flex min-w-0 items-center gap-2 text-xl font-semibold text-content sm:max-w-[25%] sm:shrink-0"><Archive aria-hidden="true" className="h-4 w-4 shrink-0" /><span className="truncate" title={payload?.name || `Bank #${bankId}`}>{payload?.name || `Bank #${bankId}`}</span></h1>
           {(
             /* hidden below sm: opening or moving the folder is a gesture on the
                machine that serves the app, and on a 360-px screen this row alone
