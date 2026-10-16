@@ -1,4 +1,4 @@
-name: Focused Failure Repair
+name: Focused Browser Repair
 
 on:
   push:
@@ -14,7 +14,7 @@ concurrency:
 jobs:
   repair:
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     env:
       PYTHONUTF8: '1'
       OMP_NUM_THREADS: '1'
@@ -23,6 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@v5
         with:
@@ -34,24 +35,25 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Install Focused Environment
+      - name: Install Full Browser Environment
         shell: pwsh
         run: |
           python -m venv .venv
           .venv/Scripts/python.exe -m pip install --disable-pip-version-check -r backend/requirements-dev.txt
+          .venv/Scripts/python.exe -m pip install --disable-pip-version-check --no-cache-dir -r backend/requirements-torch-tests.txt
           npm ci --prefix frontend
-      - name: Check Affected Backend Modules
-        run: .venv/Scripts/python.exe -X utf8 scripts/cloud_repair_checks.py
-      - name: Check Frontend Contracts
-        if: ${{ !cancelled() }}
-        working-directory: frontend
-        run: npm test
       - name: Install Browser
         if: ${{ !cancelled() }}
         run: node frontend/node_modules/playwright-core/cli.js install chromium
+      - name: Check Saved Option Regressions
+        run: .venv/Scripts/python.exe -X utf8 scripts/cloud_repair_checks.py
       - name: Check Bank and Settings in Browser
         if: ${{ !cancelled() }}
-        run: node frontend/scripts/bankOtherTagsProbe.mjs
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .git/lds-gates-validation | Out-Null
+          node frontend/scripts/bankOtherTagsProbe.mjs 2>&1 | Tee-Object -FilePath .git/lds-gates-validation/browser.log
+          exit $LASTEXITCODE
       - name: Save Repair Reports
         if: always()
         uses: actions/upload-artifact@v4
