@@ -19,7 +19,8 @@ def main():
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     import pytest
     from public_plugin_fixture import create_test_app
-    from test_image_bank_curation import _emb, _mkbank, _write_score_cache
+    from test_image_bank_curation import _emb, _write_score_cache
+    from PIL import Image
     from werkzeug.serving import make_server
 
     patch = pytest.MonkeyPatch()
@@ -27,14 +28,24 @@ def main():
         'SQLALCHEMY_DATABASE_URI': f'sqlite:///{(runtime / "state.db").as_posix()}',
     })
     from app import setup_state
+    from app.config import LOCAL_USER
     from app.extensions import db
-    from app.models import BankImage
+    from app.models import BankImage, ImageBank
 
     names = [f'image-{i:02d}.png' for i in range(1, 49)]
-    client = app.test_client()
+    source = runtime / 'sources'
+    source.mkdir(exist_ok=True)
     with app.app_context():
         setup_state.complete_core()
-    bank_id, source = _mkbank(client, runtime, names)
+        bank = ImageBank(user_id=LOCAL_USER, name='Demo', source_path=str(source))
+        db.session.add(bank)
+        db.session.flush()
+        bank_id = bank.id
+        for index, name in enumerate(names):
+            Image.new('RGB', (512, 512), (40 + index, 60, 80)).save(source / name)
+            db.session.add(BankImage(bank_id=bank_id, relpath=name, width=512, height=512,
+                                    status='pending'))
+        db.session.commit()
     embeddings = {name: _emb(1, (i % 8) / 10, (i // 8) / 10) for i, name in enumerate(names)}
     _write_score_cache(app, bank_id, embeddings)
     with app.app_context():
