@@ -19,6 +19,13 @@ MODULES = (
     'backend/tests/test_dev_requirements_contract.py',
     'scripts/tests/test_gates_driver.py',
     'backend/tests/test_suite_runtime_imports.py',
+    'backend/tests/test_suite_queue_isolation.py',
+    'backend/tests/test_bank_queue.py',
+    'backend/tests/test_bank_queue_durable.py',
+    'backend/tests/test_bank_queue_lanes.py',
+    'backend/tests/test_bank_queue_device.py',
+    'backend/tests/test_bank_queue_workspace.py',
+    'backend/tests/test_bank_queue_direct_work.py',
 )
 
 
@@ -51,7 +58,8 @@ def main():
         env.update(OMP_NUM_THREADS='1', MKL_NUM_THREADS='1', OPENBLAS_NUM_THREADS='1',
                    CUDA_VISIBLE_DEVICES='', HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1')
         report = reports / f'{label}.xml'
-        arguments = selected + [name for name in MODULES if (source / name).is_file()]
+        modules = [name for name in MODULES if (source / name).is_file()]
+        arguments = [name for name in selected if name.split('::', 1)[0] not in modules] + modules
         arguments += ['-q', '-rf', '-n', '4', '--dist', 'loadfile', '--durations=20',
                       '--basetemp', str(state / 'tmp'), '--junitxml', str(report)]
         state.mkdir(parents=True, exist_ok=True)
@@ -70,6 +78,8 @@ def main():
                            ('failed' if c.find('failure') is not None or c.find('error') is not None
                             else 'skipped' if c.find('skipped') is not None else 'passed')
                            for c in cases}
+        if len(outcomes[label]) != len(cases):
+            raise RuntimeError('The diagnostic collected a duplicate test identifier.')
         results[label] = {
             'seconds': round(time.monotonic() - started, 2),
             'cases': len(cases), 'failed': sum(v == 'failed' for v in outcomes[label].values()),
