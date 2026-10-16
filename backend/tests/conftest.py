@@ -221,6 +221,11 @@ def _reset_inmemory_registries():
     test's fresh 'dataset 1' — enough to make the kind-switch guard 409 spuriously.
     Clear it around every test so in-memory activity never leaks across cases.
 
+    The durable Bank queue also has a process-global working copy. An empty
+    fresh database does not clear that copy during restore, so forget only its
+    memory between tests. Restart/durability checks keep their rows and perform
+    all of their boots inside one test.
+
     The bank folder-sync cooldowns are process-global for the same reason: bank
     id 1 of a prior test would make the next test's first walk a no-op.
 
@@ -245,10 +250,11 @@ def _reset_inmemory_registries():
     "the encoder is invoked exactly once" would then see zero calls and fail, and
     one proving "no ML python ⇒ 503" would silently get a cache hit and a 200.
     Both did, before this line existed."""
-    from app.services import bank_jobs, bank_undo, clip_text_encoder
+    from app.services import bank_jobs, bank_queue, bank_undo, clip_text_encoder
     from app.services import dataset_activity
     from app.services import image_bank_service, ollama_gpu_fence, vision_keepalive
     dataset_activity.reset()
+    bank_queue.reset(durable=False)
     bank_jobs.reset()
     bank_undo.reset()
     image_bank_service.reset_folder_sync()
@@ -258,6 +264,7 @@ def _reset_inmemory_registries():
     clip_text_encoder.forget_memory_cache()
     yield
     dataset_activity.reset()
+    bank_queue.reset(durable=False)
     bank_jobs.reset()
     bank_undo.reset()
     image_bank_service.reset_folder_sync()

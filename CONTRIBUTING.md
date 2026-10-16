@@ -107,8 +107,10 @@ complete Windows qualification; ordinary CI retains its Linux frontend check.
 A scrubbed `validation/**` branch also runs Fork Gates on push, so validation
 transport does not need a main-branch landing or a second full workflow.
 
-Every test retains fresh app, database, config and plugin state. Ordinary tests
-stub the raw capability import transport instead of repeatedly importing Torch
+Every test retains fresh app, database, config and plugin state. The shared
+fixture clears the in-memory Bank queue and workers without deleting durable
+rows. Ordinary tests stub the raw capability import transport instead of
+repeatedly importing Torch
 in child processes. Tests of that transport use `@pytest.mark.runtime_imports`
 and supply subprocess doubles; the broken-interpreter regression intentionally
 uses its invalid executable. Real Torch bridge tests still execute normally.
