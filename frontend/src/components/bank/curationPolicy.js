@@ -34,6 +34,7 @@ export function targetRows(policy, metadata, result) {
   keys.add('unknown')
   const defaults = policy.kind === 'character' && policy.axis === 'framing'
     ? metadata?.framing_weights || {} : {}
-  return [...keys].map((key) => ({ key, label: key.replaceAll('_', ' ').replace('#', ' · person '),
+  return [...keys].map((key) => ({ key, label: key.replaceAll('_', ' ').replace('#', ' · person ')
+    .replace(/\b[a-z]/g, (letter) => letter.toUpperCase()),
     weight: policy.weights[key] ?? defaults[key] ?? 1 }))
 }

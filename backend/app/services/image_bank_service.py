@@ -6687,7 +6687,7 @@ def undo_last(user_id, bank_id, *, _bank_lease=None) -> dict:
 # re-scan (same contract as the semantic-dedup stage). They only ever build a
 # SELECTION (a set of image ids the UI checks); the user reviews it before any
 # Keep / Reject / Promote — nothing is mutated or deleted here.
-_CURATION_MAX_N = 2000       # a curated LoRA set is 20–200 images; this is generous
+_CURATION_MAX_N = bank_curation.MAX_SELECTION
 
 
 def _pool_query(bank_id, th, *, status=None, flag=None, cluster=None,
@@ -6752,7 +6752,7 @@ def _pool_embeddings(bank, emb_by_path, filters):
     return ids, E
 
 
-_TYPICALITY_DEFAULT = 0.5    # see select_diverse — 0 restores pure farthest-point
+_TYPICALITY_DEFAULT = bank_curation.TYPICALITY_DEFAULT
 _TYPICALITY_K = 10           # neighbours whose mean similarity IS the local density
 _TYPICALITY_BLOCK = 512      # rows per similarity block — NEVER a full (m×m) matrix
 _TYPICALITY_Z = 3.0          # robust deviations below the median density = full penalty

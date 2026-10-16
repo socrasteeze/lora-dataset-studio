@@ -14,6 +14,10 @@ from . import caption_coverage
 
 
 KINDS = ('character', 'concept', 'style')
+MAX_SELECTION = 2000
+MAX_REFERENCES = 16
+MAX_DUPLICATE_LIMIT = 20
+TYPICALITY_DEFAULT = 0.5
 DEFAULT_AXIS = {'character': 'framing', 'concept': 'view', 'style': 'subject'}
 FRAMING_WEIGHTS = {'face': 4.0, 'bust': 3.0, 'body': 2.0, 'back': 1.0}
 TYPICALITY_DECADES = 3.0
@@ -59,7 +63,8 @@ def describe():
     return {'kinds': [{'id': kind, 'label': kind.title(), 'axis': DEFAULT_AXIS[kind]}
                       for kind in KINDS], 'axes': axes,
             'framing_weights': dict(FRAMING_WEIGHTS),
-            'limits': {'references': 16, 'pins': 2000, 'duplicate_limit': 20}}
+            'limits': {'references': MAX_REFERENCES, 'pins': MAX_SELECTION,
+                       'duplicate_limit': MAX_DUPLICATE_LIMIT}}
 
 
 def _number(value, name, low, high):
@@ -101,8 +106,8 @@ def options(value):
     if not isinstance(quality, bool):
         raise ValueError('prefer_quality must be true or false')
     limit = value.get('duplicate_limit', 1)
-    if isinstance(limit, bool) or not isinstance(limit, int) or not 0 <= limit <= 20:
-        raise ValueError('duplicate_limit must be an integer between 0 and 20')
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 0 <= limit <= MAX_DUPLICATE_LIMIT:
+        raise ValueError(f'duplicate_limit must be an integer between 0 and {MAX_DUPLICATE_LIMIT}')
     minimum = value.get('min_similarity')
     if minimum not in (None, ''):
         minimum = _number(minimum, 'min_similarity', -1, 1)
@@ -119,8 +124,8 @@ def options(value):
     return {'kind': kind, 'axis': axis, 'match': match, 'prefer_quality': quality,
             'duplicate_limit': limit, 'min_similarity': minimum,
             'weights': clean_weights,
-            'reference_ids': _ids(value.get('reference_ids'), 'reference_ids', 16),
-            'locked_ids': _ids(value.get('locked_ids'), 'locked_ids', 2000)}
+            'reference_ids': _ids(value.get('reference_ids'), 'reference_ids', MAX_REFERENCES),
+            'locked_ids': _ids(value.get('locked_ids'), 'locked_ids', MAX_SELECTION)}
 
 
 def facets(item):
@@ -164,7 +169,7 @@ def weighted_quotas(sizes, n, weights):
 
 
 def select(items, E, n, policy, *, mode, isolation, reference_vectors=None,
-           match_vectors=None, distinct_pairs=(), typicality=0.5):
+           match_vectors=None, distinct_pairs=(), typicality=TYPICALITY_DEFAULT):
     """Return a review selection and a bounded receipt; inputs are never mutated.
 
     The caller supplies provenance-checked vectors and current technical flags.
@@ -175,7 +180,7 @@ def select(items, E, n, policy, *, mode, isolation, reference_vectors=None,
     p = options(policy)
     if mode not in ('similar', 'diverse', 'balanced'):
         raise ValueError('unknown selection mode')
-    n = max(1, min(int(n), 2000))
+    n = max(1, min(int(n), MAX_SELECTION))
     items = list(items)
     if (E.ndim != 2 or E.shape[0] != len(items) or not np.isfinite(E).all()
             or (len(items) and np.any(np.linalg.norm(E, axis=1) <= 1e-8))):
@@ -372,7 +377,7 @@ def select(items, E, n, policy, *, mode, isolation, reference_vectors=None,
             'axis': axis, 'kind': p['kind'], 'typicality': typicality,
             'buckets': reports if mode == 'balanced' else [], 'coverage': coverage,
             'unlabelled': sizes.get('unknown', 0), 'unknown': 0,
-            'unknown_match_ids': unknown_match[:2000],
+            'unknown_match_ids': unknown_match[:MAX_SELECTION],
             'unknown_match_count': len(unknown_match),
             'missing_locked': len(requested_locks) - len(locked),
             'duplicate_omitted': duplicate_omitted, 'below_minimum': reference_below,
