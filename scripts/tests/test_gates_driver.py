@@ -130,12 +130,17 @@ $env:LDS_CONFIG = 'caller-config'
 $env:LDS_PLUGINS_DIR = 'caller-plugins'
 $env:LDS_PLUGIN_DISTRIBUTION = 'caller-profile'
 $env:LDS_ENV = $null
+$env:OMP_NUM_THREADS = '6'
+$env:MKL_NUM_THREADS = $null
+$env:OPENBLAS_NUM_THREADS = '3'
 try {
   Invoke-IsolatedValidation {
     if ($env:LDS_PLUGINS_DIR -or $env:LDS_PLUGIN_DISTRIBUTION) { throw 'Inherited plugin state leaked' }
     if ($env:LDS_CONFIG -ne (Scratch 'config.json')) { throw 'Config is not isolated' }
     if ($env:LDS_ENV -ne (Scratch '.env')) { throw 'Secrets are not isolated' }
     if ($env:LDS_GATES_SCRATCH -ne $script:Scratch) { throw 'Smoke boundary missing' }
+    if ($env:OMP_NUM_THREADS -ne '1' -or $env:MKL_NUM_THREADS -ne '1' -or
+        $env:OPENBLAS_NUM_THREADS -ne '1') { throw 'Nested thread pools were not bounded' }
     & $TestPythonExecutable -c "import os; assert 'LDS_PLUGIN_DISTRIBUTION' not in os.environ; assert 'LDS_PLUGIN_BUILD_MODE' not in os.environ; assert 'LDS_PLUGINS_DIR' not in os.environ"
     if ($LASTEXITCODE -ne 0) { throw 'Empty environment keys leaked into child processes' }
     throw 'fixture failure'
@@ -143,6 +148,8 @@ try {
 } catch { if ($_.Exception.Message -ne 'fixture failure') { throw } }
 if ($env:LDS_CONFIG -ne 'caller-config' -or $env:LDS_PLUGINS_DIR -ne 'caller-plugins' -or
     $env:LDS_PLUGIN_DISTRIBUTION -ne 'caller-profile' -or $env:LDS_ENV) { throw 'Caller environment was changed' }
+if ($env:OMP_NUM_THREADS -ne '6' -or $env:MKL_NUM_THREADS -or
+    $env:OPENBLAS_NUM_THREADS -ne '3') { throw 'Caller thread limits were changed' }
 """)
     assert result.returncode == 0, result.stdout + result.stderr
 
@@ -150,6 +157,7 @@ if ($env:LDS_CONFIG -ne 'caller-config' -or $env:LDS_PLUGINS_DIR -ne 'caller-plu
 def test_receipt_uses_repository_root_not_native_current_directory(tmp_path):
     elsewhere = tmp_path / 'elsewhere'
     elsewhere.mkdir()
+    (tmp_path / 'backend.xml').write_text('<testsuites/>', encoding='utf-8')
     result = run_script(tmp_path, f"""
 [Environment]::CurrentDirectory = {quote(elsewhere)}
 $script:RunId = 'fixture'
@@ -164,7 +172,29 @@ Write-ValidationSummary
 """)
     assert result.returncode == 0, result.stdout + result.stderr
     assert (tmp_path / '.git/lds-gates-validation/fixture.json').exists()
+    assert (tmp_path / '.git/lds-gates-validation/fixture-backend.xml').read_text() == '<testsuites/>'
     assert not (elsewhere / '.git').exists()
+
+
+@pytest.mark.parametrize('full_follows', [False, True])
+def test_quick_keeps_preflight_unless_complete_host_discovery_follows(tmp_path, full_follows):
+    result = run_script(tmp_path, f"""
+function Get-Python {{ 'unused-python' }}
+$script:seen = New-Object System.Collections.ArrayList
+function Invoke-Step {{
+  param($Name, $LogName, $Body)
+  [void]$script:seen.Add($Name)
+}}
+function Invoke-FrontendSuite {{ [void]$script:seen.Add('Frontend suite') }}
+Invoke-Quick {'-FullSuiteFollows' if full_follows else ''}
+if ($script:seen.Contains('Ownership and hygiene preflight') -ne ${str(not full_follows).lower()}) {{
+  throw 'Preflight was omitted from Quick or repeated before the full suite'
+}}
+foreach ($step in @('Backend lint', 'Frontend lint', 'Frontend build', 'Served plugin startup', 'Frontend suite')) {{
+  if (-not $script:seen.Contains($step)) {{ throw "Missing required step: $step" }}
+}}
+""")
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_product_contracts_stay_separate_from_one_complete_host_suite(tmp_path):

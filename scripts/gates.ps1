@@ -4,7 +4,7 @@
 
   Phases:
     -Phase Quick   lint, frontend build, startup smoke, preflight, frontend tests
-    -Phase Gates   Quick, then bundled plugin suites, then the host suite
+    -Phase Gates   Quick without duplicate preflight tests, then plugins and host
 
   The script never merges, commits, or pushes. Scratch files live outside the
   repo and are removed on exit, including after a failure. Keep them with
@@ -66,6 +66,8 @@ function Invoke-IsolatedValidation([scriptblock]$Body) {
              'LDS_EXTENSIONS_DIR', 'LDS_BUNDLED_DIR', 'LDS_PLUGIN_DISTRIBUTION',
              'LDS_PLUGIN_BUILD_MODE', 'LDS_PLUGINS', 'LDS_EXTENSIONS', 'LDS_GATES_SCRATCH')
   $names += @('LDS_PROFILE_ID', 'LDS_PROFILE_NAME', 'LDS_PROFILE_PORT', 'LDS_PROFILES_HOME')
+  $threadLimits = @('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS')
+  $names += $threadLimits
   $saved = @{}
   foreach ($name in $names) { $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
   try {
@@ -75,6 +77,7 @@ function Invoke-IsolatedValidation([scriptblock]$Body) {
     $env:LDS_ENV = Scratch '.env'
     $env:LDS_PROFILES_HOME = Scratch 'profiles'
     $env:LDS_GATES_SCRATCH = $script:Scratch
+    foreach ($name in $threadLimits) { [Environment]::SetEnvironmentVariable($name, '1', 'Process') }
     & $Body
   } finally {
     foreach ($name in $names) {
@@ -97,6 +100,10 @@ function Write-ValidationSummary {
   $directory = [IO.Path]::GetFullPath($directory)
   New-Item -ItemType Directory -Path $directory -Force | Out-Null
   $receipt = Join-Path $directory ($script:RunId + '.json')
+  $backendReport = Scratch 'backend.xml'
+  if (Test-Path -LiteralPath $backendReport) {
+    Copy-Item -LiteralPath $backendReport -Destination (Join-Path $directory ($script:RunId + '-backend.xml'))
+  }
   [pscustomobject]@{
     Phase = $Phase; Head = (& git rev-parse HEAD).Trim()
     Steps = @($script:Results | Select-Object Name, Exit, Seconds)
@@ -159,11 +166,12 @@ function Invoke-BackendSuites {
   }
   if ($tested -eq 0) { throw 'No bundled Python contracts were discovered.' }
   Invoke-Step -Name 'Full backend and release tooling' -LogName 'backend.txt' -Body {
-    & $py -X utf8 -m pytest backend/tests scripts/tests -q -rf -n 8 --dist loadfile --basetemp (Scratch 'pt') --durations=50
+    & $py -X utf8 -m pytest backend/tests scripts/tests -q -rf -n 8 --dist loadfile --basetemp (Scratch 'pt') --durations=50 --junitxml (Scratch 'backend.xml')
   } | Out-Null
 }
 
 function Invoke-Quick {
+  param([switch]$FullSuiteFollows)
   $py = Get-Python
   Invoke-Step -Name 'Backend lint' -LogName 'ruff.txt' -Body { & $py -m ruff check . } | Out-Null
   Push-Location (Join-Path $Root 'frontend')
@@ -174,9 +182,11 @@ function Invoke-Quick {
   Invoke-Step -Name 'Served plugin startup' -LogName 'startup.txt' -Body {
     & $py -X utf8 (Join-Path $PSScriptRoot 'startup_smoke.py')
   } | Out-Null
-  Invoke-Step -Name 'Ownership and hygiene preflight' -LogName 'preflight.txt' -Body {
-    & $py -X utf8 -m pytest backend/tests/test_local_only_engines.py backend/tests/test_no_personal_data.py backend/tests/test_windows_scripts_are_ascii.py backend/tests/test_public_plugin_fixture.py backend/tests/test_fork_plugin_profile.py backend/tests/test_video_fork_plugin_contract.py backend/tests/test_extension_loader.py backend/tests/test_bank_scan_no_db_lock.py -q --basetemp (Scratch 'q') --durations=10
-  } | Out-Null
+  if (-not $FullSuiteFollows) {
+    Invoke-Step -Name 'Ownership and hygiene preflight' -LogName 'preflight.txt' -Body {
+      & $py -X utf8 -m pytest backend/tests/test_local_only_engines.py backend/tests/test_no_personal_data.py backend/tests/test_windows_scripts_are_ascii.py backend/tests/test_public_plugin_fixture.py backend/tests/test_fork_plugin_profile.py backend/tests/test_video_fork_plugin_contract.py backend/tests/test_extension_loader.py backend/tests/test_bank_scan_no_db_lock.py -q --basetemp (Scratch 'q') --durations=10
+    } | Out-Null
+  }
   Invoke-FrontendSuite
   Write-Ok 'Quick checks passed. This is NOT full backend qualification; run -Phase Gates before landing.'
 }
@@ -199,7 +209,7 @@ function Invoke-AttributionCheck {
 }
 
 function Invoke-Gates {
-  Invoke-Quick
+  Invoke-Quick -FullSuiteFollows
   Invoke-BackendSuites
   Invoke-AttributionCheck
   Write-Ok 'All gates green.'

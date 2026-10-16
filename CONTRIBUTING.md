@@ -93,20 +93,31 @@ pip install -r backend/requirements-torch-tests.txt
 python -m pytest backend/tests -q -n 8 --dist loadfile
 ```
 
-**Run it in parallel — `-n` is not an optimisation, it is the normal way to
-run this suite.** Sequentially it takes about 30 minutes; on 8 workers it takes
-about 3-4 minutes. The cost is flat rather than concentrated (the ten slowest
-tests are 7.5% of the total; the long tail is 74%), so there is no subset worth
-running instead. Keep `--dist loadfile`: it keeps each file's tests on one
-worker, which several files depend on. Drop to `-n0` when you want a debugger,
-live output, or a readable single-file run.
+Run tests in a separate cloud task unless the operator explicitly permits a
+local run. The full fork gate is `scripts/gates.ps1 -Phase Gates`. It uses eight
+pytest workers and keeps each file together with `--dist loadfile`. Ordinary
+push CI and release validation use four workers on their hosted runners. All
+three numerical-library thread pools (`OMP_NUM_THREADS`, `MKL_NUM_THREADS`,
+`OPENBLAS_NUM_THREADS`) are limited to one thread per worker. The gate restores
+the caller's environment when it exits.
 
-Prefer a fixed worker count over `-n auto`. A few tests assert on elapsed time
-rather than on a result — `test_bank_scan_no_db_lock` gives a concurrent writer
-a 400 ms budget — and those get less true the busier the machine is. On a
-many-core box `-n auto` saturates every core and they start reporting on the
-machine's load instead of on the code. (They can fail sequentially too, on a
-loaded machine; parallelism is not what makes them fragile.)
+Quick runs its focused ownership/hygiene preflight. Gates covers those same
+files once through full backend discovery. Pull requests use Fork Gates for
+complete Windows qualification; ordinary CI retains its Linux frontend check.
+A scrubbed `validation/**` branch also runs Fork Gates on push, so validation
+transport does not need a main-branch landing or a second full workflow.
+
+Every test retains fresh app, database, config and plugin state. Ordinary tests
+stub the raw capability import transport instead of repeatedly importing Torch
+in child processes. Tests of that transport use `@pytest.mark.runtime_imports`
+and supply subprocess doubles; the broken-interpreter regression intentionally
+uses its invalid executable. Real Torch bridge tests still execute normally.
+
+Do not increase worker counts to compensate for slow fixtures. Keep
+`--dist loadfile`: several files depend on file-local execution. Timing receipts
+and a backend JUnit report are saved under the Git directory's
+`lds-gates-validation/` folder and uploaded by Fork Gates. Compare runs on the
+same source and equivalent runners; historical timings are not current results.
 
 ⚠ Pass the `backend/tests` path. A bare `python -m pytest` from the repo root
 finds no `pytest.ini` at all (the config lives in `backend/`), so it silently
@@ -115,10 +126,10 @@ tests pass locally and fail on the release tag.
 
 `requirements-dev.txt` is the common CI/release baseline. CI adds the CPU-only `requirements-torch-tests.txt` overlay when training-state code changes (and for manual runs), while the release job always adds it. A suite green against a different set of packages is not evidence about CI: a stray `pytest-flask` on one dev machine once made nine tests pass locally and fail on the release tag. (The suite runs with `-p no:flask` for that reason; you do not need to uninstall anything.)
 
-This is exactly what CI runs on a release tag, so run it locally before you open a PR. If you add or change behavior, add or update a test for it. The suite mocks external tools (ComfyUI, ai-toolkit, Ollama), so it runs without a GPU or any of those installed.
+Release validation installs both declared requirement files. Run it in the cloud before landing. If you add or change behavior, add or update a test for it. The suite mocks external tools (ComfyUI, ai-toolkit, Ollama), so it runs without a GPU or any of those installed.
 
-For the frontend, run `node --test` from `frontend/` (about a minute — it
-carries the help-registry, What's-new and layout contracts) and finish with a
+For the frontend, run `npm test` from `frontend/` in the cloud (it loads the
+SDK resolver and includes core and bundled-plugin contracts) and finish with a
 successful `npm run build`. Tests live in two places, on purpose:
 
 - `src/**/<module>.test.js` — the module's own tests, colocated with the file

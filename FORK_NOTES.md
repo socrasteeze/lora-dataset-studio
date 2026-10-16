@@ -6,6 +6,11 @@ There is no sync loop. The wave log that used to live here is
 `docs/history/FORK_CHANGELOG.md`, unchanged.
 
 The landing gate is `scripts/gates.ps1 -Phase Gates`.
+It runs the complete host/tooling suite once, with eight workers and file-local
+scheduling. Quick retains its own focused preflight. Pull requests and scrubbed
+`validation/**` pushes use Fork Gates; ordinary PR CI does not duplicate the
+Windows backend run. Fresh per-test state and isolated plugin processes stay
+mandatory. Numerical libraries use one thread per pytest worker.
 
 ## Distribution
 

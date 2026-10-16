@@ -14,7 +14,11 @@ test pins that with a wall-clock bound on exactly the file that froze it.
 """
 import time
 
+import pytest
+
 from app import capabilities
+
+pytestmark = pytest.mark.runtime_imports
 
 
 def test_a_fake_interpreter_fails_fast_instead_of_hanging(tmp_path):
