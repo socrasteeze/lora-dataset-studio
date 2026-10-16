@@ -3,20 +3,20 @@
 **Updated:** 2026-10-16 | **Branch:** noble/lora-curation | **Base:** 447864093 | **Tree:** clean
 
 ## State
-Kind-aware Similar, Diverse and Balanced selection is implemented. Cloud qualification is pending. Main is unchanged by this task.
+Kind-aware Similar, Diverse and Balanced selection is implemented and feature-verified at 82e27995e. Full Fork Gates remains red on recorded baseline failures. Main and production services are unchanged by this task.
 The task starts from a89f935c1 and retains the existing test-runtime work on that branch.
 
 ## Done this session
 - Added one read-only policy for Character, Concept and Style, with references, pins, technical-quality preferences, duplicate limits and editable targets.
 - Added current-cache face matching for Character, representative seeding, explicit unknowns and per-image selection receipts.
-- Added synthetic backend regressions and a cloud browser probe for all three selectors, all three kinds and five viewport sizes.
-- Updated the Guide, settings reference, help registry and What's New. The frontend bundle ships in a separate commit.
-- Cloud b6a6efca7 passed all 45 kind/selector/viewport interactions. The standard probe reached all 15 states; its only findings were the inherited tablet Bank title. Reused that header hunk from 1352589c2.
-- Earlier exact-head focused checks passed 125 backend and 23 frontend cases. Three skips: optional SciPy BLAS and two unconfigured private-name checks. No local tests or application imports ran.
+- Updated the Guide, settings reference, help registry, What's New and the separate frontend bundle. Reused the tablet Bank header hunk from 1352589c2.
+- Selector/privacy checks: 125 backend passed, 3 skipped; the focused frontend checks passed 23. Skips: optional SciPy BLAS and two unconfigured private-name checks. No local tests ran.
+- Run 38976783076 at 82e27995e passed all 45 kind/selector/viewport interactions and 15 standard responsive states with zero findings or skips. Empty selections cleared the grid; status and source hashes remained unchanged.
+- Full gate: 9922 backend passed, 57 failed, 14 skipped; core frontend 5212 passed, 12 failed; bundled frontend 1073 passed, 4 skipped; all six bundled Python suites passed. Failure identities match baseline 38965160764 exactly. The CI duplication contract passes after removing the redundant unit replay.
 
 ## Open
-1. Inspect the newest validation/noble-lora-curation Fork Gates after the header repair. Require a complete curation receipt, including empty-selection behavior, 45 interaction states and 15 standard responsive states with no skips.
-2. Keep main unchanged until required gates pass and landing is authorized. The inherited baseline has 57 backend failures, 12 frontend failures and a Bank browser failure; see the handoff at a89f935c1.
+1. Reconcile the independent validation/test-suite-runtime baseline repairs before landing. Keep main unchanged until required gates pass and landing is authorized. The original checkout and its pending edits were preserved.
+2. The separate Bank/Settings browser check still fails its storage-folder selection assertion at bankOtherTagsProbe.mjs:223. The same assertion failed in baseline 38965160764. It passed at 05ede1745 and failed at 82e27995e with unchanged application source; retain both receipts and investigate without weakening the probe.
 3. Physical phone/PWA and real GPU/training comparisons remain separate operator checks. No training quality improvement is measured yet.
 
 ## Decisions
