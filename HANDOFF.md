@@ -4,7 +4,8 @@
 
 ## State
 Full-suite optimizations and the remaining failure repairs are implemented. Main and production state are unchanged. Tests remain cloud-only.
-Focused retry 38972514249 passed all 81 backend cases (22.31s), all five browser sizes and 55 Settings checks with the full CPU test overlay installed. The Bank responsive probe measured 14 applicable states with zero findings and six breakpoint-specific skips. Its application source and bundle match 8c7d14ebb; only diagnostic helpers differ. Final full qualification remains required.
+Full Fork Gates [38973216595](https://github.com/socrasteeze/lora-dataset-studio/actions/runs/38973216595) passed at exact source b3272eb3d. All 57 original backend failures, 12 frontend failures and the browser check are cleared. Backend/tooling: 9934 passed, 14 skipped and eight subtests passed in 899.05s. All six bundled Python suites passed (229 cases). Frontend: 5221 core and 1073 bundled passes, four bundled skips.
+Browser qualification passed at all five sizes, including delayed metadata and long Bank names: 14 applicable Bank states, zero findings, six breakpoint-specific skips and 55 Settings checks. All ten Settings responsive routes passed. The focused retry 38972514249 also passed all 81 selected backend cases with the CPU test overlay. This final receipt changes HANDOFF.md only; code, tests and bundle remain identical to b3272eb3d.
 
 ## Done this session
 - Bounded numerical-library pools to one thread per worker; retained eight full-gate workers, four ordinary CI/release workers and file-local scheduling.
@@ -20,10 +21,9 @@ Focused retry 38972514249 passed all 81 backend cases (22.31s), all five browser
 - Reconciled schema, queue, shared keyboard, help-anchor and extracted-component contracts without dropping cases or probe limits. Rebuilt dist separately.
 
 ## Open
-1. Run final exact-head Fork Gates. Do not overlap cloud jobs. Hold main until required qualification and delivery authorization.
-2. Previous full run 38970245011 at 8dff8c7a7 had 9929 passes, five new malformed-input failures and 14 skips in 756.25s. All original and adjacent failures passed. Core frontend: 5222 passes; bundled frontend: 1073 passes and four skips; all six bundled Python suites passed. The five route-forwarding failures and the cached-document browser wait are repaired and covered by the successful focused retry. The new redundant source-regex test was removed in favour of that rendered regression.
-3. The expanded comparison (38964253881) passed: baseline 161.86s/466 cases/159 failures versus optimized 108.08s/480 cases/57 failures, with no new failures, skips or missing cases. Migration coverage passed in both stages: 57.12s/27 cases versus 41.68s/28 cases. These are focused comparison timings, not full-suite speed claims.
-4. Earlier physical phone/PWA and production restart acceptance remain operator checks; no production services or real jobs were started or interrupted here.
+1. No requested test repairs remain. Changes stay on validation/test-suite-runtime. Main remains at 447864093; landing or release requires delivery authorization.
+2. Earlier physical phone/PWA and production restart acceptance remain operator checks; no production services or real jobs were started or interrupted here.
+3. The prior optimization comparison (38964253881) passed: baseline 161.86s/466 cases/159 failures versus optimized 108.08s/480 cases/57 failures, with no new failures, skips or missing cases. Migration coverage passed in both stages: 57.12s/27 cases versus 41.68s/28 cases. These are focused comparison timings, not full-suite speed claims.
 
 ## Decisions
 - Fresh apps, databases, config, plugin state and mutable caches remain per test; no shared application shortcuts.
@@ -32,13 +32,13 @@ Focused retry 38972514249 passed all 81 backend cases (22.31s), all five browser
 - Independent suites all finish, but any failure keeps the gate red. Lint, build and startup failures still stop dependent work.
 - Source and rebuilt bundle stay in separate commits. Local lint, syntax, build and privacy checks are permitted; tests and fixture servers are not.
 - The delayed-storage browser regression starts a fresh document and awaits the request before interacting. Falsy HTTP options must reach validation unchanged. Browser behaviour coverage replaces the redundant new source-regex assertion.
-- Diagnostic workflow/helper/manifest live only on diagnostic/test-suite-runtime and must not land with this implementation.
+- Diagnostic workflows/helpers/manifests live only on diagnostic/test-suite-runtime and diagnostic/test-failure-repair and must not land with this implementation. The temporary repair checkout was removed after its clean, pushed state was verified; reports remain under the Git directory.
 
 ## Traps
 - Do not run tests or fixture-backed probes locally without explicit permission. Local lint, build, syntax and privacy checks passed; ESLint retains 32 warnings.
 - create_app changes schema/runtime state. Isolate all LDS runtime paths and inherited profile identity before imports.
 - Two optional private-name checks skipped without an external list. Installed-source, real GPU and physical-device gates are separate from synthetic cloud coverage.
-- Keep configuration, profile registries, data and credentials out of Git. No history rewrite, release or main push was performed. The final receipt update changes HANDOFF.md only; runtime source matches the full-gated commit 650fe6536.
+- Keep configuration, profile registries, data and credentials out of Git. No history rewrite, release or main push was performed. Runtime source matches the full-gated commit b3272eb3d; later receipt-only commits do not change qualified code.
 
 ## Verify
 Cloud checkout only, using the pinned dev/CPU Torch overlays and Node 24:
