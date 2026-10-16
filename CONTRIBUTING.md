@@ -118,6 +118,9 @@ Do not increase worker counts to compensate for slow fixtures. Keep
 and a backend JUnit report are saved under the Git directory's
 `lds-gates-validation/` folder and uploaded by Fork Gates. Compare runs on the
 same source and equivalent runners; historical timings are not current results.
+Independent frontend, plugin and backend suites all finish even if one fails.
+The gate still fails when any suite fails; lint, build and startup failures stop
+dependent work before tests start.
 
 ⚠ Pass the `backend/tests` path. A bare `python -m pytest` from the repo root
 finds no `pytest.ini` at all (the config lives in `backend/`), so it silently

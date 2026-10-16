@@ -155,19 +155,25 @@ function Invoke-FrontendSuite {
 function Invoke-BackendSuites {
   $py = Get-Python
   $tested = 0
+  $failures = @()
   foreach ($plugin in (Get-ChildItem -LiteralPath (Join-Path $Root 'bundled') -Directory | Sort-Object Name)) {
     $tests = Join-Path $plugin.FullName 'tests'
     if (-not (Test-Path -LiteralPath $tests -PathType Container)) { continue }
     if (-not (Get-ChildItem -LiteralPath $tests -Filter 'test_*.py' -File -Recurse)) { continue }
-    Invoke-Step -Name ("Bundled Python: " + $plugin.Name) -LogName ($plugin.Name + '-python.txt') -Body {
-      & $py -X utf8 -m pytest $tests -q -p no:flask --basetemp (Scratch ("p-" + $plugin.Name)) --durations=10
-    } | Out-Null
+    try {
+      Invoke-Step -Name ("Bundled Python: " + $plugin.Name) -LogName ($plugin.Name + '-python.txt') -Body {
+        & $py -X utf8 -m pytest $tests -q -p no:flask --basetemp (Scratch ("p-" + $plugin.Name)) --durations=10
+      } | Out-Null
+    } catch { $failures += $_.Exception.Message }
     $tested++
   }
   if ($tested -eq 0) { throw 'No bundled Python contracts were discovered.' }
-  Invoke-Step -Name 'Full backend and release tooling' -LogName 'backend.txt' -Body {
-    & $py -X utf8 -m pytest backend/tests scripts/tests -q -rf -n 8 --dist loadfile --basetemp (Scratch 'pt') --durations=50 --junitxml (Scratch 'backend.xml')
-  } | Out-Null
+  try {
+    Invoke-Step -Name 'Full backend and release tooling' -LogName 'backend.txt' -Body {
+      & $py -X utf8 -m pytest backend/tests scripts/tests -q -rf -n 8 --dist loadfile --basetemp (Scratch 'pt') --durations=50 --junitxml (Scratch 'backend.xml')
+    } | Out-Null
+  } catch { $failures += $_.Exception.Message }
+  if ($failures.Count) { throw ($failures -join "`n") }
 }
 
 function Invoke-Quick {
@@ -209,9 +215,18 @@ function Invoke-AttributionCheck {
 }
 
 function Invoke-Gates {
-  Invoke-Quick -FullSuiteFollows
-  Invoke-BackendSuites
-  Invoke-AttributionCheck
+  $failures = @()
+  try { Invoke-Quick -FullSuiteFollows }
+  catch {
+    # Lint, build and startup are prerequisites. A red frontend test suite is
+    # independent of Python tests; retain its failure and collect both results.
+    if (-not $script:Results.Count -or
+        $script:Results[-1].Name -ne 'Frontend suite (core and bundled)') { throw }
+    $failures += $_.Exception.Message
+  }
+  try { Invoke-BackendSuites } catch { $failures += $_.Exception.Message }
+  try { Invoke-AttributionCheck } catch { $failures += $_.Exception.Message }
+  if ($failures.Count) { throw ($failures -join "`n") }
   Write-Ok 'All gates green.'
 }
 

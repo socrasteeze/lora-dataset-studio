@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "test": "node --import ./scripts/registerSdk.mjs --test && node scripts/testBundled.mjs",
+    "test": "node scripts/testAll.mjs",
     "test:theme": "node --test tests/theme-token-contract.test.mjs",
     "build": "vite build",
     "preview": "vite preview",

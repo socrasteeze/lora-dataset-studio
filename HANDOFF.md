@@ -35,6 +35,7 @@ Main is unchanged. No local tests, application imports or service restarts ran.
 - Optional private-name checks can skip without an external list; cloud gates do not prove physical-device or real GPU behavior.
 - Earlier no-test deliveries and historical receipts do not qualify this head. Prior detail remains in Git at the recorded base.
 - Cloud run 38958289726 stopped at an existing tablet Bank-name truncation before pytest; application source and bundle are unchanged on this branch. The workflow now preserves that failure while collecting full-gate evidence.
+- Run 38958834328 also exposed unchanged frontend source/guide assertion failures before Python ran. The driver now collects every independent suite and retains all failures; lint/build/startup still stop dependent work.
 - Keep configuration, profile registries, data and credentials out of Git. Do not restart production services.
 
 ## Verify
