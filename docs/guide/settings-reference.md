@@ -864,6 +864,31 @@ to the right subset*.
 
 The **✨ Score** pass (aesthetic · NSFW · style) needs the **Bank scoring** extra (Setup ▸ Quality tools). **🚩 Find watermarks** runs one of two ways: the **watermark detector** extra when it is installed (~0.14 s per image, and it does not need Ollama at all), otherwise the vision model from **Captioning** (~1.7 s per image). Installing the extra only ever adds the faster route — with nothing installed the pass behaves exactly as it always has. Both are detection-only: the bank never edits your source files.
 
+## Bank curation
+
+Open **Selection Policy** inside Similar, Diverse or Balanced in the Bank's
+Curate row. These are shared, temporary selection settings. They do not change
+the dataset kind, source files, captions, image status or global quality cuts.
+
+- **LoRA Kind**: Character uses framing targets, Concept uses caption view
+  labels, and Style uses caption/tag subject categories. Use filters and
+  references to identify the intended target. The kind does not identify it.
+- **Use References**: save up to 16 currently selected images. Minimum Similarity
+  is an optional raw cosine cutoff. It has no universal recommended value.
+- **Reference Match**: Whole Image uses the selected CLIP/SigLIP 2 index.
+  Character can use existing, current face measurements. Missing faces remain
+  unmeasured. No inference or download starts during selection.
+- **Prefer Quality**: technical quality flags lower selection priority. Missing
+  measurements remain unknown. Aesthetic/NSFW scores do not affect this preference.
+- **Duplicate Limit**: default 1 per measured duplicate group. Zero disables it.
+  Distinct-image decisions and pinned images can override the limit.
+- **Pin Selected**: preserve important picks inside the filtered, indexed pool.
+  Pins override ranking and quotas. A missing or unreadable pin is reported.
+- **Balance Axis / Target Weights**: choose measured or caption-derived coverage.
+  Weights are relative, editable starting points. Unknowns have an explicit bucket.
+
+See [Choose a selection policy](using-the-app.md#choose-a-selection-policy).
+
 ## Training
 
 Defaults for new local runs. This fork has no cloud-training plugin.

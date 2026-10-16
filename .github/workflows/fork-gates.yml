@@ -58,7 +58,31 @@ jobs:
 
       - name: Check Bank Imports and Settings in Browser
         id: browser_checks
+        if: ${{ !cancelled() }}
         run: node frontend/scripts/bankOtherTagsProbe.mjs
+
+      - name: Check Curation Selection Behavior
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        env:
+          LDS_DATA_DIR: ${{ runner.temp }}/lds-curation-data
+          LDS_CONFIG: ${{ runner.temp }}/lds-curation-config.json
+          LDS_ENV: ${{ runner.temp }}/lds-curation.env
+          LDS_PLUGINS_DIR: ${{ runner.temp }}/lds-curation-plugins
+          LDS_EXTENSIONS_DIR: ${{ runner.temp }}/lds-curation-extensions
+          LDS_PROFILES_HOME: ${{ runner.temp }}/lds-curation-profiles
+        run: |
+          .venv/Scripts/python.exe -m pytest backend/tests/test_bank_curation_policy.py backend/tests/test_image_bank_curation.py backend/tests/test_curation_selection_cost.py backend/tests/test_no_personal_data.py -q
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Push-Location frontend
+          try {
+            node --import ./scripts/registerSdk.mjs --test src/components/bank/curationPolicy.test.js src/components/bank/curation-ui.test.js src/components/bank/bankBalance.test.js
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally { Pop-Location }
+
+      - name: Check Curation Controls in Browser
+        if: ${{ !cancelled() }}
+        run: node frontend/scripts/bankCurationProbe.mjs
 
       - name: Run Fork Gates
         # Preserve the browser failure while collecting the independent full gate.

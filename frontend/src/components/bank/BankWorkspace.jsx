@@ -5,6 +5,8 @@ import { useFolderPersons } from './useFolderPersons'
 import { useReviewLightbox } from './useReviewLightbox'
 import { useCaptionOptions } from './useCaptionOptions'
 import { useCurationLanes } from './useCurationLanes'
+import CurationPolicyControls from './CurationPolicyControls.jsx'
+import CurationSelectionReport from './CurationSelectionReport.jsx'
 import { useToast } from '../common/Toast'
 import { useCapabilities } from '../../context/CapabilitiesContext'
 import { useConnectionStatus } from '../../hooks/useConnectionStatus'
@@ -119,7 +121,7 @@ import {
 // ⚖ Balanced pick — the distribution obtained, in words and numbers. Pure logic
 // on purpose: the repartition is what has to be provable (node --test, no JSX).
 import {
-  BALANCE_AXES, balanceNotes, balanceReadiness,
+  balanceNotes, balanceReadiness,
   balanceRows, summarizeBalance,
 } from './bankBalance.js'
 // 🎨 Medium + ⤢ Angle — buckets, tooltips and, above all, the LIMITS each row
@@ -608,6 +610,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     // dodging state-closure lag; otherwise read the current selection view.
     const on = view ? view.on : showSelected
     const order = view ? view.order : selectedOrder
+    if (on && !(order || []).length) {
+      setPage({ images: [], total: 0 })
+      return true
+    }
     const params = on
       ? { ids: (order || []).join(','), offset: String(off), limit: String(PAGE_SIZE) }
       : { ...filterParams(f), offset: String(off), limit: String(PAGE_SIZE) }
@@ -1460,9 +1466,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     ? 'Checking whether the SigLIP 2 Quality tool is installed'
     : semanticPrerequisite(semanticState)
   const {
+    curationMetadata, curationPolicy, updateCurationPolicy, selectionResult, setSelectionResult,
     curateOpen, setCurateOpen, diverseN, setDiverseN, diverseTypicality,
-    setDiverseTypicality, diverseBusy, balanceN, setBalanceN, balanceAxis,
-    setBalanceAxis, balanceBusy, balanceResult, setBalanceResult, similarN,
+    setDiverseTypicality, diverseBusy, balanceN, setBalanceN,
+    balanceBusy, balanceResult, setBalanceResult, similarN,
     setSimilarN, similarBusy, similarLast, similarAddN, setSimilarAddN,
     addMoreSimilar, textQuery, setTextQuery, textN, setTextN,
     textExclude, setTextExclude, textExcludeW, setTextExcludeW, textStatus,
@@ -1863,7 +1870,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // know (semantic index missing; coverage says nothing is classified) — otherwise the
   // backend answers it with the exact pass and the numbers.
   const balanceReady = balanceReadiness({
-    semanticReady, coverage, engineLabel: semanticState.label,
+    semanticReady: semanticReady && !!curationMetadata, engineLabel: semanticState.label,
     prerequisite: semanticBlocked,
   })
   const scoreDevice = payload?.score_device
@@ -2362,7 +2369,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           {curateShown && (
           <div id="bank-curate" className="grid grid-cols-2 gap-2">
           <div className="relative min-w-0">
-            <button type="button" disabled={live || !semanticReady || diverseBusy}
+            <button type="button" disabled={live || !semanticReady || !curationMetadata || semanticOperationBusy}
               onClick={() => setCurateOpen((v) => (v === 'diverse' ? null : 'diverse'))}
               aria-expanded={curateOpen === 'diverse'}
               title={semanticReady
@@ -2380,25 +2387,22 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                     sheet — the probe markers are what upstream's change was for,
                     and a layer is exempt from the fold budget either way. */}
                 <div data-probe-chrome="curate-diverse" data-probe-panel="curate-diverse" data-probe-layer
-                  className="fixed inset-x-4 bottom-4 z-50 max-h-[75vh] overflow-y-auto rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:mt-1 sm:w-72 sm:max-h-none sm:overflow-visible">
+                  className="fixed inset-x-4 bottom-4 z-50 max-h-[75vh] overflow-y-auto rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:mt-1 sm:w-72">
                   <p className="text-xs text-content-muted">
-                    Selects the most <strong>varied</strong> images of the current filter — the best
-                    coverage of the visual space, not N look-alikes. Reviews as a normal selection
-                    (nothing is kept or deleted yet).
+                    Covers visual variety within the current filter. The selection policy protects
+                    pinned picks and controls technical quality, duplicate groups and LoRA kind.
                   </p>
                   <label className="flex items-center gap-2 text-sm text-content">
-                    How many
+                    Image Count
                     <input type="number" min={1} max={2000} value={diverseN}
                       onChange={(e) => setDiverseN(Math.max(1, Math.min(2000, Number(e.target.value) || 1)))}
-                      className="w-20 rounded-md border border-border bg-surface px-2 py-0.5 text-sm text-content" />
+                      className="min-h-10 w-20 rounded-md border border-border bg-surface px-2 py-0.5 text-sm text-content lg:min-h-0 lg:h-8" />
                   </label>
                   {/* Typicality guard — "most diverse" used to mean "most isolated",
-                      which is how a meme or a photo of someone else won the first
-                      picks. Exposed rather than silently changed: 0 is the old
-                      behaviour, to the pick. */}
+                      picks. Zero disables only the isolation penalty. */}
                   <label className="block space-y-1 text-sm text-content">
                     <span className="flex items-center justify-between gap-2">
-                      <span>Skip the odd ones out</span>
+                      <span>Outlier Guard</span>
                       <span className="tabular-nums text-xs text-content-muted">
                         {diverseTypicality === 0 ? 'off' : `${Math.round(diverseTypicality * 100)}%`}
                       </span>
@@ -2409,13 +2413,16 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                   </label>
                   <p className="text-2xs leading-snug text-content-muted">
                     {diverseTypicality === 0
-                      ? 'Off — pure coverage, exactly like before. The most isolated images win the first picks, so memes, wrong-person shots and botched frames tend to come up first.'
-                      : 'Images that look like nothing else in the bank (memes, screenshots, someone else) stop winning on isolation alone. Variety inside your subject is untouched.'}
+                      ? 'The isolation penalty is off. Quality, duplicate limits and pins still apply.'
+                      : 'Isolated images receive less priority. Rarity does not prove an error. Pin unusual views that you want to preserve.'}
                   </p>
                   <button type="button" onClick={pickDiverse} disabled={diverseBusy}
-                    className="w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-gray-950 disabled:opacity-60">
-                    {diverseBusy ? 'Sampling' : `Select ${diverseN} most diverse`}
+                    className="min-h-10 w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-gray-950 disabled:opacity-60">
+                    {diverseBusy ? 'Sampling' : `Select ${diverseN} Images`}
                   </button>
+                  <CurationPolicyControls policy={curationPolicy} onChange={updateCurationPolicy}
+                    metadata={curationMetadata} selected={selected} mode="diverse"
+                    result={selectionResult} disabled={semanticOperationBusy} />
                 </div>
               </>
             )}
@@ -2425,7 +2432,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               Kept as its own button rather than a mode of the other one, because a
               bank with no 📐 Framing pass can still use diversity. */}
           <div className="relative min-w-0">
-            <button type="button" disabled={live || balanceBusy || !balanceReady.ready}
+            <button type="button" disabled={live || semanticOperationBusy || !balanceReady.ready}
               onClick={() => setCurateOpen((v) => (v === 'balanced' ? null : 'balanced'))}
               aria-expanded={curateOpen === 'balanced'}
               title={balanceReady.ready
@@ -2440,79 +2447,68 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 {/* Bottom sheet below sm (measured at 400 px, an anchored w-80 panel
                     pushes the page sideways), normal popover from sm up. */}
                 <div data-probe-chrome="curate-balanced" data-probe-panel="curate-balanced" data-probe-layer
-                  className="fixed inset-x-4 bottom-4 z-50 max-h-[75vh] overflow-y-auto rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:mt-1 sm:max-h-none sm:w-80 sm:overflow-visible">
+                  className="fixed inset-x-4 bottom-4 z-50 max-h-[75vh] overflow-y-auto rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:mt-1 sm:w-80">
                   <p className="text-xs text-content-muted">
-                    Splits your pick <strong>evenly across the framings</strong> — “20 face, 20 bust,
-                    20 body” — and fills each bucket with the same most-varied sampling.
-                    Nothing is kept or deleted; you get a selection to review.
+                    Uses target proportions for the selected LoRA kind. Character starts with framing,
+                    Concept with views, and Style with subject content. Unknown labels remain visible.
                   </p>
                   <label className="flex items-center gap-2 text-sm text-content">
-                    How many
+                    Image Count
                     <input type="number" min={1} max={2000} value={balanceN}
                       onChange={(e) => setBalanceN(Math.max(1, Math.min(2000, Number(e.target.value) || 1)))}
-                      className="w-20 rounded-md border border-border bg-surface px-2 py-0.5 text-sm text-content" />
+                      className="min-h-10 w-20 rounded-md border border-border bg-surface px-2 py-0.5 text-sm text-content lg:min-h-0 lg:h-8" />
                   </label>
-                  <fieldset className="space-y-1">
-                    <legend className="text-sm text-content">Balance on</legend>
-                    {BALANCE_AXES.map((a) => (
-                      <label key={a.id} className="flex items-start gap-2 text-xs text-content-muted">
-                        <input type="radio" name="bank-balance-axis" value={a.id}
-                          checked={balanceAxis === a.id}
-                          onChange={() => setBalanceAxis(a.id)}
-                          className="mt-0.5 accent-primary" />
-                        <span><span className="text-content">{a.label}</span> — {a.hint}</span>
-                      </label>
-                    ))}
-                  </fieldset>
                   <p className="text-2xs leading-snug text-content-muted">
-                    Framing is the reliable axis on a one-subject bank: person groups there tend to be
-                    few, sparse and arbitrary. It uses the same “Skip the odd ones out” setting as
-                    Pick diverse ({diverseTypicality === 0 ? 'off' : `${Math.round(diverseTypicality * 100)}%`}).
+                    Adjust the axis and weights in Selection Policy. Other groups can fill a shortage.
+                    The Outlier Guard uses {Math.round(diverseTypicality * 100)}% from Pick diverse.
                   </p>
                   <button type="button" onClick={pickBalanced} disabled={balanceBusy}
-                    className="w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-gray-950 disabled:opacity-60">
-                    {balanceBusy ? 'Sampling' : `Select ${balanceN}, balanced`}
+                    className="min-h-10 w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-gray-950 disabled:opacity-60">
+                    {balanceBusy ? 'Sampling' : `Select ${balanceN} Images`}
                   </button>
+                  <CurationPolicyControls policy={curationPolicy} onChange={updateCurationPolicy}
+                    metadata={curationMetadata} selected={selected} mode="balanced"
+                    result={selectionResult} disabled={semanticOperationBusy} />
                 </div>
               </>
             )}
           </div>
           <div className="relative min-w-0">
             <button type="button"
-              disabled={live || !semanticReady || similarBusy
-                || (selected.size !== 1 && !similarLast)}
+              disabled={live || !semanticReady || !curationMetadata || semanticOperationBusy
+                || (!selected.size && !curationPolicy.reference_ids.length && !similarLast)}
               onClick={() => setCurateOpen((v) => (v === 'similar' ? null : 'similar'))}
               aria-expanded={curateOpen === 'similar'}
               title={!semanticReady
                 ? semanticBlocked
                 : selected.size === 1
-                  ? `Rank the current filter against the ONE selected image with the ${semanticState.label} semantic index and select the closest N.`
+                  ? `Rank the current filter against the selected references with the ${semanticState.label} semantic index.`
                   : similarLast
                     ? 'Extend the last run — add the next closest images from the same ranking.'
-                    : 'Select exactly one image to use as the reference'}
+                    : 'Select one reference, or save several with Use References'}
               className={CURATE_BTN}>
               <Target aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Similar to selected{similarBusy && ' (ranking)'}
             </button>
             {curateOpen === 'similar' && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setCurateOpen(null)} aria-hidden />
-                <div className="fixed inset-x-4 bottom-4 z-50 max-h-[75vh] overflow-y-auto rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:mt-1 sm:w-72 sm:max-h-none sm:overflow-visible">
+                <div data-probe-chrome="curate-similar" data-probe-panel="curate-similar" data-probe-layer
+                  className="fixed inset-x-4 bottom-4 z-50 max-h-[75vh] overflow-y-auto rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:mt-1 sm:w-72">
                   <p className="text-xs text-content-muted">
-                    Ranks the current filter by {semanticState.label} similarity to your one selected image and selects
-                    the closest — a fast way to extract one person or look. The reference is kept in
-                    the selection.
+                    Ranks candidates against one or more references. Quality preferences and duplicate
+                    limits also apply. Pin a reference if it must remain in the selection.
                   </p>
-                  {selected.size === 1 && (
+                  {(selected.size === 1 || curationPolicy.reference_ids.length > 0) && (
                     <>
                       <label className="flex items-center gap-2 text-sm text-content">
-                        How many
+                        Image Count
                         <input type="number" min={1} max={2000} value={similarN}
                           onChange={(e) => setSimilarN(Math.max(1, Math.min(2000, Number(e.target.value) || 1)))}
-                          className="w-20 rounded-md border border-border bg-surface px-2 py-0.5 text-sm text-content" />
+                          className="min-h-10 w-20 rounded-md border border-border bg-surface px-2 py-0.5 text-sm text-content lg:min-h-0 lg:h-8" />
                       </label>
                       <button type="button" onClick={findSimilar} disabled={similarBusy}
-                        className="w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-gray-950 disabled:opacity-60">
-                        {similarBusy ? 'Ranking' : `Select ${similarN} most similar`}
+                        className="min-h-10 w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-gray-950 disabled:opacity-60">
+                        {similarBusy ? 'Ranking' : `Select ${similarN} Images`}
                       </button>
                     </>
                   )}
@@ -2533,15 +2529,18 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                         Add
                         <input type="number" min={1} max={2000} value={similarAddN}
                           onChange={(e) => setSimilarAddN(Math.max(1, Math.min(2000, Number(e.target.value) || 1)))}
-                          className="w-20 rounded-md border border-border bg-surface px-2 py-0.5 text-sm text-content" />
+                          className="min-h-10 w-20 rounded-md border border-border bg-surface px-2 py-0.5 text-sm text-content lg:min-h-0 lg:h-8" />
                         more
                       </label>
                       <button type="button" onClick={addMoreSimilar} disabled={similarBusy}
-                        className="w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-gray-950 disabled:opacity-60">
-                        {similarBusy ? 'Ranking' : `Add ${similarAddN} more`}
+                        className="min-h-10 w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-gray-950 disabled:opacity-60">
+                        {similarBusy ? 'Ranking' : `Add ${similarAddN} More`}
                       </button>
                     </div>
                   )}
+                  <CurationPolicyControls policy={curationPolicy} onChange={updateCurationPolicy}
+                    metadata={curationMetadata} selected={selected} mode="similar"
+                    result={selectionResult} disabled={semanticOperationBusy} />
                 </div>
               </>
             )}
@@ -2693,11 +2692,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           )}
         </div>
 
+        <CurationSelectionReport result={selectionResult} onDismiss={() => setSelectionResult(null)}
+          onReviewUnknown={showCuratedSelection} />
         {/* ⚖️ What the balanced pick actually GAVE you. A repartition the user
             cannot see is indistinguishable from an unbalanced one, so this is
             numbers first — the bar is decoration over a list that reads out. */}
         <div aria-live="polite">
-          {balanceResult && (
+          {balanceResult && !balanceResult.policy && (
             <div className="mt-2 space-y-2 rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-xs text-content">
               <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
                 <span aria-hidden>⚖️</span>

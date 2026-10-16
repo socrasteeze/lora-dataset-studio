@@ -24,7 +24,8 @@ test('each curation button feeds its OWN returned ids into the selection view', 
   // the reference, and shows ITS ranked ids — not the diverse ones.
   assert.match(ws, /\/api\/bank\/\$\{bankId\}\/select-similar/);
   assert.match(ws, /const ref = \[\.\.\.selected\]\[0\]/);
-  assert.match(ws, /ref_id: ref/);
+  assert.match(ws, /ref_id: referenceIds\[0\]/);
+  assert.match(ws, /selection: policy/);
   // … and 🔤 Find by text is the third of the same family: its own endpoint, its
   // own ranked ids, the same view. (Its wording/limits contract lives in
   // bankTextSearch.test.js; here we only pin that it joins the family.)
@@ -56,8 +57,9 @@ test('🎨 Pick diverse exposes the typicality guard and sends it', () => {
   assert.ok(slider, 'the guard is a slider, not a hidden constant');
   assert.match(slider[0], /min=\{0\} max=\{1\}/);
   // and it explains itself, including what OFF means
-  assert.match(ws, /Skip the odd ones out/);
-  assert.match(ws, /pure coverage, exactly like before/);
+  assert.match(ws, /Outlier Guard/);
+  assert.match(ws, /isolation penalty is off/);
+  assert.match(ws, /Quality, duplicate limits and pins still apply/);
 });
 
 test('the curated selection actually switches the grid to a ?ids= view (not scattered checkmarks)', () => {

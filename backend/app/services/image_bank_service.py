@@ -63,7 +63,7 @@ from ..models import (BankDupDistinct, BankImage, FaceDataset, FaceDatasetImage,
                       ImageBank)
 from ..utils.dbbusy import write_with_retry
 from ..utils.redact import redact_tokens, redact_user_paths
-from . import (bank_edit_history, bank_jobs, bank_queue, bank_semantic_engine,
+from . import (bank_curation, bank_edit_history, bank_jobs, bank_queue, bank_semantic_engine,
                bank_transfer_metadata, bank_undo, caption_origin,
                dataset_activity, face_models, image_encoding, path_guard, trash)
 # The scope vocabulary is a leaf (pass_scopes.py) so face_dataset_service never
@@ -6756,7 +6756,7 @@ _TYPICALITY_DEFAULT = 0.5    # see select_diverse — 0 restores pure farthest-p
 _TYPICALITY_K = 10           # neighbours whose mean similarity IS the local density
 _TYPICALITY_BLOCK = 512      # rows per similarity block — NEVER a full (m×m) matrix
 _TYPICALITY_Z = 3.0          # robust deviations below the median density = full penalty
-_TYPICALITY_DECADES = 3.0    # novelty discount at full guard + full penalty: 10⁻³
+_TYPICALITY_DECADES = bank_curation.TYPICALITY_DECADES
 _TYPICALITY_MIN_POOL = 32    # under this a median/MAD "tail" is noise — guard off
 
 _BLAS_GEMM = ...             # unprobed sentinel; None once probed and unavailable
@@ -6934,8 +6934,100 @@ def _verified_semantic_result_provenance(bank: ImageBank, captured_engine: str,
     return {'engine': captured_engine, 'model_key': captured_model_key}
 
 
+def _curation_face_vectors(bank, rows):
+    """Current cached face vectors only; never start inference during selection.
+
+    Face matching reads the face recorded by Group by person. It is not a
+    general subject detector, and a missing/stale face is unmeasured.
+    """
+    import numpy as np
+    path = _face_cache_path(bank.id)
+    if not path.is_file():
+        return {}
+    try:
+        with np.load(str(path), allow_pickle=False) as cache:
+            paths, states = cache['paths'], cache['states']
+            embs, hashes = cache['embs'], cache['hashes']
+            if (embs.shape != (len(paths), 512) or len(states) != len(paths)
+                    or hashes.shape != (len(paths), 32) or hashes.dtype != np.uint8):
+                return {}
+            positions = {str(p): j for j, p in enumerate(paths)}
+            out = {}
+            for row in rows:
+                if row.face_state != 'scorable' or row.medium in ('anime', 'illustration'):
+                    continue
+                source = analysis_image_path(bank, row)
+                j = positions.get(source)
+                if j is None or str(states[j]) != 'scorable':
+                    continue
+                digest = hashes[j].tobytes().hex()
+                if (digest == '00' * 32
+                        or bank_transfer_metadata.content_fingerprint_path(source) != digest):
+                    continue
+                vector = np.asarray(embs[j], dtype='float32')
+                if np.isfinite(vector).all() and np.linalg.norm(vector) > 1e-8:
+                    out[row.id] = vector
+            return out
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
+
+
+def _curated_selection(user_id, bank_id, n, selection, filters, mode,
+                       typicality=_TYPICALITY_DEFAULT, ref_id=None, min_score=None):
+    """Adapt the existing filtered, provenance-checked Bank pool to one policy."""
+    policy = bank_curation.options(selection)
+    if not policy['reference_ids'] and ref_id is not None:
+        policy['reference_ids'] = [int(ref_id)]
+    if policy['min_similarity'] is None and min_score is not None:
+        policy['min_similarity'] = min_score
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        raise ValueError('bank not found')
+    engine = _selected_semantic_engine(bank)
+    model_key = engine_model_key(engine)
+    embeddings = _load_semantic_embeddings(bank)
+    if not embeddings:
+        raise ValueError('run Score first' if engine == 'clip' else 'run Semantic index first')
+    weight = bank_curation._number(typicality, 'typicality', 0, 1)
+    ids, E = _pool_embeddings(bank, embeddings, filters or {})
+    rows = _pool_query(bank_id, thresholds(), **(filters or {})).order_by(BankImage.id.asc()).all()
+    by_id = {row.id: row for row in rows}
+    reference_ids = policy['reference_ids']
+    references = BankImage.query.filter(BankImage.bank_id == bank_id,
+                                        BankImage.id.in_(reference_ids)).all() if reference_ids else []
+    if len(references) != len(reference_ids):
+        raise ValueError('a reference image is not in this bank')
+    if policy['match'] == 'face':
+        face_vectors = _curation_face_vectors(bank, list({r.id: r for r in rows + references}.values()))
+        reference_vectors = {iid: face_vectors[iid] for iid in reference_ids if iid in face_vectors}
+    else:
+        face_vectors = None
+        reference_vectors = {}
+        for row in references:
+            source = analysis_image_path(bank, row)
+            vector = embeddings.get(source) if source else None
+            if vector is not None:
+                reference_vectors[row.id] = vector
+    fields = ('id', 'quality_state', 'framing', 'face_cluster', 'caption', 'tags_text',
+              'dup_group', 'semantic_dup_group')
+    th = thresholds()
+    items = [{**{key: getattr(by_id[iid], key) for key in fields},
+              'flags': image_flags(by_id[iid], th)} for iid in ids]
+    if E is None:
+        import numpy as np
+        E = np.empty((0, bank_semantic_engine.engine_dimension(engine)), dtype='float32')
+    result = bank_curation.select(
+        items, E, n, policy, mode=mode, isolation=_isolation_penalty,
+        reference_vectors=reference_vectors, match_vectors=face_vectors,
+        distinct_pairs=_distinct_pairs(bank_id), typicality=weight)
+    result.update(_verified_semantic_result_provenance(bank, engine, model_key))
+    if ref_id is not None:
+        result['ref_id'] = int(ref_id)
+    return result
+
+
 def select_diverse(user_id, bank_id, n=60, *, typicality=_TYPICALITY_DEFAULT,
-                   filters=None):
+                    filters=None, selection=None):
     """Farthest-point sampling over the ✨ Score CLIP embeddings, tempered by a
     TYPICALITY guard: the ``n`` images of the (filtered) pool that best COVER the
     visual space — the antidote to a dump of 4 000 near-identical shots. Greedy
@@ -6978,6 +7070,8 @@ def select_diverse(user_id, bank_id, n=60, *, typicality=_TYPICALITY_DEFAULT,
     'typicality': w}. Raises ValueError (→400, "run ✨ Score first") when no
     embedding exists yet, so the UI shows the clear hint instead of an empty,
     unexplained selection."""
+    if selection is not None:
+        return _curated_selection(user_id, bank_id, n, selection, filters, 'diverse', typicality)
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
@@ -7100,7 +7194,7 @@ def _balance_axis_hint(axis, m, unlabelled, unknown) -> str:
 
 
 def select_balanced(user_id, bank_id, n=60, *, axis=_BALANCE_DEFAULT_AXIS,
-                    typicality=_TYPICALITY_DEFAULT, filters=None):
+                    typicality=_TYPICALITY_DEFAULT, filters=None, selection=None):
     """Select ``n`` images SPREAD OVER the labels of ``axis`` instead of taking
     the top of one ranking: an even split across framings (and optionally across
     people), each bucket filled with the same farthest-point + typicality
@@ -7123,6 +7217,8 @@ def select_balanced(user_id, bank_id, n=60, *, axis=_BALANCE_DEFAULT_AXIS,
     'buckets': [{key, framing, cluster, available, fair_share, selected, short}],
     'unlabelled', 'unknown', 'shortfall'}. Raises ValueError (→400) when Score
     has not run, or when nothing in the filter carries the axis label."""
+    if selection is not None:
+        return _curated_selection(user_id, bank_id, n, selection, filters, 'balanced', typicality)
     import numpy as np
     bank = get_bank(user_id, bank_id)
     if not bank:
@@ -7213,7 +7309,7 @@ def select_balanced(user_id, bank_id, n=60, *, axis=_BALANCE_DEFAULT_AXIS,
             'shortfall': max(0, n - len(chosen)), **provenance}
 
 
-def select_similar(user_id, bank_id, ref_id, n=60, min_score=None, *, filters=None):
+def select_similar(user_id, bank_id, ref_id, n=60, min_score=None, *, filters=None, selection=None):
     """Rank the (filtered) pool by CLIP cosine similarity to a REFERENCE bank image
     (its own cached ✨ Score embedding) — "keep what looks like THIS", to pull one
     person / look out of a mixed dump. Returns the top-``n`` most similar ids, OR
@@ -7223,6 +7319,9 @@ def select_similar(user_id, bank_id, ref_id, n=60, min_score=None, *, filters=No
     Returns {'results': [{id, score}], 'image_ids': [...], 'pool': m, 'ref_id'}.
     Raises ValueError (→400) when Score hasn't run or the reference has no cached
     embedding (e.g. it was rejected before Score, or edited since)."""
+    if selection is not None:
+        return _curated_selection(user_id, bank_id, n, selection, filters, 'similar',
+                                  ref_id=ref_id, min_score=min_score)
     import numpy as np
     bank = get_bank(user_id, bank_id)
     if not bank:
