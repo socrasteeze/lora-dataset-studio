@@ -995,9 +995,9 @@ def bank_watermark_inpaint(bank_id):
     without them repaints exactly what it repainted before."""
     data = request.get_json(silent=True) or {}
     return _queued_start('watermark_inpaint', _app(), LOCAL_USER, bank_id,
-                  method=data.get('method') or 'auto',
+                  method=data.get('method', 'auto'),
                   device_id=data.get('device_id'),
-                  target=data.get('target') or 'all',
+                  target=data.get('target', 'all'),
                   klein_model=(data.get('klein_model') or '').strip() or None,
                   **_scope(data))
 
@@ -1280,7 +1280,7 @@ def bank_caption(bank_id):
                   length=data.get('length') or None,
                   device_id=data.get('device_id'),
                   backend=data.get('backend') or None,
-                  ollama_model=data.get('ollama_model') or None,
+                  ollama_model=data.get('ollama_model'),
                   statuses=data.get('statuses') or None,
                   include_asserted=bool(data.get('include_asserted')))
 

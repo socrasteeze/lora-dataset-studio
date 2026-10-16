@@ -212,15 +212,18 @@ try {
     // the shared host browser on every supported size using synthetic folders.
     // Storage metadata can arrive after navigation inside the browser. Hold it
     // until the user opens a different folder, then verify navigation survives.
+    // A hash-only navigation can reuse an already loaded Settings section.
+    await page.goto('about:blank');
     let releaseLocations;
     const locationsGate = new Promise((resolve) => { releaseLocations = resolve; });
     await page.route('**/api/storage/locations', async (route) => {
       await locationsGate;
       await route.continue();
     });
-    const locationsResponse = page.waitForResponse((response) =>
-      new URL(response.url()).pathname === '/api/storage/locations');
-    await page.goto(`${url}/#/settings/storage?focus=dataset-images-root`);
+    await Promise.all([
+      page.waitForRequest((request) => new URL(request.url()).pathname === '/api/storage/locations'),
+      page.goto(`${url}/#/settings/storage?focus=dataset-images-root`),
+    ]);
     const rootField = page.locator('#dataset-images-root');
     await rootField.waitFor({ state: 'visible' });
     const card = page.locator('div').filter({ has: rootField }).filter({
@@ -234,16 +237,19 @@ try {
     await browserDialog.locator('ul[aria-busy="false"]').waitFor();
     const address = browserDialog.getByRole('textbox', { name: 'Folder path', exact: true });
     await address.fill(ready.import_folders[viewportIndex]);
-    const navigated = page.waitForResponse((response) => {
-      const target = new URL(response.url());
-      return target.pathname === '/api/system/list-folders'
-        && target.searchParams.get('path') === ready.import_folders[viewportIndex];
-    });
-    await browserDialog.getByRole('button', { name: 'Go', exact: true }).click();
-    const listing = await navigated;
+    const [listing] = await Promise.all([
+      page.waitForResponse((response) => {
+        const target = new URL(response.url());
+        return target.pathname === '/api/system/list-folders'
+          && target.searchParams.get('path') === ready.import_folders[viewportIndex];
+      }),
+      browserDialog.getByRole('button', { name: 'Go', exact: true }).click(),
+    ]);
     assert.equal(listing.status(), 200);
     assert.equal((await listing.json()).path, ready.import_folders[viewportIndex]);
     await browserDialog.locator('ul[aria-busy="false"]').waitFor();
+    const locationsResponse = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === '/api/storage/locations');
     releaseLocations();
     const locations = (await (await locationsResponse).json()).locations;
     const currentRoot = locations.find((location) => location.key === 'datasets').path;

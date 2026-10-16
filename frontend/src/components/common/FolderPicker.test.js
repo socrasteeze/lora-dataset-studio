@@ -7,12 +7,6 @@ const bank = fs.readFileSync(new URL('../../pages/BankPage.jsx', import.meta.url
 const dsWorkspace = fs.readFileSync(
   new URL('../dataset/DatasetWorkspace.jsx', import.meta.url), 'utf8');
 
-test('late parent metadata cannot reset an open browser to its initial folder', () => {
-  assert.match(picker, /const initialPath = useRef\(initial \|\| null\)/);
-  assert.match(picker, /useEffect\(\(\) => \{ load\(initialPath\.current\) \}, \[load\]\)/);
-  assert.doesNotMatch(picker, /\[load, initial\]/);
-});
-
 test('the field opens the in-app folder browser, not the desktop explorer', () => {
   const field = picker.slice(picker.indexOf('export default function FolderPickerField'));
   assert.match(field, /setBrowsing\(true\)/);
