@@ -274,7 +274,7 @@ def test_activity_route_reports_no_job_as_null(client, tmp_path, app):
         bank_jobs.reset()
     response = client.get(f'/api/bank/{bank_id}/activity')
     assert response.status_code == 200
-    assert response.get_json() == {'activity': None}
+    assert response.get_json() == {'activity': None, 'queue_state': None}
 
 
 def test_saved_workspace_inventory_does_not_wait_for_a_source_walk(

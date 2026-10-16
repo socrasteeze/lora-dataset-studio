@@ -1,15 +1,16 @@
 """Cross-bank queue for workspace passes and Launch-all pipelines.
 
 A single bank already serializes its own passes (bank_jobs, one live job per
-bank) and the heavy GPU passes are globally exclusive (gpu_window). What was
-missing is a way to LINE UP several banks and walk away: today a second bank's
-GPU pass launched while another is running is simply rejected (503), not queued.
+bank) and the heavy GPU passes are globally exclusive (gpu_window). Workspace
+passes and Launch-all requests enter this durable queue and wait for their
+machine, including when a manual pass or training already holds it.
 
 This module is that queue. A module-level FIFO holds "run this bank's pipeline"
-requests; ONE WORKER PER MACHINE drains it, starting each bank's pipeline only
+or "run this exact workspace pass" requests; ONE WORKER PER MACHINE drains it,
+starting each bank's job only
 once its machine has no live Bank work AND (locally) the GPU is free — so a queued bank
 WAITS its turn instead of being turned away. Each run reuses the existing
-``image_bank_service.start_pipeline`` verbatim, so per-bank progress, the Stop
+service launcher verbatim, so per-bank progress, the Stop
 button and the pipeline report all behave exactly as a direct launch.
 
 **One lane per device.** This machine is one lane and stays strictly serial:

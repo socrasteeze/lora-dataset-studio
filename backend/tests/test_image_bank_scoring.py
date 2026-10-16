@@ -4,6 +4,8 @@ exercise the parts that don't need torch or Ollama: the read-time score flags
 (persisted scores → verdicts against the live thresholds), the facets, the
 aesthetic-aware keep-best, the gates, and the graceful degradation when an extra
 is absent. Background jobs run inline under TESTING (see bank_jobs.start)."""
+
+from bank_queue_assertions import assert_failed_job, assert_waiting_job
 import importlib.util
 import os
 import pathlib
@@ -259,27 +261,27 @@ def test_keep_best_prefers_aesthetic_when_scored(client, tmp_path, app):
 
 
 # --- gates -------------------------------------------------------------------
-def test_score_gate_503_when_extra_absent(client, tmp_path, monkeypatch):
+def test_score_stays_failed_when_extra_absent(client, tmp_path, monkeypatch):
     bank_id, _ = _mkbank(client, tmp_path, {'a.jpg': _flat()})
     from app import capabilities
     monkeypatch.setattr(capabilities, 'probe_bank_scoring',
                         lambda: {'ok': False, 'detail': 'import failed'})
     r = client.post(f'/api/bank/{bank_id}/score', json={})
-    assert r.status_code == 503
-    assert 'bank scoring' in r.get_json()['error']
+    error = assert_failed_job(client, bank_id, r)
+    assert 'bank scoring' in error
 
 
-def test_watermark_gate_503_when_model_absent(client, tmp_path, monkeypatch):
+def test_watermark_stays_failed_when_model_absent(client, tmp_path, monkeypatch):
     bank_id, _ = _mkbank(client, tmp_path, {'a.jpg': _flat()})
     from app import capabilities
     monkeypatch.setattr(capabilities, 'probe_ollama_model',
                         lambda *a, **k: {'ok': False, 'detail': 'not pulled'})
     r = client.post(f'/api/bank/{bank_id}/watermark', json={})
-    assert r.status_code == 503
-    assert 'vision model' in r.get_json()['error']
+    error = assert_failed_job(client, bank_id, r)
+    assert 'vision model' in error
 
 
-def test_score_refuses_when_gpu_busy_and_the_pass_wants_the_gpu(
+def test_score_waits_when_gpu_busy_and_the_pass_wants_the_gpu(
         client, tmp_path, monkeypatch):
     bank_id, _ = _mkbank(client, tmp_path, {'a.jpg': _flat()})
     from app import capabilities
@@ -288,8 +290,7 @@ def test_score_refuses_when_gpu_busy_and_the_pass_wants_the_gpu(
     monkeypatch.setattr(capabilities, 'bank_scoring_gpu_available', lambda: True)
     monkeypatch.setattr(banks, '_gpu_busy_reason', lambda: 'training is running on the GPU')
     r = client.post(f'/api/bank/{bank_id}/score', json={})
-    assert r.status_code == 503
-    assert 'training' in r.get_json()['error']
+    assert_waiting_job(client, bank_id, r)
 
 
 def test_a_cpu_scoring_pass_is_not_blocked_by_a_busy_gpu(

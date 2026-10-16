@@ -19,15 +19,23 @@ def _mock_resolvers(monkeypatch, wk):
     monkeypatch.setattr(wk.keh, '_unet_weight_dtype', lambda *a, **k: 'default')
 
 
-def test_the_route_threads_device_id_through(app, client, monkeypatch):
+def test_the_route_threads_device_id_through(app, client, tmp_path, monkeypatch):
     from app.services import image_bank_service as banks
+    from app.config import LOCAL_USER
+    from app.extensions import db
+    from app.models import ImageBank
     seen = {}
+    with app.app_context():
+        bank = ImageBank(user_id=LOCAL_USER, name='Fixture', source_path=str(tmp_path / 'source'))
+        db.session.add(bank)
+        db.session.commit()
+        bank_id = bank.id
 
     def fake_start(app_, user_id, bank_id, method='auto', device_id=None, **_kw):
         seen.update(method=method, device_id=device_id)
         return {'ok': True}
     monkeypatch.setattr(banks, 'start_watermark_inpaint', fake_start)
-    r = client.post('/api/bank/1/watermark/inpaint',
+    r = client.post(f'/api/bank/{bank_id}/watermark/inpaint',
                     json={'method': 'klein', 'device_id': 'api:abc123def456'})
     assert r.status_code == 202, r.get_data(as_text=True)
     assert seen == {'method': 'klein', 'device_id': 'api:abc123def456'}

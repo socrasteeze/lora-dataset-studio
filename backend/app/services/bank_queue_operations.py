@@ -62,11 +62,16 @@ def prepare(operation, user_id, bank_id, options):
         options['statuses'] = banks.normalize_pass_statuses(options['statuses'])
     if operation == 'caption':
         from .face_dataset_service import CAPTION_BACKENDS, CAPTION_LENGTHS, CAPTION_VOCABULARIES
+        from .ollama_control import normalize_ollama_model_ref
         for key, allowed in (('backend', CAPTION_BACKENDS), ('length', CAPTION_LENGTHS),
                              ('vocabulary', CAPTION_VOCABULARIES)):
             value = banks._caption_name_option(key, options.get(key))
             if value and value not in allowed:
                 raise ValueError(f'invalid caption {key}: {value}')
+        if options.get('ollama_model') is not None:
+            normalize_ollama_model_ref(options['ollama_model'], allow_empty=True)
+    if operation == 'watermark_inpaint':
+        banks.normalize_inpaint_options(options.get('method'), options.get('target'))
     if operation == 'semantic_dedup':
         banks._semantic_dup_threshold(banks._selected_semantic_engine(bank), options.get('threshold'))
     if options.get('limit') is not None and int(options['limit']) < 1:

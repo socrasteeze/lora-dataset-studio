@@ -5,6 +5,8 @@ is hermetic by construction. The two places that DO touch the embeddings child
 (the full face pass and the ~15-image sample check) drive it through
 ``_drive_infer_subprocess``, monkeypatched here exactly as the other bank pass
 tests do. Background jobs run inline under TESTING (see bank_jobs.start)."""
+
+from bank_queue_assertions import assert_failed_job
 import hashlib
 import json
 import os
@@ -479,8 +481,8 @@ def test_sample_check_needs_an_assertion(client, tmp_path, app):
     bank_id, _src = _mkbank(client, tmp_path, _TREE)
     r = client.post(f'/api/bank/{bank_id}/folder-person/check',
                     json={'subfolder': 'anna'})
-    assert r.status_code == 400
-    assert 'not asserted' in r.get_json()['error']
+    error = assert_failed_job(client, bank_id, r)
+    assert 'not asserted' in error
 
 
 def test_the_saving_is_counted_in_inferences_not_claimed(client, tmp_path, app,

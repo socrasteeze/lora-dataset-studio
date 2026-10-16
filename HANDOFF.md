@@ -1,42 +1,38 @@
 # HANDOFF
 
-**Updated:** 2026-10-16 | **Branch:** noble/lora-curation | **Base:** 447864093 | **Tree:** clean
+**Updated:** 2026-10-16 | **Branch:** noble/lora-curation | **Base:** 447864093
 
 ## State
-Kind-aware Similar, Diverse and Balanced selection is implemented and feature-verified at 82e27995e. Full Fork Gates remains red on recorded baseline failures. Main and production services are unchanged by this task.
-The task starts from a89f935c1 and retains the existing test-runtime work on that branch.
+The operator authorized repairing the remaining failures, rerunning cloud gates, and cleaning and pushing the combined changes to origin/main. Selector changes and the independent validation/test-suite-runtime repairs are reconciled. Main stays unchanged until the combined head passes all required cloud checks.
 
-## Done this session
-- Added one read-only policy for Character, Concept and Style, with references, pins, technical-quality preferences, duplicate limits and editable targets.
-- Added current-cache face matching for Character, representative seeding, explicit unknowns and per-image selection receipts.
-- Updated the Guide, settings reference, help registry, What's New and the separate frontend bundle. Reused the tablet Bank header hunk from 1352589c2.
-- Selector/privacy checks: 125 backend passed, 3 skipped; the focused frontend checks passed 23. Skips: optional SciPy BLAS and two unconfigured private-name checks. No local tests ran.
-- Run 38976783076 at 82e27995e passed all 45 kind/selector/viewport interactions and 15 standard responsive states with zero findings or skips. Empty selections cleared the grid; status and source hashes remained unchanged.
-- Full gate: 9922 backend passed, 57 failed, 14 skipped; core frontend 5212 passed, 12 failed; bundled frontend 1073 passed, 4 skipped; all six bundled Python suites passed. Failure identities match baseline 38965160764 exactly. The CI duplication contract passes after removing the redundant unit replay.
+## Done
+- Similar, Diverse and Balanced share Character, Concept and Style policies. References, pins, technical-quality penalties, duplicate caps and coverage targets produce review selections only. They never accept, reject, delete or promote images.
+- Character framing weights 4:3:2:1 are editable starting heuristics. Concept defaults to caption views; Style defaults to subject categories. Cached face matching remains Character-only and reports unmeasured images.
+- The selector head 82e27995e passed 45 populated browser interactions and 15 responsive measurements with zero findings or skips. Empty selections cleared the grid; source hashes and review decisions stayed unchanged.
+- The independent repair head b3272eb3d passed full cloud run 38973216595: 9934 backend/tooling passes, 14 skips, eight subtest passes, 229 bundled Python passes, 5221 core frontend passes and 1073 bundled frontend passes with four skips.
+- Those repairs cover queue admission behind active work, malformed saved options, semantic readiness versus statistics, late folder metadata, long Bank names and current schema/interface contracts. Browser qualification covered five sizes, 14 applicable Bank states, 55 Settings checks and ten Settings responsive routes.
+- Suite-runtime changes retain fresh per-test app/database/config/plugin state, immutable Git templates copied per test, eight file-local full-gate workers and one numerical-library thread per worker. Independent failures remain fatal.
 
 ## Open
-1. Reconcile the independent validation/test-suite-runtime baseline repairs before landing. Keep main unchanged until required gates pass and landing is authorized. The original checkout and its pending edits were preserved.
-2. The separate Bank/Settings browser check still fails its storage-folder selection assertion at bankOtherTagsProbe.mjs:223. The same assertion failed in baseline 38965160764. It passed at 05ede1745 and failed at 82e27995e with unchanged application source; retain both receipts and investigate without weakening the probe.
-3. Physical phone/PWA and real GPU/training comparisons remain separate operator checks. No training quality improvement is measured yet.
+1. Rebuild the frontend in a separate commit, scrub both passes, and push validation/noble-lora-curation for exact-head cloud qualification.
+2. Require the full fork gate, Bank/Settings browser check and curation browser check to pass on the combined source and bundle before landing on main.
+3. Refresh origin/main immediately before landing. Preserve the independent checkout and any later work. Do not merge diagnostic-only workflows or helpers.
+4. Physical phone/PWA, installed-source restart and real GPU/training comparisons remain operator checks. No production service, data or real job was changed by validation.
 
-## Decisions
-- Existing API clients that omit selection retain legacy behavior. The new UI sends the shared policy to each of the three selectors.
-- Character framing weights 4:3:2:1 are editable starting heuristics, not optimal training ratios. Concept defaults to caption views; Style defaults to subject categories.
-- Face matching uses existing SHA-bound measurements. Missing, stale or unsupported faces remain unmeasured and reviewable.
-- Pins override ranking, quotas and duplicate limits, but never filters, missing embeddings or unreadable images. Selection does not accept, reject, delete or promote.
-
-## Traps
-- Tests and fixture-backed browser probes run only in cloud unless the operator explicitly authorizes a local run.
-- The current branch includes prior suite-runtime commits. Do not land them blindly or treat their baseline failures as feature validation.
-- The original validation/test-suite-runtime checkout has newer independent repairs and a handoff edit. Preserve them. Only its Bank header hunk was reused here.
-- Caption coverage is lexical and can miss details or misread negation. Subject/style relevance still requires filters and references.
-- Local lint, build and privacy checks are allowed. No production application imports, restarts, data changes or real jobs are authorized by validation.
+## Decisions And Traps
+- Tests and fixture-backed probes remain cloud-only. Local lint, build, syntax and privacy scans are permitted.
+- Isolate every LDS runtime path and inherited profile identity before importing the application. create_app changes schema and runtime state.
+- Source and generated frontend/dist remain separate commits. Rebuild from the reconciled source; do not combine hashed bundles by hand.
+- Fork Gates runs the complete backend suite once. Do not add a duplicate focused pytest prelude to that workflow.
+- Pins bypass ranking, quotas and duplicate limits, but never filters, missing embeddings or unreadable images. Caption coverage is lexical; references and human review still matter.
+- Optional private-name checks can skip without an external list. Report that limit. Do not treat a skipped state as a pass.
+- origin is the delivery remote. upstream stays read-only. No force push, history rewrite or release is authorized by this landing request.
 
 ## Verify
-Cloud checkout with the pinned dev/CPU Torch overlays and Node 24:
+Cloud checkout only, with the pinned dev/CPU Torch overlays and Node 24:
 
 ```powershell
-.venv/Scripts/python.exe -m pytest backend/tests/test_bank_curation_policy.py backend/tests/test_image_bank_curation.py backend/tests/test_curation_selection_cost.py backend/tests/test_no_personal_data.py -q
-node frontend/scripts/bankCurationProbe.mjs
 ./scripts/gates.ps1 -Phase Gates -ScratchRoot D:/lds-gates
+node frontend/scripts/bankOtherTagsProbe.mjs
+node frontend/scripts/bankCurationProbe.mjs
 ```

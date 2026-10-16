@@ -18,6 +18,7 @@ The contract this file defends is not "there is an endpoint". It is:
 import io
 import json
 import os
+from bank_queue_assertions import assert_failed_job
 
 from PIL import Image
 
@@ -281,8 +282,8 @@ def test_an_emptied_mask_cleans_nothing_and_never_falls_back_to_the_box(
     # ✂ Auto-crop has nothing left it may act on and SAYS so, instead of running
     # over the image and cropping the box the user just deleted.
     crop = client.post(f'/api/bank/{bank_id}/watermark/crop')
-    assert crop.status_code == 400
-    assert 'hand-edited mask' in crop.get_json()['error']
+    assert 'hand-edited mask' in assert_failed_job(client, bank_id, crop)
+    assert client.delete(f'/api/bank-queue/{bank_id}').status_code == 200
     assert client.post(f'/api/bank/{bank_id}/watermark/inpaint',
                        json={'method': 'lama'}).status_code == 202
 
@@ -310,7 +311,9 @@ def test_the_crop_level_leaves_a_hand_masked_image_to_the_repaint_level(
     levels = client.get(f'/api/bank/{bank_id}/watermark/levels').get_json()
     assert (levels['croppable'], levels['inpaintable']) == (0, 1)
     assert levels['hand_masked'] == 1
-    assert client.post(f'/api/bank/{bank_id}/watermark/crop').status_code == 400
+    response = client.post(f'/api/bank/{bank_id}/watermark/crop')
+    assert 'hand-edited mask' in assert_failed_job(client, bank_id, response)
+    assert client.delete(f'/api/bank-queue/{bank_id}').status_code == 200
 
     seen = _capture_lama(monkeypatch)
     assert client.post(f'/api/bank/{bank_id}/watermark/inpaint',

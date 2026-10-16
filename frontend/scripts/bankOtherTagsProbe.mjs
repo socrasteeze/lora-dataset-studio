@@ -85,6 +85,21 @@ try {
     await page.waitForFunction(() => document.querySelector('[aria-label="Active Profile"]')?.textContent === 'Default');
       await page.locator(`img[src^="/api/bank/${ready.bank_id}/thumb/"]`).first().waitFor();
       await page.getByRole('heading', { name: 'Demo', exact: true }).waitFor();
+      const nameBounds = await page.getByRole('heading', { name: 'Demo', exact: true }).evaluate((heading) => {
+        const label = heading.querySelector('span');
+        const original = { text: label.textContent, title: label.title };
+        try {
+          label.textContent = `Synthetic Bank ${'long-name-'.repeat(20)}`;
+          label.title = label.textContent;
+          const box = heading.getBoundingClientRect();
+          return { left: box.left, right: box.right, viewport: document.documentElement.clientWidth };
+        } finally {
+          label.textContent = original.text;
+          label.title = original.title;
+        }
+      });
+      assert.ok(nameBounds.left >= -1 && nameBounds.right <= nameBounds.viewport + 1,
+        'A long Bank name must fit the header at every viewport');
       await sourceRequested;
       assert.equal(await page.locator(`img[src^="/api/bank/${ready.bank_id}/thumb/"]`).count(), 4);
     } finally {
@@ -195,7 +210,19 @@ try {
 
     // Selecting a dataset destination must not save or move anything. Exercise
     // the shared host browser on every supported size using synthetic folders.
-    await page.goto(`${url}/#/settings/storage?focus=dataset-images-root`);
+    // Storage metadata can arrive after navigation inside the browser. Hold it
+    // until the user opens a different folder, then verify navigation survives.
+    // A hash-only navigation can reuse an already loaded Settings section.
+    let releaseLocations;
+    const locationsGate = new Promise((resolve) => { releaseLocations = resolve; });
+    await page.route('**/api/storage/locations', async (route) => {
+      await locationsGate;
+      await route.continue();
+    });
+    await Promise.all([
+      page.waitForRequest((request) => new URL(request.url()).pathname === '/api/storage/locations'),
+      page.goto(`${url}/?storage-probe=${viewportIndex}#/settings/storage?focus=dataset-images-root`),
+    ]);
     const rootField = page.locator('#dataset-images-root');
     await rootField.waitFor({ state: 'visible' });
     const card = page.locator('div').filter({ has: rootField }).filter({
@@ -209,7 +236,27 @@ try {
     await browserDialog.locator('ul[aria-busy="false"]').waitFor();
     const address = browserDialog.getByRole('textbox', { name: 'Folder path', exact: true });
     await address.fill(ready.import_folders[viewportIndex]);
-    await browserDialog.getByRole('button', { name: 'Go', exact: true }).click();
+    const [listing] = await Promise.all([
+      page.waitForResponse((response) => {
+        const target = new URL(response.url());
+        return target.pathname === '/api/system/list-folders'
+          && target.searchParams.get('path') === ready.import_folders[viewportIndex];
+      }),
+      browserDialog.getByRole('button', { name: 'Go', exact: true }).click(),
+    ]);
+    assert.equal(listing.status(), 200);
+    assert.equal((await listing.json()).path, ready.import_folders[viewportIndex]);
+    await browserDialog.locator('ul[aria-busy="false"]').waitFor();
+    const locationsResponse = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === '/api/storage/locations');
+    releaseLocations();
+    const locations = (await (await locationsResponse).json()).locations;
+    const currentRoot = locations.find((location) => location.key === 'datasets').path;
+    // Wait for the parent to render the late result, rather than add a sleep.
+    await page.waitForFunction((current) => [...document.querySelectorAll('p')]
+      .some((node) => node.textContent.includes('In use now:') && node.textContent.includes(current)), currentRoot);
+    await page.unroute('**/api/storage/locations');
+    assert.equal(await address.inputValue(), ready.import_folders[viewportIndex]);
     const pick = browserDialog.getByRole('button', { name: 'Use Folder', exact: true });
     await pick.waitFor();
     const browserBoxes = await browserDialog.locator('input, button').evaluateAll((nodes) => nodes.map((node) => {
@@ -234,7 +281,7 @@ try {
     }));
     assert.ok(boxes.every((box) => box.left >= -1 && box.right <= width + 1),
       'Dataset destination controls must fit the viewport');
-    settingsOutcomes.push({ section: 'storage-browser', width, height, passed: true });
+    settingsOutcomes.push({ section: 'storage-browser', width, height, lateMetadata: true, passed: true });
     assert.deepEqual(errors, []);
     outcomes.push({ width, height, firstPageBeforeSourceCheck: true, singleBankExclusions: true, passed: true });
     // Leave only the tagged demo bank for the existing probe's list primer.

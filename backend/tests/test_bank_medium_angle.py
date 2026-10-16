@@ -15,6 +15,8 @@ weaker than a chip row makes them look:
 No model is ever loaded: the prototype matrix is the one thing that needs CLIP,
 and it is monkeypatched — exactly like the text-search tests do.
 """
+
+from bank_queue_assertions import assert_failed_job
 import numpy as np
 import pytest
 
@@ -145,8 +147,8 @@ def test_medium_refuses_before_score_and_says_which_pass(app, client, tmp_path):
     with app.app_context():
         assert 'Score' in (banks.medium_prereq(bank_id) or '')
     r = client.post(f'/api/bank/{bank_id}/medium', json={})
-    assert r.status_code == 503
-    assert 'Score' in r.get_json()['error']
+    error = assert_failed_job(client, bank_id, r)
+    assert 'Score' in error
 
 
 def test_medium_facet_counts_and_filters(app, client, tmp_path):
@@ -246,8 +248,8 @@ def test_the_angle_backfill_is_counted_priced_and_opt_in(app, client, tmp_path):
     assert payload['counts']['angle_backfillable'] == 0
     assert payload['angle_backfill_minutes'] is None
     r = client.post(f'/api/bank/{bank_id}/angles', json={})
-    assert r.status_code == 400
-    assert 'already' in r.get_json()['error']
+    error = assert_failed_job(client, bank_id, r)
+    assert 'already' in error
 
 
 # --- sorting -----------------------------------------------------------------

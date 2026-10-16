@@ -206,13 +206,35 @@ def test_remove_waiting_job_keeps_an_existing_pass_and_stop_targets_the_live_pas
     _first, bank, _image = rows
     job = bank_jobs.reserve(bank.id, 'scan')
     job['_launched'] = True
-    client.post(f'/api/bank/{bank.id}/score', json={})
+    assert client.post(f'/api/bank/{bank.id}/score', json={}).status_code == 202
     assert client.delete(f'/api/bank-queue/{bank.id}').status_code == 200
     assert not job['cancelled']
-    client.post(f'/api/bank/{bank.id}/score', json={})
+    assert client.post(f'/api/bank/{bank.id}/score', json={}).status_code == 202
     assert client.post(f'/api/bank/{bank.id}/cancel', json={}).json['ok']
     assert job['cancelled']
     assert bank_queue.state_for(bank.id)['state'] == 'pending'
+
+
+@pytest.mark.parametrize('operation,service,options', [
+    ('scan', 'start_scan', {}), ('score', 'start_score', {}),
+    ('caption', 'start_caption', {}), ('pipeline', 'start_pipeline', {'steps': ['scan']}),
+])
+def test_a_gpu_blocked_submission_runs_after_release(client, app, rows, monkeypatch,
+                                                    operation, service, options):
+    from bank_queue_assertions import assert_waiting_job
+
+    _first, bank, _image = rows
+    launched = []
+    monkeypatch.setattr(banks, service, lambda *a, **kw: launched.append((a[2], kw)))
+    monkeypatch.setattr(banks, '_gpu_busy_reason', lambda: 'A training run holds the GPU')
+    monkeypatch.setattr(bank_queue, '_drain', lambda _app: pytest.fail('blocked work must stay pending'))
+    response = client.post(f'/api/bank/{bank.id}/{operation}', json=options)
+    assert_waiting_job(client, bank.id, response)
+    assert launched == []
+    monkeypatch.setattr(banks, '_gpu_busy_reason', lambda: None)
+    assert bank_queue._process_next(app)
+    assert len(launched) == 1 and launched[0][0] == bank.id
+    assert BankQueueEntry.query.count() == 0
 
 
 def test_queued_options_are_not_exposed_in_activity_or_queue_snapshots(app, client, rows):
@@ -220,6 +242,19 @@ def test_queued_options_are_not_exposed_in_activity_or_queue_snapshots(app, clie
     bank_queue.enqueue_operation(app, LOCAL_USER, bank.id, 'scan', {'ids': [image.id]})
     assert 'operation_payload' not in bank_queue.snapshot()['items'][0]
     assert 'image_instances' not in client.get(f'/api/bank/{bank.id}/activity').json['queue_state']
+
+
+@pytest.mark.parametrize('path,options', [
+    ('caption', {'ollama_model': False}), ('caption', {'ollama_model': 0}),
+    ('caption', {'ollama_model': []}), ('caption', {'ollama_model': {}}),
+    ('watermark/inpaint', {'method': 1}), ('watermark/inpaint', {'target': []}),
+])
+def test_invalid_saved_options_never_enter_the_queue(client, rows, path, options):
+    _first, bank, _image = rows
+    response = client.post(f'/api/bank/{bank.id}/{path}', json=options)
+    assert response.status_code == 400, response.json
+    assert bank_queue.state_for(bank.id) is None
+    assert BankQueueEntry.query.count() == 0
 
 
 def test_admission_during_worker_exit_restarts_the_lane(app, rows, monkeypatch):

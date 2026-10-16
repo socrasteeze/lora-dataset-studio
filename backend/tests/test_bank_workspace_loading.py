@@ -30,18 +30,27 @@ def test_workspace_controls_do_not_read_images_walk_sources_or_probe_runtime(cli
     assert image_queries == 0
 
 
-def test_statistics_can_load_without_the_scoring_runtime(client, tmp_path, monkeypatch):
+@pytest.mark.parametrize('engine', ['clip', 'siglip2'])
+def test_statistics_can_load_without_the_scoring_runtime(client, tmp_path, monkeypatch, engine):
+    from app.extensions import db
+    from app.models import ImageBank
     from app.services import image_bank_service as banks
 
     bank_id, _ = _bank(client, tmp_path, count=2)
-    monkeypatch.setattr(banks, 'score_device_info', lambda *args: pytest.fail(
-        'the background statistics waited for the scoring runtime'))
+    with client.application.app_context():
+        db.session.get(ImageBank, bank_id).semantic_engine = engine
+        db.session.commit()
+    for name in ('score_device_info', 'semantic_device_info', '_semantic_text_status'):
+        monkeypatch.setattr(banks, name, lambda *args: pytest.fail(
+            'the background statistics waited for the scoring runtime'))
     response = client.get(f'/api/bank/{bank_id}?sync=0&runtime=0')
     assert response.status_code == 200
     payload = response.get_json()
     assert payload['counts']['total'] == 2
     assert 'flags' in payload and 'pass_scopes' in payload and 'semantic' in payload
     assert 'score_device' not in payload
+    assert payload['semantic']['engine'] == engine
+    assert 'device' not in payload['semantic'] and 'text' not in payload['semantic']
 
 
 def test_legacy_payload_and_separate_runtime_keep_their_device_contract(client, tmp_path, monkeypatch):
@@ -55,6 +64,29 @@ def test_legacy_payload_and_separate_runtime_keep_their_device_contract(client, 
     assert legacy.status_code == runtime.status_code == 200
     assert legacy.get_json()['score_device'] == runtime.get_json()['score_device'] == device
     assert runtime.get_json()['id'] == bank_id
+    assert runtime.get_json()['semantic']['device'] == device
+    assert runtime.get_json()['semantic']['engine'] == 'clip'
+
+
+def test_separate_semantic_runtime_does_not_recalculate_statistics(client, tmp_path, monkeypatch):
+    from app.extensions import db
+    from app.models import ImageBank
+    from app.services import image_bank_service as banks
+
+    bank_id, _ = _bank(client, tmp_path, count=1)
+    with client.application.app_context():
+        db.session.get(ImageBank, bank_id).semantic_engine = 'siglip2'
+        db.session.commit()
+    for name in ('semantic_counts', '_semantic_eligible_paths', '_bp_counts'):
+        monkeypatch.setattr(banks, name, lambda *args, **kw: pytest.fail('runtime read calculated statistics'))
+    monkeypatch.setattr(banks, 'score_device_info', lambda *args: {'device': 'cpu'})
+    monkeypatch.setattr(banks, 'semantic_device_info', lambda: {'device': 'cuda'})
+    monkeypatch.setattr(banks, '_semantic_text_status', lambda engine: {'available': True})
+    response = client.get(f'/api/bank/{bank_id}/score-device')
+    assert response.status_code == 200
+    assert response.json['score_device']['device'] == 'cpu'
+    assert response.json['semantic'] == {'engine': 'siglip2', 'device': {'device': 'cuda'},
+                                         'text': {'available': True}}
 
 
 @pytest.mark.parametrize('endpoint', ['workspace', 'score-device'])

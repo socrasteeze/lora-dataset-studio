@@ -129,11 +129,14 @@ def test_the_regroup_button_regroups_a_bank_with_nothing_to_scan(app, tmp_path):
 def test_the_scan_route_forwards_the_regroup_intent(app, client, tmp_path):
     """End to end from the POST body, because that is where the button's intent
     would be dropped without anyone noticing."""
+    from app.models import BankImage
     from app.services import image_bank_service as banks
 
     seen = {}
     with app.app_context():
         bank_id, _src = _bank(banks, tmp_path, name='Route')
+        selected_ids = [row.id for row in BankImage.query.filter_by(bank_id=bank_id)
+                        .order_by(BankImage.id).limit(2)]
 
     # The launch window added `statuses` and `image_ids` to every pass body, so
     # the route forwards two more keys. They are pinned here rather than absorbed
@@ -155,9 +158,9 @@ def test_the_scan_route_forwards_the_regroup_intent(app, client, tmp_path):
                         'statuses': None, 'ids': None}
         # …and a scoped body arrives whole, not silently dropped on the floor.
         assert client.post(f'/api/bank/{bank_id}/scan',
-                           json={'statuses': ['keep'], 'image_ids': [7, 9]}).status_code == 202
+                           json={'statuses': ['keep'], 'image_ids': selected_ids}).status_code == 202
         assert seen == {'rescan': False, 'regroup': False,
-                        'statuses': ['keep'], 'ids': [7, 9]}
+                        'statuses': ['keep'], 'ids': selected_ids}
 
 
 # --- the phase is visible, and it stops --------------------------------------
