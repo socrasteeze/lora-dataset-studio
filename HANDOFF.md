@@ -3,8 +3,8 @@
 **Updated:** 2026-10-16 | **Branch:** validation/test-suite-runtime | **Base:** 447864093
 
 ## State
-Full-suite optimizations are implemented. Code was full-gated at 650fe6536 (38965160764); all 190 cases in touched backend/tooling modules passed. The gate remains red on confirmed baseline failures; main is unchanged.
-Application source, production state and the shipped frontend bundle are unchanged.
+Full-suite optimizations and the remaining failure repairs are implemented. Main and production state are unchanged. Tests remain cloud-only.
+Focused cloud run 38969411582 cleared all 57 original backend failures, all 12 frontend failures, and the browser check. Follow-up source covers seven adjacent active-pass expectations found by that run. The final full gate is pending.
 
 ## Done this session
 - Bounded numerical-library pools to one thread per worker; retained eight full-gate workers, four ordinary CI/release workers and file-local scheduling.
@@ -13,10 +13,15 @@ Application source, production state and the shipped frontend bundle are unchang
 - Reset only Bank queue memory between tests; preserved durable rows and within-test restart checks.
 - Reused independent copies of prepared Git histories for updater/migration tests; retained real Git and fresh databases/media fixtures.
 - Reduced quadratic oracle inputs while retaining threshold/seed coverage and a real production-block case; retained the heartbeat write beyond the original timeout.
+- Allowed workspace jobs to queue behind active passes; immediate edits and deletes remain fenced. Queue regressions check saved failures, pending work, cancellation and GPU release.
+- Separated semantic runtime readiness from statistics for both engines; the frontend merges partial responses without losing counts or readiness.
+- Rejected malformed caption/inpaint options before queue admission and checked empty improvement scopes before model preflight.
+- Kept folder navigation when storage metadata arrives late; added a delayed-response browser regression. Preserved Bank title space with a full-name fallback and a long-name viewport check.
+- Reconciled schema, queue, shared keyboard, help-anchor and extracted-component contracts without dropping cases or probe limits. Rebuilt dist separately.
 
 ## Open
-1. Before landing, inspect the latest exact-head Fork Gates receipt and repair the remaining baseline test and Bank layout failures. Hold main until required qualification and delivery authorization.
-2. The final code run (38965160764) had 57 backend failures, 9865 passes and 14 skips in 750.13s, versus 198 failures/9721 passes/14 skips in 912.23s earlier. All remaining backend failure identities match the confirmed baseline cohort. Frontend still has the same 12 failures; bundled frontend has 1073 passes/4 skips; all six bundled Python suites pass. The browser probe remains red (folder selection in the final run, tablet truncation in earlier runs).
+1. Before landing, inspect the final exact-head Fork Gates receipt. Hold main until required qualification and delivery authorization.
+2. Focused run 38969411582 tested 601 backend cases in 83.68s: 591 passed, 8 failed and 2 optional private-name checks skipped. Seven failures were adjacent synchronous expectations; their follow-ups are implemented. The remaining failure was the diagnostic checkout's missing origin/main; Fork Gates already fetches full history. Core frontend: 5222 passed. Browser: all five sizes and 55 Settings checks passed. Full-gate dependency overlays remain required.
 3. The expanded comparison (38964253881) passed: baseline 161.86s/466 cases/159 failures versus optimized 108.08s/480 cases/57 failures, with no new failures, skips or missing cases. Migration coverage passed in both stages: 57.12s/27 cases versus 41.68s/28 cases. These are focused comparison timings, not full-suite speed claims.
 4. Earlier physical phone/PWA and production restart acceptance remain operator checks; no production services or real jobs were started or interrupted here.
 
@@ -25,7 +30,7 @@ Application source, production state and the shipped frontend bundle are unchang
 - Prepared Git templates are immutable. Every test copies its own refs, files and settings and rewires its own local remote.
 - Real Torch bridge/quantization coverage remains; ordinary capability import transport is synthetic unless a test opts in or overrides it.
 - Independent suites all finish, but any failure keeps the gate red. Lint, build and startup failures still stop dependent work.
-- Source, tests and bundle stay separate where a bundle changes; this tooling-only frontend rebuild left dist unchanged.
+- Source and rebuilt bundle stay in separate commits. Local lint, syntax, build and privacy checks are permitted; tests and fixture servers are not.
 - Diagnostic workflow/helper/manifest live only on diagnostic/test-suite-runtime and must not land with this implementation.
 
 ## Traps

@@ -85,6 +85,21 @@ try {
     await page.waitForFunction(() => document.querySelector('[aria-label="Active Profile"]')?.textContent === 'Default');
       await page.locator(`img[src^="/api/bank/${ready.bank_id}/thumb/"]`).first().waitFor();
       await page.getByRole('heading', { name: 'Demo', exact: true }).waitFor();
+      const nameBounds = await page.getByRole('heading', { name: 'Demo', exact: true }).evaluate((heading) => {
+        const label = heading.querySelector('span');
+        const original = { text: label.textContent, title: label.title };
+        try {
+          label.textContent = `Synthetic Bank ${'long-name-'.repeat(20)}`;
+          label.title = label.textContent;
+          const box = heading.getBoundingClientRect();
+          return { left: box.left, right: box.right, viewport: document.documentElement.clientWidth };
+        } finally {
+          label.textContent = original.text;
+          label.title = original.title;
+        }
+      });
+      assert.ok(nameBounds.left >= -1 && nameBounds.right <= nameBounds.viewport + 1,
+        'A long Bank name must fit the header at every viewport');
       await sourceRequested;
       assert.equal(await page.locator(`img[src^="/api/bank/${ready.bank_id}/thumb/"]`).count(), 4);
     } finally {
