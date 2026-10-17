@@ -85,18 +85,18 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
-    id: '2026-10-16-curation-training-selections',
-    date: '2026-10-16',
-    title: 'Better LoRA Selections',
-    blurb: 'Similar, Diverse and Balanced now share Character, Concept and Style policies. Use several references, pin important images, limit duplicates and adjust target proportions. The report explains each shortlist. Review before Keep or Promote.',
-    to: '/bank',
-  },
-  {
     id: '2026-10-16-storage-folder-selection',
     date: '2026-10-16',
     title: 'Keep Folder Selection',
     blurb: 'The host folder browser keeps the folder you opened when storage information arrives late. Browse fills the destination field without saving or moving files.',
     to: '/settings/storage?focus=dataset-images-root',
+  },
+  {
+    id: '2026-10-16-curation-training-selections',
+    date: '2026-10-16',
+    title: 'Better LoRA Selections',
+    blurb: 'Similar, Diverse and Balanced now share Character, Concept and Style policies. Use several references, pin important images, limit duplicates and adjust target proportions. The report explains each shortlist. Review before Keep or Promote.',
+    to: '/bank',
   },
   {
     id: '2026-10-16-bank-queued-controls',
