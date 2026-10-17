@@ -14,7 +14,7 @@ The operator authorized repairing the remaining failures, rerunning cloud gates,
 - Suite-runtime changes retain fresh per-test app/database/config/plugin state, immutable Git templates copied per test, eight file-local full-gate workers and one numerical-library thread per worker. Independent failures remain fatal.
 
 ## Open
-1. Rerun cloud Fork Gates after registering the curation Guide anchor, aligning the source news order with the existing feed order, and updating the readiness contract for metadata, shared pending state and multiple references. Preserve all existing entry IDs, readiness checks and probe limits. Rebuild the frontend separately and scrub before transport.
+1. Rerun cloud Fork Gates after the three frontend contract repairs and the folder-draft guard. Run 38985714927 at ff97b555a passed curation but timed out waiting for the second viewport's folder Go response. The initial listing could overwrite the typed path. The browser regression now holds that listing, types while loading, and asserts the draft survives before Go. It still checks late parent metadata, persistence and every viewport. Failure receipts upload before the full suite. Rebuild the frontend separately and scrub before transport.
 2. Require the full fork gate, Bank/Settings browser check and curation browser check to pass on the combined source and bundle before landing on main.
 3. Refresh origin/main immediately before landing. Preserve the independent checkout and any later work. Do not merge diagnostic-only workflows or helpers.
 4. Physical phone/PWA, installed-source restart and real GPU/training comparisons remain operator checks. No production service, data or real job was changed by validation.

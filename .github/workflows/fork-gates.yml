@@ -106,4 +106,3 @@ jobs:
             .git/lds-gates-validation/*-backend.xml
           include-hidden-files: true
           if-no-files-found: warn
-
