@@ -178,6 +178,7 @@ export const CORE_GUIDE_ANCHORS = {
     "watermark-inpainting",
     "face-similarity",
     "image-bank-triage",
+    "bank-curation",
     "training",
     "defaults",
     "speed-what-a-step-costs-and-what-it-costs-you-to-make-it-cheaper",

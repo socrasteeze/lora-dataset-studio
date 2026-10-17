@@ -3,7 +3,7 @@
 **Updated:** 2026-10-16 | **Branch:** noble/lora-curation | **Base:** 447864093
 
 ## State
-The operator authorized repairing the remaining failures, rerunning cloud gates, and cleaning and pushing the combined changes to origin/main. Selector changes and the independent validation/test-suite-runtime repairs are reconciled. Main stays unchanged until the combined head passes all required cloud checks. Run 38983056774 at 39031202c passed 9991 backend/tooling cases with 14 skips, all six bundled Python suites, the bundled frontend suite and both browser checks. Three frontend integration contracts failed and are repaired for the next full cloud run.
+The operator authorized repairing the remaining failures, rerunning cloud gates, and cleaning and pushing the combined changes to origin/main. Main stays unchanged until the combined head passes all required cloud checks. Run 38986340299 at 17b5bbfd6 passed 9991 backend/tooling cases with 14 skips, all six bundled Python suites, 5226 core frontend cases, 1073 bundled frontend cases with four skips, and both browser checks. Its only failure was the missing Settings Reference bank-curation anchor, now registered for the next full cloud run.
 
 ## Done
 - Similar, Diverse and Balanced share Character, Concept and Style policies. References, pins, technical-quality penalties, duplicate caps and coverage targets produce review selections only. They never accept, reject, delete or promote images.
@@ -14,7 +14,7 @@ The operator authorized repairing the remaining failures, rerunning cloud gates,
 - Suite-runtime changes retain fresh per-test app/database/config/plugin state, immutable Git templates copied per test, eight file-local full-gate workers and one numerical-library thread per worker. Independent failures remain fatal.
 
 ## Open
-1. Rerun cloud Fork Gates after the three frontend contract repairs and the folder-draft guard. Run 38985714927 at ff97b555a passed curation but timed out waiting for the second viewport's folder Go response. The initial listing could overwrite the typed path. The browser regression now holds that listing, types while loading, and asserts the draft survives before Go. It still checks late parent metadata, persistence and every viewport. Failure receipts upload before the full suite. Rebuild the frontend separately and scrub before transport.
+1. Rerun cloud Fork Gates after registering bank-curation in Settings Reference. A source review found exactly two added Guide headings in this wave: bank-curation and choose-a-selection-policy. Both now have entries in their chapter's reserved anchors. The readiness and news-order repairs passed at 17b5bbfd6; both forced folder races passed all five sizes, alongside 55 Settings checks, ten responsive Settings routes, 45 selector interactions and 15 curation measurements with zero findings or skips. Rebuild the frontend separately and scrub before transport.
 2. Require the full fork gate, Bank/Settings browser check and curation browser check to pass on the combined source and bundle before landing on main.
 3. Refresh origin/main immediately before landing. Preserve the independent checkout and any later work. Do not merge diagnostic-only workflows or helpers.
 4. Physical phone/PWA, installed-source restart and real GPU/training comparisons remain operator checks. No production service, data or real job was changed by validation.
