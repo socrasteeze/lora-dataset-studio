@@ -88,7 +88,7 @@ export const WHATS_NEW = [
     id: '2026-10-16-storage-folder-selection',
     date: '2026-10-16',
     title: 'Keep Folder Selection',
-    blurb: 'The host folder browser keeps the folder you opened when storage information arrives late. Browse fills the destination field without saving or moving files.',
+    blurb: 'The host folder browser keeps a path you type while folders load and keeps the folder you open when storage information arrives late. Browse fills the destination field without saving or moving files.',
     to: '/settings/storage?focus=dataset-images-root',
   },
   {

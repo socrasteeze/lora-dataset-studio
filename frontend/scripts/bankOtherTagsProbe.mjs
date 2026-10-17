@@ -231,11 +231,34 @@ try {
     const beforeSettings = await context.request.get(`${url}/api/settings`);
     assert.equal(beforeSettings.status(), 200);
     const beforeConfig = (await beforeSettings.json()).config;
-    await card.getByRole('button', { name: 'Browse', exact: true }).click();
+    let releaseInitialListing;
+    const initialListingGate = new Promise((resolve) => { releaseInitialListing = resolve; });
+    let initialListingUrl;
+    let listingRequested;
+    const initialListingRequested = new Promise((resolve) => { listingRequested = resolve; });
+    await page.route('**/api/system/list-folders*', async (route) => {
+      if (!initialListingUrl) {
+        initialListingUrl = route.request().url();
+        listingRequested();
+        await initialListingGate;
+      }
+      await route.continue();
+    });
+    await Promise.all([
+      initialListingRequested,
+      card.getByRole('button', { name: 'Browse', exact: true }).click(),
+    ]);
     const browserDialog = page.getByRole('dialog', { name: 'Choose a folder', exact: true });
-    await browserDialog.locator('ul[aria-busy="false"]').waitFor();
+    await browserDialog.locator('ul[aria-busy="true"]').waitFor();
     const address = browserDialog.getByRole('textbox', { name: 'Folder path', exact: true });
     await address.fill(ready.import_folders[viewportIndex]);
+    const initialListingResponse = page.waitForResponse((response) => response.url() === initialListingUrl);
+    releaseInitialListing();
+    assert.equal((await initialListingResponse).status(), 200);
+    await browserDialog.locator('ul[aria-busy="false"]').waitFor();
+    assert.equal(await address.inputValue(), ready.import_folders[viewportIndex],
+      'The initial folder listing must preserve a path typed while it loads');
+    await page.unroute('**/api/system/list-folders*');
     const [listing] = await Promise.all([
       page.waitForResponse((response) => {
         const target = new URL(response.url());
@@ -281,7 +304,8 @@ try {
     }));
     assert.ok(boxes.every((box) => box.left >= -1 && box.right <= width + 1),
       'Dataset destination controls must fit the viewport');
-    settingsOutcomes.push({ section: 'storage-browser', width, height, lateMetadata: true, passed: true });
+    settingsOutcomes.push({ section: 'storage-browser', width, height, lateMetadata: true,
+      lateListingDraft: true, passed: true });
     assert.deepEqual(errors, []);
     outcomes.push({ width, height, firstPageBeforeSourceCheck: true, singleBankExclusions: true, passed: true });
     // Leave only the tagged demo bank for the existing probe's list primer.
@@ -301,6 +325,13 @@ try {
   console.log(`Bank checks passed at ${outcomes.length} sizes; ${settingsOutcomes.length} Settings route checks passed.\n${probe}\n${JSON.stringify(settingsProbe)}`);
 } catch (error) {
   console.error(error.stack || error);
+  try {
+    fs.mkdirSync(receipts, { recursive: true });
+    await writeFile(path.join(receipts, 'other-tags.json'), JSON.stringify({ outcomes, settingsOutcomes,
+      failure: { name: error.name, message: error.message } }, null, 2));
+  } catch (receiptError) {
+    console.error('Could not save the browser failure receipt:', receiptError.message);
+  }
   for (const context of browser?.contexts() || []) {
     for (const page of context.pages()) {
       console.error(JSON.stringify({ url: page.url(),

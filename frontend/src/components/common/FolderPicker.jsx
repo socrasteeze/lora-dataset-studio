@@ -33,6 +33,7 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
   const [query, setQuery] = useState('')
   const dialogRef = useRef(null)
   const listingRequest = useRef(0)
+  const typedRevision = useRef(0)
   useFocusTrap(dialogRef)
 
   useEffect(() => {
@@ -67,6 +68,7 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
 
   const load = useCallback(async (p) => {
     const requestId = ++listingRequest.current
+    const draftRevision = typedRevision.current
     setLoading(true); setBrowseError('')
     try {
       const q = p ? `?path=${encodeURIComponent(p)}` : ''
@@ -77,7 +79,8 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
       setError('')
       // Follow the browser: after a click, an Up, or a successful jump, the box
       // shows where you ARE, so the next paste replaces a real path.
-      setTyped(d.path || '')
+      // Keep a newer draft when an earlier listing finishes.
+      if (draftRevision === typedRevision.current) setTyped(d.path || '')
     } catch (e) {
       if (requestId !== listingRequest.current) return
       // Keep the last valid folder. Drives stays available even when the
@@ -130,7 +133,7 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
             aria-label="Folder path"
             value={typed}
             disabled={busy}
-            onChange={(e) => setTyped(e.target.value)}
+            onChange={(e) => { typedRevision.current += 1; setTyped(e.target.value) }}
             placeholder={data?.path || 'Paste or type a path'}
             spellCheck={false}
             className="min-h-11 min-w-0 flex-1 rounded-md border border-border bg-surface-raised px-2 py-1 font-mono text-xs text-content placeholder:text-content-subtle" />
