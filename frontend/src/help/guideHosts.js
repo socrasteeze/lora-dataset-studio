@@ -35,6 +35,7 @@ export const CORE_GUIDE_ANCHORS = {
     "the-app-asks-the-question-for-you",
     "checking-your-folders-before-the-person-pass",
     "when-the-sampled-images-have-no-face-in-them",
+    "choose-a-selection-policy",
     "pick-a-balanced-set",
     "is-this-image-really-what-it-says-it-is",
     "sort-a-bank-by-medium-and-by-head-angle",

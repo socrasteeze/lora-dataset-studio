@@ -3,7 +3,7 @@
 **Updated:** 2026-10-16 | **Branch:** noble/lora-curation | **Base:** 447864093
 
 ## State
-The operator authorized repairing the remaining failures, rerunning cloud gates, and cleaning and pushing the combined changes to origin/main. Selector changes and the independent validation/test-suite-runtime repairs are reconciled. Main stays unchanged until the combined head passes all required cloud checks.
+The operator authorized repairing the remaining failures, rerunning cloud gates, and cleaning and pushing the combined changes to origin/main. Selector changes and the independent validation/test-suite-runtime repairs are reconciled. Main stays unchanged until the combined head passes all required cloud checks. Run 38983056774 at 39031202c passed 9991 backend/tooling cases with 14 skips, all six bundled Python suites, the bundled frontend suite and both browser checks. Three frontend integration contracts failed and are repaired for the next full cloud run.
 
 ## Done
 - Similar, Diverse and Balanced share Character, Concept and Style policies. References, pins, technical-quality penalties, duplicate caps and coverage targets produce review selections only. They never accept, reject, delete or promote images.
@@ -14,7 +14,7 @@ The operator authorized repairing the remaining failures, rerunning cloud gates,
 - Suite-runtime changes retain fresh per-test app/database/config/plugin state, immutable Git templates copied per test, eight file-local full-gate workers and one numerical-library thread per worker. Independent failures remain fatal.
 
 ## Open
-1. Rebuild the frontend in a separate commit, scrub both passes, and push validation/noble-lora-curation for exact-head cloud qualification.
+1. Rerun cloud Fork Gates after registering the curation Guide anchor, aligning the source news order with the existing feed order, and updating the readiness contract for metadata, shared pending state and multiple references. Preserve all existing entry IDs, readiness checks and probe limits. Rebuild the frontend separately and scrub before transport.
 2. Require the full fork gate, Bank/Settings browser check and curation browser check to pass on the combined source and bundle before landing on main.
 3. Refresh origin/main immediately before landing. Preserve the independent checkout and any later work. Do not merge diagnostic-only workflows or helpers.
 4. Physical phone/PWA, installed-source restart and real GPU/training comparisons remain operator checks. No production service, data or real job was changed by validation.

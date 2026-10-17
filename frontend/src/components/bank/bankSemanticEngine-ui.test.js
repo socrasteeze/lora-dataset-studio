@@ -99,11 +99,28 @@ test('every semantic action gates on semanticReady, while Medium stays CLIP/Scor
     panel.indexOf("onPassOpen('caption')"))
   assert.match(crops, /disabled=\{live \|\| !semanticReady\}/)
 
-  const curate = workspace.slice(workspace.indexOf('Curate'),
+  const curate = workspace.slice(workspace.indexOf('<div id="bank-curate"'),
     workspace.indexOf('{coverageOpen &&'))
-  assert.match(curate, /disabled=\{live \|\| !semanticReady \|\| diverseBusy\}/)
-  assert.match(curate,
-    /disabled=\{live \|\| !semanticReady \|\| similarBusy\n\s*\|\| \(selected\.size !== 1 && !similarLast\)\}/)
+  const selectorButton = (lane) => {
+    const expansion = curate.indexOf(`aria-expanded={curateOpen === '${lane}'}`)
+    assert.ok(expansion >= 0, `${lane} selector is missing`)
+    const start = curate.lastIndexOf('<button', expansion)
+    const end = curate.indexOf('</button>', expansion)
+    assert.ok(start >= 0 && end > expansion, `${lane} button bounds are missing`)
+    return curate.slice(start, end)
+  }
+  assert.match(workspace,
+    /const semanticOperationBusy = diverseBusy \|\| balanceBusy \|\| similarBusy \|\| textPending/)
+  for (const lane of ['diverse', 'similar']) {
+    assert.match(selectorButton(lane),
+      /disabled=\{live \|\| !semanticReady \|\| !curationMetadata \|\| semanticOperationBusy/)
+  }
+  assert.match(selectorButton('similar'),
+    /!selected\.size && !curationPolicy\.reference_ids\.length && !similarLast/)
+  assert.match(workspace,
+    /const balanceReady = balanceReadiness\(\{\s*semanticReady: semanticReady && !!curationMetadata/)
+  assert.match(selectorButton('balanced'),
+    /disabled=\{live \|\| semanticOperationBusy \|\| !balanceReady\.ready\}/)
   assert.match(curate, /disabled=\{live \|\| !semanticReady\}[\s\S]*openTextSearch/)
 
   const medium = panel.slice(panel.indexOf("onPassOpen('medium')"),
