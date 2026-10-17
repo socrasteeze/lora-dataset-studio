@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-17-dataset-import-picked-images',
+    date: '2026-10-17',
+    title: 'Pick the images to import from a bank or another dataset',
+    blurb: '"Import from a bank or a dataset" in Add images now shows the source\'s images: click the ones you want and only those are copied, with their captions. Your other datasets are offered as sources next to your banks, and a bank can still send its whole kept set.',
+    to: '/datasets?section=add',
+  },
+  {
     id: '2026-10-16-storage-folder-selection',
     date: '2026-10-16',
     title: 'Keep Folder Selection',
