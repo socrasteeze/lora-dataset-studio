@@ -61,6 +61,15 @@ jobs:
         if: ${{ !cancelled() }}
         run: node frontend/scripts/bankOtherTagsProbe.mjs
 
+      - name: Save Browser Receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bank-other-tags-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .git/lds-gates-validation/other-tags.json
+          include-hidden-files: true
+          if-no-files-found: warn
+
       - name: Check Curation Controls in Browser
         if: ${{ !cancelled() }}
         run: node frontend/scripts/bankCurationProbe.mjs
@@ -98,11 +107,3 @@ jobs:
           include-hidden-files: true
           if-no-files-found: warn
 
-      - name: Save Browser Receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: bank-other-tags-${{ github.event.pull_request.head.sha || github.sha }}
-          path: .git/lds-gates-validation/other-tags.json
-          include-hidden-files: true
-          if-no-files-found: warn
