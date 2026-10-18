@@ -5,6 +5,7 @@ import { useToast } from '../common/Toast'
 import { copyText } from '../../utils/copyText'
 import { INPUT_CLASS, Card } from './primitives'
 import ResetToDefault from './ResetToDefault'
+import { waitForRelaunchedServer } from '../../utils/serverRestart'
 
 /* managed-access:start -- kept dependency-free so its real production logic can
    be exercised by the Node test suite without needing to transpile this JSX file. */
@@ -116,13 +117,7 @@ export default function ServerSection({ config, setField, runtime, handleSave, c
   const qrUrl = reachUrls[0]?.url || null
 
   const waitForHealthAndReload = async () => {
-    for (let i = 0; i < 120; i += 1) {
-      await new Promise((r) => setTimeout(r, 1000))
-      try {
-        const res = await fetch('/api/health', { cache: 'no-store' })
-        if (res.ok) { window.location.reload(); return }
-      } catch { /* still restarting — keep waiting */ }
-    }
+    if (await waitForRelaunchedServer({ timeoutMs: 2 * 60 * 1000 })) { window.location.reload(); return }
     setRestarting(false)   // gave up after ~2 min
   }
 
