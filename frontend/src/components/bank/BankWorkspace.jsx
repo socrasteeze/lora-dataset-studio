@@ -1980,7 +1980,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-2" data-probe-panel="bank-identities">
         <IdentityFilter source="bank" scopeId={bankId} value={filter.identityId} version={identityVersion}
           onChange={(value) => setF('identityId', value || null)} />
-        <IdentityTools source="bank" scopeId={bankId} imageIds={[...selected]} busy={live}
+        <IdentityTools key={String(bankId) + ':' + (payload?.instance_id || '')}
+          source="bank" scopeId={bankId} imageIds={[...selected]} busy={live}
           onChanged={() => { setIdentityVersion((value) => value + 1); refreshImages(); refreshPayload({ force: true }); }} />
       </div>
       {/* ── The top bar ──────────────────────────────────────────────────

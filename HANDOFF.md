@@ -1,9 +1,9 @@
 # HANDOFF
 
-**Updated:** 2026-10-18 | **Branch:** validation/identity-learning | **Base:** 5306f107f | **Tree:** clean after this commit
+**Updated:** 2026-10-18 | **Branch:** validation/identity-learning | **Source base:** 5d32d6ceb | **Main base:** 5306f107f
 
 ## State
-The approved implementation is drafted in the isolated task worktree. Static lint/build/privacy checks pass; exact-source cloud behavioral/rendered qualification and real recognition accuracy remain open.
+The approved implementation is drafted in the isolated task worktree. Cloud qualification found issues now repaired for a fresh exact-head run. Real recognition accuracy remains open.
 
 ## Done this session
 - Added identity records, per-subject references, corrections, rejected pairs, undo and shared filters in backend/app/services/identity_learning.py.
@@ -13,9 +13,9 @@ The approved implementation is drafted in the isolated task worktree. Static lin
 - Initial scope receipt: 88d17bb6a. The running checkout remains unchanged.
 
 ## Open
-1. Inspect cloud Fork Gates on the latest task head. Initial 43c41d2fe run 39161578218 found sparse identity-row sizing; the local grid repair needs a fresh cloud render.
+1. Run cloud Fork Gates on the next task head. Head 116c4a87e, run 39162028868: Bank/Settings and all 45 curation cases passed. Backend: 10002 passed, 20 failures from the old core-table count. Frontend: 5227 passed, 3 contract failures (identity sort, modal opacity, inherited import-panel ellipses). Identity browser probe stopped at an inaccessible Kind label before completing a case. These issues are repaired in source; fresh cloud confirmation is required.
 2. Repair every introduced backend/frontend/browser failure; do not count unrun synthetic cases or the production build as passing behaviors.
-3. Exercise the explicit held-out evaluation on permitted labeled unseen artwork. Corpus selection remains pending; report wrong names, misses, abstentions and provenance.
+3. The operator chose a local accuracy set. Await its location/labels and explicit local-evaluation authorization; keep those images local and report wrong names, misses, abstentions and provenance.
 4. Carry forward upstream-port and physical-device/trainer gates from 5d32d6ceb:HANDOFF.md. Activation of the running checkout needs a separate stop/start.
 
 ## Decisions
@@ -31,7 +31,7 @@ The approved implementation is drafted in the isolated task worktree. Static lin
 ## Traps
 - Do not switch, rebuild or migrate the running checkout; retain its unresolved activation gate.
 - Isolate runtime paths and inherited profile identity before application imports, which can mutate schema/state.
-- Local tests, fixture-backed checks and probes remain unauthorized; static lint/build/privacy scans are permitted.
+- Local tests, fixture-backed checks and probes remain unauthorized; selecting a future local corpus did not authorize a run. Static lint/build/privacy scans are permitted.
 - Bank clusters are disposable local numbers, not permanent identities.
 - Whole-image taggers cannot locate several characters; captions are not confirmed evidence.
 - Keep real images and names private; accuracy needs a permitted labeled set with unseen artwork held out.

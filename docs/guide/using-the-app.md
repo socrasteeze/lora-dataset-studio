@@ -13,7 +13,7 @@ Minimum Similarity and Ambiguity Margin are editable starting heuristics. They a
 Missing models, unusable faces and stale pixels remain unmeasured. Install the relevant tools in **Setup > Quality Tools**.
 Unconfirmed suggestions never become training examples. Confirm a suggestion to teach it, or use **Reject Match** to exclude that pair.
 
-**Remove Name** removes an assignment. **Undo** restores the last action only where later work has not changed it.
+**Remove Name** removes an assignment. **Undo** restores the complete last bulk action, including after a reload, only where later work has not changed it.
 Use **Correct Name** to replace a wrong identity and exclude its previous match. A removed example stops teaching the wrong identity.
 The identity filter changes the actual image pool, including selection and bulk decisions.
 
@@ -26,7 +26,12 @@ Dataset backups and training ZIP exports carry identity metadata separately from
 Identity operations do not change captions, trigger words, source files or Keep/Reject decisions.
 
 The current recognition path uses prepared InsightFace for photos and CLIP for drawn subjects. It does not retrain model weights after a name.
+If preparation was missing when you named an image, select that named subject and use **Find Matches** after Setup to complete its evidence.
+Unsaved names recover as a local browser draft. Review a recovered name before assigning it; the draft is not accepted server state.
 Recognition across outfits and art styles needs a labeled reference and unseen-artwork evaluation before an accuracy claim is valid.
+The matcher uses at most 32 current examples per identity, newest first, from a maximum of 6400 reference records per pass.
+These are resource limits, not optimal training sizes. All assignments remain stored.
+Each image supports up to 32 subject regions. Catalog imports accept at most 300000 character rows within 32 MiB.
 **Stop** ends a multi-batch operation after its current request finishes. Earlier batches remain saved; the browser does not promise durable resume.
 
 

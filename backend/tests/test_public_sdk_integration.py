@@ -94,8 +94,10 @@ def test_each_public_product_registers_alone_with_real_sdk(host, pid):
     assert loaded.records[pid].state == 'loaded', loaded.records[pid].error
     assert all(r.state == 'disabled' for key, r in loaded.records.items() if key != pid)
     # Public Video/publication history persists even while the packages are absent.
-    assert len(db.metadata.tables) == 37
+    assert len(db.metadata.tables) == 43
     assert {'dataset_import_receipt', 'dataset_duplicate_keep', 'bank_collection', 'bank_collection_member'} <= set(db.metadata.tables)
+    assert {'named_identity', 'identity_subject', 'identity_evidence', 'identity_assignment',
+            'identity_action', 'character_vocabulary'} <= set(db.metadata.tables)
     assert {'video_civitai_link', 'video_checkpoint_preview'} <= set(db.metadata.tables)
     assert not any('creature' in name for name in db.metadata.tables)
 

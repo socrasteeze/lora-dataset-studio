@@ -42,6 +42,7 @@ try {
   for (const [width, height] of [[360, 800], [412, 915], [844, 390], [768, 1024], [1280, 800]]) {
     for (const source of ['bank', 'dataset']) {
       for (const kind of ['anime', 'person']) {
+        assert.ok((await fetch(url+'/test/reset-identities', { method: 'POST' })).ok)
         const context = await browser.newContext({ viewport: { width, height } })
         const page = await context.newPage()
         const errors = []
@@ -55,7 +56,19 @@ try {
         await page.locator('[data-identity-open]').click()
         const panel = page.getByRole('dialog', { name: 'Identities', exact: true })
         await panel.getByLabel('Kind', { exact: true }).selectOption(kind)
+        await panel.getByRole('button', { name: 'Choose Subject', exact: true }).click()
+        await page.getByRole('button', { name: 'Crop', exact: true }).click()
         await panel.getByLabel('Name', { exact: true }).fill('Aster '+source+' '+kind+' '+width)
+        if (source === 'bank' && kind === 'anime' && width === 360) {
+          page.once('dialog', (dialog) => dialog.accept())
+          await page.reload()
+          await page.getByAltText('image-01.png', { exact: true }).click()
+          await page.locator('[data-identity-open]').click()
+          await page.waitForFunction((expected) => document.querySelector('[role="dialog"] input[aria-label="Name"]')?.value === expected,
+            'Aster '+source+' '+kind+' '+width)
+          await panel.getByRole('button', { name: 'Choose Subject', exact: true }).click()
+          await page.getByRole('button', { name: 'Crop', exact: true }).click()
+        }
         if (kind === 'anime') await panel.getByLabel('One Character', { exact: true }).check()
         const assigned = page.waitForResponse((response) => response.url().endsWith('/assign') && response.request().method() === 'POST')
         await panel.getByRole('button', { name: 'Assign', exact: true }).click()
@@ -88,11 +101,38 @@ try {
         assert.equal((await removal).status(), 200)
         await panel.getByRole('button', { name: 'Undo', exact: true }).click()
         await panel.getByRole('button', { name: 'Remove Name', exact: true }).first().waitFor()
-        await panel.getByRole('button', { name: 'Find Matches', exact: true }).click()
-        await panel.getByRole('button', { name: 'Close', exact: true }).waitFor({ state: 'visible' })
-        await page.waitForFunction(() => !document.querySelector('[role="dialog"] button')?.disabled)
         await panel.getByRole('button', { name: 'Close', exact: true }).click()
         await panel.waitFor({ state: 'detached' })
+        if (source === 'bank') {
+          await page.getByAltText('image-01.png', { exact: true }).click()
+          await page.getByAltText('image-02.png', { exact: true }).click()
+        } else {
+          const checks = page.getByRole('checkbox', { name: /Select .* for bulk actions/ })
+          await checks.nth(0).uncheck(); await checks.nth(1).check()
+        }
+        await page.locator('[data-identity-open]').click()
+        await panel.getByLabel('Kind', { exact: true }).selectOption(kind)
+        if (kind === 'anime') await panel.getByLabel('One Character', { exact: true }).check()
+        await panel.getByRole('button', { name: 'Find Matches', exact: true }).click()
+        await panel.getByRole('button', { name: 'Reject Match', exact: true }).first().waitFor()
+        await panel.getByRole('button', { name: 'Reject Match', exact: true }).first().click()
+        await panel.getByRole('button', { name: 'Undo', exact: true }).click()
+        await panel.getByRole('button', { name: 'Find Matches', exact: true }).click()
+        await panel.getByRole('button', { name: 'Confirm', exact: true }).first().waitFor()
+        await panel.getByRole('button', { name: 'Confirm', exact: true }).first().click()
+        if (kind === 'anime') {
+          await panel.getByRole('button', { name: 'Suggest Names', exact: true }).click()
+          await panel.getByRole('button', { name: 'aster demo · 0.92', exact: true }).waitFor()
+        }
+        await panel.getByRole('button', { name: 'Close', exact: true }).click()
+        const identityResponse = await page.request.get(url+'/api/identities?kind='+kind)
+        const identity = (await identityResponse.json()).identities[0]
+        await page.getByLabel('Identity Filter', { exact: true }).selectOption(identity.id)
+        if (source === 'dataset') {
+          await page.waitForFunction(() => document.querySelectorAll('#ds-images-review input[type="checkbox"]').length === 2)
+        } else {
+          await page.waitForFunction(() => document.querySelectorAll('img[alt^="image-"]').length === 2)
+        }
         assert.deepEqual(errors, [])
         outcomes.push({ width, height, source, kind, passed: true })
         await context.close()

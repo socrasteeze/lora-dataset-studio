@@ -73,6 +73,18 @@ def main():
                 'hashes': [hashlib.sha256((source/f'image-{i:02d}.png').read_bytes()).hexdigest()
                            for i in range(1, 5)]}
 
+    @app.post('/test/reset-identities')
+    def reset_identities():
+        from app.models import (IdentityAction, IdentityAssignment, IdentityEvidence,
+                                IdentitySubject, NamedIdentity)
+        for model in (IdentityAction, IdentityAssignment, IdentityEvidence,
+                      IdentitySubject, NamedIdentity):
+            model.query.delete()
+        BankImage.query.update({'identity_snapshot': None})
+        FaceDatasetImage.query.update({'identity_snapshot': None})
+        db.session.commit()
+        return {'ok': True}
+
     @app.post('/test/shutdown')
     def shutdown():
         import threading

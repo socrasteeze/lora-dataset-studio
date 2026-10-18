@@ -22,8 +22,10 @@ def endpoint(fn):
         except identities.IdentityNotFound as error:
             db.session.rollback()
             return jsonify(error=str(error)), 404
-        except (identities.IdentityConflict, IntegrityError,
-                BankJobBusy, DatasetActivityBusy):
+        except identities.IdentityConflict as error:
+            db.session.rollback()
+            return jsonify(error=str(error)), 409
+        except (IntegrityError, BankJobBusy, DatasetActivityBusy):
             db.session.rollback()
             return jsonify(error='Identity or image work changed. Reload before retrying.'), 409
         except RecognitionUnavailable as error:
@@ -117,6 +119,8 @@ def assign(source, scope_id):
                 result['learning'] = identities.analyze(
                     LOCAL_USER, source, scope_id, {**data, 'kind': identity.kind},
                     confirmation=(identity.id, set(result['subject_ids'])))
+                if result['learning']['unknown']:
+                    result['learning']['reason'] = 'Name saved. Some subjects need a usable single-subject crop.'
             except RecognitionUnavailable as error:
                 result['learning'] = {'measured': 0, 'reason': str(error),
                                       'setup_route': '#/setup?step=quality'}
@@ -184,7 +188,17 @@ def undo_offer(source, scope_id):
 def image_file(source, scope_id, image_id):
     try:
         scope, image = identities._image(LOCAL_USER, source, scope_id, image_id)
-        response = send_file(identities._path(source, scope, image))
+        path = identities._path(source, scope, image)
+        if request.args.get('thumbnail') == '1':
+            if source == 'bank':
+                from ..services.image_bank_service import ensure_thumb
+                path = ensure_thumb(scope, image)
+            else:
+                from ..services.dataset_thumbs import ensure_thumb
+                path = ensure_thumb(scope_id, path, image.filename, 256)
+            if not path:
+                raise ValueError('Preview is unavailable.')
+        response = send_file(path)
         response.headers['Cache-Control'] = 'private, no-store'
         return response
     except (ValueError, OSError):

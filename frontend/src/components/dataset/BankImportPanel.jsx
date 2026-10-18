@@ -267,9 +267,9 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
 
   const loadingSources = banks == null || datasets == null;
   const noSource = !loadingSources && bankRows.length === 0 && datasets.length === 0;
-  const importLabel = copying ? `Copying ${copying.done}/${copying.total}…`
-    : watching != null ? 'Importing…'
-      : starting ? 'Starting…'
+  const importLabel = copying ? `Copying ${copying.done}/${copying.total}`
+    : watching != null ? 'Importing'
+      : starting ? 'Starting'
         : selected.size ? `Import ${selected.size} selected` : 'Import selected';
 
   return (
@@ -289,7 +289,7 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
       </p>
 
       {loadingSources ? (
-        <p className="text-content-subtle text-xs">Loading sources…</p>
+        <p className="text-content-subtle text-xs">Loading sources</p>
       ) : noSource ? (
         <p className="text-content-subtle text-xs">
           No bank and no other dataset yet —{' '}
@@ -307,12 +307,12 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
             <select id="ds-bank-import-select" value={chosen} disabled={busy}
               onChange={(e) => pickSource(e.target.value)}
               className="mt-1 w-full rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50">
-              <option value="">Choose a bank or a dataset…</option>
+              <option value="">Choose a bank or a dataset</option>
               {bankRows.length > 0 && (
                 <optgroup label="Banks">
                   {bankRows.map((r) => (
                     <option key={`bank-${r.id}`} value={sourceValue('bank', r.id)}>
-                      {r.name} — {r.count == null ? 'counting…' : `${r.count} to import`} ({r.keep}/{r.total} kept)
+                      {r.name} — {r.count == null ? 'counting' : `${r.count} to import`} ({r.keep}/{r.total} kept)
                     </option>
                   ))}
                 </optgroup>
@@ -371,7 +371,7 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
               </div>
 
               {items == null ? (
-                <p className="text-content-subtle text-xs">Loading images…</p>
+                <p className="text-content-subtle text-xs">Loading images</p>
               ) : items.length === 0 ? (
                 <p className="text-content-subtle text-xs">
                   {showAll
@@ -406,7 +406,7 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
               {sourceKind === 'bank' && items && items.length < itemsTotal && (
                 <button type="button" onClick={loadMore} disabled={loadingMore}
                   className="self-start text-content-subtle text-2xs underline hover:text-content disabled:opacity-40">
-                  {loadingMore ? 'Loading…' : `Show more (${items.length} of ${itemsTotal})`}
+                  {loadingMore ? 'Loading' : `Show more (${items.length} of ${itemsTotal})`}
                 </button>
               )}
             </>
