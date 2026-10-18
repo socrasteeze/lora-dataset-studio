@@ -220,7 +220,7 @@ def _offline_env() -> dict:
     return env
 
 
-def caption_images(image_paths, timeout=None, on_progress=None) -> dict:
+def caption_images(image_paths, timeout=None, on_progress=None, *, force_cpu=False) -> dict:
     """Tag ``image_paths`` into raw category maps. Does not format or store.
 
     Success: ``{ok, results: {path: {general, character}}, errors, model}``.
@@ -241,7 +241,7 @@ def caption_images(image_paths, timeout=None, on_progress=None) -> dict:
     payload = json.dumps({
         'images': images,
         'models_dir': models_dir(),
-        'device': device(),
+        'device': 'cpu' if force_cpu else device(),
     })
     budget = int(timeout) if timeout else default_timeout(len(images))
 

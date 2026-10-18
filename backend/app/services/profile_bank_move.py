@@ -167,6 +167,8 @@ def _copy_rows(target, snapshot, maps, origin, threshold, *, resume):
             'promoted_dataset_id': original.get('promoted_dataset_id'),
             'promoted_bank_id': original.get('promoted_bank_id')})
         expected['bank_image'].append(_insert(target, 'bank_image', row, maps, resume=resume))
+        from .identity_metadata import materialize_sqlite
+        materialize_sqlite(target, 'bank', bank, expected['bank_image'][-1])
     # Missing collection members/distinct endpoints remain tombstones. Negative
     # aliases cannot accidentally bind a future positive image ID.
     references = {row[key] for row in snapshot['bank_dup_distinct'] for key in ('image_a', 'image_b')}
@@ -476,6 +478,8 @@ def move_bank(user_id, bank_id, instance_id, target_id, operation_id):
             if source_cache.exists():
                 source_cache.rename(archive / 'cache')
             _detach_history(source, snapshot, origin, new_id)
+            from .identity_metadata import remove_bank_sqlite
+            remove_bank_sqlite(source, bank_id, instance_id)
             source.execute('DELETE FROM bank_collection_member WHERE collection_id IN (SELECT id FROM bank_collection WHERE bank_id=?)', (bank_id,))
             for table in reversed(TABLES[1:]):
                 if table != 'bank_collection_member':

@@ -3163,7 +3163,8 @@ _BACKUP_IMG_FIELDS = ('filename', 'source', 'framing', 'variation_label', 'statu
                       # preservation, lossless transfer) — dropping either here
                       # would silently lose it across a backup/restore cycle.
                       'fail_reason', 'source_metadata',
-                      'bank_analysis_snapshot', 'transfer_metadata', 'bank_profile_history')
+                      'bank_analysis_snapshot', 'transfer_metadata', 'bank_profile_history',
+                      'identity_snapshot')
 
 
 def _backup_basename(value):
@@ -3359,6 +3360,9 @@ def _normalized_backup_image_meta(meta, *, version=BACKUP_VERSION):
                                    or parent_id <= 0)):
         raise ValueError('invalid backup parent image id')
     out['parent_image_id'] = parent_id
+    from .identity_metadata import normalize as normalize_identities
+    identity_data = normalize_identities(meta.get('identity_snapshot'))
+    out['identity_snapshot'] = json.dumps(identity_data) if identity_data else None
     return out
 
 
@@ -4278,6 +4282,9 @@ def _bkp_restore_validated(user_id: int, z: zipfile.ZipFile, manifest,
         db.session.flush()
         id_map = {meta.get('backup_image_id'): img.id for img, meta in restored_rows
                   if meta.get('backup_image_id') is not None}
+        from .identity_learning import restore_metadata
+        for img, meta in restored_rows:
+            restore_metadata(user_id, 'dataset', ds.id, img.id, meta.get('identity_snapshot'))
         for img, meta in restored_rows:
             img.parent_image_id = id_map.get(meta.get('parent_image_id'))
         # Reference fields are rebuilt exclusively from actual ref/ archive files.
@@ -6158,7 +6165,7 @@ def _imp_commit_row(user_id, dataset_id, index, stored, extension, scale,
                     framing_at, caption_origin_at, bank_id_at,
                     watermark_state_at, watermark_bbox_at,
                     watermark_regions_at, watermark_source_at,
-                    watermark_score_at, import_receipt=None):
+                    watermark_score_at, import_receipt=None, identity_snapshot=None):
     """One image's atomic landing, moved verbatim: seal the analysis
     sidecar, restore transfer-metadata values, write the file atomically,
     insert the row and commit — and on ANY failure roll back, unlink the
@@ -6215,6 +6222,10 @@ def _imp_commit_row(user_id, dataset_id, index, stored, extension, scale,
                                    metadata_by_index[index]
                                    if index < len(metadata_by_index) else None))
         db.session.add(img)
+        db.session.flush()
+        if identity_snapshot:
+            from .identity_learning import restore_metadata
+            restore_metadata(user_id, 'dataset', dataset_id, img.id, identity_snapshot)
         if import_receipt is not None:
             db.session.add(import_receipt)
         db.session.commit()
@@ -6243,7 +6254,8 @@ def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, st
                   watermark_scores=None, statuses=None,
                   transfer_metadatas=None, dedupe_seen=None,
                   preserve_exact_bytes=False, created_ids_sink=None,
-                  provenance_changes_sink=None, import_receipt=None):
+                  provenance_changes_sink=None, import_receipt=None,
+                  identity_snapshots=None):
     """Store original static bytes (or head-crop) + create import rows (status=keep).
     When crop=True, each image is auto head-cropped via Qwen3-VL - the CALLER
     must then hold the GPU-exclusive window - and is by construction a face,
@@ -6313,6 +6325,18 @@ def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, st
         watermark_bboxes, watermark_regions, watermark_sources,
         watermark_scores, statuses, transfer_metadatas)
 
+    from .identity_metadata import normalize as normalize_identities
+    from ..models import BankImage
+    import hashlib
+    identity_values = list(identity_snapshots or ())
+    if not identity_values and bank_image_ids:
+        identity_values = [
+            (db.session.get(BankImage, value).identity_snapshot
+             if value and db.session.get(BankImage, value) else None)
+            for value in bank_image_ids]
+    identity_values = [normalize_identities(value) for value in identity_values]
+    if crop and any(identity_values):
+        raise ValueError('Assign identities after automatic head cropping.')
     ids = []
     failed = 0
     for index, raw in enumerate(files_bytes):
@@ -6356,6 +6380,14 @@ def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, st
             _imp_absorb_duplicate(
                 match, index, stats, dataset_id, bank_id_at,
                 seal_analysis_snapshot, provenance_changes_sink)
+            # Perceptual deduplication can match different pixels. Never
+            # transfer a person's label onto merely similar content.
+            if index < len(identity_values) and identity_values[index]:
+                matched = db.session.get(FaceDatasetImage, match)
+                if matched and bank_transfer_metadata.content_fingerprint_path(_img_path(matched)) == hashlib.sha256(stored).hexdigest():
+                    from .identity_learning import restore_metadata
+                    restore_metadata(user_id, 'dataset', dataset_id, match, identity_values[index])
+                    db.session.commit()
             continue
         if import_receipt is not None:
             import_receipt.result = json.dumps({
@@ -6368,7 +6400,8 @@ def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, st
             captions_by_index, metadata_by_index, status_at, framing_at,
             caption_origin_at, bank_id_at, watermark_state_at,
             watermark_bbox_at, watermark_regions_at, watermark_source_at,
-            watermark_score_at, import_receipt=import_receipt)
+            watermark_score_at, import_receipt=import_receipt,
+            identity_snapshot=identity_values[index] if index < len(identity_values) else None)
         if dedupe and fp is not None:
             seen.append((fp, img.id))
         ids.append(img.id)
@@ -6463,7 +6496,8 @@ _DATASET_ZIP_IMG_EXTS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp')
 
 
 @_serialize_dataset_ingest
-def _merge_training_images(user_id, dataset_id, entries, captions, stats=None):
+def _merge_training_images(user_id, dataset_id, entries, captions, stats=None,
+                           identity_metadata=None):
     """Shared ZIP/folder import: entries are (stem, display_name, getter),
     where getter returns image bytes; captions maps stems to text. Readable
     images become kept import rows with preserved aspect and capped matching
@@ -6540,6 +6574,10 @@ def _merge_training_images(user_id, dataset_id, entries, captions, stats=None):
             caption=cap,
             caption_origin=caption_origin.ASSERTED if cap else None)
         db.session.add(img)
+        db.session.flush()
+        if identity_metadata and identity_metadata.get(stem):
+            from .identity_learning import restore_metadata
+            restore_metadata(user_id, 'dataset', dataset_id, img.id, identity_metadata[stem])
         db.session.commit()
         if fp is not None:
             seen.append((fp, img.id))     # so the rest of the batch dedupes too
@@ -6597,8 +6635,24 @@ def import_dataset_zip(user_id: int, dataset_id: int,
                  lambda i=i: z.read(i))
                 for i in infos if i.filename.lower().endswith(_DATASET_ZIP_IMG_EXTS)
             ]
+            identity_metadata = {}
+            identity_member = next((info for info in infos
+                                    if info.filename == '_identity_metadata.json'), None)
+            if identity_member:
+                if identity_member.file_size > 32*1024*1024:
+                    raise ValueError('Identity manifest exceeds 32 MiB.')
+                from .identity_metadata import normalize as normalize_identities
+                try:
+                    identity_manifest = json.loads(z.read(identity_member))
+                except (ValueError, RecursionError):
+                    raise ValueError('Invalid identity manifest.') from None
+                if not isinstance(identity_manifest, dict) or len(identity_manifest) > DATASET_ZIP_MAX_FILES:
+                    raise ValueError('Invalid identity manifest.')
+                identity_metadata = {key: normalize_identities(value)
+                                     for key, value in identity_manifest.items()}
             return _merge_training_images(
-                user_id, dataset_id, entries, captions, stats=stats)
+                user_id, dataset_id, entries, captions, stats=stats,
+                identity_metadata=identity_metadata)
         finally:
             z.close()
     finally:
@@ -6741,7 +6795,8 @@ def import_from_dataset(user_id, dataset_id, source_dataset_id, image_ids,
                 source_metadata=[row.source_metadata for row in carried],
                 captions=[row.caption for row in carried],
                 caption_origins=[row.caption_origin for row in carried],
-                framings=[row.framing for row in carried])
+                framings=[row.framing for row in carried],
+                identity_snapshots=[row.identity_snapshot for row in carried])
             ids.extend(chunk_ids)
             failed += chunk_failed
     return ids, failed
@@ -12596,6 +12651,7 @@ def write_export_zip(user_id: int, dataset_id: int, output: BinaryIO) -> None:
     safe_trigger = ''.join(c for c in ds.trigger_word if c.isalnum() or c in ('-', '_')) or 'lora'
     folder = f"10_{safe_trigger}"
     comp = {'face': 0, 'bust': 0, 'body': 0, 'back': 0}
+    identity_metadata = {}
     with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as zf:
         # Keep the real reference photo in the set: fully synthetic datasets
         # drift from real distributions (research 2026-06-14). Include it as
@@ -12623,8 +12679,13 @@ def write_export_zip(user_id: int, dataset_id: int, output: BinaryIO) -> None:
             base = f"{folder}/{safe}_{n:03d}"
             zf.writestr(f"{base}.png", png.getvalue())
             zf.writestr(f"{base}.txt", _export_caption(ds, img.caption))
+            if img.identity_snapshot:
+                from .identity_metadata import normalize as normalize_identities
+                identity_metadata[base] = normalize_identities(img.identity_snapshot)
             if img.framing in comp:
                 comp[img.framing] += 1
+        if identity_metadata:
+            zf.writestr('_identity_metadata.json', json.dumps(identity_metadata))
         zf.writestr(f"{folder}/_dataset_info.md",
                     _dataset_info(ds, len(kept), comp))
 

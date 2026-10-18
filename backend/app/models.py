@@ -6,6 +6,84 @@ from .extensions import db
 from sqlalchemy import Integer, String, Text, DateTime, Float
 
 
+class NamedIdentity(db.Model):
+    """A permanent, profile-local person or drawn character."""
+    __tablename__ = 'named_identity'
+    __table_args__ = (db.UniqueConstraint('user_id', 'kind', 'name_key'),)
+    id = db.Column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex)
+    user_id = db.Column(String(36), nullable=False, index=True)
+    kind = db.Column(String(12), nullable=False)
+    name = db.Column(String(100), nullable=False)
+    name_key = db.Column(String(100), nullable=False)
+    series = db.Column(String(200), nullable=True)
+    aliases = db.Column(Text, nullable=False, default='[]')
+    catalog_tag = db.Column(String(200), nullable=True, index=True)
+    revision = db.Column(Integer, nullable=False, default=1)
+    created_at = db.Column(DateTime, default=db.func.current_timestamp())
+
+
+class IdentitySubject(db.Model):
+    """A located subject; source instances fence recycled numeric IDs."""
+    __tablename__ = 'identity_subject'
+    __table_args__ = (db.UniqueConstraint(
+        'source', 'scope_instance', 'image_instance', 'region_key'),)
+    id = db.Column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex)
+    user_id = db.Column(String(36), nullable=False, index=True)
+    source = db.Column(String(8), nullable=False)
+    scope_id = db.Column(Integer, nullable=False, index=True)
+    scope_instance = db.Column(String(32), nullable=False)
+    image_id = db.Column(Integer, nullable=False, index=True)
+    image_instance = db.Column(String(32), nullable=False)
+    region_key = db.Column(String(64), nullable=False)
+    region = db.Column(Text, nullable=True)
+    single_subject = db.Column(db.Boolean, nullable=False, default=False)
+    revision = db.Column(Integer, nullable=False, default=1)
+
+
+class IdentityEvidence(db.Model):
+    """Local normalized vectors with exact engine and pixel provenance."""
+    __tablename__ = 'identity_evidence'
+    __table_args__ = (db.UniqueConstraint('subject_id', 'model_key'),)
+    id = db.Column(Integer, primary_key=True)
+    subject_id = db.Column(String(32), db.ForeignKey(
+        'identity_subject.id', ondelete='CASCADE'), nullable=False, index=True)
+    model_key = db.Column(String(120), nullable=False, index=True)
+    content_hash = db.Column(String(64), nullable=False)
+    vector = db.Column(db.LargeBinary, nullable=False)
+    dimension = db.Column(Integer, nullable=False)
+    created_at = db.Column(DateTime, default=db.func.current_timestamp())
+
+
+class IdentityAssignment(db.Model):
+    """Human decisions; matching never writes a confirmed assignment."""
+    __tablename__ = 'identity_assignment'
+    subject_id = db.Column(String(32), db.ForeignKey(
+        'identity_subject.id', ondelete='CASCADE'), primary_key=True)
+    identity_id = db.Column(String(32), db.ForeignKey(
+        'named_identity.id', ondelete='CASCADE'), primary_key=True)
+    state = db.Column(String(12), nullable=False)
+    learn = db.Column(db.Boolean, nullable=False, default=False)
+    updated_at = db.Column(DateTime, default=db.func.current_timestamp())
+
+
+class IdentityAction(db.Model):
+    """Durable compare-and-swap undo for an explicit assignment action."""
+    __tablename__ = 'identity_action'
+    id = db.Column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex)
+    user_id = db.Column(String(36), nullable=False, index=True)
+    snapshots = db.Column(Text, nullable=False)
+    undone = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(DateTime, default=db.func.current_timestamp())
+
+
+class CharacterVocabulary(db.Model):
+    """Prepared offline dictionary; a vocabulary entry is not recognition."""
+    __tablename__ = 'character_vocabulary'
+    tag = db.Column(String(200), primary_key=True)
+    name = db.Column(String(200), nullable=False, index=True)
+    series = db.Column(String(200), nullable=True)
+
+
 class DatasetImportReceipt(db.Model):
     """One browser upload's durable answer, retained after image deletion."""
     __tablename__ = 'dataset_import_receipt'
@@ -147,6 +225,9 @@ class FaceDatasetImage(db.Model):
     """One image of a face-dataset: a generated Klein variation or an imported real photo."""
     __tablename__ = 'face_dataset_image'
     id = db.Column(Integer, primary_key=True)
+    instance_id = db.Column(String(32), nullable=False, unique=True,
+                            default=lambda: uuid.uuid4().hex)
+    identity_snapshot = db.Column(Text, nullable=True)
     dataset_id = db.Column(
         Integer, db.ForeignKey('face_dataset.id', ondelete='CASCADE'),
         nullable=False, index=True)
@@ -379,6 +460,7 @@ class BankImage(db.Model):
     id = db.Column(Integer, primary_key=True)
     instance_id = db.Column(String(32), nullable=False, unique=True,
                             default=lambda: uuid.uuid4().hex)
+    identity_snapshot = db.Column(Text, nullable=True)
     bank_id = db.Column(
         Integer, db.ForeignKey('image_bank.id', ondelete='CASCADE'),
         nullable=False, index=True)

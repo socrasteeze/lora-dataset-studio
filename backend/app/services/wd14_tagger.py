@@ -194,7 +194,7 @@ def default_timeout(n_images: int) -> int:
 
 
 def tag_images(image_paths, threshold_value=None, timeout=None,
-               on_progress=None) -> dict:
+               on_progress=None, *, force_cpu=False) -> dict:
     """Tag `image_paths`. Returns a dict carrying `ok`; on failure it also carries
     a human `error` and an `error_kind` in {unavailable, failed, timeout}.
 
@@ -216,7 +216,7 @@ def tag_images(image_paths, threshold_value=None, timeout=None,
         'images': images,
         'threshold': thr,
         'models_dir': models_dir(),
-        'device': device(),
+        'device': 'cpu' if force_cpu else device(),
         # The child does the fetching, so it is handed the whole spec rather than
         # a hardcoded copy of it: one place defines which model this is.
         'model_files': {name: {'url': url, 'min_bytes': min_bytes}

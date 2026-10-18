@@ -3712,7 +3712,7 @@ def _apply_facets(q, th, skip=None, *, bank_id=None, status=None, reason=None,
                   flag=None, cluster=None, group=None, semantic_group=None,
                   style=None, subfolder=None, search=None, exclude=None,
                   tags=None, res_bucket=None, framing=None, origin=None,
-                  medium=None, angle=None, collection_id=None):
+                  medium=None, angle=None, collection_id=None, identity_id=None):
     """Narrow ``q`` by the composing facets and return ``(q, order)``.
 
     ONE place, because the grid and the chip counters ask the same question and
@@ -3725,6 +3725,9 @@ def _apply_facets(q, th, skip=None, *, bank_id=None, status=None, reason=None,
     counting rule: a facet's own value must never narrow its own counts, or
     picking "blur" would show its neighbours at 0 and the user could no longer
     change their mind without clearing everything first."""
+    if identity_id:
+        from .identity_learning import filter_clause
+        q = q.filter(filter_clause('bank', bank_id, identity_id))
     if collection_id is not None:
         from . import bank_collections
         q = bank_collections.scope_query(bank_id, collection_id, q)
@@ -3863,7 +3866,8 @@ def list_images(user_id, bank_id, status=None, reason=None, flag=None,
                 semantic_group=None, sort=None, res_bucket=None, framing=None,
                 origin=None, medium=None, angle=None, ids=None, exclude=None,
                 tags=None, wd14_tags=None,
-                ids_only=False, offset=0, limit=200, collection_id=None) -> dict | None:
+                ids_only=False, offset=0, limit=200, collection_id=None,
+                identity_id=None) -> dict | None:
     """One PAGE of the bank grid (a 9 000-image bank must never ship whole).
     Filters compose: status ∩ flag ∩ cluster ∩ dup-group ∩ style ∩ subfolder ∩ tags ∩ search.
     ``search`` is a plain full-text term matched (case-insensitive LIKE) against the
@@ -3949,7 +3953,7 @@ def list_images(user_id, bank_id, status=None, reason=None, flag=None,
         from . import bank_collections
         scoped = bank_collections.image_query(user_id, bank_id, collection_id, scoped)
     q, order = _apply_facets(
-        scoped, th, bank_id=bank_id,
+        scoped, th, bank_id=bank_id, identity_id=identity_id,
         status=status, reason=reason, flag=flag, cluster=cluster, group=group,
         semantic_group=semantic_group, style=style, subfolder=subfolder,
         search=search, exclude=exclude, tags=tags, res_bucket=res_bucket,
@@ -4018,6 +4022,7 @@ def facet_counts(user_id, bank_id, **f) -> dict | None:
     th = thresholds()
     facets = {k: f.get(k) for k in FACETS}
     facets['collection_id'] = f.get('collection_id')
+    facets['identity_id'] = f.get('identity_id')
 
     def pool(skip, extra=None):
         q, _order = _apply_facets(BankImage.query.filter_by(bank_id=bank_id), th,
@@ -6699,7 +6704,7 @@ _CURATION_MAX_N = bank_curation.MAX_SELECTION
 def _pool_query(bank_id, th, *, status=None, flag=None, cluster=None,
                 style=None, subfolder=None, search=None, exclude=None, tags=None,
                 medium=None, angle=None, collection_id=None, res_bucket=None,
-                framing=None, origin=None, wd14_tags=None, reason=None):
+                framing=None, origin=None, wd14_tags=None, reason=None, identity_id=None):
     """The candidate-pool query for the curation selectors — the SAME filter
     composition as list_images, without ordering/pagination. With no explicit
     status or rejection reason, rejected images remain outside the pool."""
@@ -6707,7 +6712,7 @@ def _pool_query(bank_id, th, *, status=None, flag=None, cluster=None,
     if status not in ('pending', 'keep', 'reject') and reason not in REASON_KEYS:
         q = q.filter(BankImage.status != 'reject')
     q, _ = _apply_facets(
-        q, th, bank_id=bank_id, collection_id=collection_id,
+        q, th, bank_id=bank_id, collection_id=collection_id, identity_id=identity_id,
         status=status, reason=reason, flag=flag, cluster=cluster, style=style,
         subfolder=subfolder, search=search, exclude=exclude, tags=tags,
         res_bucket=res_bucket, framing=framing, origin=origin,
@@ -14827,8 +14832,12 @@ def _dataset_import_job(bank_id, dataset_id, src_dir, image_rows, activity_token
                     values['semantic_dup_group'] = None
                 if values.get('face_cluster') is None:
                     values['face_cluster_origin'] = None
-                db.session.add(BankImage(
-                    bank_id=bank_id, relpath=filename, file_size=size, **values))
+                copied_image = BankImage(
+                    bank_id=bank_id, relpath=filename, file_size=size, **values)
+                db.session.add(copied_image)
+                db.session.flush()
+                from .identity_learning import restore_metadata
+                restore_metadata(user_id, 'bank', bank_id, copied_image.id, row.identity_snapshot)
                 if cache_bundle and compatible:
                     cache_entries[dest] = cache_bundle
                     cache_fingerprints[dest] = compatible['fingerprint']
@@ -15594,9 +15603,12 @@ def _bank_promote_job(user_id, src_bank_id, dest_bank_id, ids):
                     'left unchanged. Re-run the stale analysis passes and try '
                     'again.')
                 return
-            db.session.add(BankImage(
-                bank_id=dest_bank_id, relpath=r.relpath, file_size=size,
-                **values))
+            copied_image = BankImage(
+                bank_id=dest_bank_id, relpath=r.relpath, file_size=size, **values)
+            db.session.add(copied_image)
+            db.session.flush()
+            from .identity_learning import restore_metadata
+            restore_metadata(user_id, 'bank', dest_bank_id, copied_image.id, r.identity_snapshot)
             if preserved:
                 if bundle:
                     cache_entries[target] = bundle

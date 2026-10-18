@@ -640,6 +640,7 @@ def bank_images(bank_id):
             return jsonify({'error': 'Collection is unavailable. Clear the collection filter.'}), 400
     payload = banks.list_images(
         LOCAL_USER, bank_id,
+        identity_id=args.get('identity_id') or None,
         status=args.get('status') or None,
         # WHY a rejected image was rejected — the ✕ Rejected sub-facet. Carries
         # its own status scope service-side, so it never rewrites `status`.
@@ -709,6 +710,7 @@ def bank_facets(bank_id):
             return jsonify({'error': 'Collection is unavailable. Clear the collection filter.'}), 400
     out = banks.facet_counts(
         LOCAL_USER, bank_id,
+        identity_id=args.get('identity_id') or None,
         status=args.get('status') or None,
         reason=args.get('reason') or None,
         flag=args.get('flag') or None,
@@ -1853,6 +1855,7 @@ def _curation_filters(data):
     subfolder = data.get('subfolder')
     return {
         'collection_id': (_int('collection_id') or 0) if data.get('collection_id') is not None else None,
+        'identity_id': data.get('identity_id') or None,
         'status': data.get('status') or None,
         'flag': data.get('flag') or None,
         'cluster': _int('cluster'),

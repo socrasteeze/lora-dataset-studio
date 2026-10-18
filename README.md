@@ -37,6 +37,11 @@ https://github.com/user-attachments/assets/d51ff89c-34e9-41a9-b47d-08939a8c867b
 
 ## Everything it does
 
+**Named identities:** assign photographic people or anime characters in Bank and Dataset.
+Confirmed examples support local match suggestions; corrections, rejected matches and Undo preserve human decisions.
+Several characters need separate subject regions before their images teach identity.
+Cross-artwork recognition accuracy remains unmeasured. See [identity assignment](docs/guide/using-the-app.md#assign-identities).
+
 The big capabilities, each with what's actually inside it. Every block links down to its detailed section.
 
 ### 🎨 Build any dataset — Character, Concept or Style
