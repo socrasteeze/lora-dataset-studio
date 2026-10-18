@@ -44,12 +44,12 @@ test('the tag pass posts no device — it only runs here', () => {
   assert.doesNotMatch(dispatch[1], /passOpen === 'framing'/);
 });
 
-test('the facet vocabulary is fetched on the tagged count, not on the payload poll', () => {
+test('the facet vocabulary refreshes on counts and manual retries, not the payload poll', () => {
   // The bank payload is polled every 2 s while a pass runs. Tallying tags across
   // 9 000 rows on that tick would be paid over and over for an answer that only
-  // moves when the pass advances.
+  // moves when the pass advances. An explicit recovery click may refresh it too.
   assert.match(workspace, /tags\/facets/);
-  assert.match(workspace, /\}, \[bankId, taggedCount\]\)/);
+  assert.match(workspace, /\}, \[bankId, taggedCount, tagFacetRetry\]\)/);
 });
 
 test('the tag filter is part of filterParams, so it reaches Select-all and Review', () => {
