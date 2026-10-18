@@ -63,6 +63,14 @@ try {
         assert.equal(response.status(), 200, await response.text())
         assert.equal((await response.json()).learning.measured, 1)
         await panel.getByRole('button', { name: 'Remove Name', exact: true }).first().waitFor()
+        if (source === 'bank' && kind === 'anime' && width === 360) {
+          await panel.getByRole('button', { name: 'Close', exact: true }).click()
+          await page.reload()
+          await page.getByAltText('image-01.png', { exact: true }).click()
+          await page.locator('[data-identity-open]').click()
+          await panel.getByRole('button', { name: 'Remove Name', exact: true }).first().waitFor()
+          await page.waitForFunction(() => [...document.querySelectorAll('[role="dialog"] button')].some((button) => button.textContent === 'Undo' && !button.disabled))
+        }
         const geometry = await panel.evaluate((element) => {
           const rect = element.getBoundingClientRect()
           const controls = [...element.querySelectorAll('button, select, input:not([type="checkbox"]):not([type="file"])')]

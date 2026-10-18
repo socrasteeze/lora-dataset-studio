@@ -13,6 +13,7 @@ import json
 import math
 from pathlib import Path
 import unicodedata
+import uuid
 
 from sqlalchemy import func
 
@@ -200,7 +201,7 @@ def list_identities(user, kind=None, query=''):
         rows = rows.filter_by(kind=_kind(kind))
     if query:
         q = _text(query, 100).casefold().replace('%', '\\%').replace('_', '\\_')
-        rows = rows.filter(db.or_(func.lower(NamedIdentity.name).like('%'+q+'%', escape='\\'),
+        rows = rows.filter(db.or_(NamedIdentity.name_key.like('%'+q+'%', escape='\\'),
                                   func.lower(NamedIdentity.aliases).like('%'+q+'%', escape='\\')))
     return [identity_dict(row) for row in rows.order_by(
         NamedIdentity.name_key, NamedIdentity.id).limit(200).all()]
@@ -251,9 +252,14 @@ def _subject_dict(subject):
 
 
 def _preview(scope, rows):
-    value = [(image.id, image.instance_id,
-              sorted((s.id, s.revision) for s in _subjects(source, scope, image)))
-             for source, image in rows]
+    value = []
+    for source, image in rows:
+        try:
+            digest = fingerprint(_path(source, scope, image))
+        except (OSError, ValueError):
+            digest = None
+        value.append((image.id, image.instance_id, digest,
+                      sorted((s.id, s.revision) for s in _subjects(source, scope, image))))
     return hashlib.sha256(json.dumps([scope.instance_id, value]).encode()).hexdigest()
 
 
@@ -289,6 +295,37 @@ def _claim(subject, revision):
     if changed != 1:
         raise IdentityConflict('Assignment changed. Reload it before saving.')
     db.session.refresh(subject)
+
+
+def _record_action(user, subjects, snapshots, operation_id=None):
+    subject = subjects[0]
+    position = 1
+    action_id = uuid.uuid4().hex
+    if operation_id is not None:
+        prior = IdentityAction.query.filter_by(
+            user_id=user, operation_id=operation_id, source=subject.source,
+            scope_instance=subject.scope_instance).order_by(IdentityAction.position.desc()).first()
+        if prior is None or prior.undone:
+            raise IdentityConflict('The bulk action changed or was undone. Start a fresh action.')
+        position = prior.position + 1
+    action = IdentityAction(id=action_id, user_id=user, source=subject.source,
+                            scope_id=subject.scope_id, scope_instance=subject.scope_instance,
+                            operation_id=operation_id or action_id, position=position,
+                            snapshots=json.dumps(snapshots))
+    db.session.add(action)
+    return action
+
+
+def undo_offer(user, source, scope_id):
+    scope = _scope(user, source, scope_id)
+    action = IdentityAction.query.filter_by(
+        user_id=user, source=source, scope_instance=scope.instance_id, undone=False).order_by(
+            IdentityAction.created_at.desc(), IdentityAction.position.desc()).first()
+    if action is None:
+        return {'operation_id': None, 'subjects': 0}
+    group = IdentityAction.query.filter_by(user_id=user, operation_id=action.operation_id).all()
+    return {'operation_id': action.operation_id,
+            'subjects': sum(len(json.loads(row.snapshots)) for row in group)}
 
 
 def assign(user, source, scope_id, data):
@@ -329,6 +366,8 @@ def assign(user, source, scope_id, data):
     for subject in subjects:
         snapshots.append({'subject_id': subject.id, 'before': _assignment_snapshot(subject),
                           'single_before': subject.single_subject,
+                          'evidence_before': {e.model_key: e.content_hash for e in
+                                              IdentityEvidence.query.filter_by(subject_id=subject.id).all()},
                           'after_revision': subject.revision+1})
         _claim(subject, subject.revision)
         if single or subject.region:
@@ -360,12 +399,11 @@ def assign(user, source, scope_id, data):
             decision = IdentityAssignment(subject_id=subject.id, identity_id=target.id)
             db.session.add(decision)
         decision.state, decision.learn = 'confirmed', learn
-    action = IdentityAction(user_id=user, snapshots=json.dumps(snapshots))
-    db.session.add(action)
+    action = _record_action(user, subjects, snapshots, data.get('operation_id'))
     for subject in subjects:
         sync_metadata(subject)
     db.session.commit()
-    return {'action_id': action.id, 'assigned': len(subjects),
+    return {'action_id': action.id, 'operation_id': action.operation_id, 'assigned': len(subjects),
             'subject_ids': [s.id for s in subjects]}
 
 
@@ -384,6 +422,11 @@ def decision(user, subject_id, data):
     prior_single = subject.single_subject
     _claim(subject, data.get('revision'))
     if operation == 'confirm':
+        model = FACE_MODEL if target.kind == 'person' else CLIP_MODEL
+        current_evidence = IdentityEvidence.query.filter_by(
+            subject_id=subject.id, model_key=model).first()
+        if current_evidence is None or not _live_evidence(subject, current_evidence):
+            raise IdentityConflict('Subject pixels changed. Analyze the image before confirming.')
         if target.kind == 'anime' and any(
                 old.identity_id != target.id and old.state == 'confirmed'
                 and _identity(user, old.identity_id).kind == 'anime'
@@ -408,13 +451,14 @@ def decision(user, subject_id, data):
             db.session.add(row)
         row.state = 'confirmed' if operation == 'confirm' else 'rejected'
         row.learn = operation == 'confirm'
-    action = IdentityAction(user_id=user, snapshots=json.dumps([{
+    action = _record_action(user, [subject], [{
         'subject_id': subject.id, 'before': before, 'single_before': prior_single,
-        'after_revision': subject.revision}]))
-    db.session.add(action)
+        'evidence_before': {e.model_key: e.content_hash for e in
+                            IdentityEvidence.query.filter_by(subject_id=subject.id).all()},
+        'after_revision': subject.revision}])
     sync_metadata(subject)
     db.session.commit()
-    return {'action_id': action.id, 'changed': 1}
+    return {'action_id': action.id, 'operation_id': action.operation_id, 'changed': 1}
 
 
 def undo(user, action_id):
@@ -423,8 +467,11 @@ def undo(user, action_id):
         raise IdentityNotFound('Undo is unavailable.')
     if action.undone:
         return {'restored': 0, 'skipped': 0}
+    group = IdentityAction.query.filter_by(
+        user_id=user, operation_id=action.operation_id).order_by(
+            IdentityAction.position.desc()).all()
     restored = skipped = 0
-    for item in json.loads(action.snapshots):
+    for item in [item for member in group for item in json.loads(member.snapshots)]:
         subject = db.session.get(IdentitySubject, item['subject_id'])
         if subject is None or subject.revision != item['after_revision']:
             skipped += 1
@@ -433,11 +480,20 @@ def undo(user, action_id):
         IdentityAssignment.query.filter_by(subject_id=subject.id).delete()
         for previous in item['before']:
             if db.session.get(NamedIdentity, previous['identity_id']):
+                if previous['learn']:
+                    identity = _identity(user, previous['identity_id'])
+                    model = FACE_MODEL if identity.kind == 'person' else CLIP_MODEL
+                    evidence = IdentityEvidence.query.filter_by(
+                        subject_id=subject.id, model_key=model).first()
+                    previous['learn'] = bool(
+                        evidence and item.get('evidence_before', {}).get(model) == evidence.content_hash
+                        and _live_evidence(subject, evidence))
                 db.session.add(IdentityAssignment(subject_id=subject.id, **previous))
         subject.single_subject = item['single_before']
         sync_metadata(subject)
         restored += 1
-    action.undone = True
+    for member in group:
+        member.undone = True
     db.session.commit()
     return {'restored': restored, 'skipped': skipped}
 
@@ -462,7 +518,7 @@ def _live_evidence(subject, evidence):
         return False
 
 
-def store_evidence(subject, model_key, digest, vector):
+def store_evidence(subject, model_key, digest, vector, *, confirmed_identity=None):
     dimension = 512 if model_key == FACE_MODEL else 768
     value = normalized_vector(vector, dimension)
     row = IdentityEvidence.query.filter_by(subject_id=subject.id, model_key=model_key).first()
@@ -470,14 +526,17 @@ def store_evidence(subject, model_key, digest, vector):
         row = IdentityEvidence(subject_id=subject.id, model_key=model_key)
         db.session.add(row)
     elif row.content_hash != digest:
+        if confirmed_identity is None:
+            _claim(subject, subject.revision)
         for assignment in IdentityAssignment.query.filter_by(subject_id=subject.id).all():
-            assignment.learn = False
+            if assignment.identity_id != confirmed_identity:
+                assignment.learn = False
     row.content_hash, row.dimension, row.vector = digest, dimension, value.tobytes()
     db.session.flush()
     return row
 
 
-def analyze(user, source, scope_id, data):
+def analyze(user, source, scope_id, data, *, confirmation=None):
     from . import identity_inference
     ids, kind = _ids(data.get('image_ids')), _kind(data.get('kind'))
     scope = _scope(user, source, scope_id)
@@ -515,7 +574,9 @@ def analyze(user, source, scope_id, data):
                                single=kind == 'person' or requested is not None,
                                continuity=kind == 'person')
             store_evidence(subject, FACE_MODEL if kind == 'person' else CLIP_MODEL,
-                           digest, entry.get('vector'))
+                           digest, entry.get('vector'),
+                           confirmed_identity=(confirmation[0] if confirmation
+                                               and subject.id in confirmation[1] else None))
             # A previously named whole-frame person can enroll only when
             # detection proves one usable face, never by choosing the biggest.
             whole = next((s for s in _subjects(source, scope, image) if s.region is None), None)
@@ -524,7 +585,9 @@ def analyze(user, source, scope_id, data):
                     subject_id=whole.id, state='confirmed', learn=True).all()
                 for assignment in confirmed:
                     if _identity(user, assignment.identity_id).kind == 'person':
-                        store_evidence(whole, FACE_MODEL, digest, entry.get('vector'))
+                        store_evidence(whole, FACE_MODEL, digest, entry.get('vector'),
+                                       confirmed_identity=(confirmation[0] if confirmation
+                                                           and whole.id in confirmation[1] else None))
                         whole.single_subject = True
             measured.append(subject.id)
     for image, _path_value, _digest, _requested in work:
