@@ -510,6 +510,9 @@ _SCHEMA_ADDITIONS = (
     ('face_dataset', 'instance_id', 'VARCHAR(32)'),
     ('image_bank', 'instance_id', 'VARCHAR(32)'),
     ('bank_image', 'instance_id', 'VARCHAR(32)'),
+    ('face_dataset_image', 'instance_id', 'VARCHAR(32)'),
+    ('face_dataset_image', 'identity_snapshot', 'TEXT'),
+    ('bank_image', 'identity_snapshot', 'TEXT'),
     ('image_bank', 'pipeline_report', 'TEXT'),
     # "One bank per subfolder": the loose-files bank is rooted at the parent but
     # must NOT recurse when its live folder is re-walked (see refresh_bank).
@@ -706,7 +709,7 @@ def _ensure_schema_version():
 def _backfill_recovery_ids():
     """Assign recovery identities once, including rows in legacy databases."""
     from sqlalchemy import text
-    for table in ('face_dataset', 'image_bank', 'bank_image'):
+    for table in ('face_dataset', 'image_bank', 'bank_image', 'face_dataset_image'):
         columns = {row[1] for row in db.session.execute(text(f'PRAGMA table_info({table})'))}
         if 'instance_id' not in columns:
             continue
@@ -721,7 +724,7 @@ def _ensure_instance_id_unique():
     the way a fresh create_all already does. Duplicate values are reported and
     left in place — this does not delete rows."""
     from sqlalchemy import text
-    for table in ('face_dataset', 'image_bank', 'bank_image'):
+    for table in ('face_dataset', 'image_bank', 'bank_image', 'face_dataset_image'):
         try:
             columns = {row[1] for row in db.session.execute(
                 text(f'PRAGMA table_info({table})'))}

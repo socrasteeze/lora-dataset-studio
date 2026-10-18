@@ -111,6 +111,7 @@ import { bankSortGroups, loadBankSort, saveBankSort } from '../../utils/gridSort
 // 🏷️ One image's caption → the chips you can filter by, and the same chips over a
 // whole SELECTION with how often each was cited (pure/testable).
 import { tagsParam, selectionTagCounts } from './bankTags.js'
+import IdentityTools, { IdentityFilter } from '../shared/IdentityTools.jsx'
 // 🔤 Text search wording — "closest", never "matching" — plus the cold-start and
 // CLIP-limitation copy. Pure/testable (node --test cannot parse this JSX).
 import {
@@ -204,6 +205,7 @@ async function fetchAllIds(bankId, params) {
 }
 
 export default function BankWorkspace({ bankId, onBack, onGone }) {
+  const [identityVersion, setIdentityVersion] = useState(0)
   const [profileMoveOpen, setProfileMoveOpen] = useState(false)
   const toast = useToast()
   const { caps, loading: capsLoading, refresh: refreshCaps } = useCapabilities()
@@ -554,6 +556,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
 
   const filterParams = useCallback((f) => {
     const params = {}
+    if (f.identityId) params.identity_id = f.identityId
     if (f.collectionId != null) params.collection_id = String(f.collectionId)
     if (f.status) params.status = f.status
     if (f.flag) params.flag = f.flag
@@ -848,7 +851,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     setTagSource(null); setTagPicked(new Set())
     setF({ status: null, flag: null, cluster: null, style: null, subfolder: null,
       search: null, exclude: null, tags: null, resBucket: null, origin: null,
-      wd14Tags: [], framing: null,
+      wd14Tags: [], framing: null, identityId: null,
       // medium/angle were missing here until the ✕ Why row was added: "Clear
       // all" left them narrowing a grid the header then called unfiltered,
       // which is the exact failure bankFilterSummary.js exists to prevent.
@@ -1974,6 +1977,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
        accessibility contract, and a rail that tabbed out of order would be a
        regression the eye cannot see. */
     <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2" data-probe-panel="bank-identities">
+        <IdentityFilter source="bank" scopeId={bankId} value={filter.identityId} version={identityVersion}
+          onChange={(value) => setF('identityId', value || null)} />
+        <IdentityTools source="bank" scopeId={bankId} imageIds={[...selected]} busy={live}
+          onChanged={() => { setIdentityVersion((value) => value + 1); refreshImages(); refreshPayload({ force: true }); }} />
+      </div>
       {/* ── The top bar ──────────────────────────────────────────────────
           Bank identity, the counters, and the DECISIVE actions. Everything
           here is bank-wide; anything that narrows the grid lives in the rail. */}

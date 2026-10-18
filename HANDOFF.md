@@ -3,21 +3,20 @@
 **Updated:** 2026-10-18 | **Branch:** validation/identity-learning | **Base:** 5306f107f | **Tree:** clean after this commit
 
 ## State
-The operator approved photographic and anime identity assignment, learning through confirmed examples, and original-character matching across artwork. Implementation follows this scope receipt; feature and accuracy qualification remain open.
+The approved implementation is drafted in the isolated task worktree. Static lint/build/privacy checks pass; exact-source cloud behavioral/rendered qualification and real recognition accuracy remain open.
 
 ## Done this session
-- Compared dataset-manager vocabulary/person matching with current LDS source.
-- Created an isolated worktree from 5d32d6ceb; the running checkout and bundle remain unchanged.
-- Recorded the approved scope and checks in docs/plans/identity-learning.md.
+- Added identity records, per-subject references, corrections, rejected pairs, undo and shared filters in backend/app/services/identity_learning.py.
+- Added prepared CPU inference, category-aware tag suggestions, bounded portable metadata and explicit held-out evaluation.
+- Mounted shared controls in Bank and Dataset, added transfer/backup/ZIP/profile preservation, help and news.
+- Added backend regressions and a cloud-only browser probe over 20 populated surface/kind/viewport states.
+- Initial scope receipt: 88d17bb6a. The running checkout remains unchanged.
 
 ## Open
-1. Implement profile-scoped identities, subject evidence, assignments, corrections and undo; preserve confirmed decisions through rescans.
-2. Add photographic recognition and anime catalog/custom assignment with reviewed WD14/PixAI suggestions on Bank and Dataset.
-3. Add original-character matching across artwork, outfits and styles; named examples teach future matches and rejected pairs stay excluded.
-4. Preserve provenance through promotion/import/export and profile transfer; keep captions, triggers, source bytes and review decisions unchanged.
-5. Add isolated regressions and populated responsive checks; qualify exact source and bundle with cloud Gates before landing.
-6. Qualify recognition on labeled unseen artwork; permitted corpus selection remains pending. Synthetic tests do not establish accuracy.
-7. Carry forward unqualified upstream ports and physical-device/trainer gates from 5d32d6ceb:HANDOFF.md. The running checkout has an unresolved frontend/backend activation mismatch; activation needs a separate stop/start.
+1. Commit source and bundle separately, transport the scrubbed validation branch and inspect exact-head cloud Fork Gates.
+2. Repair every introduced backend/frontend/browser failure; do not count unrun synthetic cases or the production build as passing behaviors.
+3. Exercise the explicit held-out evaluation on permitted labeled unseen artwork. Corpus selection remains pending; report wrong names, misses, abstentions and provenance.
+4. Carry forward upstream-port and physical-device/trainer gates from 5d32d6ceb:HANDOFF.md. Activation of the running checkout needs a separate stop/start.
 
 ## Decisions
 - Photographic people, anime assignment and original-character learning are required workstreams.
@@ -38,11 +37,12 @@ The operator approved photographic and anime identity assignment, learning throu
 - Keep real images and names private; accuracy needs a permitted labeled set with unseen artwork held out.
 
 ## Verify
-No tests or probes ran for this documentation-only receipt. Review the diff, scan publishable files for privacy/attribution, and check whitespace before commit.
+Local Ruff, ESLint (zero errors), production build, whitespace and publishable-file privacy scan passed. Outbound inventory is unchanged. Tests/probes have not run locally.
 Cloud checkout only, with pinned dev/CPU Torch overlays and Node 24:
 
 ```powershell
 ./scripts/gates.ps1 -Phase Gates -ScratchRoot D:/lds-gates
 node frontend/scripts/bankOtherTagsProbe.mjs
 node frontend/scripts/bankCurationProbe.mjs
+node frontend/scripts/identityLearningProbe.mjs
 ```

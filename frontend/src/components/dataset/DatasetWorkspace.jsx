@@ -19,6 +19,8 @@ import { holdsLocalGpu } from '../../utils/activityLanes.js';
 import { IMPROVE_DERIVATION } from './improveCandidates.js';
 import { faceAnalysisState, faceAnalysisLabel } from './faceScoringGate.js';
 import DatasetGrid from './DatasetGrid';
+import { IdentityFilter } from '../shared/IdentityTools.jsx';
+import { apiFetch as identityFetch } from '../../api/fetchClient.js';
 import { Chip, Select } from '../common/Controls.jsx';
 import { datasetBusyReason } from './datasetBusyReason.js';
 import KleinModelSetting from '../shared/KleinModelSetting';
@@ -269,6 +271,22 @@ function GridFilterBar({
 }
 
 export default function DatasetWorkspace({ ds, onBack }) {
+  const [identityFilter, setIdentityFilter] = useState('');
+  const [identityIds, setIdentityIds] = useState(null);
+  const [identityError, setIdentityError] = useState('');
+  const [identityVersion, setIdentityVersion] = useState(0);
+  const identityDatasetId = ds.data?.id;
+  const identityImageKey = (ds.data?.images || []).map((image) => image.id).join(',');
+  useEffect(() => {
+    if (!identityFilter || !identityDatasetId) { setIdentityIds(null); setIdentityError(''); return; }
+    const controller = new AbortController();
+    setIdentityIds([]);
+    identityFetch('/api/identity/dataset/' + identityDatasetId + '/filter/' + identityFilter,
+      { signal: controller.signal })
+      .then((data) => { setIdentityIds(data.image_ids); setIdentityError(''); })
+      .catch((error) => { if (!controller.signal.aborted) setIdentityError(error.message); });
+    return () => controller.abort();
+  }, [identityFilter, identityDatasetId, identityImageKey, identityVersion]);
   const navigate = useNavigate();
   const toast = useToast();
   const { caps, loading: capsLoading, refresh: refreshCaps } = useCapabilities();
@@ -714,12 +732,13 @@ export default function DatasetWorkspace({ ds, onBack }) {
   const toggleExclude = toggleTag(setExcludeTags, setIncludeTags);
   const toggleInclude = toggleTag(setIncludeTags, setExcludeTags);
   const clearFilters = () => {
+    setIdentityFilter('');
     setExcludeTags([]); setIncludeTags([]); setStatusFilter(DEFAULT_GRID_STATUS_FILTER);
     setCoverageFilter(null);
   };
   const tagFiltersActive = excludeTags.length > 0 || includeTags.length > 0;
   const statusFilterActive = statusFilter !== DEFAULT_GRID_STATUS_FILTER;
-  const filtersActive = tagFiltersActive || statusFilterActive || !!coverageFilter;
+  const filtersActive = tagFiltersActive || statusFilterActive || !!coverageFilter || !!identityFilter;
   const statusFilterLabel = GRID_STATUS_FILTERS.find((f) => f.id === statusFilter)?.label || '';
   const statusFilterOpts = { unresolvedRescueIds };
   const statusCounts = gridStatusFilterCounts(rescueGridImages, statusFilterOpts);
@@ -740,9 +759,10 @@ export default function DatasetWorkspace({ ds, onBack }) {
   // Third filter, same rank as the other two — so it also narrows what select-all
   // and every bulk action see, which is the point of picking a bucket.
   const coverageIds = coverageFilter ? new Set(coverageFilter.ids) : null;
+  const identitySet = new Set(identityIds || []);
   const gridImages = sortDatasetImages(coverageIds
     ? filteredGridImages.filter((i) => coverageIds.has(i.id))
-    : filteredGridImages, gridSort);
+    : filteredGridImages, gridSort).filter((image) => !identityFilter || identitySet.has(image.id));
   // (Divergence 1) upstream's `summarizeGeneration`/`refusalHeadline` tally is NOT
   // taken with the chip filter it shipped beside: generationOutcome.js is the
   // removed cloud engines' refusal notice, and is deleted on this fork.
@@ -1312,6 +1332,9 @@ export default function DatasetWorkspace({ ds, onBack }) {
               {watermarkDetected > 0 ? ` · ${watermarkDetected} watermark(s) flagged` : ''}
             </p>
             <div id="gf-images" className="scroll-mt-20 flex flex-col gap-2">
+              <IdentityFilter source="dataset" scopeId={d.id} value={identityFilter}
+                onChange={setIdentityFilter} version={identityVersion} />
+              {identityError && <p role="alert" className="text-sm text-danger">{identityError}</p>}
               {rescueGridImages.length > 0 && (
                 // One wrapping row at 400 px: the decision chips flow, the Sort
                 // control drops onto its own line instead of forcing a scrollbar.
@@ -1354,6 +1377,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   onBatch={ds.batchImages} busy={ds.busy}
                   improveBusy={ds.improveBusy} generateBusy={ds.generationBusy} curationBusy={ds.curationBusy}
                   onBulkBusyChange={setGridBulkBusy}
+                  onIdentityChanged={() => setIdentityVersion((value) => value + 1)}
                   onImproveBatch={ds.improveBatch} activity={act}
                           subjectType={d.subject_type || 'human'}
                   eligibilityImages={images}

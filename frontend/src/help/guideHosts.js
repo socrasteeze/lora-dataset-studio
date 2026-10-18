@@ -10,6 +10,7 @@ export const CORE_GUIDE_ANCHORS = {
     "around-the-app"
   ],
   "using-the-app": [
+    "assign-identities",
     "the-character-walkthrough-reference-photo-trained-lora",
     "write-caption-txt",
     "review-training-duplicates",

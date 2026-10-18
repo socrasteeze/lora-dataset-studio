@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Target, Trash2 } from 'lucide-react';
 import DatasetGridItem from './DatasetGridItem';
+import IdentityTools from '../shared/IdentityTools.jsx';
 import TileSizeControl from '../shared/TileSizeControl';
 import { nextSelection } from '../shared/rangeSelect.js';
 import KleinImproveNote from './KleinImproveNote';
@@ -281,7 +282,7 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
                                       // Which image the lightbox is currently on
                                       // (null when it is closed).
                                       viewingImageId = null,
-                                      onBulkBusyChange }) {
+                                      onBulkBusyChange, onIdentityChanged }) {
   const toast = useToast();
   const { caps } = useCapabilities();
   const [selected, setSelected] = useState(() => new Set());
@@ -500,6 +501,9 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
   return (
     <div id="ds-images-review" tabIndex={-1} data-workspace-focus
       className="flex flex-col gap-2 scroll-mt-20">
+      <IdentityTools source="dataset" scopeId={datasetId} imageIds={[...selected]}
+        busy={bulkBusy} defaultKind={subjectType === 'anime' ? 'anime' : 'person'}
+        onChanged={onIdentityChanged} />
       {/* Says what the pass BLOCKS, once, in words — the per-button titles name
           which pass, and a title is not readable on a touch screen at all. */}
       {busyReason && (

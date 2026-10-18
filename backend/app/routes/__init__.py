@@ -12,7 +12,7 @@ def register_blueprints(app, csrf):
     # compatibility imports while callers migrate to the owning plugin.
     for name in ('settings', 'datasets', 'training', 'studio', 'setup',
                  'setup_state', 'ollama', 'local_llm', 'backup', 'bank',
-                 'system', 'cluster', 'profiles',
+                 'system', 'cluster', 'profiles', 'identities',
                  'extensions'):
         try:
             mod = import_module(f'app.routes.{name}')

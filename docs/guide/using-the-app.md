@@ -1,4 +1,34 @@
 # Using the app
+## Assign identities
+
+Bank and Dataset share identity assignment. Select images, then choose **Assign Identity**.
+Use **Person** for photographic faces or **Anime** for drawn characters. Choose an existing name or enter a custom name.
+
+**Learn Identity** adds confirmed subject evidence to the local reference set when the prepared model is available.
+For a whole anime image, confirm **One Character**. If several characters appear, select one image and use **Choose Subject**.
+This records a subject region without changing the image file. Different regions may hold different names.
+
+**Find Matches** analyzes the selected images on the CPU and compares them with confirmed examples in the same profile.
+Minimum Similarity and Ambiguity Margin are editable starting heuristics. They are not measured accuracy or probability.
+Missing models, unusable faces and stale pixels remain unmeasured. Install the relevant tools in **Setup > Quality Tools**.
+Unconfirmed suggestions never become training examples. Confirm a suggestion to teach it, or use **Reject Match** to exclude that pair.
+
+**Remove Name** removes an assignment. **Undo** restores the last action only where later work has not changed it.
+Use **Correct Name** to replace a wrong identity and exclude its previous match. A removed example stops teaching the wrong identity.
+The identity filter changes the actual image pool, including selection and bulk decisions.
+
+**Suggest Names** reads character predictions from prepared WD14 or PixAI models. The tagger can suggest only its supported labels.
+**Import Catalog** accepts a local UTF-8 character masterlist or tagger vocabulary CSV. A catalog is a spelling dictionary.
+An original character does not need a catalog entry. Naming its confirmed examples creates its local reference set.
+
+Names and reference evidence stay inside the active profile. Explicit Bank moves and image transfers preserve supported identity metadata.
+Dataset backups and training ZIP exports carry identity metadata separately from captions. Re-encoded pixels need fresh evidence.
+Identity operations do not change captions, trigger words, source files or Keep/Reject decisions.
+
+The current recognition path uses prepared InsightFace for photos and CLIP for drawn subjects. It does not retrain model weights after a name.
+Recognition across outfits and art styles needs a labeled reference and unseen-artwork evaluation before an accuracy claim is valid.
+**Stop** ends a multi-batch operation after its current request finishes. Earlier batches remain saved; the browser does not promise durable resume.
+
 
 The workspace is a **guided flow**: each stage stays folded until the one
 before it is done, and the progress rail on the left tells you where you are

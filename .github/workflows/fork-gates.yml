@@ -83,6 +83,19 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
 
+      - name: Check Identity Learning in Browser
+        if: ${{ !cancelled() }}
+        run: node frontend/scripts/identityLearningProbe.mjs
+
+      - name: Save Identity Receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: identities-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .git/lds-gates-validation/identities.json
+          include-hidden-files: true
+          if-no-files-found: error
+
       - name: Run Fork Gates
         # Preserve the browser failure while collecting the independent full gate.
         if: ${{ !cancelled() && (steps.browser_checks.outcome == 'success' || steps.browser_checks.outcome == 'failure') }}
