@@ -841,6 +841,10 @@ const TOPICS = [
   setupStep('setup-training', 'training', 'Set up ai-toolkit (LoRA training)',
     ['ai-toolkit', 'aitoolkit', 'training', 'lora training', 'run.py', 'python',
      'interpreter', 'install training', 'train']),
+  { id: 'studio-base-model-only', kind: 'setting', title: 'Base Model Only',
+    keywords: ['base model only', 'no lora', 'without lora', 'model family', 'full model', 'generate'],
+    guide: { chapter: 'using-the-app', anchor: 'testing-a-full-model' },
+    app: { route: '/studio' } },
   { id: 'page-studio', kind: 'page', title: 'Test Studio',
     keywords: ['studio', 'test', 'lora', 'checkpoint', 'generate', 'compare',
       // The words someone types when the Z-Image pipeline won't start or renders
