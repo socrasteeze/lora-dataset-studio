@@ -276,17 +276,24 @@ export default function DatasetWorkspace({ ds, onBack }) {
   const [identityError, setIdentityError] = useState('');
   const [identityVersion, setIdentityVersion] = useState(0);
   const identityDatasetId = ds.data?.id;
+  const identityScope = ds.data?.instance_id;
+  const identityRevision = ds.data?.identity_revision;
+  const identityFilterScope = useRef('');
   const identityImageKey = (ds.data?.images || []).map((image) => image.id).join(',');
   useEffect(() => {
-    if (!identityFilter || !identityDatasetId) { setIdentityIds(null); setIdentityError(''); return; }
+    if (!identityFilter || !identityDatasetId) {
+      identityFilterScope.current = ''; setIdentityIds(null); setIdentityError(''); return;
+    }
     const controller = new AbortController();
-    setIdentityIds([]);
+    const key = identityDatasetId + ':' + identityScope + ':' + identityFilter;
+    if (identityFilterScope.current !== key) setIdentityIds([]);
+    identityFilterScope.current = key;
     identityFetch('/api/identity/dataset/' + identityDatasetId + '/filter/' + identityFilter,
       { signal: controller.signal })
       .then((data) => { setIdentityIds(data.image_ids); setIdentityError(''); })
-      .catch((error) => { if (!controller.signal.aborted) setIdentityError(error.message); });
+      .catch((error) => { if (!controller.signal.aborted) { setIdentityIds([]); setIdentityError(error.message); } });
     return () => controller.abort();
-  }, [identityFilter, identityDatasetId, identityImageKey, identityVersion]);
+  }, [identityFilter, identityDatasetId, identityScope, identityRevision, identityImageKey, identityVersion]);
   const navigate = useNavigate();
   const toast = useToast();
   const { caps, loading: capsLoading, refresh: refreshCaps } = useCapabilities();
@@ -1335,11 +1342,15 @@ export default function DatasetWorkspace({ ds, onBack }) {
             <div id="gf-images" className="scroll-mt-20 flex flex-col gap-2">
               <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2">
                 <IdentityFilter source="dataset" scopeId={d.id} value={identityFilter}
-                  onChange={setIdentityFilter} version={identityVersion} />
-                <IdentityUndo key={d.instance_id} source="dataset" scopeId={d.id} version={identityVersion} busy={ds.busy}
+                  onChange={setIdentityFilter} version={identityVersion + ':' + identityRevision} />
+                <IdentityUndo key={d.instance_id} source="dataset" scopeId={d.id} version={identityVersion + ':' + identityRevision} busy={ds.busy}
                   onChanged={() => setIdentityVersion((value) => value + 1)} />
               </div>
-              {identityError && <p role="alert" className="text-sm text-danger">{identityError}</p>}
+              {identityError && <div role="alert" className="text-sm text-danger">
+                <p>{identityError}</p>
+                <button type="button" className="min-h-10 rounded-md border border-border px-3 py-2 text-sm"
+                  onClick={() => setIdentityVersion((value) => value + 1)}>Retry Filter</button>
+              </div>}
               {rescueGridImages.length > 0 && (
                 // One wrapping row at 400 px: the decision chips flow, the Sort
                 // control drops onto its own line instead of forcing a scrollbar.

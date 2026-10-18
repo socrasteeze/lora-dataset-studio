@@ -507,6 +507,54 @@ def test_transferred_names_cannot_rebind_themselves_to_replaced_pixels(client, l
     assert suggest(client, library, source='dataset')['reference_identities'] == 0
 
 
+def test_imported_names_invalidate_old_previews_and_undo_without_discarding_either_name(client, library):
+    from app.extensions import db
+    from app.models import FaceDatasetImage, IdentityAssignment, IdentitySubject
+    from app.services.identity_learning import filter_ids, restore_metadata
+    first, second = create(client), create(client, 'Nova')
+    original = assign(client, library, first).get_json()
+    assign(client, library, second, source='dataset')
+    ids = library['bank_ids'][:1]
+    base = f"/api/identity/bank/{library['bank']}"
+    preview = client.post(base+'/view', json={'image_ids': ids}).get_json()
+    snapshot = db.session.get(FaceDatasetImage, library['dataset_ids'][0]).identity_snapshot
+    restore_metadata(library['user'], 'bank', library['bank'], ids[0], snapshot)
+    db.session.commit()
+    response = client.post(base+'/unassign', json={**preview, 'image_ids': ids, 'identity_id': first['id']})
+    assert response.status_code == 409
+    result = client.post('/api/identity/actions/'+original['operation_id']+'/undo', json={})
+    assert result.get_json() == {'restored': 0, 'skipped': 1}
+    for identity in (first, second):
+        assert filter_ids(library['user'], 'bank', library['bank'], identity['id']) == ids
+    subject = IdentitySubject.query.filter_by(source='bank', image_id=ids[0]).one()
+    assert all(not row.learn for row in IdentityAssignment.query.filter_by(subject_id=subject.id))
+
+
+def test_dataset_identity_revision_tracks_merged_names_and_image_instances_without_noop_changes(client, library):
+    from app.extensions import db
+    from app.models import BankImage, FaceDatasetImage
+    from app.services.identity_learning import filter_ids, restore_metadata
+    identity = create(client)
+    assign(client, library, identity)
+    endpoint = f"/api/dataset/{library['dataset']}"
+    before = client.get(endpoint).get_json()
+    snapshot = db.session.get(BankImage, library['bank_ids'][0]).identity_snapshot
+    image_id = library['dataset_ids'][0]
+    restore_metadata(library['user'], 'dataset', library['dataset'], image_id, snapshot)
+    db.session.commit()
+    merged = client.get(endpoint).get_json()
+    assert [row['id'] for row in before['images']] == [row['id'] for row in merged['images']]
+    assert before['identity_revision'] != merged['identity_revision']
+    assert filter_ids(library['user'], 'dataset', library['dataset'], identity['id']) == [image_id]
+    restore_metadata(library['user'], 'dataset', library['dataset'], image_id, snapshot)
+    db.session.commit()
+    assert client.get(endpoint).get_json()['identity_revision'] == merged['identity_revision']
+    db.session.get(FaceDatasetImage, image_id).instance_id = 'f'*32
+    db.session.commit()
+    assert client.get(endpoint).get_json()['identity_revision'] != merged['identity_revision']
+    assert filter_ids(library['user'], 'dataset', library['dataset'], identity['id']) == []
+
+
 def test_dictionary_metadata_obeys_the_same_one_mib_limit_as_serialized_metadata():
     from app.services.identity_metadata import normalize
     decisions = [{'identity': {'id': f'{index+1:032x}', 'name': f'Aster {index}', 'kind': 'anime',
