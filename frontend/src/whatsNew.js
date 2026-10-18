@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-18-z-server-restart', date: '2026-10-18',
+    title: 'Reconnect after a server restart',
+    blurb: 'LDS waits for the restarted server before reconnecting. Fixed ports stay fixed, and Linux restarts reuse ports left by closed connections.',
+    to: '/settings?section=server',
+  },
+  {
     id: '2026-10-18-undo-folder-group',
     date: '2026-10-18',
     title: 'Undo a wrong person group from the grouping dialog',
@@ -114,7 +120,7 @@ export const WHATS_NEW = [
   {
     id: '2026-10-17-studio-base-model-only', date: '2026-10-17',
     title: 'Generate in Test Studio without a LoRA',
-    blurb: 'Choose Base model only, pick a model family and base, then enter your prompt. No trained dataset or LoRA selection is required.',
+    blurb: 'Choose Base Model Only, pick a model family and base, then enter your prompt. No trained dataset or LoRA selection is required.',
     to: '/studio',
   },
   {

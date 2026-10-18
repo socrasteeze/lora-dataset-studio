@@ -163,8 +163,10 @@ This section controls the shared local image engines, **Klein** and **Krea 2 Edi
 
 **Test Image / Studio** supports all seven image training families: Z-Image,
 SDXL, Krea 2, FLUX.1, FLUX.2 Klein, Anima and Qwen-Image 2.1. The **Trained image
-models** group prepares FLUX.1, Anima and Qwen 2.1 using the same model selection
-that generation checks before launch.
+models** group, now labeled **Studio Image Models**, prepares FLUX.1, Anima,
+Qwen 2.1 and MOSS-Image using the same model selection that generation checks
+before launch. MOSS-Image uses **Base Model Only** in Test Studio; it does not
+add a training family or accept a LoRA.
 
 Each family needs its own diffusion model, text encoder(s) and VAE. Leave a
 file field blank to detect compatible installed files, including shared
@@ -179,10 +181,16 @@ does not silently change that selection.
 
 | Setting | Purpose |
 |---|---|
-| `studio_models.<family>.diffusion_model` | Optional ComfyUI-relative base model name; `<family>` is `flux`, `anima` or `qwenimage21` |
+| `studio_models.<family>.diffusion_model` | Optional ComfyUI-relative base model name; `<family>` is `flux`, `anima`, `qwenimage21` or `moss` |
 | `studio_models.<family>.text_encoder` | Optional compatible encoder selection |
 | `studio_models.flux.text_encoder_2` | Optional FLUX.1 CLIP-L selection, in addition to T5 |
 | `studio_models.<family>.vae` | Optional compatible VAE selection |
+
+MOSS-Image requires BF16 diffusion weights, its Qwen3.5 9B INT8 text encoder
+and the FLUX.2 VAE. Its bundled loaders require ComfyUI with Qwen3.5 support.
+Use **Fix missing ComfyUI nodes** to install the loaders explicitly. Finish
+queued jobs before restarting ComfyUI, then check the nodes again. Quantized
+MOSS diffusion weights are not supported by this loader.
 
 Qwen-Image 2.1 uses Qwen3-VL **8B** and the dedicated **2.1 VAE**. Its older
 Qwen Image/Edit counterparts are incompatible. If native nodes are missing,
