@@ -14,6 +14,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  linux_startup:
+    name: Linux Startup Ports
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      LDS_DATA_DIR: ${{ runner.temp }}/lds-startup-data
+      LDS_CONFIG: ${{ runner.temp }}/lds-startup-config.json
+      LDS_ENV: ${{ runner.temp }}/lds-startup.env
+      LDS_PLUGINS_DIR: ${{ runner.temp }}/lds-startup-plugins
+      LDS_EXTENSIONS_DIR: ${{ runner.temp }}/lds-startup-extensions
+      OMP_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare Python
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install -r backend/requirements-dev.txt
+      - name: Check Linux Bind Rules
+        run: .venv/bin/python -m pytest backend/tests/test_port_utils.py -q --junitxml=linux-startup-ports.xml
+      - name: Save Linux Receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-startup-${{ github.event.pull_request.head.sha || github.sha }}
+          path: linux-startup-ports.xml
+          if-no-files-found: error
+
   gates:
     name: Full Fork Gates
     runs-on: windows-latest
@@ -93,6 +128,19 @@ jobs:
         with:
           name: identities-${{ github.event.pull_request.head.sha || github.sha }}
           path: .git/lds-gates-validation/identities.json
+          include-hidden-files: true
+          if-no-files-found: error
+
+      - name: Check Base Model Studio in Browser
+        if: ${{ !cancelled() }}
+        run: node frontend/scripts/studioBaseProbe.mjs
+
+      - name: Save Studio Receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-base-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .git/lds-gates-validation/studio-base.json
           include-hidden-files: true
           if-no-files-found: error
 

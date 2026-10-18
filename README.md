@@ -42,6 +42,9 @@ Confirmed examples support local match suggestions; corrections, rejected matche
 Several characters need separate subject regions before their images teach identity.
 Cross-artwork recognition accuracy remains unmeasured. See [identity assignment](docs/guide/using-the-app.md#assign-identities).
 
+**Base model generation:** Test Studio can generate from a prepared local model without a LoRA or trained dataset.
+MOSS-Image uses its own model files and bundled loaders, with explicit preparation controls in Studio and Settings.
+
 The big capabilities, each with what's actually inside it. Every block links down to its detailed section.
 
 ### 🎨 Build any dataset — Character, Concept or Style

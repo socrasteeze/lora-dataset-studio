@@ -214,7 +214,7 @@ export default function StudioRunSetup({
         </span>
         <button type="button" onClick={launchGuarded} disabled={!canLaunch}
           aria-label="Run the test"
-          className="ml-auto px-4 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
+          className="min-h-10 lg:min-h-0 ml-auto px-4 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
           {launching ? '' : (batchLaunchText('🚀 Run the test', picked) ?? '🚀 Run the test')}
         </button>
       </div>
