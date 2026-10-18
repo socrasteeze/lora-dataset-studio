@@ -42,7 +42,7 @@ try {
   browser = await chromium.launch({ executablePath: findHeadlessShell(fs, path) })
   const before = await (await fetch(url+'/test/state')).json()
   for (const [width, height] of [[360, 800], [412, 915], [844, 390], [768, 1024], [1280, 800]]) {
-    const recoveryContext = await browser.newContext({ viewport: { width, height } })
+    const recoveryContext = await browser.newContext({ viewport: { width, height }, hasTouch: width < 1024 })
     const recoveryPage = await recoveryContext.newPage()
     activePage = recoveryPage; activeErrors = []
     recoveryPage.on('pageerror', (error) => activeErrors.push(error.message))
@@ -74,7 +74,7 @@ try {
     for (const source of ['bank', 'dataset']) {
       for (const kind of ['anime', 'person']) {
         assert.ok((await fetch(url+'/test/reset-identities', { method: 'POST' })).ok)
-        const context = await browser.newContext({ viewport: { width, height } })
+        const context = await browser.newContext({ viewport: { width, height }, hasTouch: width < 1024 })
         const page = await context.newPage()
         const errors = []
         activePage = page; activeErrors = errors
@@ -84,7 +84,11 @@ try {
         }, { source, ready })
         await page.goto(url + (source === 'bank' ? '/#/bank' : '/#/datasets?section=images'))
         if (source === 'bank') await page.getByAltText('image-01.png', { exact: true }).click()
-        else await page.getByRole('checkbox', { name: /Select .* for bulk actions/ }).first().check()
+        else {
+          const card = page.locator('.dataset-grid-item').first()
+          if (width >= 1024) await card.hover()
+          await card.getByRole('checkbox', { name: /Select .* for bulk actions/ }).check()
+        }
         await page.locator('[data-identity-open]').click()
         const panel = page.getByRole('dialog', { name: 'Identities', exact: true })
         await panel.getByLabel('Kind', { exact: true }).selectOption(kind)
@@ -139,8 +143,11 @@ try {
           await page.getByAltText('image-01.png', { exact: true }).click()
           await page.getByAltText('image-02.png', { exact: true }).click()
         } else {
-          const checks = page.getByRole('checkbox', { name: /Select .* for bulk actions/ })
-          await checks.nth(0).uncheck(); await checks.nth(1).check()
+          const cards = page.locator('.dataset-grid-item')
+          if (width >= 1024) await cards.nth(0).hover()
+          await cards.nth(0).getByRole('checkbox', { name: /Select .* for bulk actions/ }).uncheck()
+          if (width >= 1024) await cards.nth(1).hover()
+          await cards.nth(1).getByRole('checkbox', { name: /Select .* for bulk actions/ }).check()
         }
         await page.locator('[data-identity-open]').click()
         await panel.getByLabel('Kind', { exact: true }).selectOption(kind)
@@ -166,7 +173,7 @@ try {
           await page.waitForFunction(() => document.querySelectorAll('img[alt^="image-"]').length === 2)
         }
         assert.deepEqual(errors, [])
-        outcomes.push({ width, height, source, kind, passed: true })
+        outcomes.push({ width, height, touch: width < 1024, source, kind, passed: true })
         await context.close()
       }
     }
