@@ -118,6 +118,8 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
   const [undoOffer, setUndoOffer] = useState(null);
   const [crop, setCrop] = useState(false);
   const [natural, setNatural] = useState(null);
+  const [previewError, setPreviewError] = useState('');
+  const [previewAttempt, setPreviewAttempt] = useState(0);
   const [focusId, setFocusId] = useState(null);
   const [minimum, setMinimum] = useState(defaultKind === 'person' ? '0.55' : '0.70');
   const [margin, setMargin] = useState('0.05');
@@ -128,13 +130,17 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
   const trigger = useRef(null);
   const upload = useRef(null);
   const previews = useRef(new Map());
+  const reviewedHashes = useRef(new Map());
   const reloadVersion = useRef(0);
   const draftScope = useRef(null);
   const ids = focusId ? [focusId] : imageIds;
   const previewId = ids.length === 1 ? ids[0] : null;
   const base = '/api/identity/' + source + '/' + scopeId;
-  const imageUrl = previewId ? base + '/image/' + previewId : '';
-  useEffect(() => { setNatural(null); }, [imageUrl]);
+  const previewHash = state?.images.find((image) => image.id === previewId)?.content_hash;
+  const imageUrl = previewId ? base + '/image/' + previewId + '?review=' + (previewHash || 'unavailable') + '&attempt=' + previewAttempt : '';
+  const currentImageUrl = useRef('');
+  currentImageUrl.current = imageUrl;
+  const previewReady = natural?.key === imageUrl;
   const idsKey = imageIds.join(',');
   useEffect(() => { setFocusId(null); setReplaceIdentity(null); setRegions({}); }, [idsKey]);
   const draftKey = state?.scope_instance
@@ -172,6 +178,13 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
     for (const batch of batches(chosen)) {
       const data = await postJson(base + '/view', { image_ids: batch });
       if (version !== reloadVersion.current) return;
+      for (const image of data.images) {
+        if (reviewedHashes.current.has(image.id) && reviewedHashes.current.get(image.id) !== image.content_hash) {
+          setRegions((prior) => { const next = { ...prior }; delete next[image.id]; return next; });
+          setSingle(false);
+        }
+        reviewedHashes.current.set(image.id, image.content_hash);
+      }
       previews.current.set(batch.join(','), data);
       first ||= data;
       count += batch.length;
@@ -394,15 +407,15 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
             </select>
           </label>
           {!target && <label className="min-w-0 text-xs sm:col-span-2">Name
-            <input aria-label="Name" autoComplete="off" className={FIELD} maxLength={100} value={name} disabled={working}
+            <input aria-label="Name" autoComplete="off" className={FIELD} maxLength={100} value={name} disabled={working || !prepared}
               onChange={(event) => { setName(event.target.value); setCatalogChoice(null); }} />
           </label>}
           {!target && <label className="min-w-0 text-xs">Aliases
-            <input aria-label="Aliases" className={FIELD} value={aliases} disabled={working}
+            <input aria-label="Aliases" className={FIELD} value={aliases} disabled={working || !prepared}
               placeholder="Comma-separated names" onChange={(event) => setAliases(event.target.value)} />
           </label>}
           {!target && kind === 'anime' && <label className="min-w-0 text-xs">Series
-            <input aria-label="Series" className={FIELD} maxLength={200} value={series} disabled={working}
+            <input aria-label="Series" className={FIELD} maxLength={200} value={series} disabled={working || !prepared}
               onChange={(event) => setSeries(event.target.value)} />
           </label>}
         </div>
@@ -410,10 +423,17 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
           {catalog.map((item) => <button type="button" className={BUTTON} key={item.tag} onClick={() => chooseCatalog(item)}>{item.name}</button>)}
         </div>}
         {previewId && <div className="flex min-w-0 flex-col items-start gap-2">
-          <img src={imageUrl} alt="Selected subject" className="max-h-56 max-w-full rounded-md object-contain"
-            onLoad={(event) => setNatural({ width: event.target.naturalWidth, height: event.target.naturalHeight })} />
+          <img key={imageUrl} data-identity-source src={imageUrl} alt="Selected subject" className="max-h-56 max-w-full rounded-md object-contain"
+            onLoad={(event) => { if (currentImageUrl.current === imageUrl) {
+              setNatural({ width: event.target.naturalWidth, height: event.target.naturalHeight, key: imageUrl }); setPreviewError('');
+            } }}
+            onError={() => { if (currentImageUrl.current === imageUrl) { setNatural(null); setPreviewError(imageUrl); } }} />
+          {previewError === imageUrl && <div role="alert" className="text-xs text-danger">
+            <p>Preview unavailable. Retry before learning.</p>
+            <button type="button" className={BUTTON} onClick={() => setPreviewAttempt((value) => value + 1)}>Retry Preview</button>
+          </div>}
           <div className="grid w-full grid-cols-2 gap-2">
-            <button type="button" className={BUTTON} disabled={working || !natural || !!replaceIdentity} onClick={() => setCrop(true)}>Choose Subject</button>
+            <button type="button" className={BUTTON} disabled={working || !prepared || !previewReady || !!replaceIdentity} onClick={() => setCrop(true)}>Choose Subject</button>
             <button type="button" className={BUTTON} disabled={working || !regions[previewId] || !!replaceIdentity}
               onClick={() => setRegions((prior) => { const next = { ...prior }; delete next[previewId]; return next; })}>Whole Image</button>
           </div>
@@ -431,7 +451,7 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
         </div>
         <p className="text-xs text-content-muted">For several characters, choose a subject crop. Only confirmed examples teach identity. Captions and image decisions stay unchanged.</p>
         <div className="grid grid-cols-2 gap-2">
-          <button type="button" className={BUTTON} disabled={working || !prepared || (!target && !name.trim())} onClick={assign}>{replaceIdentity ? 'Correct Name' : 'Assign'}</button>
+          <button type="button" className={BUTTON} disabled={working || !prepared || (learn && previewId && !previewReady) || (!target && !name.trim())} onClick={assign}>{replaceIdentity ? 'Correct Name' : 'Assign'}</button>
           <button type="button" className={BUTTON} disabled={working || !undoOffer} onClick={undo}>Undo</button>
           <button type="button" className={BUTTON + ' col-span-2'} disabled={working || !prepared || !target} onClick={unassignSelection}>Unassign Name</button>
         </div>

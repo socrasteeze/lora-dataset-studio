@@ -277,10 +277,12 @@ def view(user, source, scope_id, ids):
     ids = _ids(ids)
     scope = _scope(user, source, scope_id)
     rows = [_image(user, source, scope_id, i)[1] for i in ids]
+    digests = {}
+    preview = _preview(scope, [(source, row) for row in rows], capture=digests)
     return {'scope_instance': scope.instance_id,
             'profile_id': os.environ.get('LDS_PROFILE_ID') or 'default',
-            'preview': _preview(scope, [(source, row) for row in rows]),
-            'images': [{'id': row.id, 'subjects': [_subject_dict(s) for s in
+            'preview': preview,
+            'images': [{'id': row.id, 'content_hash': digests[row.id], 'subjects': [_subject_dict(s) for s in
                         _subjects(source, scope, row)]} for row in rows]}
 
 

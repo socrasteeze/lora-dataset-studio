@@ -106,11 +106,29 @@ try {
           await page.getByRole('dialog', { name: 'Subject Crop', exact: true }).getByRole('button', { name: 'Crop', exact: true }).click()
         }
         if (kind === 'anime') await panel.getByLabel('One Character', { exact: true }).check()
+        const swapped = source === 'bank' && kind === 'anime' && width === 360
+        if (swapped) {
+          const oldPreview = await panel.locator('[data-identity-source]').getAttribute('src')
+          assert.ok((await fetch(url+'/test/change-first-image', { method: 'POST' })).ok)
+          const refused = page.waitForResponse((response) => response.url().endsWith('/assign') && response.request().method() === 'POST')
+          await panel.getByRole('button', { name: 'Assign', exact: true }).click()
+          assert.equal((await refused).status(), 409)
+          await page.waitForFunction((old) => document.querySelector('[data-identity-source]')?.getAttribute('src') !== old, oldPreview)
+          assert.equal(await panel.getByLabel('One Character', { exact: true }).isChecked(), false)
+          assert.equal(await panel.getByText('Subject Crop Selected', { exact: true }).count(), 0)
+          await panel.getByRole('button', { name: 'Choose Subject', exact: true }).click()
+          await page.getByRole('dialog', { name: 'Subject Crop', exact: true }).getByRole('button', { name: 'Crop', exact: true }).click()
+          await panel.getByLabel('One Character', { exact: true }).check()
+        }
         const assigned = page.waitForResponse((response) => response.url().endsWith('/assign') && response.request().method() === 'POST')
         await panel.getByRole('button', { name: 'Assign', exact: true }).click()
         const response = await assigned
         assert.equal(response.status(), 200, await response.text())
         assert.equal((await response.json()).learning.measured, 1)
+        if (swapped) {
+          const request = response.request().postDataJSON()
+          assert.deepEqual(request.regions[String(request.image_ids[0])], [0.1, 0.1, 0.8, 0.8])
+        }
         await panel.getByRole('button', { name: 'Remove Name', exact: true }).first().waitFor()
         if (source === 'bank' && kind === 'anime' && width === 360) {
           await panel.getByRole('button', { name: 'Close', exact: true }).click()
@@ -199,8 +217,10 @@ try {
         await page.waitForFunction((source) => document.querySelectorAll(source === 'bank'
           ? 'img[alt^="image-"]' : '#ds-images-review input[type="checkbox"]').length === 2, source)
         assert.deepEqual(errors, [])
-        outcomes.push({ width, height, touch: width < 1024, source, kind, bulkUnassignUndo: true, passed: true })
+        outcomes.push({ width, height, touch: width < 1024, source, kind, bulkUnassignUndo: true,
+          stalePreviewRecovery: swapped, passed: true })
         await context.close()
+        if (swapped) assert.ok((await fetch(url+'/test/restore-first-image', { method: 'POST' })).ok)
       }
     }
   }
