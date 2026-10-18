@@ -5277,11 +5277,21 @@ def _image_engine(img):
 
 def dataset_payload(user_id, dataset_id):
     from . import lora_test_studio as studio
+    from ..models import IdentitySubject
+    import hashlib
     ds = get_dataset(user_id, dataset_id)
     if not ds:
         return None
     imgs = (FaceDatasetImage.query.filter_by(dataset_id=dataset_id)
             .order_by(FaceDatasetImage.id.desc()).all())
+    identity_state = db.session.query(db.func.count(IdentitySubject.id),
+                                     db.func.coalesce(db.func.sum(IdentitySubject.revision), 0)).filter(
+                                         IdentitySubject.user_id == user_id,
+                                         IdentitySubject.source == 'dataset',
+                                         IdentitySubject.scope_instance == ds.instance_id).one()
+    identity_revision = hashlib.sha256(json.dumps([
+        ds.instance_id, list(identity_state), [(image.id, image.instance_id) for image in imgs],
+    ]).encode()).hexdigest()
     ref_size = image_pixel_size(_ref_path(ds)) if ds.ref_filename else None
     comp = {'face': 0, 'bust': 0, 'body': 0, 'back': 0}
     # Count each composition bucket's images originating from crops below
@@ -5321,7 +5331,7 @@ def dataset_payload(user_id, dataset_id):
         return caption_has_identity_leak(i.caption, body=body, appearance=appearance)
 
     return {
-        'id': ds.id, 'instance_id': ds.instance_id,
+        'id': ds.id, 'instance_id': ds.instance_id, 'identity_revision': identity_revision,
         'name': ds.name, 'trigger_word': ds.trigger_word,
         'train_type': (ds.train_type or 'zimage'),
         # Results can load without waiting for trainer/model discovery.

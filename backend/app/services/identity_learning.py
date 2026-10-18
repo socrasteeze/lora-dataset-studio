@@ -730,6 +730,7 @@ def restore_metadata(user, source, scope_id, image_id, raw):
     for item in value['subjects']:
         subject = _subject(user, source, scope, image, item['region'],
                            single=item['single_subject'])
+        claimed = False
         for assignment in item['assignments']:
             identity = assignment['identity']
             target = db.session.get(NamedIdentity, identity['id'])
@@ -744,15 +745,36 @@ def restore_metadata(user, source, scope_id, image_id, raw):
             elif target.user_id != user or target.kind != identity['kind']:
                 raise IdentityConflict('Imported identity conflicts with this profile.')
             if db.session.get(IdentityAssignment, (subject.id, target.id)) is None:
+                if not claimed:
+                    _claim(subject, subject.revision)
+                    claimed = True
                 db.session.add(IdentityAssignment(
                     subject_id=subject.id, identity_id=target.id,
                     state=assignment['state'], learn=assignment['learn'],
                     content_hash=assignment.get('content_hash')))
         for evidence in item['evidence']:
             if evidence['content_hash'] == digest:
+                current = IdentityEvidence.query.filter_by(
+                    subject_id=subject.id, model_key=evidence['model_key']).first()
+                if current is not None and current.content_hash == digest:
+                    continue
                 import numpy as np
                 store_evidence(subject, evidence['model_key'], digest,
                                np.frombuffer(bytes.fromhex(evidence['vector']), dtype='<f4'))
+    subjects = _subjects(source, scope, image)
+    confirmed = [(row, assignment, _identity(user, assignment.identity_id)) for row in subjects
+                 for assignment in IdentityAssignment.query.filter_by(subject_id=row.id, state='confirmed').all()]
+    for row in subjects:
+        ambiguous = [assignment for owner, assignment, identity in confirmed
+                     if owner.id == row.id and assignment.learn and any(
+                         other.identity_id != assignment.identity_id
+                         and ((other_owner.id == row.id and other_identity.kind == identity.kind)
+                              or (row.region is None and identity.kind == 'anime'))
+                         for other_owner, other, other_identity in confirmed)]
+        if ambiguous:
+            _claim(row, row.revision)
+            for assignment in ambiguous:
+                assignment.learn = False
     sync_metadata(subject)
 
 

@@ -28,6 +28,7 @@ An original character does not need a catalog entry. Naming its confirmed exampl
 
 Names and reference evidence stay inside the active profile. Explicit Bank moves and image transfers preserve supported identity metadata.
 Dataset backups and training ZIP exports carry identity metadata separately from captions. Re-encoded pixels need fresh name confirmation and evidence.
+Transferred names update identity filters even when an existing image receives the metadata. Conflicting names stay stored, but do not teach that subject until you resolve them.
 Identity operations do not change captions, trigger words, source files or Keep/Reject decisions.
 
 The current recognition path uses prepared InsightFace for photos and CLIP for drawn subjects. It does not retrain model weights after a name.
