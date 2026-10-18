@@ -19,11 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      LDS_DATA_DIR: ${{ runner.temp }}/lds-startup-data
-      LDS_CONFIG: ${{ runner.temp }}/lds-startup-config.json
-      LDS_ENV: ${{ runner.temp }}/lds-startup.env
-      LDS_PLUGINS_DIR: ${{ runner.temp }}/lds-startup-plugins
-      LDS_EXTENSIONS_DIR: ${{ runner.temp }}/lds-startup-extensions
       OMP_NUM_THREADS: '1'
       MKL_NUM_THREADS: '1'
       OPENBLAS_NUM_THREADS: '1'
@@ -40,6 +35,12 @@ jobs:
           python -m venv .venv
           .venv/bin/python -m pip install -r backend/requirements-dev.txt
       - name: Check Linux Bind Rules
+        env:
+          LDS_DATA_DIR: ${{ runner.temp }}/lds-startup-data
+          LDS_CONFIG: ${{ runner.temp }}/lds-startup-config.json
+          LDS_ENV: ${{ runner.temp }}/lds-startup.env
+          LDS_PLUGINS_DIR: ${{ runner.temp }}/lds-startup-plugins
+          LDS_EXTENSIONS_DIR: ${{ runner.temp }}/lds-startup-extensions
         run: .venv/bin/python -m pytest backend/tests/test_port_utils.py -q --junitxml=linux-startup-ports.xml
       - name: Save Linux Receipt
         if: always()
