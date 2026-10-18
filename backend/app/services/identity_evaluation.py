@@ -16,8 +16,7 @@ def evaluate(user, data):
     if (not isinstance(references, list) or not 1 <= len(references) <= 2000
             or not isinstance(holdouts, list) or not 1 <= len(holdouts) <= 2000):
         raise ValueError('Choose between 1 and 2000 references and holdouts.')
-    minimum = learning._number(data.get('minimum'), 0.55 if kind == 'person' else 0.70)
-    margin = learning._number(data.get('margin'), 0.05, 0, 1)
+    minimum, margin = learning.match_settings(kind, data)
     bank, reference_hashes, reference_groups = {}, set(), set()
     contract, reference_ids = [], set()
 

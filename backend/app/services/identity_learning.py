@@ -710,6 +710,11 @@ def _number(value, default, low=-1.0, high=1.0):
     return float(value)
 
 
+def match_settings(kind, data):
+    return (_number(data.get('minimum'), 0.55 if kind == 'person' else 0.70),
+            _number(data.get('margin'), 0.05, 0, 1))
+
+
 def suggestions(user, source, scope_id, data):
     import numpy as np
     from .identity_matching import rank_candidates, disposition
@@ -717,8 +722,7 @@ def suggestions(user, source, scope_id, data):
     ids = _ids(data.get('image_ids'))
     scope = _scope(user, source, scope_id)
     model_key = FACE_MODEL if kind == 'person' else CLIP_MODEL
-    minimum = _number(data.get('minimum'), 0.55 if kind == 'person' else 0.70)
-    margin = _number(data.get('margin'), 0.05, 0, 1)
+    minimum, margin = match_settings(kind, data)
     confirmed = (db.session.query(IdentityAssignment, IdentitySubject, IdentityEvidence,
                                  NamedIdentity)
                  .join(IdentitySubject, IdentitySubject.id == IdentityAssignment.subject_id)
