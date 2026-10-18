@@ -177,4 +177,3 @@ def image_file(source, scope_id, image_id):
         return response
     except (ValueError, OSError):
         return jsonify(error='Image is unavailable.'), 404
-

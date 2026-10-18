@@ -118,4 +118,3 @@ try {
   assert.ok(resolved.startsWith(path.resolve(tmpdir())+path.sep) && path.basename(resolved).startsWith('lds-identities-'))
   await rm(resolved, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 }
-

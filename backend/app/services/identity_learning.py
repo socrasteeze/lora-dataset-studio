@@ -749,4 +749,3 @@ def tag_candidates(user, source, scope_id, data):
             for name, score in sorted(candidates.items(), key=lambda pair: -pair[1])
             if isinstance(score, (int, float)) and math.isfinite(score)]})
     return {'images': result}
-

@@ -96,4 +96,3 @@ def character_tags(paths, engine):
         raise RecognitionUnavailable('Character tagging failed. Check Setup > Quality Tools.')
     return {path: {name: score for name, score in tags.items() if name in names}
             for path, tags in (result.get('results') or {}).items()}
-
