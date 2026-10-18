@@ -69,7 +69,7 @@ try {
     assert.equal((await clearResponse.json()).cleared, 4)
     await grouping.getByText(/— 4 image\(s\)/).waitFor()
     assert.deepEqual((await (await recoveryContext.request.get(url+'/api/bank/'+ready.bank_id+'/folder-persons')).json()).assertions, [])
-    recoveryOutcomes.push({ width, height, eligibleBefore: 0, eligibleAfter: 4, passed: true })
+    recoveryOutcomes.push({ width, height, touch: width < 1024, eligibleBefore: 0, eligibleAfter: 4, passed: true })
     await recoveryContext.close()
     for (const source of ['bank', 'dataset']) {
       for (const kind of ['anime', 'person']) {
@@ -93,7 +93,7 @@ try {
         const panel = page.getByRole('dialog', { name: 'Identities', exact: true })
         await panel.getByLabel('Kind', { exact: true }).selectOption(kind)
         await panel.getByRole('button', { name: 'Choose Subject', exact: true }).click()
-        await page.getByRole('button', { name: 'Crop', exact: true }).click()
+        await page.getByRole('dialog', { name: 'Subject Crop', exact: true }).getByRole('button', { name: 'Crop', exact: true }).click()
         await panel.getByLabel('Name', { exact: true }).fill('Aster '+source+' '+kind+' '+width)
         if (source === 'bank' && kind === 'anime' && width === 360) {
           page.once('dialog', (dialog) => dialog.accept())
@@ -103,7 +103,7 @@ try {
           await page.waitForFunction((expected) => document.querySelector('[role="dialog"] input[aria-label="Name"]')?.value === expected,
             'Aster '+source+' '+kind+' '+width)
           await panel.getByRole('button', { name: 'Choose Subject', exact: true }).click()
-          await page.getByRole('button', { name: 'Crop', exact: true }).click()
+          await page.getByRole('dialog', { name: 'Subject Crop', exact: true }).getByRole('button', { name: 'Crop', exact: true }).click()
         }
         if (kind === 'anime') await panel.getByLabel('One Character', { exact: true }).check()
         const assigned = page.waitForResponse((response) => response.url().endsWith('/assign') && response.request().method() === 'POST')
@@ -137,6 +137,7 @@ try {
         assert.equal((await removal).status(), 200)
         await panel.getByRole('button', { name: 'Undo', exact: true }).click()
         await panel.getByRole('button', { name: 'Remove Name', exact: true }).first().waitFor()
+        await panel.getByRole('button', { name: 'Select Subject', exact: true }).first().click()
         await panel.getByRole('button', { name: 'Close', exact: true }).click()
         await panel.waitFor({ state: 'detached' })
         if (source === 'bank') {
@@ -172,8 +173,33 @@ try {
         } else {
           await page.waitForFunction(() => document.querySelectorAll('img[alt^="image-"]').length === 2)
         }
+        if (source === 'bank') {
+          await page.getByAltText('image-01.png', { exact: true }).click()
+          await page.getByAltText('image-02.png', { exact: true }).click()
+        } else {
+          for (const index of [0, 1]) {
+            const card = page.locator('.dataset-grid-item').nth(index)
+            if (width >= 1024) await card.hover()
+            await card.getByRole('checkbox', { name: /Select .* for bulk actions/ }).check()
+          }
+        }
+        await page.locator('[data-identity-open]').click()
+        await panel.getByLabel('Kind', { exact: true }).selectOption(kind)
+        await panel.getByLabel('Existing Identity', { exact: true }).selectOption(identity.id)
+        const unassigned = page.waitForResponse((response) => response.url().endsWith('/unassign'))
+        await panel.getByRole('button', { name: 'Unassign Name', exact: true }).click()
+        const unassignResponse = await unassigned
+        assert.equal(unassignResponse.status(), 200)
+        assert.equal((await unassignResponse.json()).unassigned, 2)
+        if (source === 'bank') await panel.getByRole('button', { name: 'Close', exact: true }).click()
+        await panel.waitFor({ state: 'detached' })
+        await page.waitForFunction((source) => document.querySelectorAll(source === 'bank'
+          ? 'img[alt^="image-"]' : '#ds-images-review input[type="checkbox"]').length === 0, source)
+        await page.getByRole('button', { name: 'Undo Identity', exact: true }).click()
+        await page.waitForFunction((source) => document.querySelectorAll(source === 'bank'
+          ? 'img[alt^="image-"]' : '#ds-images-review input[type="checkbox"]').length === 2, source)
         assert.deepEqual(errors, [])
-        outcomes.push({ width, height, touch: width < 1024, source, kind, passed: true })
+        outcomes.push({ width, height, touch: width < 1024, source, kind, bulkUnassignUndo: true, passed: true })
         await context.close()
       }
     }

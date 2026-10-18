@@ -37,7 +37,8 @@ def evaluate(user, data):
         identity = learning._identity(user, item.get('identity_id'))
         assignment = db.session.get(IdentityAssignment, (subject.id, identity.id))
         if (identity.kind != kind or not assignment or assignment.state != 'confirmed'
-                or not assignment.learn or not subject.single_subject):
+                or not assignment.learn or not subject.single_subject
+                or assignment.content_hash != row.content_hash):
             raise ValueError('References require confirmed, eligible subject examples.')
         if subject.id in reference_ids:
             raise ValueError('Reference subjects must be unique.')

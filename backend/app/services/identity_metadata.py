@@ -51,6 +51,9 @@ def normalize(raw):
                     or not isinstance(decision.get('learn'), bool)):
                 raise ValueError('Invalid identity assignment.')
             seen.add(identity['id'])
+            label_hash = decision.get('content_hash')
+            if label_hash is not None and (not isinstance(label_hash, str) or not _HASH.fullmatch(label_hash)):
+                raise ValueError('Invalid identity label provenance.')
             aliases = identity.get('aliases', [])
             if not isinstance(aliases, list) or len(aliases) > 20:
                 raise ValueError('Invalid identity aliases.')
@@ -60,7 +63,7 @@ def normalize(raw):
                          'series': _text(identity.get('series'), 200, optional=True) or None,
                          'catalog_tag': _text(identity.get('catalog_tag'), 200, optional=True) or None}
             decisions.append({'identity': canonical, 'state': decision['state'],
-                              'learn': decision['learn']})
+                              'learn': decision['learn'], 'content_hash': label_hash})
         seen_models = set()
         for item in evidence:
             if not isinstance(item, dict):
@@ -82,7 +85,10 @@ def normalize(raw):
         out.append({'region': region(subject.get('region')),
                     'single_subject': subject['single_subject'],
                     'assignments': decisions, 'evidence': vectors})
-    return {'version': 1, 'subjects': out}
+    normalized = {'version': 1, 'subjects': out}
+    if len(json.dumps(normalized).encode('utf-8')) > 1024*1024:
+        raise ValueError('Identity metadata exceeds 1 MiB.')
+    return normalized
 
 
 def materialize_sqlite(connection, source, scope, image):
@@ -122,9 +128,9 @@ def materialize_sqlite(connection, source, scope, image):
                      identity['name'].casefold(), identity['series'],
                      json.dumps(identity['aliases']), identity['catalog_tag']))
             connection.execute(
-                'INSERT OR IGNORE INTO identity_assignment(subject_id,identity_id,state,learn,updated_at) '
-                'VALUES(?,?,?,?,CURRENT_TIMESTAMP)',
-                (subject_id, identity['id'], decision['state'], decision['learn']))
+                'INSERT OR IGNORE INTO identity_assignment(subject_id,identity_id,state,learn,content_hash,updated_at) '
+                'VALUES(?,?,?,?,?,CURRENT_TIMESTAMP)',
+                (subject_id, identity['id'], decision['state'], decision['learn'], decision['content_hash']))
         for evidence in item['evidence']:
             connection.execute(
                 'INSERT OR IGNORE INTO identity_evidence(subject_id,model_key,content_hash,'

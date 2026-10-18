@@ -102,7 +102,7 @@ export const WHATS_NEW = [
     id: '2026-10-18-identity-learning',
     date: '2026-10-18',
     title: 'Teach identities with the names you confirm',
-    blurb: 'Assign people and anime characters in Bank or Dataset. Confirmed examples support local match suggestions, while corrections, rejected matches and Undo preserve your decisions. Character recognition across art styles still needs a labeled accuracy check.',
+    blurb: 'Assign people and anime characters in Bank or Dataset, then use confirmed examples for local match suggestions. Bulk unassign, corrections and Undo preserve your decisions; character recognition across art styles still needs a labeled accuracy check.',
     to: '/bank',
   },
   {

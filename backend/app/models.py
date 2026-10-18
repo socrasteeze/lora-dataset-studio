@@ -63,6 +63,7 @@ class IdentityAssignment(db.Model):
         'named_identity.id', ondelete='CASCADE'), primary_key=True)
     state = db.Column(String(12), nullable=False)
     learn = db.Column(db.Boolean, nullable=False, default=False)
+    content_hash = db.Column(String(64), nullable=True)
     updated_at = db.Column(DateTime, default=db.func.current_timestamp())
 
 

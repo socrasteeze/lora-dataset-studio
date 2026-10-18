@@ -513,6 +513,7 @@ _SCHEMA_ADDITIONS = (
     ('face_dataset_image', 'instance_id', 'VARCHAR(32)'),
     ('face_dataset_image', 'identity_snapshot', 'TEXT'),
     ('bank_image', 'identity_snapshot', 'TEXT'),
+    ('identity_assignment', 'content_hash', 'VARCHAR(64)'),
     ('image_bank', 'pipeline_report', 'TEXT'),
     # "One bank per subfolder": the loose-files bank is rooted at the parent but
     # must NOT recurse when its live folder is re-walked (see refresh_bank).

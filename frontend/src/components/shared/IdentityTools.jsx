@@ -57,6 +57,41 @@ export function IdentityFilter({ source, scopeId, value = '', onChange, version 
   </div>;
 }
 
+export function IdentityUndo({ source, scopeId, version = 0, busy = false, onChanged }) {
+  const [offer, setOffer] = useState(null);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [retry, setRetry] = useState(0);
+  useUnsavedWork(working);
+  useEffect(() => {
+    const controller = new AbortController();
+    setOffer(null); setError('');
+    apiFetch('/api/identity/' + source + '/' + scopeId + '/undo', { signal: controller.signal, background: true })
+      .then((data) => setOffer(data.operation_id))
+      .catch((failure) => { if (!controller.signal.aborted) setError(failure.message); });
+    return () => controller.abort();
+  }, [source, scopeId, version, retry]);
+  const undo = async () => {
+    if (working || busy) return;
+    if (error) { setRetry((value) => value + 1); return; }
+    setWorking(true); setNotice('');
+    try {
+      const result = await postJson('/api/identity/actions/' + offer + '/undo', {});
+      setNotice(result.restored + ' restored. ' + result.skipped + ' skipped because images or decisions changed.');
+      setRetry((value) => value + 1); onChanged?.();
+    } catch (failure) { setError(failure.message || 'Undo failed.'); }
+    finally { setWorking(false); }
+  };
+  return <div className="w-full min-w-0">
+    <button type="button" className={BUTTON + ' w-full'} disabled={working || busy || (!offer && !error)} onClick={undo}>
+      {error ? 'Retry Undo' : 'Undo Identity'}
+    </button>
+    {notice && <p role="status" className="mt-1 text-xs">{notice}</p>}
+    {error && <p role="alert" className="mt-1 text-xs text-danger">{error}</p>}
+  </div>;
+}
+
 export default function IdentityTools({ source, scopeId, imageIds, busy = false, onChanged, defaultKind = 'anime' }) {
   const [open, setOpen] = useState(false);
   const [working, setWorking] = useState(false);
@@ -89,6 +124,7 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
   const titleId = useId();
   const stop = useRef(false);
   const dialog = useRef(null);
+  const cropDialog = useRef(null);
   const trigger = useRef(null);
   const upload = useRef(null);
   const previews = useRef(new Map());
@@ -100,6 +136,7 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
   const imageUrl = previewId ? base + '/image/' + previewId : '';
   useEffect(() => { setNatural(null); }, [imageUrl]);
   const idsKey = imageIds.join(',');
+  useEffect(() => { setFocusId(null); setReplaceIdentity(null); setRegions({}); }, [idsKey]);
   const draftKey = state?.scope_instance
     ? 'lds:identity-draft:' + state.profile_id + ':' + source + ':' + state.scope_instance : null;
   useUnsavedWork(open && (working || !!name || !!aliases || !!series));
@@ -149,6 +186,7 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
     if (working) return;
     if ((name || aliases || series) && !window.confirm('Discard the unsaved name?')) return;
     setName(''); setAliases(''); setSeries('');
+    setReplaceIdentity(null); setFocusId(null); setRegions({});
     setOpen(false);
   }, [name, aliases, series, working]);
   const closeRef = useRef(close);
@@ -174,14 +212,16 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
     dialog.current?.focus();
     const keydown = (event) => {
       if (event.key === 'Escape') { event.preventDefault(); if (!cropRef.current) closeRef.current(); }
-      if (event.key !== 'Tab' || cropRef.current) return;
-      const fields = [...dialog.current.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href]')];
+      if (event.key !== 'Tab') return;
+      const activeDialog = cropRef.current ? cropDialog.current : dialog.current;
+      if (!activeDialog) return;
+      const fields = [...activeDialog.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href]')];
       const first = fields[0], last = fields.at(-1);
       if (!fields.length) { event.preventDefault(); return; }
-      if (!dialog.current.contains(document.activeElement)) {
+      if (!activeDialog.contains(document.activeElement)) {
         event.preventDefault(); (event.shiftKey ? last : first).focus(); return;
       }
-      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog.current)) {
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === activeDialog)) {
         event.preventDefault(); last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
         event.preventDefault(); first.focus();
@@ -206,10 +246,12 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
     setWorking(true); setError(''); setNotice('');
     try {
       await fn();
-      onChanged?.();
-      await reload();
     } catch (failure) { setError(failure.message || 'Identity operation failed.'); }
-    finally { setWorking(false); }
+    finally {
+      try { onChanged?.(); await reload(); }
+      catch (failure) { setError((prior) => prior || failure.message || 'Reload failed.'); }
+      setWorking(false);
+    }
   }
 
   async function assign() {
@@ -245,6 +287,24 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
     });
   }
 
+  async function unassignSelection() {
+    await perform(async () => {
+      let operationId = null, count = 0, checked = 0;
+      for (const batch of batches(ids)) {
+        if (stop.current) break;
+        const preview = previews.current.get(batch.join(','));
+        if (!preview) throw new Error('Selection preview expired. Reopen the panel.');
+        const result = await postJson(base + '/unassign', {
+          ...preview, image_ids: batch, identity_id: target, operation_id: operationId,
+        });
+        if (result.operation_id) { operationId = result.operation_id; setUndoOffer(operationId); }
+        count += result.unassigned; checked += batch.length;
+        setNotice(count + ' names removed. ' + checked + ' of ' + ids.length + ' images checked.');
+      }
+      setSuggestions([]); setReplaceIdentity(null);
+    });
+  }
+
   async function findMatches() {
     await perform(async () => {
       if (!minimum.trim() || !margin.trim() || !Number.isFinite(Number(minimum)) || !Number.isFinite(Number(margin))) {
@@ -261,7 +321,8 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
         });
         found.push(...result.suggestions); unknown += result.unmeasured.length;
         count += batch.length; setSuggestions([...found]);
-        setNotice(count + ' checked of ' + ids.length + '. ' + unknown + ' unmeasured. Thresholds are starting heuristics.');
+        setNotice(count + ' checked of ' + ids.length + '. ' + unknown + ' unmeasured. Thresholds are starting heuristics.'
+          + (result.reference_identities === 0 ? ' No current examples. Review an image and assign its name.' : ''));
       }
     });
   }
@@ -285,6 +346,7 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
         identity_id: identity, action, revision: subject.revision, single_subject: single,
       });
       setUndoOffer(result.operation_id);
+      if (action === 'remove' && identity === replaceIdentity) setReplaceIdentity(null);
       setSuggestions((rows) => rows.filter((row) => row.subject_id !== subject.id));
       setNotice(action === 'confirm' ? 'Example confirmed.' : 'Decision saved.');
     });
@@ -293,7 +355,7 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
   async function undo() {
     await perform(async () => {
       const result = await postJson('/api/identity/actions/' + undoOffer + '/undo', {});
-      setNotice(result.restored + ' restored. ' + result.skipped + ' skipped because later work exists.');
+      setNotice(result.restored + ' restored. ' + result.skipped + ' skipped because images or decisions changed.');
       setSuggestions([]);
     });
   }
@@ -306,7 +368,7 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
 
   return <>
     <button ref={trigger} type="button" className={BUTTON} data-identity-open
-      disabled={busy || !imageIds.length} onClick={() => { setOpen(true); setError(''); setSuggestions([]); setTagRows([]); }}>
+      disabled={busy || !imageIds.length} onClick={() => { setOpen(true); setError(''); setNotice(''); setSuggestions([]); setTagRows([]); }}>
       Assign Identity{imageIds.length ? ' (' + imageIds.length + ')' : ''}
     </button>
     {open && createPortal(<div className="fixed inset-0 z-[100] overflow-y-auto bg-black/60 p-3 sm:p-6" data-probe-layer>
@@ -351,11 +413,17 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
           <img src={imageUrl} alt="Selected subject" className="max-h-56 max-w-full rounded-md object-contain"
             onLoad={(event) => setNatural({ width: event.target.naturalWidth, height: event.target.naturalHeight })} />
           <div className="grid w-full grid-cols-2 gap-2">
-            <button type="button" className={BUTTON} disabled={working || !natural} onClick={() => setCrop(true)}>Choose Subject</button>
-            <button type="button" className={BUTTON} disabled={working || !regions[previewId]}
+            <button type="button" className={BUTTON} disabled={working || !natural || !!replaceIdentity} onClick={() => setCrop(true)}>Choose Subject</button>
+            <button type="button" className={BUTTON} disabled={working || !regions[previewId] || !!replaceIdentity}
               onClick={() => setRegions((prior) => { const next = { ...prior }; delete next[previewId]; return next; })}>Whole Image</button>
           </div>
           {regions[previewId] && <span className="text-xs">Subject Crop Selected</span>}
+          {replaceIdentity && <>
+            <p className="text-xs text-content-muted">Correct Name keeps this region. To change the region, remove the old name and choose a new crop.</p>
+            <button type="button" className={BUTTON} disabled={working} onClick={() => {
+              setReplaceIdentity(null); setName(''); setAliases(''); setSeries('');
+            }}>Cancel Correction</button>
+          </>}
         </div>}
         <div className="flex flex-wrap gap-4 text-xs">
           <label className="flex min-h-10 items-center gap-2"><input aria-label="Learn Identity" type="checkbox" checked={learn} disabled={working} onChange={(event) => setLearn(event.target.checked)} />Learn Identity</label>
@@ -365,7 +433,9 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
         <div className="grid grid-cols-2 gap-2">
           <button type="button" className={BUTTON} disabled={working || !prepared || (!target && !name.trim())} onClick={assign}>{replaceIdentity ? 'Correct Name' : 'Assign'}</button>
           <button type="button" className={BUTTON} disabled={working || !undoOffer} onClick={undo}>Undo</button>
+          <button type="button" className={BUTTON + ' col-span-2'} disabled={working || !prepared || !target} onClick={unassignSelection}>Unassign Name</button>
         </div>
+        <p className="text-xs text-content-muted">Unassign removes the chosen name from selected images. Other names stay. Undo Identity also works when the filtered grid is empty.</p>
         <div className="grid grid-cols-2 gap-3">
           <label className="text-xs">Minimum Similarity<input aria-label="Minimum Similarity" className={FIELD} type="number" min="-1" max="1" step="0.01" value={minimum} disabled={working} onChange={(event) => setMinimum(event.target.value)} /></label>
           <label className="text-xs">Ambiguity Margin<input aria-label="Ambiguity Margin" className={FIELD} type="number" min="0" max="1" step="0.01" value={margin} disabled={working} onChange={(event) => setMargin(event.target.value)} /></label>
@@ -428,7 +498,7 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
         </div>)}
       </section>
     </div>, document.body)}
-    {crop && createPortal(<div className="relative z-[110]"><CropModal imageUrl={imageUrl} onCancel={() => setCrop(false)}
+    {crop && createPortal(<div ref={cropDialog} role="dialog" aria-modal="true" aria-label="Subject Crop" className="fixed inset-0 z-[110]"><CropModal imageUrl={imageUrl} onCancel={() => setCrop(false)}
       onConfirm={(box) => { setRegions((prior) => ({ ...prior, [previewId]: [box.x / natural.width, box.y / natural.height, box.w / natural.width, box.h / natural.height] })); setCrop(false); }} /></div>, document.body)}
   </>;
 }

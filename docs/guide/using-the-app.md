@@ -11,10 +11,15 @@ This records a subject region without changing the image file. Different regions
 **Find Matches** analyzes the selected images on the CPU and compares them with confirmed examples in the same profile.
 Minimum Similarity and Ambiguity Margin are editable starting heuristics. They are not measured accuracy or probability.
 Missing models, unusable faces and stale pixels remain unmeasured. Install the relevant tools in **Setup > Quality Tools**.
+Names saved before Setup remain bound to the pixels you reviewed. If those pixels change, review the new image and assign its name again before it can teach identity.
 Unconfirmed suggestions never become training examples. Confirm a suggestion to teach it, or use **Reject Match** to exclude that pair.
 
 **Remove Name** removes an assignment. **Undo** restores the complete last bulk action, including after a reload, only where later work has not changed it.
+To remove one identity from several images, select those images, choose the existing name, then use **Unassign Name**. Other names stay assigned.
+**Undo Identity** beside the identity filter restores the last identity action even if the filtered grid is empty.
 Use **Correct Name** to replace a wrong identity and exclude its previous match. A removed example stops teaching the wrong identity.
+Name correction keeps the current subject region. To change that region, remove the old assignment and choose a new crop.
+Before adding another character to an image that teaches a whole-image name, remove that whole-image assignment and name each character crop separately.
 The identity filter changes the actual image pool, including selection and bulk decisions.
 
 **Suggest Names** reads character predictions from prepared WD14 or PixAI models. The tagger can suggest only its supported labels.
@@ -22,7 +27,7 @@ The identity filter changes the actual image pool, including selection and bulk 
 An original character does not need a catalog entry. Naming its confirmed examples creates its local reference set.
 
 Names and reference evidence stay inside the active profile. Explicit Bank moves and image transfers preserve supported identity metadata.
-Dataset backups and training ZIP exports carry identity metadata separately from captions. Re-encoded pixels need fresh evidence.
+Dataset backups and training ZIP exports carry identity metadata separately from captions. Re-encoded pixels need fresh name confirmation and evidence.
 Identity operations do not change captions, trigger words, source files or Keep/Reject decisions.
 
 The current recognition path uses prepared InsightFace for photos and CLIP for drawn subjects. It does not retrain model weights after a name.

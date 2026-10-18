@@ -242,7 +242,8 @@ def rename_identity(user, identity_id, data):
 
 
 def _assignment_snapshot(subject):
-    return [{'identity_id': a.identity_id, 'state': a.state, 'learn': a.learn}
+    return [{'identity_id': a.identity_id, 'state': a.state, 'learn': a.learn,
+             'content_hash': a.content_hash}
             for a in IdentityAssignment.query.filter_by(subject_id=subject.id).all()]
 
 
@@ -258,13 +259,15 @@ def _subject_dict(subject):
             'assignments': decisions}
 
 
-def _preview(scope, rows):
+def _preview(scope, rows, *, capture=None):
     value = []
     for source, image in rows:
         try:
             digest = fingerprint(_path(source, scope, image))
         except (OSError, ValueError):
             digest = None
+        if capture is not None:
+            capture[image.id] = digest
         value.append((image.id, image.instance_id, digest,
                       sorted((s.id, s.revision) for s in _subjects(source, scope, image))))
     return hashlib.sha256(json.dumps([scope.instance_id, value]).encode()).hexdigest()
@@ -339,12 +342,27 @@ def undo_offer(user, source, scope_id):
             'subjects': sum(len(json.loads(row.snapshots)) for row in group)}
 
 
+def _check_character_region(user, source, scope, image, box, target, learn):
+    if target.kind != 'anime':
+        return
+    for subject in _subjects(source, scope, image):
+        for previous in IdentityAssignment.query.filter_by(subject_id=subject.id, state='confirmed').all():
+            if previous.identity_id == target.id:
+                continue
+            if box is None and learn and subject.region:
+                raise ValueError('Choose a subject crop. This image already names another subject.')
+            if (box is not None and subject.region is None and previous.learn
+                    and _identity(user, previous.identity_id).kind == 'anime'):
+                raise ValueError('Remove the old whole-image name, then assign each character to a crop.')
+
+
 def assign(user, source, scope_id, data):
     ids = _ids(data.get('image_ids'))
     scope = _scope(user, source, scope_id)
     rows = [_image(user, source, scope_id, i)[1] for i in ids]
+    digests = {}
     if (data.get('scope_instance') != scope.instance_id
-            or data.get('preview') != _preview(scope, [(source, row) for row in rows])):
+            or data.get('preview') != _preview(scope, [(source, row) for row in rows], capture=digests)):
         raise IdentityConflict('Selection changed. Reload it before assigning.')
     target = _identity(user, data.get('identity_id'))
     learn = data.get('learn', True)
@@ -362,6 +380,7 @@ def assign(user, source, scope_id, data):
     subjects = []
     for row in rows:
         box = parsed[str(row.id)]
+        _check_character_region(user, source, scope, row, box, target, learn)
         if target.kind == 'person' and box is None:
             for located in _subjects(source, scope, row):
                 if located.region and any(
@@ -411,12 +430,41 @@ def assign(user, source, scope_id, data):
             decision = IdentityAssignment(subject_id=subject.id, identity_id=target.id)
             db.session.add(decision)
         decision.state, decision.learn = 'confirmed', learn
+        decision.content_hash = digests[subject.image_id]
     action = _record_action(user, subjects, snapshots, data.get('operation_id'))
     for subject in subjects:
         sync_metadata(subject)
     db.session.commit()
     return {'action_id': action.id, 'operation_id': action.operation_id, 'assigned': len(subjects),
             'subject_ids': [s.id for s in subjects]}
+
+
+def unassign(user, source, scope_id, data):
+    ids = _ids(data.get('image_ids'))
+    scope = _scope(user, source, scope_id)
+    rows = [_image(user, source, scope_id, value)[1] for value in ids]
+    if (data.get('scope_instance') != scope.instance_id
+            or data.get('preview') != _preview(scope, [(source, row) for row in rows])):
+        raise IdentityConflict('Selection changed. Reload it before removing names.')
+    target = _identity(user, data.get('identity_id'))
+    subjects = [subject for row in rows for subject in _subjects(source, scope, row)
+                if IdentityAssignment.query.filter_by(
+                    subject_id=subject.id, identity_id=target.id, state='confirmed').first()]
+    snapshots = []
+    for subject in subjects:
+        snapshots.append({'subject_id': subject.id, 'before': _assignment_snapshot(subject),
+                          'single_before': subject.single_subject,
+                          'evidence_before': {e.model_key: e.content_hash for e in
+                                              IdentityEvidence.query.filter_by(subject_id=subject.id).all()},
+                          'after_revision': subject.revision+1})
+        _claim(subject, subject.revision)
+        db.session.delete(db.session.get(IdentityAssignment, (subject.id, target.id)))
+    action = _record_action(user, subjects, snapshots, data.get('operation_id')) if subjects else None
+    for subject in subjects:
+        sync_metadata(subject)
+    db.session.commit()
+    return {'unassigned': len(subjects), 'action_id': action.id if action else None,
+            'operation_id': action.operation_id if action else None}
 
 
 def decision(user, subject_id, data):
@@ -434,6 +482,8 @@ def decision(user, subject_id, data):
     prior_single = subject.single_subject
     _claim(subject, data.get('revision'))
     if operation == 'confirm':
+        _check_character_region(user, subject.source, scope, image,
+                                json.loads(subject.region) if subject.region else None, target, True)
         model = FACE_MODEL if target.kind == 'person' else CLIP_MODEL
         current_evidence = IdentityEvidence.query.filter_by(
             subject_id=subject.id, model_key=model).first()
@@ -463,6 +513,8 @@ def decision(user, subject_id, data):
             db.session.add(row)
         row.state = 'confirmed' if operation == 'confirm' else 'rejected'
         row.learn = operation == 'confirm'
+        if operation == 'confirm':
+            row.content_hash = current_evidence.content_hash
     action = _record_action(user, [subject], [{
         'subject_id': subject.id, 'before': before, 'single_before': prior_single,
         'evidence_before': {e.model_key: e.content_hash for e in
@@ -510,6 +562,7 @@ def undo(user, action_id):
                         subject_id=subject.id, model_key=model).first()
                     previous['learn'] = bool(
                         evidence and item.get('evidence_before', {}).get(model) == evidence.content_hash
+                        and previous.get('content_hash') == evidence.content_hash
                         and _live_evidence(subject, evidence))
                 db.session.add(IdentityAssignment(subject_id=subject.id, **previous))
         subject.single_subject = item['single_before']
@@ -548,15 +601,16 @@ def store_evidence(subject, model_key, digest, vector, *, confirmed_identity=Non
     dimension = 512 if model_key == FACE_MODEL else 768
     value = normalized_vector(vector, dimension)
     row = IdentityEvidence.query.filter_by(subject_id=subject.id, model_key=model_key).first()
+    stale = [assignment for assignment in IdentityAssignment.query.filter_by(
+        subject_id=subject.id, state='confirmed', learn=True).all()
+        if assignment.content_hash != digest]
+    if stale or (row is not None and row.content_hash != digest and confirmed_identity is None):
+        _claim(subject, subject.revision)
+    for assignment in stale:
+        assignment.learn = False
     if row is None:
         row = IdentityEvidence(subject_id=subject.id, model_key=model_key)
         db.session.add(row)
-    elif row.content_hash != digest:
-        if confirmed_identity is None:
-            _claim(subject, subject.revision)
-        for assignment in IdentityAssignment.query.filter_by(subject_id=subject.id).all():
-            if assignment.identity_id != confirmed_identity:
-                assignment.learn = False
     row.content_hash, row.dimension, row.vector = digest, dimension, value.tobytes()
     db.session.flush()
     return row
@@ -654,7 +708,8 @@ def sync_metadata(subject):
         for assignment in IdentityAssignment.query.filter_by(subject_id=row.id).all():
             identity = _identity(subject.user_id, assignment.identity_id)
             assignments.append({'identity': identity_dict(identity),
-                                'state': assignment.state, 'learn': assignment.learn})
+                                'state': assignment.state, 'learn': assignment.learn,
+                                'content_hash': assignment.content_hash})
         evidence = [{'model_key': e.model_key, 'content_hash': e.content_hash,
                      'dimension': e.dimension, 'vector': e.vector.hex()}
                     for e in IdentityEvidence.query.filter_by(subject_id=row.id).all()]
@@ -691,7 +746,8 @@ def restore_metadata(user, source, scope_id, image_id, raw):
             if db.session.get(IdentityAssignment, (subject.id, target.id)) is None:
                 db.session.add(IdentityAssignment(
                     subject_id=subject.id, identity_id=target.id,
-                    state=assignment['state'], learn=assignment['learn']))
+                    state=assignment['state'], learn=assignment['learn'],
+                    content_hash=assignment.get('content_hash')))
         for evidence in item['evidence']:
             if evidence['content_hash'] == digest:
                 import numpy as np
@@ -733,6 +789,7 @@ def suggestions(user, source, scope_id, data):
                          IdentityAssignment.learn.is_(True),
                          IdentitySubject.single_subject.is_(True),
                          IdentityEvidence.model_key == model_key)
+                 .filter(IdentityAssignment.content_hash == IdentityEvidence.content_hash)
                  .order_by(IdentityEvidence.created_at.desc(), IdentityEvidence.id.desc())
                  .limit(6401).all())
     if len(confirmed) > 6400:

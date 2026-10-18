@@ -140,6 +140,14 @@ def analyze(source, scope_id):
         return identities.analyze(LOCAL_USER, source, scope_id, data)
 
 
+@bp.post('/identity/<source>/<int:scope_id>/unassign')
+@endpoint
+def unassign(source, scope_id):
+    data = body()
+    with identities.lease(source, scope_id):
+        return identities.unassign(LOCAL_USER, source, scope_id, data)
+
+
 @bp.post('/identity/<source>/<int:scope_id>/suggest')
 @endpoint
 def suggest(source, scope_id):
