@@ -9,23 +9,33 @@ const batches = (ids) => Array.from({ length: Math.ceil(ids.length / 16) }, (_, 
 
 export function IdentityFilter({ source, scopeId, value = '', onChange, version = 0 }) {
   const [rows, setRows] = useState([]);
+  const [query, setQuery] = useState('');
   const [error, setError] = useState('');
+  const seen = useRef(new Map());
   useEffect(() => {
     const controller = new AbortController();
-    apiFetch('/api/identities', { signal: controller.signal })
-      .then((data) => { setRows(data.identities); setError(''); })
-      .catch((failure) => { if (!controller.signal.aborted) setError(failure.message); });
-    return () => controller.abort();
-  }, [source, scopeId, version]);
-  return <label className="flex min-w-0 max-w-full items-center gap-2 text-xs">
-    <span>Identity</span>
+    const timer = setTimeout(() => {
+      apiFetch('/api/identities?q=' + encodeURIComponent(query), { signal: controller.signal })
+        .then((data) => {
+          for (const identity of data.identities) seen.current.set(identity.id, identity);
+          setRows(data.identities); setError('');
+        })
+        .catch((failure) => { if (!controller.signal.aborted) setError(failure.message); });
+    }, query ? 250 : 0);
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [source, scopeId, version, query]);
+  const options = value && !rows.some((row) => row.id === value) && seen.current.has(value)
+    ? [seen.current.get(value), ...rows] : rows;
+  return <div className="grid w-full min-w-0 grid-cols-2 gap-2 text-xs">
+    <input aria-label="Find Identity" placeholder="Find Identity" className={FIELD}
+      value={query} onChange={(event) => setQuery(event.target.value)} />
     <select aria-label="Identity Filter" className={FIELD} value={value || ''}
       onChange={(event) => onChange(event.target.value)}>
       <option value="">All Identities</option>
-      {rows.map((row) => <option key={row.id} value={row.id}>{row.name} ({row.kind === 'person' ? 'Person' : 'Anime'})</option>)}
+      {options.map((row) => <option key={row.id} value={row.id}>{row.name} ({row.kind === 'person' ? 'Person' : 'Anime'})</option>)}
     </select>
-    {error && <span role="alert" className="text-danger">{error}</span>}
-  </label>;
+    {error && <span role="alert" className="col-span-2 text-danger">{error}</span>}
+  </div>;
 }
 
 export default function IdentityTools({ source, scopeId, imageIds, busy = false, onChanged, defaultKind = 'anime' }) {
@@ -43,13 +53,14 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
   const [learn, setLearn] = useState(true);
   const [regions, setRegions] = useState({});
   const [state, setState] = useState(null);
+  const [prepared, setPrepared] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [tagRows, setTagRows] = useState([]);
   const [catalog, setCatalog] = useState([]);
   const [engine, setEngine] = useState('wd14');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [actions, setActions] = useState([]);
+  const [undoOffer, setUndoOffer] = useState(null);
   const [crop, setCrop] = useState(false);
   const [natural, setNatural] = useState(null);
   const [focusId, setFocusId] = useState(null);
@@ -60,19 +71,33 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
   const dialog = useRef(null);
   const trigger = useRef(null);
   const upload = useRef(null);
+  const previews = useRef(new Map());
+  const reloadVersion = useRef(0);
   const ids = focusId ? [focusId] : imageIds;
   const previewId = ids.length === 1 ? ids[0] : null;
   const base = '/api/identity/' + source + '/' + scopeId;
   const imageUrl = previewId ? base + '/image/' + previewId : '';
   const idsKey = imageIds.join(',');
 
-  const reload = useCallback(async (chosen = imageIds) => {
+  const reload = useCallback(async () => {
+    const version = ++reloadVersion.current;
+    const chosen = focusId ? [focusId] : imageIds;
+    setPrepared(false);
+    previews.current.clear();
     if (!chosen.length) { setState(null); return; }
-    // The panel renders one bounded batch; actions process every selected batch.
-    const data = await postJson(base + '/view', { image_ids: chosen.slice(0, 16) });
-    setState(data);
-    return data;
-  }, [base, idsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+    let first, count = 0;
+    for (const batch of batches(chosen)) {
+      const data = await postJson(base + '/view', { image_ids: batch });
+      if (version !== reloadVersion.current) return;
+      previews.current.set(batch.join(','), data);
+      first ||= data;
+      count += batch.length;
+      if (count < chosen.length) setNotice(count + ' prepared of ' + chosen.length + '.');
+    }
+    const offer = await apiFetch(base + '/undo');
+    if (version !== reloadVersion.current) return;
+    setState(first); setUndoOffer(offer.operation_id); setPrepared(true);
+  }, [base, idsKey, focusId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const close = useCallback(() => {
     if (working) return;
@@ -91,7 +116,7 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
     apiFetch('/api/identities?kind=' + kind)
       .then((data) => { if (live) setRoster(data.identities); })
       .catch((failure) => { if (live) setError(failure.message); });
-    return () => { live = false; };
+    return () => { live = false; reloadVersion.current += 1; };
   }, [open, kind, reload]);
 
   useEffect(() => {
@@ -148,15 +173,19 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
         setTarget(identity.id);
       }
       let count = 0;
+      let operationId = null;
       for (const batch of batches(ids)) {
         if (stop.current) break;
-        const preview = await postJson(base + '/view', { image_ids: batch });
+        const preview = previews.current.get(batch.join(','));
+        if (!preview) throw new Error('Selection preview expired. Reopen the panel.');
         const result = await postJson(base + '/assign', {
           ...preview, image_ids: batch, identity_id: identity.id, regions,
           single_subject: single, learn,
           replace_identity_id: replaceIdentity,
+          operation_id: operationId,
         });
-        setActions((prior) => [...prior, result.action_id]);
+        operationId = result.operation_id;
+        setUndoOffer(operationId);
         count += result.assigned;
         setNotice(count + ' assigned of ' + ids.length + (result.learning?.reason ? '. ' + result.learning.reason : ''));
       }
@@ -167,6 +196,9 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
 
   async function findMatches() {
     await perform(async () => {
+      if (!minimum.trim() || !margin.trim() || !Number.isFinite(Number(minimum)) || !Number.isFinite(Number(margin))) {
+        throw new Error('Enter valid match settings.');
+      }
       const found = [];
       let count = 0, unknown = 0;
       for (const batch of batches(ids)) {
@@ -201,7 +233,7 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
       const result = await postJson('/api/identity/subjects/' + subject.id + '/decision', {
         identity_id: identity, action, revision: subject.revision, single_subject: single,
       });
-      setActions((prior) => [...prior, result.action_id]);
+      setUndoOffer(result.operation_id);
       setSuggestions((rows) => rows.filter((row) => row.subject_id !== subject.id));
       setNotice(action === 'confirm' ? 'Example confirmed.' : 'Decision saved.');
     });
@@ -209,8 +241,7 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
 
   async function undo() {
     await perform(async () => {
-      const result = await postJson('/api/identity/actions/' + actions.at(-1) + '/undo', {});
-      setActions((prior) => prior.slice(0, -1));
+      const result = await postJson('/api/identity/actions/' + undoOffer + '/undo', {});
       setNotice(result.restored + ' restored. ' + result.skipped + ' skipped because later work exists.');
       setSuggestions([]);
     });
@@ -281,8 +312,8 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
         </div>
         <p className="text-xs text-content-muted">For several characters, choose a subject crop. Only confirmed examples teach identity. Captions and image decisions stay unchanged.</p>
         <div className="grid grid-cols-2 gap-2">
-          <button type="button" className={BUTTON} disabled={working || (!target && !name.trim())} onClick={assign}>{replaceIdentity ? 'Correct Name' : 'Assign'}</button>
-          <button type="button" className={BUTTON} disabled={working || !actions.length} onClick={undo}>Undo</button>
+          <button type="button" className={BUTTON} disabled={working || !prepared || (!target && !name.trim())} onClick={assign}>{replaceIdentity ? 'Correct Name' : 'Assign'}</button>
+          <button type="button" className={BUTTON} disabled={working || !undoOffer} onClick={undo}>Undo</button>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <label className="text-xs">Minimum Similarity<input className={FIELD} type="number" min="-1" max="1" step="0.01" value={minimum} disabled={working} onChange={(event) => setMinimum(event.target.value)} /></label>

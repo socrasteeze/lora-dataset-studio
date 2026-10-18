@@ -383,3 +383,47 @@ def test_tag_suggestions_do_not_write_captions_or_confirm_identities(client, lib
     assert response.get_json()['images'][0]['candidates'][0]['tag'] == 'aster_demo'
     assert IdentityAssignment.query.count() == 0
     assert BankImage.query.first().caption == 'Invented caption'
+
+
+def test_pixel_swap_invalidates_the_preview_before_any_name_is_written(client, library):
+    from app.models import IdentityAssignment
+    identity = create(client)
+    base = f"/api/identity/bank/{library['bank']}"
+    ids = library['bank_ids'][:1]
+    preview = client.post(base+'/view', json={'image_ids': ids}).get_json()
+    Image.new('RGB', (128, 128), 'white').save(library['folder']/'image-01.png')
+    response = client.post(base+'/assign', json={**preview, 'image_ids': ids,
+                                               'identity_id': identity['id'],
+                                               'single_subject': True})
+    assert response.status_code == 409
+    assert IdentityAssignment.query.count() == 0
+
+
+def test_fresh_correction_can_enroll_new_pixels_and_undo_cannot_teach_the_old_label(client, library):
+    first, second = create(client), create(client, 'Nova')
+    assign(client, library, first)
+    Image.new('RGB', (128, 128), 'white').save(library['folder']/'image-01.png')
+    response = assign(client, library, second, replace_identity_id=first['id'])
+    assert response.status_code == 200, response.get_json()
+    analyze(client, library)
+    assert suggest(client, library)['suggestions'][0]['identity']['id'] == second['id']
+    action = response.get_json()['action_id']
+    assert client.post('/api/identity/actions/'+action+'/undo', json={}).status_code == 200
+    assert suggest(client, library)['reference_identities'] == 0
+
+
+def test_bulk_undo_survives_a_new_client_and_restores_every_batch(client, library, app):
+    from app.models import IdentityAssignment
+    identity = create(client)
+    first = assign(client, library, identity, library['bank_ids'][:1]).get_json()
+    second = assign(client, library, identity, library['bank_ids'][1:2],
+                    operation_id=first['operation_id'])
+    assert second.status_code == 200, second.get_json()
+    restarted_client = app.test_client()
+    offer = restarted_client.get(f"/api/identity/bank/{library['bank']}/undo").get_json()
+    assert offer['operation_id'] == first['operation_id']
+    assert offer['subjects'] == 2
+    response = restarted_client.post('/api/identity/actions/'+offer['operation_id']+'/undo', json={})
+    assert response.get_json() == {'restored': 2, 'skipped': 0}
+    assert IdentityAssignment.query.filter_by(state='confirmed').count() == 0
+    assert assign(client, library, identity, operation_id=first['operation_id']).status_code == 409

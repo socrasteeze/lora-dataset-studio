@@ -115,7 +115,8 @@ def assign(source, scope_id):
             identity = identities._identity(LOCAL_USER, data.get('identity_id'))
             try:
                 result['learning'] = identities.analyze(
-                    LOCAL_USER, source, scope_id, {**data, 'kind': identity.kind})
+                    LOCAL_USER, source, scope_id, {**data, 'kind': identity.kind},
+                    confirmation=(identity.id, set(result['subject_ids'])))
             except RecognitionUnavailable as error:
                 result['learning'] = {'measured': 0, 'reason': str(error),
                                       'setup_route': '#/setup?step=quality'}
@@ -165,7 +166,18 @@ def decision(subject_id):
 @bp.post('/identity/actions/<action_id>/undo')
 @endpoint
 def undo(action_id):
-    return identities.undo(LOCAL_USER, action_id)
+    from ..models import IdentityAction
+    action = db.session.get(IdentityAction, action_id)
+    if action is None or action.user_id != LOCAL_USER:
+        raise identities.IdentityNotFound('Undo is unavailable.')
+    with identities.lease(action.source, action.scope_id):
+        return identities.undo(LOCAL_USER, action_id)
+
+
+@bp.get('/identity/<source>/<int:scope_id>/undo')
+@endpoint
+def undo_offer(source, scope_id):
+    return identities.undo_offer(LOCAL_USER, source, scope_id)
 
 
 @bp.get('/identity/<source>/<int:scope_id>/image/<int:image_id>')

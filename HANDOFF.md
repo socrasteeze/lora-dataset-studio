@@ -13,7 +13,7 @@ The approved implementation is drafted in the isolated task worktree. Static lin
 - Initial scope receipt: 88d17bb6a. The running checkout remains unchanged.
 
 ## Open
-1. Commit source and bundle separately, transport the scrubbed validation branch and inspect exact-head cloud Fork Gates.
+1. Inspect cloud Fork Gates on the latest task head. Initial 43c41d2fe run 39161578218 found sparse identity-row sizing; the local grid repair needs a fresh cloud render.
 2. Repair every introduced backend/frontend/browser failure; do not count unrun synthetic cases or the production build as passing behaviors.
 3. Exercise the explicit held-out evaluation on permitted labeled unseen artwork. Corpus selection remains pending; report wrong names, misses, abstentions and provenance.
 4. Carry forward upstream-port and physical-device/trainer gates from 5d32d6ceb:HANDOFF.md. Activation of the running checkout needs a separate stop/start.

@@ -71,9 +71,14 @@ class IdentityAction(db.Model):
     __tablename__ = 'identity_action'
     id = db.Column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex)
     user_id = db.Column(String(36), nullable=False, index=True)
+    source = db.Column(String(8), nullable=False)
+    scope_id = db.Column(Integer, nullable=False)
+    scope_instance = db.Column(String(32), nullable=False, index=True)
+    operation_id = db.Column(String(32), nullable=False, index=True)
+    position = db.Column(Integer, nullable=False)
     snapshots = db.Column(Text, nullable=False)
     undone = db.Column(db.Boolean, nullable=False, default=False)
-    created_at = db.Column(DateTime, default=db.func.current_timestamp())
+    created_at = db.Column(DateTime, default=naive_utcnow)
 
 
 class CharacterVocabulary(db.Model):

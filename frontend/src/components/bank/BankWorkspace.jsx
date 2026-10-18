@@ -1977,7 +1977,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
        accessibility contract, and a rail that tabbed out of order would be a
        regression the eye cannot see. */
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2" data-probe-panel="bank-identities">
+      <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-2" data-probe-panel="bank-identities">
         <IdentityFilter source="bank" scopeId={bankId} value={filter.identityId} version={identityVersion}
           onChange={(value) => setF('identityId', value || null)} />
         <IdentityTools source="bank" scopeId={bankId} imageIds={[...selected]} busy={live}
