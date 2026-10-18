@@ -91,6 +91,16 @@ def main():
         threading.Thread(target=server.shutdown, daemon=True).start()
         return {'stopping': True}
 
+    @app.post('/test/change-first-image')
+    def change_first_image():
+        Image.new('RGB', (640, 480), 'white').save(source/'image-01.png')
+        return {'changed': True}
+
+    @app.post('/test/restore-first-image')
+    def restore_first_image():
+        Image.new('RGB', (512, 512), (30, 80, 110)).save(source/'image-01.png')
+        return {'restored': True}
+
     server = make_server('127.0.0.1', port, app, threaded=True)
     try:
         server.serve_forever()

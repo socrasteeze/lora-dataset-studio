@@ -12,6 +12,7 @@ This records a subject region without changing the image file. Different regions
 Minimum Similarity and Ambiguity Margin are editable starting heuristics. They are not measured accuracy or probability.
 Missing models, unusable faces and stale pixels remain unmeasured. Install the relevant tools in **Setup > Quality Tools**.
 Names saved before Setup remain bound to the pixels you reviewed. If those pixels change, review the new image and assign its name again before it can teach identity.
+When a stale selection reloads, its preview uses the current pixels and dimensions. A changed image clears its old crop and One Character assertion before another learning assignment.
 Unconfirmed suggestions never become training examples. Confirm a suggestion to teach it, or use **Reject Match** to exclude that pair.
 
 **Remove Name** removes an assignment. **Undo** restores the complete last bulk action, including after a reload, only where later work has not changed it.
