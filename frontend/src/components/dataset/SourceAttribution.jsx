@@ -1,5 +1,7 @@
 import PexelsAttribution from './PexelsAttribution';
 import WebImageSource from './WebImageSource';
+import ImageSourceAttribution from './ImageSourceAttribution';
+import { SOURCE_NAMES } from '../shared/imageSources.js';
 
 /**
  * Provenance is recorded for a GROWING list of scraper sources (Pexels today,
@@ -17,6 +19,7 @@ import WebImageSource from './WebImageSource';
 const PLATFORM_RENDERERS = {
   pexels: PexelsAttribution,
   websearch: WebImageSource,
+  ...Object.fromEntries(Object.keys(SOURCE_NAMES).map((key) => [key, ImageSourceAttribution])),
 };
 
 export default function SourceAttribution({ metadata, className = '' }) {

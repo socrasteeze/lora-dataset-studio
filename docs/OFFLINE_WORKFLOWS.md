@@ -10,15 +10,22 @@ The curated build includes Camera Angles, Canvas, DLSS 5, Image Upscale, Live,
 Model Tools, Qwen Dataset, Resource Monitor, SeedVR2 and Video. Their local
 operations remain available. `fork-plugins.json` owns this list.
 
-Hugging Face publishing, web scraping, Civitai browsing and the Civitai
+Hugging Face publishing, the former general web scraper, Civitai browsing and the Civitai
 publisher are excluded. API image generators and GPU rentals are excluded.
 Distribution overrides cannot load a plugin in the excluded list, and an
 archive outside the ten bundled plugins is refused. Online image and video
-imports and in-app update checks return a refusal without contacting a service.
+imports through the retired routes and in-app update checks return a refusal without contacting a service.
 Saving a cloud-training token is refused before any account check. The server
 does not load a repository `.env` through Flask on startup.
 
 ## Preparation
+
+Image Sources is a narrow operator-started acquisition exception. Bank and
+Dataset expose the same controls for supported booru, Rule34 and Pawchive URLs.
+Scan, Scan More, Rescan, Load Previews, Download and Resume can contact these sources.
+Import uses verified local files. Page loads and cached previews stay local.
+No dataset or existing local image is uploaded. A restart requires Resume.
+There are no subscriptions or automatic background source checks.
 
 Setup may download packages, node packs and model weights only after an
 operator starts the action. This retains the existing preparation workflow.
@@ -39,7 +46,8 @@ tools and their model files before running an offline workflow.
 Existing datasets, banks, prompts, credentials and historical publication/link
 records are retained. Excluding a plugin does not delete its data. A Hugging
 Face or Civitai token can still support an operator-started Setup download.
-It cannot enable publishing, browsing, scraping or a rental.
+It cannot enable publishing, Civitai browsing, the retired scraper or a rental.
+Image Source credentials live in the separate write-only source credential set.
 
 Regression coverage is in `backend/tests/test_offline_workflows.py` and
 `backend/tests/test_fork_outbound_gate.py`. The current product description

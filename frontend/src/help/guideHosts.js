@@ -10,6 +10,7 @@ export const CORE_GUIDE_ANCHORS = {
     "around-the-app"
   ],
   "using-the-app": [
+    "image-sources",
     "the-character-walkthrough-reference-photo-trained-lora",
     "write-caption-txt",
     "review-training-duplicates",
@@ -143,6 +144,7 @@ export const CORE_GUIDE_ANCHORS = {
     "11-preview-quality-steps-and-cfg"
   ],
   "settings-reference": [
+    "image-source-credentials",
     "how-settings-work",
     "advanced-environment-overrides",
     "instance-profiles",

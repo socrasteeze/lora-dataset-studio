@@ -84,6 +84,14 @@ const action = (id, title, keywords, route, chapter, anchor, tip) => ({
 });
 
 const TOPICS = [
+  { id: 'image-sources', kind: 'action', title: 'Image Sources',
+    keywords: ['booru', 'danbooru', 'gelbooru', 'e621', 'rule34', 'pawchive', 'download', 'original', 'zip'],
+    guide: { chapter: 'using-the-app', anchor: 'image-sources' },
+    app: { route: '/bank' } },
+  { id: 'image-source-credentials', kind: 'setting', title: 'Source Credentials',
+    keywords: ['booru', 'api key', 'cookies', 'source', 'credentials'],
+    guide: { chapter: 'settings-reference', anchor: 'image-source-credentials' },
+    app: { route: '/bank' } },
   // ---- Settings: section-level topics (kind 'section') --------------------
   { id: 'settings-how', kind: 'section', title: 'How settings work',
     keywords: ['settings', 'how', 'save', 'secret', 'write-only', 'restart', 'config'],

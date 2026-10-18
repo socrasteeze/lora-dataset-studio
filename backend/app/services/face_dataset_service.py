@@ -425,6 +425,10 @@ def _guard_not_bank_export(dataset_id, activity_token=None):
         raise RuntimeError(
             'This dataset is receiving images from a Bank. Wait for that copy '
             'to finish before editing or deleting it.')
+    if exclusive == 'source_import':
+        raise RuntimeError(
+            'This dataset is receiving source images. Wait for that import '
+            'to finish before editing or deleting it.')
     if exclusive == 'training_export':
         raise RuntimeError(
             'This dataset is being frozen for training. Wait for that export '
@@ -798,6 +802,9 @@ def normalize_source_metadata(value, *, image_url=None):
     if not isinstance(value, dict):
         return None
     platform = value.get('platform')
+    from .image_source_metadata import PROVIDERS, normalize as normalize_image_source
+    if platform in PROVIDERS:
+        return normalize_image_source(value)
     if platform == 'websearch':
         # Web search stores the source page without photographer credit.
         # image_url is not restricted to a CDN: open-web images may live anywhere.

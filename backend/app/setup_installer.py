@@ -443,7 +443,7 @@ _BUNDLED_STAMP = '.lds-version'
 # to all of them; only the FETCH differs between the two registries.
 _ALL_NODE_PACKS = tuple(_NODE_PACKS) + tuple(_BUNDLED_NODE_PACKS)
 
-INSTALL_ACTIONS = ('ml_extras', 'ollama_model',
+INSTALL_ACTIONS = ('ml_extras', 'ollama_model', 'image_source_extras',
                    'face_scoring', 'masks', 'watermark_inpaint',
                    'bank_scoring', 'bank_siglip2', 'wd14', 'pixai',
                    'watermark_detect',
@@ -455,7 +455,8 @@ INSTALL_ACTIONS = ('ml_extras', 'ollama_model',
 
 _ML_REQUIREMENTS = cfg.BACKEND_DIR / 'requirements-ml.txt'
 # pip -r installers share one worker and target THIS interpreter.
-_PIP_REQUIREMENTS = {'ml_extras': _ML_REQUIREMENTS}
+_PIP_REQUIREMENTS = {'ml_extras': _ML_REQUIREMENTS,
+                     'image_source_extras': cfg.BACKEND_DIR / 'requirements-image-sources.txt'}
 # The single package the watermark-inpaint scoped install adds. The NAME lives
 # here (an identifier), but the VERSION SPEC is parsed from requirements-ml.txt
 # so there's exactly one place a version floor is ever written.
@@ -529,6 +530,7 @@ _FLASK_VENV_INCOMPATIBLE = frozenset({_WATERMARK_PKG})
 #                 Windows). The ~400 MB of WEIGHTS are not a pip concern — the
 #                 child fetches those on first run (see services/wd14_tagger.py).
 _CAPABILITY_PACKAGES = {
+    'image_source_extras': ('gallery-dl',),
     'face_scoring': ('insightface', 'onnxruntime', 'numpy', 'opencv-python-headless'),
     'masks': ('rembg', 'onnxruntime', 'numpy', 'opencv-python-headless'),
     'watermark_inpaint': (_WATERMARK_PKG,),
@@ -3312,7 +3314,20 @@ def _run_dlss5nr_bridge(action) -> int:
     return neural_render.install_bridge(log=lambda line: _append(action, line))
 
 
+def _run_image_source_extras(action):
+    result = _run_ml_extras(action)
+    if result != 0:
+        return result
+    ok = capabilities._import_ok(sys.executable,
+                                 'import gallery_dl.job, gallery_dl.extractor, requests')
+    if ok is not True:
+        _append(action, 'The source packages did not pass the import check. Select Retry.')
+        return 1
+    return 0
+
+
 _WORKERS = {**{a: _run_ml_extras for a in _PIP_REQUIREMENTS},
+            'image_source_extras': _run_image_source_extras,
             'dlss5nr_bridge': _run_dlss5nr_bridge,
             'ollama_model': _run_ollama_model,
             **{a: _run_ml_capability for a in _CAPABILITY_ML_ACTIONS},  # face_scoring + masks
