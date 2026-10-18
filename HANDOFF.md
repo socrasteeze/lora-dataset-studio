@@ -11,9 +11,10 @@ The approved implementation is drafted in the isolated task worktree. Cloud qual
 - Mounted shared controls in Bank and Dataset, added transfer/backup/ZIP/profile preservation, help and news.
 - Added backend regressions and a cloud-only browser probe over 20 populated surface/kind/viewport states.
 - Initial scope receipt: 88d17bb6a. The running checkout remains unchanged.
+- Scope amendment: show per-folder Undo Group in Group by person, so a wrong single-person declaration can be cleared without hunting through filters. Preserve images and review decisions; rerun clustering to compute replacement groups.
 
 ## Open
-1. Run cloud Fork Gates on the next task head. Head 116c4a87e, run 39162028868: Bank/Settings and all 45 curation cases passed. Backend: 10002 passed, 20 failures from the old core-table count. Frontend: 5227 passed, 3 contract failures (identity sort, modal opacity, inherited import-panel ellipses). Identity browser probe stopped at an inaccessible Kind label before completing a case. These issues are repaired in source; fresh cloud confirmation is required.
+1. Inspect Fork Gates for 3c03bac1a, run 39163879561. Its identity probe reached final filtering in the first state, exposing a wrong Bank setF call shape; repaired in source. Bank/Settings completed four sizes/44 cases before a desktop filter-control timeout; inspect the completed job log before deciding its cause. The independent full gate is running. The previous table-count/sort/modal/ellipsis fixes and the new five-viewport folder-undo checks still need a fully green exact-head run.
 2. Repair every introduced backend/frontend/browser failure; do not count unrun synthetic cases or the production build as passing behaviors.
 3. The operator chose a local accuracy set. Await its location/labels and explicit local-evaluation authorization; keep those images local and report wrong names, misses, abstentions and provenance.
 4. Carry forward upstream-port and physical-device/trainer gates from 5d32d6ceb:HANDOFF.md. Activation of the running checkout needs a separate stop/start.

@@ -62,7 +62,7 @@ export default function PassDialog({
   passId, payload, selectionSize = 0, live = false, detectorReady = false,
   semanticEngine = 'clip',
   scope = '', onScope, redo = false, onRedo,
-  onClose, onLaunch, children, secondary, extraSettings,
+  onClose, onLaunch, children, secondary, extraSettings, scopeRecovery,
   stayOpenOnLaunch = false,
 }) {
   const spec = bankPass(passId, { semanticEngine })
@@ -211,6 +211,8 @@ export default function PassDialog({
                 <DisabledNote>{spec.scopes}</DisabledNote>
               </div>
             )}
+
+            {scopeRecovery}
 
             {/* ③ the "do it again" line — where “Rescan all” went. */}
             {spec.redo && (

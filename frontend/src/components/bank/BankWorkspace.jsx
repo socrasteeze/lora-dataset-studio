@@ -46,6 +46,7 @@ import CoveragePanel from './BankCoveragePanel.jsx'
 // The two structural halves of the redesign: all of triage beside the grid, and
 // the eight passes behind one button instead of across the top of the screen.
 import BankFilterRail from './BankFilterRail.jsx'
+import { FolderGroupRecovery } from './SubfolderPersonPanel.jsx'
 import StyleGroupsBrowser from './StyleGroupsBrowser.jsx'
 import BankGroupComparison from './BankGroupComparison.jsx'
 import BankCollectionsDialog from './BankCollectionsDialog.jsx'
@@ -798,7 +799,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
 
   const {
     folderPersons, folderPersonInfo, folderPersonBusy, loadFolderPersons,
-    assertFolderPerson, revokeFolderPerson, checkFolderPerson,
+    assertFolderPerson, revokeFolderPersonAt, checkFolderPerson,
     scanFolderPersons,
   } = useFolderPersons({
     bankId, live: watchingJob, filter, toast, refreshImages, refreshPayload,
@@ -837,6 +838,14 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     const f = { ...filter, ...patch }
     setFilter(f); setOffset(0); setSelected(new Set()); exitSelectionView()
     refreshImages(f, 0, { on: false })
+  }
+
+  const undoFolderGroup = async (subfolder) => {
+    const entry = folderPersons.find((row) => row.subfolder === subfolder)
+    const result = await revokeFolderPersonAt(subfolder)
+    if (result && !result.queued && entry && filter.cluster === entry.cluster_id) {
+      setF({ cluster: null })
+    }
   }
 
   // Every facet off at once — the antidote to a folded panel making the grid
@@ -1979,7 +1988,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     <div className="space-y-3">
       <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-2" data-probe-panel="bank-identities">
         <IdentityFilter source="bank" scopeId={bankId} value={filter.identityId} version={identityVersion}
-          onChange={(value) => setF('identityId', value || null)} />
+          onChange={(value) => setF({ identityId: value || null })} />
         <IdentityTools key={String(bankId) + ':' + (payload?.instance_id || '')}
           source="bank" scopeId={bankId} imageIds={[...selected]} busy={live}
           onChanged={() => { setIdentityVersion((value) => value + 1); refreshImages(); refreshPayload({ force: true }); }} />
@@ -2180,7 +2189,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               excludeText={excludeText} setExcludeText={setExcludeText}
               subfolders={subfolders} folderPersonInfo={folderPersonInfo}
               folderPersons={folderPersons} folderPersonBusy={folderPersonBusy}
-              assertFolderPerson={assertFolderPerson} revokeFolderPerson={revokeFolderPerson}
+              assertFolderPerson={assertFolderPerson} revokeFolderPerson={() => undoFolderGroup(filter.subfolder ?? '')}
               checkFolderPerson={checkFolderPerson} scanFolderPersons={scanFolderPersons}
               tagRow={tagRow} tagPicked={tagPicked} toggleTag={toggleTag} clearTags={clearTags}
               chipsFiltered={chipsFiltered} flags={flags}
@@ -2889,6 +2898,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           redo={!!passRedo[passOpen]}
           onRedo={(v) => setPassRedoFor(passOpen, v)}
           onClose={() => setPassOpen(null)}
+          scopeRecovery={passOpen === 'faces' && <FolderGroupRecovery entries={folderPersons}
+            busy={bankBusy || folderPersonBusy} onRevoke={undoFolderGroup} />}
           stayOpenOnLaunch={passOpen === 'text_scan' || passOpen === 'watermark'}
           onLaunch={(run) => (passOpen === 'faces'
             ? launchFacesFromDialog()

@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-18-undo-folder-group',
+    date: '2026-10-18',
+    title: 'Undo a wrong person group from the grouping dialog',
+    blurb: 'Group by person now lists folders you marked as one person. Use Undo Group to put a folder back into the clustering scope without changing its images or Keep/Reject decisions.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-18-identity-learning',
     date: '2026-10-18',
     title: 'Teach identities with the names you confirm',

@@ -36,6 +36,7 @@ export function useFolderPersons({
       // a person cluster, and the PEOPLE row above would otherwise keep showing
       // a group that no longer exists until the next poll.
       loadFolderPersons(); refreshImages(); refreshPayload({ force: true })
+      return d
     } catch (e) {
       toast.error(e?.message || 'That did not work')
     } finally { setFolderPersonBusy(false) }
@@ -47,11 +48,12 @@ export function useFolderPersons({
       + 'will skip them',
   )
 
-  const revokeFolderPerson = () => runFolderPerson(
+  const revokeFolderPersonAt = (subfolder) => runFolderPerson(
     () => del(`/api/bank/${bankId}/folder-person`
-      + `?subfolder=${encodeURIComponent(filter.subfolder ?? '')}`),
+      + `?subfolder=${encodeURIComponent(subfolder ?? '')}`),
     (d) => `${d.cleared} image(s) back to normal clustering`,
   )
+  const revokeFolderPerson = () => revokeFolderPersonAt(filter.subfolder)
 
   const checkFolderPerson = () => runFolderPerson(
     () => postJson(`/api/bank/${bankId}/folder-person/check`,
@@ -65,7 +67,7 @@ export function useFolderPersons({
   )
   return {
     folderPersons, folderPersonInfo, folderPersonBusy, loadFolderPersons,
-    assertFolderPerson, revokeFolderPerson, checkFolderPerson,
+    assertFolderPerson, revokeFolderPerson, revokeFolderPersonAt, checkFolderPerson,
     scanFolderPersons,
   };
 }

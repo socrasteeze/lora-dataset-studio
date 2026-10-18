@@ -34,6 +34,13 @@ These are resource limits, not optimal training sizes. All assignments remain st
 Each image supports up to 32 subject regions. Catalog imports accept at most 300000 character rows within 32 MiB.
 **Stop** ends a multi-batch operation after its current request finishes. Earlier batches remain saved; the browser does not promise durable resume.
 
+## Undo a folder group
+
+If **Group by person** shows zero images because folders were marked as one person, open **Folder Groups** in that same dialog and choose **Undo Group** for the wrong declaration.
+The manual group is cleared and its images return to the clustering scope. Run the pass again to calculate new face groups.
+Images, captions and Keep/Reject decisions stay unchanged. This does not restore computed groups that an earlier manual declaration replaced.
+The existing folder control also works: choose the folder under **Filters > Subfolder**, then choose **Not one person after all**.
+
 
 The workspace is a **guided flow**: each stage stays folded until the one
 before it is done, and the progress rail on the left tells you where you are
