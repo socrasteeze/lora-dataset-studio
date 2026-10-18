@@ -1,5 +1,56 @@
 # Using the app
 
+## Image Sources
+
+Open **Image Sources** on the Bank list or in a Dataset's import section.
+Install the optional source package with **Install Sources** if required.
+Use a supported source URL, or leave URL blank and enter a booru **Tag Query**.
+Danbooru, Gelbooru, e621/e926, Rule34, Paheal and Pawchive have source adapters.
+Pawchive requires a profile or individual post URL. Support depends on the
+source's current access rules and the installed extractor. A refusal is not an
+empty successful download.
+
+1. Choose a destination. Bank can use a new named Bank or an existing Bank.
+2. Select **Scan**. The default limit is 200 media entries; each pass permits 1-1000.
+3. Use **Load Previews** to cache previews for the first 24 selected items.
+4. Use **Clear All**, a results filter, and **Select Page** to narrow a selection.
+5. Select **Download** to fetch the selected originals.
+6. Select **Import** to add verified images to the destination for review.
+
+Filters change the view. Actions use selected items across all result pages.
+Previews never substitute for originals. A source without preview metadata
+shows **No Preview** until its image downloads. The results grid displays 24
+items at a time. The saved job list retains the latest 30 jobs in the interface.
+
+Each job keeps its source cursor, selection, downloaded checksums and import
+state. **Stop** preserves completed files. **Resume** retries the last action.
+After a restart, jobs show **Interrupted** and require Resume. **Scan More**
+continues the media window; changed remote listings can shift that window.
+Use **Rescan** to restart the media window and refresh temporary download URLs
+without clearing selections or verified files. Each job permits at most 5000 items.
+Saved jobs have no schedule and never contact sources merely because a page opens.
+
+Image imports preserve supported static original bytes and orientation. Source
+posts, available dimensions, ratings and grouped tags remain separate from
+editable training captions. Repeated exact bytes do not add a second destination
+image. New images enter Pending review. Near-duplicate decisions remain yours.
+Existing review decisions and edited captions remain unchanged on import retry.
+
+Pawchive scans expand post details and request original attachments. ZIP files
+are download targets even though their extension is not an image extension.
+Download a selected ZIP to list its extracted images, then select those images
+for import. The original ZIP stays cached. Archives permit at most 1000 entries,
+512 MiB expanded content and a 200:1 expansion ratio per entry. Unsafe paths,
+links, encrypted archives, unsupported formats and invalid images fail visibly.
+RAR and 7z extraction are unavailable. Animated images do not enter the static
+image workflow.
+
+Image downloads permit 64 MiB per image and 256 MiB per ZIP. Each job has a
+2 GiB cache limit and leaves a 256 MiB free-space reserve. Source errors and
+rate limits stop or fail work visibly; verified files remain available for retry.
+Downloads use public HTTPS only. Source credentials are write-only. Thread
+boards, subscriptions, online generation and publishing remain outside this workflow.
+
 The workspace is a **guided flow**: each stage stays folded until the one
 before it is done, and the progress rail on the left tells you where you are
 and what's blocking the next step. You never have to guess what comes next —
@@ -288,7 +339,7 @@ never an automatic continuation.
 Pick **Concept** at creation and describe the concept in the required field —
 the captioner needs to know exactly *what to omit*. What changes vs character:
 
-- **No reference photo.** Import local images, upload them from your browser, or promote bank keepers. **More > Import from folder** merges image/caption pairs from a local host folder. **Import dataset** accepts a ZIP. Online scraping is excluded.
+- **No reference photo.** Import local images, upload them from your browser, or promote bank keepers. **More > Import from folder** merges image/caption pairs from a local host folder. **Import dataset** accepts a ZIP. **Image Sources** can collect selected originals from supported sites.
 - **Captions invert**: they describe everything *except* the concept, so the
   concept is what binds to the trigger. The leak check watches for stray
   descriptions of it.

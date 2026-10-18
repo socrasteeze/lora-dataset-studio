@@ -108,6 +108,10 @@
     "huggingface.co"
    ]
   },
+  "backend/app/services/image_source_network.py": {
+   "calls": 2,
+   "hosts": []
+  },
   "backend/app/services/klein_edit_helper.py": {
    "calls": 0,
    "hosts": [

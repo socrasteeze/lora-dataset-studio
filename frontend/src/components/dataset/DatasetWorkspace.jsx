@@ -13,6 +13,7 @@ import ImportDropzone from './ImportDropzone';
 import PluginSlot, { hasContributions } from '../../plugins/PluginSlot.jsx';
 import { contributions } from '../../plugins/registry.js';
 import BankImportPanel from './BankImportPanel';
+import ImageSourcesPanel from '../shared/ImageSourcesPanel';
 import DatasetFolderNote from './DatasetFolderNote';
 import { isDatasetImportBlocked, isStopGenerationBlocked } from './activityGates.js';
 import { holdsLocalGpu } from '../../utils/activityLanes.js';
@@ -928,6 +929,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
             // keep one coherent source generation, but does not touch the GPU.
             || act.kind === 'bank_export'
             || act.kind === 'bank_import'
+            || act.kind === 'source_import'
             || act.kind === 'training_export'
             || act.kind === 'backup';
           const label = {
@@ -943,6 +945,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
             edit_reference: 'Editing reference',
             bank_export: `Copying into a Bank${prog}`,
             bank_import: `Copying images from a Bank${prog}`,
+            source_import: `Importing source images${prog}`,
             training_export: 'Freezing the Dataset for training',
             backup: `Creating portable backup${prog}`,
           }[act.kind];
@@ -1071,8 +1074,11 @@ export default function DatasetWorkspace({ ds, onBack }) {
   // The server's promote path does the copying (normalize + dedup vs THIS
   // dataset) in a background job — we only pick the bank and refresh at the end.
   const bankImport = (
+    <div className="min-w-0 space-y-3">
+    <ImageSourcesPanel datasetId={d.id} disabled={importBusy} onImported={() => ds.refresh()} />
     <BankImportPanel datasetId={d.id} disabled={importBusy}
       onImported={() => ds.refresh()} />
+    </div>
   );
 
   return (

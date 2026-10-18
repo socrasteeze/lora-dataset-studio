@@ -95,6 +95,19 @@ jobs:
           LDS_EXTENSIONS_DIR: ${{ runner.temp }}/lds-gates-extensions
         run: ./scripts/gates.ps1 -Phase Gates -ScratchRoot D:/lds-gates
 
+      - name: Check Image Sources in Browser
+        if: ${{ !cancelled() }}
+        run: node frontend/scripts/imageSourcesProbe.mjs
+
+      - name: Save Image Source Receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-sources-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .git/lds-gates-validation/image-sources.json
+          include-hidden-files: true
+          if-no-files-found: warn
+
       - name: Save Gate Receipts
         # The browser check writes a second receipt on the same exact head.
         if: always()

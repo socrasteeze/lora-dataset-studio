@@ -1,6 +1,28 @@
 # Settings reference
 
-This fork uses local tools and private-network API targets. Online publishing, scraping, Civitai browsing and in-app update APIs are disabled. Shared credentials remain only for downloads started in Setup. Prepare model weights locally before inference or training.
+This fork uses local tools and private-network API targets. Image Sources is an explicit acquisition exception for supported public sites. Online publishing, Civitai browsing and in-app update APIs remain disabled. Prepare model weights locally before inference or training.
+
+## Image Source Credentials
+
+Open **Image Sources > Credentials** on the Bank list or in Dataset imports.
+Choose the source before saving. Username, API Key, User ID and Cookies apply
+only to that source. Fields remain blank after save; the API reports presence
+without returning saved values. Saving empty fields clears that source's values.
+Cookies use `name=value; name=value` format. The application does not read a
+browser profile or import browser cookies on its own.
+
+Danbooru and e621/e926 can use Username and API Key. Gelbooru and Rule34 can
+require API Key and User ID. Source requirements can change. A source access
+failure stays visible and does not fall back to another provider.
+
+Credentials use the private `IMAGE_SOURCE_CREDENTIALS` entry in the configured
+environment file. Configure them through the panel; do not place secrets in
+source URLs, `config.json`, exports or repository files. They do not enable
+publishing, Civitai browsing, or the retired general scraper.
+
+The **Install Sources** action installs the pinned optional gallery-dl package
+into the application interpreter and verifies the imports used by its worker.
+It does not install or replace a GPU runtime.
 
 Every setting in LoRA Dataset Studio, explained: what it does, its default, when to change it, and the traps to avoid.
 

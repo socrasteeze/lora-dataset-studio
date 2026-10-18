@@ -38,6 +38,7 @@
 
 # The app itself -- the tests import it.
 -r requirements.txt
+-r requirements-image-sources.txt
 
 # Pinned, not floated: CI and a contributor must run the SAME collector.
 pytest==9.1.1

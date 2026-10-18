@@ -991,7 +991,12 @@ def test_no_orphan_ml_package():
     the file, which would install unpinned via the bare-name fallback)."""
     from app import setup_installer
     owned = {setup_installer._canon(p)
-             for pkgs in setup_installer._CAPABILITY_PACKAGES.values() for p in pkgs}
+             for action, pkgs in setup_installer._CAPABILITY_PACKAGES.items()
+             if action not in setup_installer._PIP_REQUIREMENTS for p in pkgs}
+    for action, requirements in setup_installer._PIP_REQUIREMENTS.items():
+        for package in setup_installer._CAPABILITY_PACKAGES.get(action, ()):
+            spec = setup_installer._requirement_spec(package, requirements=requirements)
+            assert spec != package, f'{action} has an unpinned package: {package}'
     in_file = setup_installer._ml_requirement_names()
     assert in_file, 'requirements-ml.txt parsed empty — the mapping cannot be validated'
     orphans = in_file - owned

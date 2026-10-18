@@ -148,7 +148,7 @@ def _lock_and_check_work(gate, registry, changes=()):
     from ..extensions import db
     from ..gpu_window import vision_gpu_window_blocks_gpu
     from ..job_queue import GPU_ARBITER_LOCK, QUEUE_EXECUTION_LOCK, queue_execution_busy, queue_manager
-    from ..models import ImageGenerationQueue
+    from ..models import ImageGenerationQueue, ImageSourceJob
     from ..services import bank_jobs, dataset_activity, lora_training, ollama_control, reference_edit_jobs
     from . import environment
     from .lifecycle import state_change_lock
@@ -168,6 +168,11 @@ def _lock_and_check_work(gate, registry, changes=()):
 
     # Match the existing local launch order. The remaining acquisitions never
     # block, so an older request/worker with a different order cannot deadlock.
+    source_control = current_app.extensions.get('image_sources')
+    if source_control:
+        gate.acquire(source_control['lock'])
+    if ImageSourceJob.query.filter(ImageSourceJob.state.in_(('queued', 'running'))).first():
+        raise RestartBlocked('Stop Image Sources and let its current action finish before restarting.')
     for lock in (lora_training._launch_transaction_lock, lora_training._queue_lock,
                  GPU_ARBITER_LOCK, QUEUE_EXECUTION_LOCK, bank_jobs._lock, dataset_activity._lock,
                  reference_edit_jobs._lock, setup_installer._lock, ollama_control._pull_lock):

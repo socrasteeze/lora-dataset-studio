@@ -143,8 +143,9 @@ What stays off:
 
 - In-app online update checks and apply operations are unavailable. Maintain
   the checkout or replace the local release outside the app, then restart.
-- Civitai browsing, Hugging Face publishing and online media imports are
-  unavailable, even with a saved key. The scrape blueprint is not registered.
+- Civitai browsing, Hugging Face publishing and the former general online
+  media imports are unavailable, even with a saved key. The scrape blueprint
+  is not registered. Image Sources is the operator-authorized exception below.
 - External plugin ZIPs and any plugin outside the ten bundled ids are refused.
 - There is no plugin catalog and no usage-statistics collector. Installed
   plugins are listed by `GET /api/plugins/`, which also reports `can_manage`.
@@ -174,6 +175,31 @@ Still allowed: local file import/export, local generation and training,
 operator-started model/node-pack downloads and Setup installs, and the private
 network peers the operator entered. Stored credentials and historical link
 tables remain; they do not enable online runtime features.
+
+## Image Sources exception
+
+The operator authorized a focused image importer for boorus, Rule34 and Pawchive.
+The core `image_sources` blueprint owns this workflow. The old `scrape` plugin
+and its routes remain excluded. `offline_only()` remains true for every other
+existing caller. Image Sources does not restore publishing or online generation.
+
+Only explicit Scan, Scan More, Rescan, Load Previews, Download and Resume actions can
+start source requests. Import consumes verified local bytes. Boot marks queued
+or running source jobs interrupted without starting them. Status, cached preview
+and selection routes contact no provider. Source credentials are write-only.
+
+The gallery-dl child ignores ambient configuration and receives a scoped public
+HTTPS proxy. Downloads resolve and pin public addresses for each TLS connection,
+including redirects. It runs no postprocessors or arbitrary client options.
+`requirements-image-sources.txt` pins the optional engine. Setup verifies its
+actual imports after installation. The worker has no GPU dependency.
+
+Manual jobs retain canonical provenance and separate download/import state.
+Exact bytes share a content identity; near-duplicate decisions stay in Bank.
+ZIP extraction has entry, expanded-size, path and image limits. Unsupported
+archives and animated formats remain failures, not successful imports.
+Scheduled subscriptions, forum-thread boards and automatic remote resumes are
+outside this wave. See the Image Sources sections in the Guide.
 
 ## Mobile workflow contract
 

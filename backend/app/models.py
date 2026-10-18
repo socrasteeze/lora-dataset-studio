@@ -14,6 +14,45 @@ class DatasetImportReceipt(db.Model):
     fingerprint = db.Column(String(64), nullable=False)
     result = db.Column(Text, nullable=False)
 
+class ImageSourceJob(db.Model):
+    """Explicit acquisition intent. Boot recovers state without network work."""
+    __tablename__ = 'image_source_job'
+    id = db.Column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex)
+    user_id = db.Column(String(36), nullable=False, index=True)
+    provider = db.Column(String(24), nullable=False)
+    url = db.Column(Text, nullable=False)
+    state = db.Column(String(24), nullable=False, default='ready')
+    phase = db.Column(String(24), nullable=False, default='scan')
+    position = db.Column(Integer, nullable=False, default=0)
+    limit = db.Column(Integer, nullable=False, default=200)
+    done = db.Column(Integer, nullable=False, default=0)
+    total = db.Column(Integer, nullable=False, default=0)
+    destination = db.Column(String(16), nullable=False)
+    target_id = db.Column(Integer, nullable=True)
+    name = db.Column(String(100), nullable=False, default='Source Import')
+    error = db.Column(Text, nullable=True)
+    created_at = db.Column(DateTime, nullable=False, default=naive_utcnow)
+
+
+class ImageSourceAsset(db.Model):
+    """An original media item, its local bytes, and its independent import state."""
+    __tablename__ = 'image_source_asset'
+    id = db.Column(Integer, primary_key=True)
+    job_id = db.Column(String(32), db.ForeignKey('image_source_job.id', ondelete='CASCADE'),
+                       nullable=False, index=True)
+    source_key = db.Column(String(64), nullable=False)
+    url = db.Column(Text, nullable=False)
+    thumbnail = db.Column(Text, nullable=True)
+    kind = db.Column(String(16), nullable=False)
+    selected = db.Column(db.Boolean, nullable=False, default=True)
+    metadata_json = db.Column(Text, nullable=False)
+    local_name = db.Column(String(100), nullable=True)
+    sha256 = db.Column(String(64), nullable=True)
+    imported = db.Column(db.Boolean, nullable=False, default=False)
+    error = db.Column(Text, nullable=True)
+    __table_args__ = (db.UniqueConstraint('job_id', 'source_key'),)
+
+
 class FaceDataset(db.Model):
     """A named face-dataset for LoRA character training (one per character)."""
     __tablename__ = 'face_dataset'

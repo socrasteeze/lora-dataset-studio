@@ -33,7 +33,7 @@ pip install -r backend/requirements-ml.txt
 python backend/run.py
 ```
 
-This fork refuses online scraping, publishing, rented GPUs and external plugin archives. Do not restore them to match an upstream issue. The current boundaries are in [FORK_NOTES.md](FORK_NOTES.md).
+This fork refuses the former general scraper, publishing, rented GPUs and external plugin archives. Image Sources is a narrow exception for operator-started image acquisition. Do not restore unrelated online features to match an upstream issue. The current boundaries are in [FORK_NOTES.md](FORK_NOTES.md).
 
 `run.py` re-execs itself into `.venv` if it exists, so every launch method converges on the same interpreter. On Windows you can instead just double-click **`start.bat`**, which finds (or downloads) a suitable Python, builds the venv, and starts the server on port **5050**.
 

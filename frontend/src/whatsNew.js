@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-18-image-sources', date: '2026-10-18', title: 'Collect Original Images',
+    blurb: 'Scan booru, Rule34 and Pawchive sources. Select originals, resume interrupted jobs and import images with their source tags into Bank or Dataset. ZIP images stay reviewable. Downloads start only from your actions.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-16-storage-folder-selection',
     date: '2026-10-16',
     title: 'Keep Folder Selection',
