@@ -83,18 +83,6 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
 
-      - name: Run Fork Gates
-        # Preserve the browser failure while collecting the independent full gate.
-        if: ${{ !cancelled() && (steps.browser_checks.outcome == 'success' || steps.browser_checks.outcome == 'failure') }}
-        shell: pwsh
-        env:
-          LDS_DATA_DIR: ${{ runner.temp }}/lds-gates-data
-          LDS_CONFIG: ${{ runner.temp }}/lds-gates-config.json
-          LDS_ENV: ${{ runner.temp }}/lds-gates.env
-          LDS_PLUGINS_DIR: ${{ runner.temp }}/lds-gates-plugins
-          LDS_EXTENSIONS_DIR: ${{ runner.temp }}/lds-gates-extensions
-        run: ./scripts/gates.ps1 -Phase Gates -ScratchRoot D:/lds-gates
-
       - name: Check Image Sources in Browser
         if: ${{ !cancelled() }}
         run: node frontend/scripts/imageSourcesProbe.mjs
@@ -107,6 +95,18 @@ jobs:
           path: .git/lds-gates-validation/image-sources.json
           include-hidden-files: true
           if-no-files-found: warn
+
+      - name: Run Fork Gates
+        # Preserve browser failures while collecting the independent full gate.
+        if: ${{ !cancelled() && (steps.browser_checks.outcome == 'success' || steps.browser_checks.outcome == 'failure') }}
+        shell: pwsh
+        env:
+          LDS_DATA_DIR: ${{ runner.temp }}/lds-gates-data
+          LDS_CONFIG: ${{ runner.temp }}/lds-gates-config.json
+          LDS_ENV: ${{ runner.temp }}/lds-gates.env
+          LDS_PLUGINS_DIR: ${{ runner.temp }}/lds-gates-plugins
+          LDS_EXTENSIONS_DIR: ${{ runner.temp }}/lds-gates-extensions
+        run: ./scripts/gates.ps1 -Phase Gates -ScratchRoot D:/lds-gates
 
       - name: Save Gate Receipts
         # The browser check writes a second receipt on the same exact head.

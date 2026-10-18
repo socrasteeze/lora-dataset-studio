@@ -20,7 +20,9 @@ def main():
     from werkzeug.serving import make_server
     from flask import jsonify
     patch = pytest.MonkeyPatch()
-    app = create_test_app(runtime, patch)
+    app = create_test_app(runtime, patch, config_object={
+        'SQLALCHEMY_DATABASE_URI': f'sqlite:///{(runtime / "state.db").as_posix()}',
+    })
     from app import capabilities, setup_state
     from app.config import LOCAL_USER
     from app.extensions import db
