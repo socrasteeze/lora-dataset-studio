@@ -70,6 +70,7 @@ def main():
                 subjects.append({'region': [left, top, right-left, bottom-top],
                                  'vector': face.normed_embedding.tolist()})
             results.append({'state': 'measured' if subjects else 'no_usable_face',
+                            'detected_count': len(faces),
                             'subjects': subjects})
         except Exception:
             results.append({'state': 'unreadable', 'subjects': []})

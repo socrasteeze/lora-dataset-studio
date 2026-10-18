@@ -741,7 +741,9 @@ export default function DatasetWorkspace({ ds, onBack }) {
   const filtersActive = tagFiltersActive || statusFilterActive || !!coverageFilter || !!identityFilter;
   const statusFilterLabel = GRID_STATUS_FILTERS.find((f) => f.id === statusFilter)?.label || '';
   const statusFilterOpts = { unresolvedRescueIds };
-  const statusCounts = gridStatusFilterCounts(rescueGridImages, statusFilterOpts);
+  const identitySet = new Set(identityIds || []);
+  const identityPool = identityFilter ? rescueGridImages.filter((image) => identitySet.has(image.id)) : rescueGridImages;
+  const statusCounts = gridStatusFilterCounts(identityPool, statusFilterOpts);
   // The list actually rendered by the grid. Filtering here means select-all,
   // auto-triage and every bulk action operate ONLY on the visible images. The
   // Caption-tools counts keep using the full `images` list (global, never lies).
@@ -749,7 +751,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
   // The sort runs LAST and only reorders: membership is entirely the filters'
   // business, so "shown / total" and every bulk action keep meaning what they say.
   const filteredGridImages = filterImages(
-    filterImagesByStatus(rescueGridImages, statusFilter, statusFilterOpts),
+    filterImagesByStatus(identityPool, statusFilter, statusFilterOpts),
     { excludes: excludeTags, includes: includeTags, mode: effCaptionMode },
   );
   // 🔍 A coverage chip narrows to the exact images that bucket counted. It is an
@@ -759,10 +761,9 @@ export default function DatasetWorkspace({ ds, onBack }) {
   // Third filter, same rank as the other two — so it also narrows what select-all
   // and every bulk action see, which is the point of picking a bucket.
   const coverageIds = coverageFilter ? new Set(coverageFilter.ids) : null;
-  const identitySet = new Set(identityIds || []);
   const gridImages = sortDatasetImages(coverageIds
     ? filteredGridImages.filter((i) => coverageIds.has(i.id))
-    : filteredGridImages, gridSort).filter((image) => !identityFilter || identitySet.has(image.id));
+    : filteredGridImages, gridSort);
   // (Divergence 1) upstream's `summarizeGeneration`/`refusalHeadline` tally is NOT
   // taken with the chip filter it shipped beside: generationOutcome.js is the
   // removed cloud engines' refusal notice, and is deleted on this fork.

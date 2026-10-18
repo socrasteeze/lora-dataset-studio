@@ -2,10 +2,29 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { apiFetch, postForm, postJson } from '../../api/fetchClient.js';
 import CropModal from '../dataset/CropModal.jsx';
+import { useUnsavedWork } from '../../hooks/useUnsavedWork.js';
 
 const BUTTON = 'min-h-10 min-w-0 rounded-md border border-border px-3 py-2 text-xs font-semibold disabled:opacity-40 hover:bg-surface-raised';
 const FIELD = 'min-h-10 w-full min-w-0 rounded-md border border-border bg-surface px-2 py-2 text-sm text-content';
 const batches = (ids) => Array.from({ length: Math.ceil(ids.length / 16) }, (_, n) => ids.slice(n * 16, n * 16 + 16));
+
+function SubjectPreview({ src, region, onReady }) {
+  const [size, setSize] = useState(null);
+  const [failed, setFailed] = useState(false);
+  const box = size && region
+    ? [region[0] * size.width, region[1] * size.height, region[2] * size.width, region[3] * size.height]
+    : size ? [0, 0, size.width, size.height] : null;
+  return <div className="flex h-40 w-56 max-w-full items-center justify-center overflow-hidden">
+    {failed ? <span className="text-xs">Preview Unavailable</span>
+      : box ? <svg viewBox={box.join(' ')} className="h-full w-full" role="img" aria-label="Suggested Subject">
+        <image href={src} width={size.width} height={size.height}
+          onLoad={onReady} onError={() => setFailed(true)} />
+      </svg>
+        : <img src={src} alt="Suggested subject" loading="lazy" className="max-h-full max-w-full object-contain"
+          onError={() => setFailed(true)}
+          onLoad={(event) => { setSize({ width: event.target.naturalWidth, height: event.target.naturalHeight }); }} />}
+  </div>;
+}
 
 export function IdentityFilter({ source, scopeId, value = '', onChange, version = 0 }) {
   const [rows, setRows] = useState([]);
@@ -55,6 +74,7 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
   const [state, setState] = useState(null);
   const [prepared, setPrepared] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
+  const [reviewReady, setReviewReady] = useState({});
   const [tagRows, setTagRows] = useState([]);
   const [catalog, setCatalog] = useState([]);
   const [engine, setEngine] = useState('wd14');
@@ -73,11 +93,37 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
   const upload = useRef(null);
   const previews = useRef(new Map());
   const reloadVersion = useRef(0);
+  const draftScope = useRef(null);
   const ids = focusId ? [focusId] : imageIds;
   const previewId = ids.length === 1 ? ids[0] : null;
   const base = '/api/identity/' + source + '/' + scopeId;
   const imageUrl = previewId ? base + '/image/' + previewId : '';
+  useEffect(() => { setNatural(null); }, [imageUrl]);
   const idsKey = imageIds.join(',');
+  const draftKey = state?.scope_instance
+    ? 'lds:identity-draft:' + state.profile_id + ':' + source + ':' + state.scope_instance : null;
+  useUnsavedWork(open && (working || !!name || !!aliases || !!series));
+
+  useEffect(() => {
+    if (!draftKey) return;
+    try {
+      if (draftScope.current !== draftKey) {
+        draftScope.current = draftKey;
+        const saved = JSON.parse(sessionStorage.getItem(draftKey) || 'null');
+        if (saved && typeof saved.name === 'string' && saved.name.length <= 100
+          && typeof saved.aliases === 'string' && saved.aliases.length <= 2048
+          && typeof saved.series === 'string' && saved.series.length <= 200
+          && ['anime', 'person'].includes(saved.kind)) {
+          setName(saved.name); setAliases(saved.aliases); setSeries(saved.series);
+          setKind(saved.kind); setTarget('');
+          setNotice('Recovered a local name draft. Review it before assigning.');
+        }
+        return;
+      }
+      if (name || aliases || series) sessionStorage.setItem(draftKey, JSON.stringify({ name, aliases, series, kind }));
+      else sessionStorage.removeItem(draftKey);
+    } catch { setError('Local draft storage is unavailable. Keep this panel open until you save.'); }
+  }, [draftKey, name, aliases, series, kind]);
 
   const reload = useCallback(async () => {
     const version = ++reloadVersion.current;
@@ -101,9 +147,10 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
 
   const close = useCallback(() => {
     if (working) return;
-    if (name && !window.confirm('Discard the unsaved name?')) return;
+    if ((name || aliases || series) && !window.confirm('Discard the unsaved name?')) return;
+    setName(''); setAliases(''); setSeries('');
     setOpen(false);
-  }, [name, working]);
+  }, [name, aliases, series, working]);
   const closeRef = useRef(close);
   const cropRef = useRef(crop);
   closeRef.current = close;
@@ -131,6 +178,9 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
       const fields = [...dialog.current.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href]')];
       const first = fields[0], last = fields.at(-1);
       if (!fields.length) { event.preventDefault(); return; }
+      if (!dialog.current.contains(document.activeElement)) {
+        event.preventDefault(); (event.shiftKey ? last : first).focus(); return;
+      }
       if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog.current)) {
         event.preventDefault(); last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -190,6 +240,7 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
         setNotice(count + ' assigned of ' + ids.length + (result.learning?.reason ? '. ' + result.learning.reason : ''));
       }
       setName('');
+      setAliases(''); setSeries(''); setCatalogChoice(null);
       setReplaceIdentity(null);
     });
   }
@@ -260,7 +311,7 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
     </button>
     {open && createPortal(<div className="fixed inset-0 z-[100] overflow-y-auto bg-black/60 p-3 sm:p-6" data-probe-layer>
       <section ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId}
-        className="mx-auto flex w-full max-w-3xl flex-col gap-4 rounded-xl bg-surface p-4 text-content shadow-xl"
+        className="mx-auto flex w-full max-w-3xl flex-col gap-4 rounded-xl bg-surface-overlay p-4 text-content shadow-xl"
         data-probe-panel="identity-dialog">
         <div className="flex items-center justify-between gap-2">
           <h2 id={titleId} className="text-base font-semibold">Identities</h2>
@@ -270,26 +321,26 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
         {focusId && <button type="button" className={BUTTON} disabled={working} onClick={() => setFocusId(null)}>All Selected</button>}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="min-w-0 text-xs">Kind
-            <select className={FIELD} value={kind} disabled={working}
+            <select aria-label="Kind" className={FIELD} value={kind} disabled={working}
               onChange={(event) => { setKind(event.target.value); setTarget(''); setSuggestions([]); setMinimum(event.target.value === 'person' ? '0.55' : '0.70'); }}>
               <option value="person">Person</option><option value="anime">Anime</option>
             </select>
           </label>
           <label className="min-w-0 text-xs">Existing Identity
-            <select className={FIELD} value={target} disabled={working} onChange={(event) => setTarget(event.target.value)}>
+            <select aria-label="Existing Identity" className={FIELD} value={target} disabled={working} onChange={(event) => setTarget(event.target.value)}>
               <option value="">New Identity</option>{roster.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
             </select>
           </label>
           {!target && <label className="min-w-0 text-xs sm:col-span-2">Name
-            <input autoComplete="off" className={FIELD} maxLength={100} value={name} disabled={working}
+            <input aria-label="Name" autoComplete="off" className={FIELD} maxLength={100} value={name} disabled={working}
               onChange={(event) => { setName(event.target.value); setCatalogChoice(null); }} />
           </label>}
           {!target && <label className="min-w-0 text-xs">Aliases
-            <input className={FIELD} value={aliases} disabled={working}
+            <input aria-label="Aliases" className={FIELD} value={aliases} disabled={working}
               placeholder="Comma-separated names" onChange={(event) => setAliases(event.target.value)} />
           </label>}
           {!target && kind === 'anime' && <label className="min-w-0 text-xs">Series
-            <input className={FIELD} maxLength={200} value={series} disabled={working}
+            <input aria-label="Series" className={FIELD} maxLength={200} value={series} disabled={working}
               onChange={(event) => setSeries(event.target.value)} />
           </label>}
         </div>
@@ -307,8 +358,8 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
           {regions[previewId] && <span className="text-xs">Subject Crop Selected</span>}
         </div>}
         <div className="flex flex-wrap gap-4 text-xs">
-          <label className="flex min-h-10 items-center gap-2"><input type="checkbox" checked={learn} disabled={working} onChange={(event) => setLearn(event.target.checked)} />Learn Identity</label>
-          <label className="flex min-h-10 items-center gap-2"><input type="checkbox" checked={single} disabled={working} onChange={(event) => setSingle(event.target.checked)} />One Character</label>
+          <label className="flex min-h-10 items-center gap-2"><input aria-label="Learn Identity" type="checkbox" checked={learn} disabled={working} onChange={(event) => setLearn(event.target.checked)} />Learn Identity</label>
+          <label className="flex min-h-10 items-center gap-2"><input aria-label="One Character" type="checkbox" checked={single} disabled={working} onChange={(event) => setSingle(event.target.checked)} />One Character</label>
         </div>
         <p className="text-xs text-content-muted">For several characters, choose a subject crop. Only confirmed examples teach identity. Captions and image decisions stay unchanged.</p>
         <div className="grid grid-cols-2 gap-2">
@@ -316,8 +367,8 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
           <button type="button" className={BUTTON} disabled={working || !undoOffer} onClick={undo}>Undo</button>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <label className="text-xs">Minimum Similarity<input className={FIELD} type="number" min="-1" max="1" step="0.01" value={minimum} disabled={working} onChange={(event) => setMinimum(event.target.value)} /></label>
-          <label className="text-xs">Ambiguity Margin<input className={FIELD} type="number" min="0" max="1" step="0.01" value={margin} disabled={working} onChange={(event) => setMargin(event.target.value)} /></label>
+          <label className="text-xs">Minimum Similarity<input aria-label="Minimum Similarity" className={FIELD} type="number" min="-1" max="1" step="0.01" value={minimum} disabled={working} onChange={(event) => setMinimum(event.target.value)} /></label>
+          <label className="text-xs">Ambiguity Margin<input aria-label="Ambiguity Margin" className={FIELD} type="number" min="0" max="1" step="0.01" value={margin} disabled={working} onChange={(event) => setMargin(event.target.value)} /></label>
         </div>
         <button type="button" className={BUTTON} disabled={working} onClick={findMatches}>Find Matches</button>
         {kind === 'anime' && <div className="grid grid-cols-2 gap-2">
@@ -326,13 +377,14 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
           </select>
           <button type="button" className={BUTTON} disabled={working} onClick={findTags}>Suggest Names</button>
           <button type="button" className={BUTTON} disabled={working} onClick={() => upload.current.click()}>Import Catalog</button>
-          <a className={BUTTON + ' text-center'} href="#/setup?step=quality">Setup</a>
           <input ref={upload} className="hidden" type="file" accept=".csv" onChange={(event) => {
             const file = event.target.files?.[0]; if (!file) return;
             perform(async () => { const data = new FormData(); data.append('file', file); const result = await postForm('/api/identities/catalog/import', data); setNotice(result.imported + ' catalog entries imported.'); });
             event.target.value = '';
           }} />
         </div>}
+        <a className={BUTTON + ' block text-center'} href="#/setup?step=quality"
+          onClick={(event) => { if (working) event.preventDefault(); }}>Setup</a>
         {working && <button type="button" className={BUTTON} onClick={() => { stop.current = true; setNotice('Stop requested. The current batch will finish.'); }}>Stop</button>}
         {notice && <p role="status" className="text-sm">{notice}</p>}
         {error && <p role="alert" className="text-sm text-danger">{error}</p>}
@@ -354,10 +406,15 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
             </div>)}
           </div>)}
         </div>)}
-        {suggestions.map((suggestion) => <div key={suggestion.subject_id} className="flex flex-col gap-2">
-          <p className="break-words text-sm">{suggestion.identity.name} · {suggestion.score.toFixed(3)} · {suggestion.state === 'suggested' ? 'Suggested' : 'Uncertain'}</p>
+        {suggestions.map((suggestion) => <div key={suggestion.subject_id + ':' + suggestion.revision} className="flex flex-col gap-2">
+          <p className="break-words text-sm">Image {imageIds.indexOf(suggestion.image_id) + 1} · {suggestion.identity.name} · {suggestion.score.toFixed(3)} · {suggestion.state === 'suggested' ? 'Suggested' : 'Uncertain'}</p>
+          <SubjectPreview src={base + '/image/' + suggestion.image_id + '?thumbnail=1&v=' + suggestion.revision}
+            region={suggestion.region}
+            onReady={() => setReviewReady((prior) => ({ ...prior, [suggestion.subject_id + ':' + suggestion.revision]: true }))} />
+          <button type="button" className={BUTTON} disabled={working}
+            onClick={() => { setFocusId(suggestion.image_id); setSuggestions([suggestion]); setRegions((prior) => ({ ...prior, [suggestion.image_id]: suggestion.region })); }}>Inspect Subject</button>
           <div className="grid grid-cols-2 gap-2">
-            <button type="button" className={BUTTON} disabled={working} onClick={() => decide({ id: suggestion.subject_id, revision: suggestion.revision }, suggestion.identity.id, 'confirm')}>Confirm</button>
+            <button type="button" className={BUTTON} disabled={working || !reviewReady[suggestion.subject_id + ':' + suggestion.revision]} onClick={() => decide({ id: suggestion.subject_id, revision: suggestion.revision }, suggestion.identity.id, 'confirm')}>Confirm</button>
             <button type="button" className={BUTTON} disabled={working} onClick={() => decide({ id: suggestion.subject_id, revision: suggestion.revision }, suggestion.identity.id, 'reject')}>Reject Match</button>
           </div>
         </div>)}

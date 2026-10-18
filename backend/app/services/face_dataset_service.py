@@ -4282,9 +4282,6 @@ def _bkp_restore_validated(user_id: int, z: zipfile.ZipFile, manifest,
         db.session.flush()
         id_map = {meta.get('backup_image_id'): img.id for img, meta in restored_rows
                   if meta.get('backup_image_id') is not None}
-        from .identity_learning import restore_metadata
-        for img, meta in restored_rows:
-            restore_metadata(user_id, 'dataset', ds.id, img.id, meta.get('identity_snapshot'))
         for img, meta in restored_rows:
             img.parent_image_id = id_map.get(meta.get('parent_image_id'))
         # Reference fields are rebuilt exclusively from actual ref/ archive files.
@@ -4312,6 +4309,9 @@ def _bkp_restore_validated(user_id: int, z: zipfile.ZipFile, manifest,
 
         os.replace(staging_dir, final_dir)
         promoted = True
+        from .identity_learning import restore_metadata
+        for img, meta in restored_rows:
+            restore_metadata(user_id, 'dataset', ds.id, img.id, meta.get('identity_snapshot'))
         db.session.commit()
     except Exception:
         try:

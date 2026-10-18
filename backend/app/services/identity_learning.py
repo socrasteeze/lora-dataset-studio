@@ -11,6 +11,7 @@ import hashlib
 import io
 import json
 import math
+import os
 from pathlib import Path
 import unicodedata
 import uuid
@@ -164,6 +165,9 @@ def _subject(user, source, scope, image, box=None, *, single=False, continuity=F
 
 
 def _identity(user, identity_id):
+    if (not isinstance(identity_id, str) or len(identity_id) != 32
+            or any(c not in '0123456789abcdef' for c in identity_id)):
+        raise ValueError('Choose a valid identity.')
     row = db.session.get(NamedIdentity, identity_id)
     if row is None or row.user_id != user:
         raise IdentityNotFound('Identity is unavailable.')
@@ -185,6 +189,9 @@ def create_identity(user, data):
     key = name.casefold()
     existing = NamedIdentity.query.filter_by(user_id=user, kind=kind, name_key=key).first()
     if existing:
+        requested_series = _text(data.get('series'), 200, optional=True) or None
+        if requested_series is not None and requested_series != existing.series:
+            raise IdentityConflict('This name already belongs to another series. Choose a distinct name or the existing identity.')
         return existing
     row = NamedIdentity(user_id=user, kind=kind, name=name, name_key=key,
                         series=_text(data.get('series'), 200, optional=True) or None,
@@ -222,13 +229,13 @@ def rename_identity(user, identity_id, data):
         'revision': revision+1}, synchronize_session=False)
     if changed != 1:
         raise IdentityConflict('Identity changed. Reload it before saving.')
-    db.session.commit()
+    db.session.flush()
     db.session.refresh(row)
     for assignment in IdentityAssignment.query.filter_by(identity_id=row.id).all():
         subject = db.session.get(IdentitySubject, assignment.subject_id)
         try:
             sync_metadata(subject)
-        except IdentityNotFound:
+        except (IdentityNotFound, IdentityConflict):
             continue
     db.session.commit()
     return identity_dict(row)
@@ -268,6 +275,7 @@ def view(user, source, scope_id, ids):
     scope = _scope(user, source, scope_id)
     rows = [_image(user, source, scope_id, i)[1] for i in ids]
     return {'scope_instance': scope.instance_id,
+            'profile_id': os.environ.get('LDS_PROFILE_ID') or 'default',
             'preview': _preview(scope, [(source, row) for row in rows]),
             'images': [{'id': row.id, 'subjects': [_subject_dict(s) for s in
                         _subjects(source, scope, row)]} for row in rows]}
@@ -288,7 +296,7 @@ def lease(source, scope_id):
 
 
 def _claim(subject, revision):
-    if subject.revision != revision:
+    if isinstance(revision, bool) or not isinstance(revision, int) or subject.revision != revision:
         raise IdentityConflict('Assignment changed. Reload it before saving.')
     changed = IdentitySubject.query.filter_by(id=subject.id, revision=revision).update(
         {'revision': revision+1}, synchronize_session=False)
@@ -302,6 +310,9 @@ def _record_action(user, subjects, snapshots, operation_id=None):
     position = 1
     action_id = uuid.uuid4().hex
     if operation_id is not None:
+        if (not isinstance(operation_id, str) or len(operation_id) != 32
+                or any(c not in '0123456789abcdef' for c in operation_id)):
+            raise ValueError('Choose a valid bulk action.')
         prior = IdentityAction.query.filter_by(
             user_id=user, operation_id=operation_id, source=subject.source,
             scope_instance=subject.scope_instance).order_by(IdentityAction.position.desc()).first()
@@ -352,13 +363,14 @@ def assign(user, source, scope_id, data):
     for row in rows:
         box = parsed[str(row.id)]
         if target.kind == 'person' and box is None:
-            faces = [s for s in _subjects(source, scope, row)
-                     if IdentityEvidence.query.filter_by(
-                         subject_id=s.id, model_key=FACE_MODEL).first()]
-            if len(faces) > 1 and learn:
-                raise ValueError('Select one face before teaching this person.')
-            subject = faces[0] if len(faces) == 1 else _subject(
-                user, source, scope, row, single=single)
+            for located in _subjects(source, scope, row):
+                if located.region and any(
+                    a.identity_id != target.id and _identity(user, a.identity_id).kind == 'person'
+                    for a in IdentityAssignment.query.filter_by(
+                        subject_id=located.id, state='confirmed').all()
+                ):
+                    raise ValueError('Correct the located person or choose a separate subject crop.')
+            subject = _subject(user, source, scope, row, single=single)
         else:
             subject = _subject(user, source, scope, row, box, single=single)
         subjects.append(subject)
@@ -467,6 +479,9 @@ def undo(user, action_id):
         raise IdentityNotFound('Undo is unavailable.')
     if action.undone:
         return {'restored': 0, 'skipped': 0}
+    scope = _scope(user, action.source, action.scope_id)
+    if scope.instance_id != action.scope_instance:
+        raise IdentityConflict('Image surface changed. This action cannot be restored.')
     group = IdentityAction.query.filter_by(
         user_id=user, operation_id=action.operation_id).order_by(
             IdentityAction.position.desc()).all()
@@ -474,6 +489,14 @@ def undo(user, action_id):
     for item in [item for member in group for item in json.loads(member.snapshots)]:
         subject = db.session.get(IdentitySubject, item['subject_id'])
         if subject is None or subject.revision != item['after_revision']:
+            skipped += 1
+            continue
+        try:
+            owner, image = _image(user, subject.source, subject.scope_id, subject.image_id)
+        except IdentityNotFound:
+            skipped += 1
+            continue
+        if owner.instance_id != subject.scope_instance or image.instance_id != subject.image_instance:
             skipped += 1
             continue
         _claim(subject, subject.revision)
@@ -500,7 +523,10 @@ def undo(user, action_id):
 
 def normalized_vector(value, dimension):
     import numpy as np
-    vector = np.asarray(value, dtype='<f4')
+    try:
+        vector = np.asarray(value, dtype='<f4')
+    except (ValueError, TypeError):
+        raise ValueError('Recognition returned an invalid vector.') from None
     if (vector.shape != (dimension,) or not np.isfinite(vector).all()
             or float(np.linalg.norm(vector)) < 1e-8):
         raise ValueError('Recognition returned an invalid vector.')
@@ -558,6 +584,9 @@ def analyze(user, source, scope_id, data, *, confirmation=None):
         [{'path': path, 'region': box} for _, path, _, box in work], kind)
     if not isinstance(outputs, list) or len(outputs) != len(work):
         raise ValueError('Recognition returned an incomplete batch.')
+    if any(not isinstance(output, dict) or not isinstance(output.get('subjects', []), list)
+           for output in outputs):
+        raise ValueError('Recognition returned invalid subject results.')
     measured, unknown = [], []
     for (image, path, digest, requested), output in zip(work, outputs):
         if fingerprint(path) != digest:
@@ -569,6 +598,8 @@ def analyze(user, source, scope_id, data, *, confirmation=None):
         if len(entries) > 32:
             raise ValueError('Recognition returned too many subjects.')
         for entry in entries:
+            if not isinstance(entry, dict):
+                raise ValueError('Recognition returned an invalid subject.')
             box = region(entry.get('region'))
             subject = _subject(user, source, scope, image, box,
                                single=kind == 'person' or requested is not None,
@@ -579,16 +610,29 @@ def analyze(user, source, scope_id, data, *, confirmation=None):
                                                and subject.id in confirmation[1] else None))
             # A previously named whole-frame person can enroll only when
             # detection proves one usable face, never by choosing the biggest.
-            whole = next((s for s in _subjects(source, scope, image) if s.region is None), None)
-            if kind == 'person' and len(entries) == 1 and whole and whole.id != subject.id:
+            selected = next((s for s in _subjects(source, scope, image)
+                             if (json.loads(s.region) if s.region else None) == requested), None)
+            detected = output.get('detected_count', len(entries))
+            if kind == 'person' and detected == 1 and len(entries) == 1 and selected and selected.id != subject.id:
                 confirmed = IdentityAssignment.query.filter_by(
-                    subject_id=whole.id, state='confirmed', learn=True).all()
+                    subject_id=selected.id, state='confirmed', learn=True).all()
                 for assignment in confirmed:
                     if _identity(user, assignment.identity_id).kind == 'person':
-                        store_evidence(whole, FACE_MODEL, digest, entry.get('vector'),
+                        store_evidence(selected, FACE_MODEL, digest, entry.get('vector'),
                                        confirmed_identity=(confirmation[0] if confirmation
-                                                           and whole.id in confirmation[1] else None))
-                        whole.single_subject = True
+                                                           and selected.id in confirmation[1] else None))
+                        selected.single_subject = True
+            elif kind == 'person' and detected != 1 and selected:
+                blocked = IdentityAssignment.query.filter_by(
+                    subject_id=selected.id, state='confirmed', learn=True).all()
+                for assignment in blocked:
+                    if _identity(user, assignment.identity_id).kind == 'person':
+                        assignment.learn = False
+                IdentityEvidence.query.filter_by(subject_id=selected.id, model_key=FACE_MODEL).delete()
+                if blocked and not (confirmation and selected.id in confirmation[1]):
+                    _claim(selected, selected.revision)
+                if not any(item['image_id'] == image.id for item in unknown):
+                    unknown.append({'image_id': image.id, 'reason': 'multiple_faces'})
             measured.append(subject.id)
     for image, _path_value, _digest, _requested in work:
         existing = _subjects(source, scope, image)
@@ -601,6 +645,8 @@ def analyze(user, source, scope_id, data, *, confirmation=None):
 def sync_metadata(subject):
     """Transport mirror only; canonical live decisions remain relational."""
     scope, image = _image(subject.user_id, subject.source, subject.scope_id, subject.image_id)
+    if scope.instance_id != subject.scope_instance or image.instance_id != subject.image_instance:
+        raise IdentityConflict('Image instance changed. Identity metadata was not written.')
     payload = []
     db.session.flush()
     for row in _subjects(subject.source, scope, image):

@@ -501,7 +501,8 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
   return (
     <div id="ds-images-review" tabIndex={-1} data-workspace-focus
       className="flex flex-col gap-2 scroll-mt-20">
-      <IdentityTools source="dataset" scopeId={datasetId} imageIds={[...selected]}
+      <IdentityTools key={String(datasetId) + ':' + datasetInstanceId}
+        source="dataset" scopeId={datasetId} imageIds={[...selected]}
         busy={bulkBusy} defaultKind={subjectType === 'anime' ? 'anime' : 'person'}
         onChanged={onIdentityChanged} />
       {/* Says what the pass BLOCKS, once, in words — the per-button titles name

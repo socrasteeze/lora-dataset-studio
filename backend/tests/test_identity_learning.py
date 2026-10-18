@@ -427,3 +427,91 @@ def test_bulk_undo_survives_a_new_client_and_restores_every_batch(client, librar
     assert response.get_json() == {'restored': 2, 'skipped': 0}
     assert IdentityAssignment.query.filter_by(state='confirmed').count() == 0
     assert assign(client, library, identity, operation_id=first['operation_id']).status_code == 409
+
+
+def test_group_photo_does_not_teach_the_only_usable_face(client, library, monkeypatch):
+    from app.services import identity_inference
+    monkeypatch.setattr(identity_inference, 'extract', lambda items, kind: [
+        {'detected_count': 2, 'subjects': [
+            {'region': [0.1, 0.1, 0.4, 0.4], 'vector': vector(1, dimension=512)}]}
+        for _ in items])
+    identity = create(client, kind='person')
+    response = assign(client, library, identity, single_subject=False)
+    assert response.status_code == 200
+    assert response.get_json()['learning']['unknown'][0]['reason'] == 'multiple_faces'
+    analyze(client, library, kind='person')
+    assert suggest(client, library, kind='person')['reference_identities'] == 0
+
+
+def test_photographic_body_crop_enrolls_its_one_detected_face(client, library, monkeypatch):
+    from app.services import identity_inference
+    monkeypatch.setattr(identity_inference, 'extract', lambda items, kind: [
+        {'detected_count': 1, 'subjects': [
+            {'region': [0.2, 0.2, 0.2, 0.2], 'vector': vector(1, dimension=512)}]}
+        for _ in items])
+    identity = create(client, kind='person')
+    response = assign(client, library, identity,
+                      regions={str(library['bank_ids'][0]): [0.1, 0.1, 0.8, 0.8]})
+    assert response.status_code == 200
+    analyze(client, library, kind='person')
+    hints = suggest(client, library, kind='person')
+    assert hints['reference_identities'] == 1
+    assert hints['suggestions'][0]['identity']['id'] == identity['id']
+
+
+def test_undo_cannot_write_metadata_to_a_recycled_image_id(client, library):
+    from app.extensions import db
+    from app.models import BankImage
+    identity = create(client)
+    saved = assign(client, library, identity).get_json()
+    row = db.session.get(BankImage, library['bank_ids'][0])
+    row.instance_id = 'f'*32
+    row.identity_snapshot = None
+    db.session.commit()
+    response = client.post('/api/identity/actions/'+saved['action_id']+'/undo', json={})
+    assert response.get_json() == {'restored': 0, 'skipped': 1}
+    assert db.session.get(BankImage, library['bank_ids'][0]).identity_snapshot is None
+
+
+def test_identical_display_names_from_different_series_do_not_merge_silently(client, library):
+    first = client.post('/api/identities', json={'name': 'Aster', 'kind': 'anime', 'series': 'Series One'})
+    assert first.status_code == 200
+    second = client.post('/api/identities', json={'name': 'Aster', 'kind': 'anime', 'series': 'Series Two'})
+    assert second.status_code == 409
+
+
+@pytest.mark.parametrize('identity_id', [None, [], {}, True, 42, 'invalid'])
+def test_malformed_identity_ids_are_request_errors(client, library, identity_id):
+    base = f"/api/identity/bank/{library['bank']}"
+    preview = client.post(base+'/view', json={'image_ids': library['bank_ids'][:1]}).get_json()
+    response = client.post(base+'/assign', json={
+        **preview, 'identity_id': identity_id, 'image_ids': library['bank_ids'][:1],
+        'single_subject': True})
+    assert response.status_code == 400
+
+
+@pytest.mark.parametrize('output', [
+    None, [None], [{'subjects': 123}], [{'subjects': [None]}],
+    [{'subjects': [{'region': None, 'vector': {'invalid': 1}}]}],
+])
+def test_malformed_worker_results_keep_the_name_without_teaching(client, library, monkeypatch, output):
+    from app.models import IdentityEvidence
+    from app.services import identity_inference
+    monkeypatch.setattr(identity_inference, 'extract', lambda *args: output)
+    identity = create(client)
+    response = assign(client, library, identity)
+    assert response.status_code == 200, response.get_json()
+    assert response.get_json()['assigned'] == 1
+    assert response.get_json()['learning']['measured'] == 0
+    assert IdentityEvidence.query.count() == 0
+
+
+def test_dataset_backup_restores_names_after_staged_files_are_promoted(client, library):
+    from app.services import face_dataset_service as datasets
+    from app.services.identity_learning import filter_ids
+    identity = create(client)
+    assign(client, library, identity, source='dataset')
+    archive = datasets.build_backup_zip(library['user'], library['dataset'])
+    restored = datasets.import_backup_zip(library['user'], archive)
+    matched = filter_ids(library['user'], 'dataset', restored.id, identity['id'])
+    assert len(matched) == 1
