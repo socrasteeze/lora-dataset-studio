@@ -72,6 +72,15 @@ try {
     const errors = [];
     activePage = page;
     activeErrors = errors;
+    let tagReads = 0;
+    const tagFailures = viewportIndex === 0 ? 3 : 1;
+    await context.route((requestUrl) => requestUrl.pathname.endsWith('/tags/facets'), async (route) => {
+      tagReads += 1;
+      if (tagReads <= tagFailures) {
+        await route.fulfill({ status: 503, contentType: 'application/json',
+          body: JSON.stringify({ error: 'Synthetic transient read failure' }) });
+      } else await route.continue();
+    });
     page.on('pageerror', (error) => { errors.push(error.message); console.error(error.message); });
     await page.addInitScript((id) => localStorage.setItem('bankCurrentId', String(id)), ready.bank_id);
     // Hold the source check open. Saved images and metadata must render before
@@ -112,10 +121,13 @@ try {
     assert.equal((await sourceResponse).status(), 200);
     await context.unroute('**/folder-sync');
     const drawer = page.locator('[aria-controls="bank-filter-rail"]:visible');
-    await page.getByRole('button', { name: /^Other Tags/ }).or(drawer).first().waitFor();
+    await page.getByRole('button', { name: /^Other Tags/ }).or(drawer)
+      .or(page.getByRole('button', { name: 'Retry Tags', exact: true })).first().waitFor();
     if (await drawer.count()) await drawer.click();
+    if (tagFailures === 3) await page.getByRole('button', { name: 'Retry Tags', exact: true }).click();
     const trigger = page.getByRole('button', { name: /^Other Tags/ });
     await trigger.click();
+    assert.ok(tagReads >= tagFailures + 1, 'Tag filters must recover from failed reads without a changed tag count');
     const panel = page.locator('#tag-facet-other');
     const search = panel.getByRole('searchbox');
     await search.fill('blue');

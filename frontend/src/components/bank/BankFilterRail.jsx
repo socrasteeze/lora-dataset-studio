@@ -162,6 +162,7 @@ export default function BankFilterRail({
   sortGroups, setSort, tileSize, setTileSize,
   moreOpen, setMoreOpen, isDrawer, onClose, onBrowseStyles,
   tagFiltersShown, tagGroups, wd14Tags, toggleFacetTag, selectFacetTags, clearWd14Tags,
+  tagFacetError, retryTagFacets,
   filterSummary, clearAllFilters, shownReasons, reasonCounts, reasonHint,
 }) {
   // Which measured axes have data. The conditions are the ones the workspace
@@ -485,6 +486,10 @@ export default function BankFilterRail({
               </Button>
             )}
           </div>
+          {tagFacetError && <div role="alert" className="my-2 flex flex-wrap items-center gap-2 text-xs text-content-muted">
+            <span>Tag filters are unavailable.</span>
+            <Button size="md" onClick={retryTagFacets}>Retry Tags</Button>
+          </div>}
           <TagFacetMenus facets={tagGroups.facets} other={tagGroups.other} selected={wd14Tags}
             onToggle={toggleFacetTag} onSelectAll={selectFacetTags} />
         </section>

@@ -317,7 +317,7 @@ const TOPICS = [
     app: { route: '/gallery' } },
   action('bank-other-tags', 'Other Tags',
     ['uncategorized', 'uncategorised', 'other tags', 'all tags', 'tag categories',
-     'tag picklists', 'find tags', 'select all tags', 'any tag', 'or filter', 'wd14'],
+     'tag picklists', 'find tags', 'select all tags', 'any tag', 'or filter', 'wd14', 'retry tags'],
     '/bank', 'using-the-app', 'other-bank-tags'),
   { id: 'page-bank', kind: 'page', title: 'Image bank (triage)',
     keywords: ['bank', 'triage', 'import', 'folder', 'browse', 'choose folder', 'path',
