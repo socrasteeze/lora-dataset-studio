@@ -92,6 +92,12 @@ export const WHATS_NEW = [
     to: '/bank',
   },
   {
+    id: '2026-10-18-studio-moss-image', date: '2026-10-18',
+    title: 'Create with MOSS-Image in Test Studio',
+    blurb: 'Choose Base Model Only, then MOSS-Image. Existing model files are reused; missing files and the MOSS loaders can be prepared from the Studio.',
+    to: '/studio',
+  },
+  {
     id: '2026-10-18-identity-learning',
     date: '2026-10-18',
     title: 'Teach identities with the names you confirm',
