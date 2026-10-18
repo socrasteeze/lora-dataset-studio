@@ -23,6 +23,7 @@ The requested selector changes and remaining failure repairs are complete. Full 
 
 ## Open
 1. The running app checkout was preserved on validation/test-suite-runtime. Stop the app before switching that checkout to main, then start it. No production service, data or real job was changed or interrupted by validation.
+   - **Not honoured during the 2026-10-17 upstream review.** This checkout was switched `validation/test-suite-runtime` → `upstream-review/2026-10-17` (via `main`) and `frontend/dist` was rebuilt in place at 21:06, while `backend/run.py` (PID 26540, started 17:22) was still serving from it. The served frontend is now the review branch's bundle, four commits ahead of `main`, while the Python process still holds the pre-switch backend, so `POST /api/dataset/<id>/import-from-dataset` is in the served UI but not in the running backend until a restart. No data migration or job was triggered. Operator decides: leave the checkout on the review branch, or stop the app and switch back to `validation/test-suite-runtime`. Do not switch again while the app is live.
 2. Physical phone/PWA acceptance, installed-source trainer compatibility and real GPU/training comparisons remain operator checks. They are not claimed by synthetic cloud qualification.
 
 ## Upstream review carried forward
