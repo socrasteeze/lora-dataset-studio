@@ -16,6 +16,7 @@ const runtime = await mkdtemp(path.join(tmpdir(), 'lds-identities-'))
 const receipt = path.resolve(root, execFileSync('git', ['rev-parse', '--git-path', 'lds-gates-validation'],
   { cwd: root, encoding: 'utf8', windowsHide: true }).trim())
 let server, browser, url
+let activePage, activeErrors = []
 let output = '', complete = false, failure = null
 const outcomes = []
 const recoveryOutcomes = []
@@ -43,6 +44,8 @@ try {
   for (const [width, height] of [[360, 800], [412, 915], [844, 390], [768, 1024], [1280, 800]]) {
     const recoveryContext = await browser.newContext({ viewport: { width, height } })
     const recoveryPage = await recoveryContext.newPage()
+    activePage = recoveryPage; activeErrors = []
+    recoveryPage.on('pageerror', (error) => activeErrors.push(error.message))
     await recoveryPage.addInitScript((id) => localStorage.setItem('bankCurrentId', String(id)), ready.bank_id)
     await recoveryPage.route((requestUrl) => requestUrl.pathname === '/api/capabilities', async (route) => {
       const response = await route.fetch()
@@ -74,6 +77,7 @@ try {
         const context = await browser.newContext({ viewport: { width, height } })
         const page = await context.newPage()
         const errors = []
+        activePage = page; activeErrors = errors
         page.on('pageerror', (error) => errors.push(error.message))
         await page.addInitScript(({ source, ready }) => {
           localStorage.setItem(source === 'bank' ? 'bankCurrentId' : 'datasetCurrentId', String(ready[source+'_id']))
@@ -180,6 +184,17 @@ try {
   await writeFile(path.join(receipt, 'identities.json'), JSON.stringify({
     head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim(),
     expected: 20, outcomes, recoveryExpected: 5, recoveryOutcomes, skipped: [], complete, failure,
+    diagnostic: failure && activePage && !activePage.isClosed() ? {
+      url: activePage.url(), errors: activeErrors,
+      headings: await activePage.getByRole('heading').allTextContents(),
+      buttons: await activePage.getByRole('button').allTextContents(),
+      imagePanel: await activePage.locator('body').evaluate(() => {
+        const panel = document.querySelector('#gf-images')
+        return { exists: !!panel, visible: !!panel?.getClientRects().length,
+          cards: document.querySelectorAll('.dataset-grid-item').length,
+          checkboxes: document.querySelectorAll('#gf-images input[type="checkbox"]').length }
+      }),
+    } : null,
   }, null, 2))
   await browser?.close()
   if (server && server.exitCode === null) {
