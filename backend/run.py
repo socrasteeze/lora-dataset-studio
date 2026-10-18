@@ -77,7 +77,7 @@ if _pil_version and _pil_mixed:
           f'Pillow=={_pinned_pillow_version() or _pil_version}', flush=True)
 
 from app import create_app
-from port_utils import find_available_port
+from port_utils import startup_port
 from single_instance import live_instance, refusal_message, release_lock, write_lock
 
 try:
@@ -176,8 +176,8 @@ if __name__ == '__main__':
             # it exists already — open THAT one instead of printing at them.
             webbrowser.open(f"http://127.0.0.1:{running['port']}/")
         sys.exit(0)
-    port = (requested_port if os.environ.get('LDS_AUTO_PORT') == '0'
-            else find_available_port(host, requested_port))
+    # Never a slide under a container's fixed publish (LDS_BIND_MANAGED).
+    port = startup_port(host, requested_port)
     if port != requested_port:
         print(f"[LDS] port {requested_port} is already in use; using {port} instead.",
               flush=True)
