@@ -23,4 +23,3 @@ def disposition(ranked, minimum, margin):
     score = ranked[0][0]
     ambiguous = len(ranked) > 1 and score-ranked[1][0] < margin
     return 'suggested' if score >= minimum and not ambiguous else 'uncertain'
-

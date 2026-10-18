@@ -79,4 +79,3 @@ def evaluate(user, data):
             'coverage': answered/counts['total'],
             'corpus_hash': hashlib.sha256(json.dumps(sorted(contract), sort_keys=True).encode()).hexdigest(),
             'synthetic_accuracy_claim': False}
-

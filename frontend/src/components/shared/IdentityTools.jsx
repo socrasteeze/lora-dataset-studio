@@ -344,4 +344,3 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
       onConfirm={(box) => { setRegions((prior) => ({ ...prior, [previewId]: [box.x / natural.width, box.y / natural.height, box.w / natural.width, box.h / natural.height] })); setCrop(false); }} /></div>, document.body)}
   </>;
 }
-

@@ -383,5 +383,3 @@ def test_tag_suggestions_do_not_write_captions_or_confirm_identities(client, lib
     assert response.get_json()['images'][0]['candidates'][0]['tag'] == 'aster_demo'
     assert IdentityAssignment.query.count() == 0
     assert BankImage.query.first().caption == 'Invented caption'
-
-

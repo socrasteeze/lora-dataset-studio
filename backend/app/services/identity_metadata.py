@@ -140,4 +140,3 @@ def remove_bank_sqlite(connection, bank_id, instance_id):
         connection.execute(f'DELETE FROM {table} WHERE subject_id IN ({subjects})', params)
     connection.execute(
         "DELETE FROM identity_subject WHERE source='bank' AND scope_id=? AND scope_instance=?", params)
-
