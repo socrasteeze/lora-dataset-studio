@@ -19,7 +19,7 @@ import { holdsLocalGpu } from '../../utils/activityLanes.js';
 import { IMPROVE_DERIVATION } from './improveCandidates.js';
 import { faceAnalysisState, faceAnalysisLabel } from './faceScoringGate.js';
 import DatasetGrid from './DatasetGrid';
-import { IdentityFilter } from '../shared/IdentityTools.jsx';
+import { IdentityFilter, IdentityUndo } from '../shared/IdentityTools.jsx';
 import { apiFetch as identityFetch } from '../../api/fetchClient.js';
 import { Chip, Select } from '../common/Controls.jsx';
 import { datasetBusyReason } from './datasetBusyReason.js';
@@ -1333,8 +1333,12 @@ export default function DatasetWorkspace({ ds, onBack }) {
               {watermarkDetected > 0 ? ` · ${watermarkDetected} watermark(s) flagged` : ''}
             </p>
             <div id="gf-images" className="scroll-mt-20 flex flex-col gap-2">
-              <IdentityFilter source="dataset" scopeId={d.id} value={identityFilter}
-                onChange={setIdentityFilter} version={identityVersion} />
+              <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2">
+                <IdentityFilter source="dataset" scopeId={d.id} value={identityFilter}
+                  onChange={setIdentityFilter} version={identityVersion} />
+                <IdentityUndo key={d.instance_id} source="dataset" scopeId={d.id} version={identityVersion} busy={ds.busy}
+                  onChanged={() => setIdentityVersion((value) => value + 1)} />
+              </div>
               {identityError && <p role="alert" className="text-sm text-danger">{identityError}</p>}
               {rescueGridImages.length > 0 && (
                 // One wrapping row at 400 px: the decision chips flow, the Sort

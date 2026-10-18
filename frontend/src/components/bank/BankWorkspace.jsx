@@ -112,7 +112,7 @@ import { bankSortGroups, loadBankSort, saveBankSort } from '../../utils/gridSort
 // 🏷️ One image's caption → the chips you can filter by, and the same chips over a
 // whole SELECTION with how often each was cited (pure/testable).
 import { tagsParam, selectionTagCounts } from './bankTags.js'
-import IdentityTools, { IdentityFilter } from '../shared/IdentityTools.jsx'
+import IdentityTools, { IdentityFilter, IdentityUndo } from '../shared/IdentityTools.jsx'
 // 🔤 Text search wording — "closest", never "matching" — plus the cold-start and
 // CLIP-limitation copy. Pure/testable (node --test cannot parse this JSX).
 import {
@@ -1998,9 +1998,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-2" data-probe-panel="bank-identities">
         <IdentityFilter source="bank" scopeId={bankId} value={filter.identityId} version={identityVersion}
           onChange={(value) => setF({ identityId: value || null })} />
-        <IdentityTools key={String(bankId) + ':' + (payload?.instance_id || '')}
-          source="bank" scopeId={bankId} imageIds={[...selected]} busy={live}
-          onChanged={() => { setIdentityVersion((value) => value + 1); refreshImages(); refreshPayload({ force: true }); }} />
+        <div className="grid w-full min-w-0 grid-cols-2 items-start gap-2">
+          <IdentityTools key={String(bankId) + ':' + (payload?.instance_id || '')}
+            source="bank" scopeId={bankId} imageIds={[...selected]} busy={live}
+            onChanged={() => { setIdentityVersion((value) => value + 1); refreshImages(); refreshPayload({ force: true }); }} />
+          <IdentityUndo source="bank" scopeId={bankId} version={identityVersion} busy={live}
+            onChanged={() => { setIdentityVersion((value) => value + 1); refreshImages(); refreshPayload({ force: true }); }} />
+        </div>
       </div>
       {/* ── The top bar ──────────────────────────────────────────────────
           Bank identity, the counters, and the DECISIVE actions. Everything

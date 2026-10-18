@@ -83,6 +83,13 @@ def analyze(client, lib, ids=None, source='bank', kind='anime'):
     return base
 
 
+def unassign(client, lib, identity, ids, source='bank', **extra):
+    base = f"/api/identity/{source}/{lib[source]}"
+    preview = client.post(base+'/view', json={'image_ids': ids}).get_json()
+    return client.post(base+'/unassign', json={
+        **preview, 'image_ids': ids, 'identity_id': identity['id'], **extra})
+
+
 def suggest(client, lib, ids=None, source='bank', kind='anime', **settings):
     ids = ids or lib[source+'_ids'][1:3]
     response = client.post(f"/api/identity/{source}/{lib[source]}/suggest",
@@ -383,6 +390,148 @@ def test_tag_suggestions_do_not_write_captions_or_confirm_identities(client, lib
     assert response.get_json()['images'][0]['candidates'][0]['tag'] == 'aster_demo'
     assert IdentityAssignment.query.count() == 0
     assert BankImage.query.first().caption == 'Invented caption'
+
+
+@pytest.mark.parametrize('source', ['bank', 'dataset'])
+@pytest.mark.parametrize('kind', ['anime', 'person'])
+def test_bulk_unassign_preserves_other_names_and_undo_restores_examples(client, library, source, kind):
+    from app.services.identity_learning import filter_ids
+    identity, other = create(client, kind=kind), create(client, 'Nova', kind=kind)
+    ids = library[source+'_ids'][:2]
+    assert assign(client, library, identity, ids, source=source,
+                  regions={str(value): [0.05, 0.05, 0.4, 0.4] for value in ids}).status_code == 200
+    assert assign(client, library, other, ids[:1], source=source, learn=False,
+                  regions={str(ids[0]): [0.55, 0.55, 0.3, 0.3]}).status_code == 200
+    response = unassign(client, library, identity, ids, source=source)
+    assert response.status_code == 200, response.get_json()
+    assert response.get_json()['unassigned'] == 2
+    assert filter_ids(library['user'], source, library[source], identity['id']) == []
+    assert filter_ids(library['user'], source, library[source], other['id']) == ids[:1]
+    analyze(client, library, library[source+'_ids'][2:3], source=source, kind=kind)
+    assert suggest(client, library, library[source+'_ids'][2:3], source=source, kind=kind)['reference_identities'] == 0
+    restored = client.post('/api/identity/actions/'+response.get_json()['operation_id']+'/undo', json={})
+    assert restored.get_json() == {'restored': 2, 'skipped': 0}
+    assert filter_ids(library['user'], source, library[source], identity['id']) == ids
+    assert filter_ids(library['user'], source, library[source], other['id']) == ids[:1]
+    assert suggest(client, library, library[source+'_ids'][2:3], source=source, kind=kind)['reference_identities'] == 1
+
+
+@pytest.mark.parametrize('source', ['bank', 'dataset'])
+def test_bulk_unassign_refuses_stale_preview_without_clearing_other_images(client, library, source):
+    from app.services.identity_learning import filter_ids
+    identity = create(client)
+    ids = library[source+'_ids'][:2]
+    assign(client, library, identity, ids, source=source)
+    base = f"/api/identity/{source}/{library[source]}"
+    preview = client.post(base+'/view', json={'image_ids': ids}).get_json()
+    subject = preview['images'][0]['subjects'][0]
+    assert client.post('/api/identity/subjects/'+subject['id']+'/decision', json={
+        'identity_id': identity['id'], 'revision': subject['revision'], 'action': 'remove'}).status_code == 200
+    response = client.post(base+'/unassign', json={**preview, 'image_ids': ids, 'identity_id': identity['id']})
+    assert response.status_code == 409
+    assert filter_ids(library['user'], source, library[source], identity['id']) == ids[1:]
+
+
+def test_named_second_character_cannot_leave_a_whole_image_teaching_the_first(client, library):
+    first, second = create(client), create(client, 'Nova')
+    assert assign(client, library, first).status_code == 200
+    response = assign(client, library, second, learn=False,
+                      regions={str(library['bank_ids'][0]): [0.55, 0.55, 0.3, 0.3]})
+    assert response.status_code == 400
+    assert 'old whole-image name' in response.get_json()['error']
+    assert unassign(client, library, first, library['bank_ids'][:1]).status_code == 200
+    assert assign(client, library, second,
+                  regions={str(library['bank_ids'][0]): [0.55, 0.55, 0.3, 0.3]}).status_code == 200
+    assert assign(client, library, first).status_code == 400
+
+
+def test_confirming_a_second_character_requires_the_first_whole_image_to_be_cropped(client, library):
+    from app.models import IdentitySubject
+    first, second = create(client), create(client, 'Nova')
+    assign(client, library, first)
+    assign(client, library, second, library['bank_ids'][1:2])
+    base = f"/api/identity/bank/{library['bank']}"
+    preview = client.post(base+'/view', json={'image_ids': library['bank_ids'][:1]}).get_json()
+    result = client.post(base+'/analyze', json={**preview, 'image_ids': library['bank_ids'][:1],
+                                              'kind': 'anime',
+                                              'regions': {str(library['bank_ids'][0]): [0.5, 0.5, 0.4, 0.4]}})
+    subject = IdentitySubject.query.filter(IdentitySubject.region.isnot(None)).one()
+    assert result.status_code == 200
+    response = client.post('/api/identity/subjects/'+subject.id+'/decision', json={
+        'identity_id': second['id'], 'revision': subject.revision, 'action': 'confirm'})
+    assert response.status_code == 400
+    assert 'old whole-image name' in response.get_json()['error']
+
+
+@pytest.mark.parametrize('kind', ['anime', 'person'])
+@pytest.mark.parametrize('changed', [False, True])
+def test_names_saved_before_setup_are_bound_to_the_reviewed_pixels(client, library, monkeypatch, kind, changed):
+    from app.models import IdentityAssignment
+    from app.services import identity_inference
+    extract = identity_inference.extract
+
+    def unavailable(*args):
+        raise identity_inference.RecognitionUnavailable('Prepare the local recognition tool.')
+
+    monkeypatch.setattr(identity_inference, 'extract', unavailable)
+    identity = create(client, kind=kind)
+    result = assign(client, library, identity).get_json()
+    assert result['learning']['measured'] == 0
+    binding = IdentityAssignment.query.filter_by(identity_id=identity['id']).one().content_hash
+    assert len(binding) == 64
+    if changed:
+        Image.new('RGB', (128, 128), 'white').save(library['folder']/'image-01.png')
+    monkeypatch.setattr(identity_inference, 'extract', extract)
+    analyze(client, library, library['bank_ids'][:1], kind=kind)
+    analyze(client, library, kind=kind)
+    assert suggest(client, library, kind=kind)['reference_identities'] == (0 if changed else 1)
+    decision = IdentityAssignment.query.filter_by(identity_id=identity['id']).one()
+    assert decision.content_hash == binding
+    assert decision.learn is (not changed)
+
+
+def test_transferred_names_cannot_rebind_themselves_to_replaced_pixels(client, library):
+    from app.extensions import db
+    from app.models import BankImage
+    from app.services.identity_learning import filter_ids, restore_metadata
+    identity = create(client)
+    assign(client, library, identity)
+    snapshot = db.session.get(BankImage, library['bank_ids'][0]).identity_snapshot
+    Image.new('RGB', (128, 128), 'white').save(library['folder']/'image-01.png')
+    Image.new('RGB', (128, 128), 'white').save(library['destination']/'image-01.png')
+    restore_metadata(library['user'], 'dataset', library['dataset'], library['dataset_ids'][0], snapshot)
+    db.session.commit()
+    analyze(client, library, library['dataset_ids'][:1], source='dataset')
+    analyze(client, library, source='dataset')
+    assert filter_ids(library['user'], 'dataset', library['dataset'], identity['id']) == library['dataset_ids'][:1]
+    assert suggest(client, library, source='dataset')['reference_identities'] == 0
+
+
+def test_dictionary_metadata_obeys_the_same_one_mib_limit_as_serialized_metadata():
+    from app.services.identity_metadata import normalize
+    decisions = [{'identity': {'id': f'{index+1:032x}', 'name': f'Aster {index}', 'kind': 'anime',
+                               'aliases': [f'alias{n}'+'x'*90 for n in range(20)]},
+                  'state': 'confirmed', 'learn': False} for index in range(64)]
+    payload = {'version': 1, 'subjects': [
+        {'region': None, 'single_subject': False, 'assignments': decisions, 'evidence': []}
+        for _ in range(32)]}
+    with pytest.raises(ValueError, match='1 MiB'):
+        normalize(payload)
+
+
+def test_bulk_unassign_undo_restores_all_batches(client, library):
+    from app.services.identity_learning import filter_ids
+    identity = create(client)
+    ids = library['bank_ids'][:2]
+    assign(client, library, identity, ids)
+    first = unassign(client, library, identity, ids[:1]).get_json()
+    second = unassign(client, library, identity, ids[1:], operation_id=first['operation_id'])
+    assert second.status_code == 200
+    assert second.get_json()['operation_id'] == first['operation_id']
+    assert filter_ids(library['user'], 'bank', library['bank'], identity['id']) == []
+    restored = client.post('/api/identity/actions/'+first['operation_id']+'/undo', json={})
+    assert restored.get_json() == {'restored': 2, 'skipped': 0}
+    assert filter_ids(library['user'], 'bank', library['bank'], identity['id']) == ids
 
 
 def test_pixel_swap_invalidates_the_preview_before_any_name_is_written(client, library):
