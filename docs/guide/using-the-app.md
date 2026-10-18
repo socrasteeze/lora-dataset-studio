@@ -937,6 +937,7 @@ selections. Category filters still combine with Other Tags as separate requireme
 **Show More** reveals the next 100 matches without losing your selections.
 The list includes rare tags beyond the former 400-tag cutoff. Close the menu
 or change its search without clearing your selected filters.
+The tag vocabulary retries a failed read twice. If it remains unavailable, choose **Retry Tags** to load it again without changing your filters.
 
 ## Choosing where a bank pass runs
 

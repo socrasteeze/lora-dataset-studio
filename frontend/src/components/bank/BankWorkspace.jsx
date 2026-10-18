@@ -261,6 +261,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // The bank's WD14 tag vocabulary with counts, fetched on demand (never folded
   // into the 2 s payload poll — it only moves when the tag pass does).
   const [tagFacets, setTagFacets] = useState(null)
+  const [tagFacetError, setTagFacetError] = useState(false)
+  const [tagFacetRetry, setTagFacetRetry] = useState(0)
   // 🏷️ …and the SELECTION's tags, which need no click at all. `tagFreeze` is the
   // snapshot taken the instant a chip is ticked: applying a filter clears the
   // selection (setF does, and must — the ids no longer match what is on screen),
@@ -777,13 +779,20 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // paid over and over for an answer that only changes when the pass advances.
   const taggedCount = payload?.counts?.tagged || 0
   useEffect(() => {
-    if (!taggedCount) { setTagFacets(null); return }
+    if (!taggedCount) { setTagFacets(null); setTagFacetError(false); return }
     let alive = true
-    apiFetch(`/api/bank/${bankId}/tags/facets`)
-      .then((d) => { if (alive) setTagFacets(d) })
-      .catch(() => { /* transient — the next tagged-count change retries */ })
-    return () => { alive = false }
-  }, [bankId, taggedCount])
+    let retries = 0, timer
+    setTagFacetError(false)
+    const load = () => apiFetch(`/api/bank/${bankId}/tags/facets`, { background: true })
+      .then((d) => { if (alive) { setTagFacets(d); setTagFacetError(false) } })
+      .catch(() => {
+        if (!alive) return
+        if (retries < 2) { retries += 1; timer = setTimeout(load, 500 * retries) }
+        else setTagFacetError(true)
+      })
+    load()
+    return () => { alive = false; clearTimeout(timer) }
+  }, [bankId, taggedCount, tagFacetRetry])
 
   // Keep the coverage panel current: refetch when it opens, and whenever the kept
   // set or the framing classification changes (a keep/reject or the framing pass).
@@ -2212,6 +2221,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               isDrawer={!railIsColumnNow} onClose={closeRail}
               onBrowseStyles={() => setStyleBrowserOpen(true)}
               tagFiltersShown={tagFiltersShown} tagGroups={grouped}
+              tagFacetError={tagFacetError} retryTagFacets={() => setTagFacetRetry((value) => value + 1)}
               wd14Tags={filter.wd14Tags}
               toggleFacetTag={toggleFacetTag} selectFacetTags={selectFacetTags}
               clearWd14Tags={() => setF({ wd14Tags: [] })}

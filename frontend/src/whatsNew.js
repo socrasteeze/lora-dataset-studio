@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-18-bank-tag-recovery',
+    date: '2026-10-18',
+    title: 'Recover tag filters after a failed read',
+    blurb: 'Bank retries failed tag-vocabulary reads and offers Retry Tags if they still fail. Your current filters stay selected while the controls recover.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-18-undo-folder-group',
     date: '2026-10-18',
     title: 'Undo a wrong person group from the grouping dialog',
