@@ -17,7 +17,7 @@ The approved implementation is drafted in the isolated task worktree. Cloud qual
 - Metadata merges now invalidate old previews/undo, preserve current evidence, and stop conflicting imported names from teaching. Dataset payloads carry a revision token for graph and image-instance changes; identity filters refresh without clearing a still-valid grid during the read.
 
 ## Open
-1. Fork Gates for 3c03bac1a, run 39163879561: full Gates passed (10046 backend/tooling passed, 14 skipped), including both linters, frontend/build/startup and bundled Python. Run 39167509536 at 1877c9835 passed Bank/Settings, curation, 2 Bank identity states and the first 0-to-4 folder undo. Dataset now loaded its four cards with no script errors; the probe stopped because its unscoped Crop selector also matched tile buttons. The identity crop editor now has a named dialog and keyboard containment, and the probe scopes to it. Latest source/bundle and all 25 identity/undo states need a green exact-head run. Tag-read recovery has forced-failure checks; the original desktop timeout's exact cause remains unproven.
+1. Inspect the latest Fork Gates run for this task branch. The combined source/bundle through 1b23ecbfa adds import revision/merge safeguards after the last browser receipt. Head 54f30de86, run 39168714526, passed Bank/Settings, curation, all 20 identity/bulk-unassign/empty-grid-undo cases and all 5 folder-undo cases. Full Gates last passed at 3c03bac1a, run 39163879561 (10046 backend/tooling passed, 14 skipped). Current code still needs its complete exact-head qualification; never reuse the older full gate as current proof. Tag-read recovery has forced-failure checks; the original desktop timeout's exact cause remains unproven.
 2. Repair every introduced backend/frontend/browser failure; do not count unrun synthetic cases or the production build as passing behaviors.
 3. The operator chose a local accuracy set. Await its location/labels and explicit local-evaluation authorization; keep those images local and report wrong names, misses, abstentions and provenance.
 4. Carry forward upstream-port and physical-device/trainer gates from 5d32d6ceb:HANDOFF.md. Activation of the running checkout needs a separate stop/start.
@@ -42,6 +42,7 @@ The approved implementation is drafted in the isolated task worktree. Cloud qual
 
 ## Verify
 Local Ruff, ESLint (zero errors), production build, whitespace and publishable-file privacy scan passed. Outbound inventory is unchanged. Tests/probes have not run locally.
+The prior cloud run's optional private-name checks skipped because no external name list was configured. Live model/tool/device checks remain separate from synthetic cloud qualification.
 Cloud checkout only, with pinned dev/CPU Torch overlays and Node 24:
 
 ```powershell
