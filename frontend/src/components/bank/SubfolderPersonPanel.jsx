@@ -4,6 +4,27 @@ import {
   verdictTone,
 } from './folderPerson'
 
+export function FolderGroupRecovery({ entries, busy, onRevoke }) {
+  if (!entries?.length) return null
+  return (
+    <section aria-label="Folder Groups" className="space-y-2 rounded-md border border-sky-400/40 bg-sky-500/10 p-3 text-xs">
+      <h3 className="font-semibold text-content">Folder Groups</h3>
+      <p className="text-content-muted">These folders were marked as one person. Undo a group to include its images in face clustering again. Images and Keep/Reject stay unchanged.</p>
+      <ul className="space-y-2">
+        {entries.map((entry) => (
+          <li key={entry.subfolder} className="flex min-w-0 items-center gap-2">
+            <span className="min-w-0 flex-1 break-words text-content">{folderLabel(entry.subfolder)} · {entry.images} images</span>
+            <button type="button" disabled={busy} onClick={() => onRevoke(entry.subfolder)}
+              className="min-h-10 shrink-0 rounded-md border border-border px-3 py-2 font-semibold text-content hover:bg-surface-raised disabled:opacity-50">
+              ↩ Undo Group
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 /** 👤 "Single person here" — the folder-level person assertion, shown right under
  *  the Subfolder selector because that is where the user already IS when they
  *  think it: they picked the folder, they know whose it is.

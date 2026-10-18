@@ -18,6 +18,7 @@ const receipt = path.resolve(root, execFileSync('git', ['rev-parse', '--git-path
 let server, browser, url
 let output = '', complete = false, failure = null
 const outcomes = []
+const recoveryOutcomes = []
 try {
   const socket = createServer()
   await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen(0, '127.0.0.1', resolve) })
@@ -40,6 +41,33 @@ try {
   browser = await chromium.launch({ executablePath: findHeadlessShell(fs, path) })
   const before = await (await fetch(url+'/test/state')).json()
   for (const [width, height] of [[360, 800], [412, 915], [844, 390], [768, 1024], [1280, 800]]) {
+    const recoveryContext = await browser.newContext({ viewport: { width, height } })
+    const recoveryPage = await recoveryContext.newPage()
+    await recoveryPage.addInitScript((id) => localStorage.setItem('bankCurrentId', String(id)), ready.bank_id)
+    await recoveryPage.route((requestUrl) => requestUrl.pathname === '/api/capabilities', async (route) => {
+      const response = await route.fetch()
+      await route.fulfill({ response, json: { ...await response.json(), face_scoring: true } })
+    })
+    const marked = await recoveryContext.request.post(url+'/api/bank/'+ready.bank_id+'/folder-person',
+      { data: { subfolder: '' } })
+    assert.equal(marked.status(), 200)
+    await recoveryPage.goto(url+'/#/bank')
+    await recoveryPage.locator('[aria-controls="bank-passes-panel"]').click()
+    await recoveryPage.getByRole('button', { name: /Group by person/ }).click()
+    const grouping = recoveryPage.getByRole('dialog', { name: /Group by person/ })
+    await grouping.getByText(/— 0 image\(s\)/).waitFor()
+    const undoGroup = grouping.getByRole('button', { name: /Undo Group/ })
+    const undoBounds = await undoGroup.boundingBox()
+    assert.ok(undoBounds && undoBounds.height >= 39 && undoBounds.x >= 0 && undoBounds.x+undoBounds.width <= width+1)
+    const cleared = recoveryPage.waitForResponse((response) => response.url().includes('/folder-person?') && response.request().method() === 'DELETE')
+    await undoGroup.click()
+    const clearResponse = await cleared
+    assert.equal(clearResponse.status(), 200)
+    assert.equal((await clearResponse.json()).cleared, 4)
+    await grouping.getByText(/— 4 image\(s\)/).waitFor()
+    assert.deepEqual((await (await recoveryContext.request.get(url+'/api/bank/'+ready.bank_id+'/folder-persons')).json()).assertions, [])
+    recoveryOutcomes.push({ width, height, eligibleBefore: 0, eligibleAfter: 4, passed: true })
+    await recoveryContext.close()
     for (const source of ['bank', 'dataset']) {
       for (const kind of ['anime', 'person']) {
         assert.ok((await fetch(url+'/test/reset-identities', { method: 'POST' })).ok)
@@ -141,6 +169,7 @@ try {
   }
   assert.deepEqual(await (await fetch(url+'/test/state')).json(), before)
   assert.equal(outcomes.length, 20)
+  assert.equal(recoveryOutcomes.length, 5)
   complete = true
   console.log('Identity assignment, removal, Undo, matching and layout passed in 20 populated states.')
 } catch (error) {
@@ -150,7 +179,7 @@ try {
   fs.mkdirSync(receipt, { recursive: true })
   await writeFile(path.join(receipt, 'identities.json'), JSON.stringify({
     head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim(),
-    expected: 20, outcomes, skipped: [], complete, failure,
+    expected: 20, outcomes, recoveryExpected: 5, recoveryOutcomes, skipped: [], complete, failure,
   }, null, 2))
   await browser?.close()
   if (server && server.exitCode === null) {

@@ -11,6 +11,7 @@ export const CORE_GUIDE_ANCHORS = {
   ],
   "using-the-app": [
     "assign-identities",
+    "undo-a-folder-group",
     "the-character-walkthrough-reference-photo-trained-lora",
     "write-caption-txt",
     "review-training-duplicates",
