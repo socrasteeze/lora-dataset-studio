@@ -24,6 +24,8 @@ let server;
 let browser;
 let serverOutput = '';
 let serverUrl;
+let activePage;
+let activeErrors = [];
 
 async function run(command, args) {
   const child = spawn(command, args, { cwd: path.join(root, 'frontend'), windowsHide: true });
@@ -68,6 +70,8 @@ try {
     const context = await browser.newContext({ viewport: { width, height } });
     const page = await context.newPage();
     const errors = [];
+    activePage = page;
+    activeErrors = errors;
     page.on('pageerror', (error) => { errors.push(error.message); console.error(error.message); });
     await page.addInitScript((id) => localStorage.setItem('bankCurrentId', String(id)), ready.bank_id);
     // Hold the source check open. Saved images and metadata must render before
@@ -328,7 +332,13 @@ try {
   try {
     fs.mkdirSync(receipts, { recursive: true });
     await writeFile(path.join(receipts, 'other-tags.json'), JSON.stringify({ outcomes, settingsOutcomes,
-      failure: { name: error.name, message: error.message } }, null, 2));
+      failure: { name: error.name, message: error.message },
+      diagnostic: activePage && !activePage.isClosed() ? {
+        viewport: activePage.viewportSize(), errors: activeErrors,
+        headings: await activePage.locator('h1, h2').allTextContents(),
+        buttons: await activePage.getByRole('button').allTextContents(),
+        tagFilters: await activePage.locator('[aria-label="Tag filters"]').count(),
+      } : null }, null, 2));
   } catch (receiptError) {
     console.error('Could not save the browser failure receipt:', receiptError.message);
   }
