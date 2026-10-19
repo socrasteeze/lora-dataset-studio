@@ -1,27 +1,23 @@
 # HANDOFF
 
-**Updated:** 2026-10-18 | **Branch:** validation/identity-upstream | **Source base:** 5d32d6ceb | **Main base:** 5306f107f
+**Updated:** 2026-10-18 | **Branch:** main | **Qualified code:** 2673a79fa | **Prior main:** 5306f107f
 
 ## State
-The identity implementation qualified in cloud at be06ddbab26a32e5d4032201c8a19cfb4b5e0851. Seven upstream source ports now join it on validation/identity-upstream. Combined cloud qualification is pending. The operator authorized clean landing on origin/main and the Overwatch baseline update. The running checkout is unchanged. Activation is planned after qualification and an idle-state check, with a local metadata backup. Real recognition accuracy remains open.
+Named identities, folder-group recovery, Bank-tab recovery and seven upstream ports qualified at 2673a79faf05a5d01d1c85585585620be51a2bbf and landed on origin/main. LDS is active on that build; Overwatch renders 000 IN SYNC.
+This final receipt changes HANDOFF.md only. Application source and bundle remain identical to the qualified commit. Real recognition accuracy remains open.
 
 ## Done this session
-- Added identity records, per-subject references, corrections, rejected pairs, undo and shared filters in backend/app/services/identity_learning.py.
-- Added prepared CPU inference, category-aware tag suggestions, bounded portable metadata and explicit held-out evaluation.
-- Mounted shared controls in Bank and Dataset, added transfer/backup/ZIP/profile preservation, help and news.
-- Added backend regressions and a cloud-only browser probe over 20 populated surface/kind/viewport states.
-- Initial scope receipt: 88d17bb6a. The running checkout remains unchanged.
-- Scope amendment: show per-folder Undo Group in Group by person, so a wrong single-person declaration can be cleared without hunting through filters. Preserve images and review decisions; rerun clustering to compute replacement groups.
-- Added the required bulk Unassign Name action and a scope-level Undo Identity control that stays available when the identity filter empties the grid. Cloud cases removed two names and restored them from that empty state on both surfaces.
-- Bind every human label to its reviewed pixel hash, including before model setup. Analysis cannot turn a name from replaced pixels into an example. Crop corrections keep their existing region; whole-image anime learners cannot silently coexist with another named character crop.
-- Metadata merges now invalidate old previews/undo, preserve current evidence, and stop conflicting imported names from teaching. Dataset payloads carry a revision token for graph and image-instance changes; identity filters refresh without clearing a still-valid grid during the read.
-- Displayed subject previews now use the same reviewed pixel hash as assignment. Pixel replacement clears old crop/single-character choices and blocks learning until the new preview loads. The cloud probe replaces a synthetic image between review and Assign, expects 409, then checks fresh crop dimensions before retrying.
+- Committed the initial scope before execution: 88d17bb6a. Bank and Dataset share named identities, confirmed-example learning, filters and portable metadata through backend/app/services/identity_learning.py.
+- Added bulk Unassign Name and scope-level Undo Identity, including an empty filtered grid. Labels and previews bind to reviewed pixels; correction, replacement and metadata imports cannot silently teach stale evidence.
+- Group by person lists Folder Groups with Undo Group, including a bank with only one folder. No live declarations were revoked; images and Keep/Reject decisions were preserved.
+- PluginSlot uses bounded per-panel import recovery, preserves unsaved forms and shows a compact Reload Page control. Five normal Video-tab states and 15 failure/draft recovery states passed in cloud.
+- Reviewed 57 upstream commits, ported seven source changes, skipped 13 bundles and rejected 37 commits under the fork rules. Advanced the dashboard baseline only after qualified landing.
+- Stopped LDS while idle, verified one private metadata backup, switched the checkout and restarted with the same profile/bind/port. All 14 checked metadata tables, settings, credentials and the profile registry were preserved. Private checkpoint: .git/lds-activation-20261019.
 
 ## Open
-1. Complete exact-head cloud Gates, Studio/identity/Bank/Settings/curation browser checks and the Linux startup-port check. Then land the qualified branch on origin/main and advance only the reviewed LDS baseline in Overwatch. Preserve its unrelated existing config edits. As announced for the requested live Bank repair, activate only while idle: stop the dedicated supervisor/backend, back up local metadata, switch the checkout, then restart with the same profile, bind and port. Do not cancel active work.
-2. The operator chose a local accuracy set. Await its location/labels and explicit local-evaluation authorization; keep those images local and report wrong names, misses, abstentions and provenance. Similarity thresholds remain unmeasured heuristics.
-3. Carry forward physical-device/trainer gates from 5d32d6ceb:HANDOFF.md. The prior picked-image import and Qwen preset ports are included in the qualified identity source. The original desktop tag timeout's exact cause remains unproven; automatic and manual recovery passed forced-failure checks.
-4. Added operator report: Bank's Video tab shows an inline render fallback. Live browser access is unavailable; the server log has no matching backend exception. Await the first browser ErrorBoundary line. Prepared a concrete recovery repair: plugin imports have panel-specific reload limits, unsaved forms suppress automatic reload, and lane failures show Reload Page without squeezing Images. The enabled-Video cloud fixture checks five normal states and 15 transient/permanent/dirty-form cases, including the Images and recovery target sizes. Do not claim the live cause from the screenshot alone.
+1. The operator chose a local accuracy set. Await its location/labels and explicit local-evaluation authorization; keep those images local and report wrong names, misses, abstentions and provenance. Similarity thresholds remain unmeasured heuristics.
+2. Physical phone/PWA acceptance, installed-source trainer compatibility and real GPU/training comparisons remain operator checks. Opt-in live encoder/Ollama checks were not run. Synthetic cloud qualification does not close these gates.
+3. If the Bank tab error recurs, collect the first browser [ErrorBoundary] line. Live browser access was unavailable, and the server log had no matching exception. The original tab error and earlier desktop tag timeout have unconfirmed causes; automatic/manual recovery passed controlled failures. Do not infer a live cause from screenshots alone.
 
 ## Upstream review carried forward
 
@@ -40,7 +36,7 @@ On 2026-10-18, upstream's default branch remained v2 at d566904e40f80f3513b4f9f0
 | 3ad18cd67 | REJECT. The Docker updater is outside this fork's distribution. |
 | d4c9b3dbc | REJECT. Retain the fork version/channel and announce only adopted behavior. |
 
-Decision: retain the seven named source ports, then qualify and land them with the identity work. A later review starts after `d566904e4`. Do not merge upstream/v1 or upstream/v2. Advance Overwatch's full-SHA compare URL and review comment/subtitle only after the qualified fork landing.
+Decision: the seven named source ports qualified and landed with the identity work. A later review starts after `d566904e4`. Do not merge upstream/v1 or upstream/v2. Overwatch's full-SHA compare URL, review comment and subtitle now match this baseline; configuration validation and the rendered 000 IN SYNC row passed. Unrelated existing dashboard edits were preserved, and the dashboard was not restarted or committed.
 
 ## Decisions
 - Photographic people, anime assignment and original-character learning are required workstreams.
@@ -53,21 +49,20 @@ Decision: retain the seven named source ports, then qualify and land them with t
 - Scrubbed task-branch pushes may transport cloud validation; main needs passing Gates and landing authorization.
 
 ## Traps
-- Do not switch, rebuild or migrate the running checkout before cloud qualification and the idle-state/metadata-backup checks.
+- Do not switch or rebuild the running application checkout. Use an isolated worktree; a later activation needs qualification, an idle-state check and a metadata backup.
 - Isolate runtime paths and inherited profile identity before application imports, which can mutate schema/state.
 - Local tests, fixture-backed checks and probes remain unauthorized; selecting a future local corpus did not authorize a run. Static lint/build/privacy scans are permitted.
-- Bank clusters are disposable local numbers, not permanent identities.
-- Whole-image taggers cannot locate several characters; captions are not confirmed evidence.
+- Bank clusters are disposable local numbers, not permanent identities; captions and tags are not confirmed evidence.
+- Whole-image taggers cannot locate several characters. Multi-character enrollment needs a region; reviewed labels must never teach from replaced pixels.
 - Keep real images and names private; accuracy needs a permitted labeled set with unseen artwork held out.
 
 ## Verify
-Local Ruff, ESLint (zero errors), production build, whitespace and publishable-file privacy scan passed. Outbound inventory is unchanged. Tests/probes have not run locally.
-Run 39181130238 at 0a0cbd70b completed with 10083 backend/tooling tests passed, 15 skips and no backend failure. Linux startup (13 cases), all bundled Python suites, Bank/Settings (including 15 tab recovery states), curation (45 states), identity (20 states plus recovery) and Studio (10 states) passed. Core frontend found two integration errors: an assertion still expected the old prompt capitalization, and the server-restart news target used a workspace query instead of /settings/server. Both are corrected for the next exact-head run. Main and the running app remain unchanged.
-Combined run 39176250128 at 40a4c8ce0 passed Linux ports and the existing Bank/Settings, curation and identity browser cases. Backend: 10082 passed, one workflow-contract failure and 15 skips. Core frontend found one introduced guide ellipsis. The Studio probe used steps_list although the client sends steps. All three integration repairs are staged for the next exact-head cloud run. The Windows workflow guard still forbids replaying targeted pytest before its full suite; the independent Linux job covers platform-specific bind rules.
-Fork Gates run 39172784150 succeeded at be06ddbab26a32e5d4032201c8a19cfb4b5e0851. Its full Gates receipt reports Succeeded=true and zero exit codes for every step, including both linters, build, served plugin startup, core/bundled frontend, bundled Python and the full backend/tooling suite. Backend JUnit: 10063 passed, 14 skipped, zero errors/failures.
-The same exact-head browser receipts passed 20 identity cases, 5 folder-undo cases, stale-pixel/preview/crop recovery, Bank/Settings and curation checks. Folder Undo works even when the bank has only one folder, where the old Subfolder menu is hidden. No live declarations were changed.
-Receipts are retained under the worktree Git metadata in lds-gates-validation/cloud-39172784150. Run: https://github.com/socrasteeze/lora-dataset-studio/actions/runs/39172784150.
-The optional private-name checks skipped because no external name list was configured. Live model/tool/device checks remain separate from synthetic cloud qualification. Recognition accuracy has not been measured on real artwork.
+Fork Gates 39183822421 passed at 2673a79faf05a5d01d1c85585585620be51a2bbf. The receipt has Succeeded=true and zero exits for both linters, build, served plugin startup, core/bundled frontend, all bundled Python suites and the full backend/tooling suite. Backend JUnit: 10083 passed, 15 skipped, zero failures/errors. Linux startup: 13 passed, no skips.
+The exact-head browser receipts passed 20 identity cases, five folder-undo cases, stale-pixel/preview/crop recovery, five Bank cases, 55 Settings cases, five normal Video-tab cases, 15 tab-recovery cases, 45 curation cases and 10 Studio cases. Curation layout measured 15 states with zero findings/skips. The broader Bank layout probe measured 14 states with zero findings and six hidden-state skips; skipped states are not claimed as measured.
+Receipts: worktree Git metadata, lds-gates-validation/cloud-39183822421. Run: https://github.com/socrasteeze/lora-dataset-studio/actions/runs/39183822421.
+Post-push CI 39185814233 passed at the same qualified commit: lint, change-size gate, frontend tests/build and backend tests. Run: https://github.com/socrasteeze/lora-dataset-studio/actions/runs/39185814233.
+Local Ruff, ESLint (zero errors, 32 existing warnings), production build, whitespace, static privacy scans and Ghost policy checks passed. No software tests or responsive probes ran locally. The optional private-name tests skipped because no external name list was configured; other skips cover opt-in live/installed-source checks and platform/fork capabilities. Outbound inventory is unchanged.
+After activation, read-only operational checks verified a new healthy boot identity, the unchanged bind/port/profile, served entry/Video assets matching the qualified bundle, six identity tables and all 14 existing metadata fingerprints. Local settings/credentials/profile-registry hashes were unchanged. Real recognition accuracy has not been measured.
 Cloud checkout only, with pinned dev/CPU Torch overlays and Node 24:
 
 ```powershell
