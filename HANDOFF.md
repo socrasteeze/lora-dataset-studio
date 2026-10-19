@@ -1,22 +1,23 @@
 # HANDOFF
 
-**Updated:** 2026-10-19 | **Branch:** noble/scraper-main-integration | **Base:** deb460c3b
+**Updated:** 2026-10-19 | **Branch:** main | **Base:** deb460c3b
 
 ## State
-Scraper branch c053c7d72 is being integrated with main deb460c3b in an isolated worktree.
-Source conflicts are resolved. Static lint, build and privacy checks passed. Main delivery and the authorized restart remain pending; tests and CI stay off.
+Scraper branch c053c7d72 is merged into main through e8354e8b5, with rebuilt assets in bf0fedf2f.
+The app restarted successfully on the merged code. Static checks passed; tests and CI remain off, and full qualification is incomplete.
 
 ## Done this session
 - Combined Image Sources, source previews, header spacing, the Bank review viewport fix and Auto-Center with main's identity learning, Studio and aligned queue changes.
 - Preserved both route registrations, help entries and schema assertions; retained stable What's New identifiers in descending order.
-- Kept main's bundle in the source merge. Rebuild merged assets in a separate build(frontend) commit before activation.
+- Rebuilt merged assets in a separate build(frontend) commit, then fast-forwarded the running main checkout.
+- Backed up the active database and local settings under ignored Git storage before the controlled restart.
+- Verified a new healthy boot, the same profile and listener bind/port, matching served entry assets, unchanged settings hashes and unchanged row counts in all 44 existing metadata tables. The two Image Sources tables were added.
 
 ## Open
-1. Commit and push main with [skip ci], then restart through the existing app action and verify health and served assets.
-2. Tests, rendered behavior, live provider access and Auto-Center model accuracy remain unverified. Run only an explicitly requested scope. Earlier source-panel screenshots do not cover Auto-Center.
-3. The operator chose a local identity accuracy set. Await its location/labels and explicit evaluation authorization; keep images local. Report wrong names, misses, abstentions and provenance. Similarity thresholds remain unmeasured heuristics.
-4. Physical phone/PWA acceptance, installed-source trainer compatibility and real GPU/training comparisons remain operator gates. Opt-in live encoder/Ollama checks were not run.
-5. If the Bank tab error recurs, collect the first browser ErrorBoundary line. The original live tab error and earlier desktop tag timeout have unconfirmed causes.
+1. Tests, rendered behavior, live provider access and Auto-Center model accuracy remain unverified. Run only an explicitly requested scope. Earlier source-panel screenshots do not cover Auto-Center.
+2. The operator chose a local identity accuracy set. Await its location/labels and explicit evaluation authorization; keep images local. Report wrong names, misses, abstentions and provenance. Similarity thresholds remain unmeasured heuristics.
+3. Physical phone/PWA acceptance, installed-source trainer compatibility and real GPU/training comparisons remain operator gates. Opt-in live encoder/Ollama checks were not run.
+4. If the Bank tab error recurs, collect the first browser ErrorBoundary line. The original live tab error and earlier desktop tag timeout have unconfirmed causes.
 
 ## Decisions
 - Image Sources uses manual Scan, Load Previews, Download and Import Images actions. Opening a panel does not start network work.
@@ -35,7 +36,7 @@ Source conflicts are resolved. Static lint, build and privacy checks passed. Mai
 - Do not merge upstream branches. The upstream review below is carried forward unchanged.
 
 ## Verify
-Merged-tree Ruff passed. ESLint passed with zero errors and 32 existing warnings. Production build passed. Privacy scan covered 3072 text files with zero findings; attribution inspection has no unresolved findings. The reviewed outbound inventory is unchanged. Tests, model inference and rendered validation did not run. Activation remains pending. Historical receipts qualify only their recorded commits.
+Merged-tree Ruff passed. ESLint passed with zero errors and 32 existing warnings. Production build passed. Privacy scan covered 3072 text files with zero findings; attribution inspection has no unresolved findings. The reviewed outbound inventory is unchanged. Tests, model inference and rendered validation did not run. Read-only activation checks passed after the controlled restart; no model or provider work was started. Historical receipts qualify only their recorded commits.
 Prior identity/upstream qualification: 2673a79faf05a5d01d1c85585585620be51a2bbf, Fork Gates 39183822421 and post-push CI 39185814233. Queue run 39189043465 was cancelled before full Gates finished; no further tests were authorized.
 Scraper tip c053c7d72 had successful lint/build/privacy inspection, with 32 existing ESLint warnings. Auto-Center regression files were written but never run; no live model call or rendered check was made.
 Permitted commands (use the existing pinned interpreter from the primary checkout when this worktree has no .venv):
