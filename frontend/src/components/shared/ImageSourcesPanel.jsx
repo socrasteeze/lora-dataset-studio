@@ -37,6 +37,7 @@ export default function ImageSourcesPanel({ datasetId, banks = [], disabled = fa
   const [notice, setNotice] = useState('')
   const generation = useRef(0)
   const fetching = useRef(false)
+  const changing = useRef(false)
   const importedCallback = useRef(onImported)
   importedCallback.current = onImported
   const seen = useRef('')
@@ -50,7 +51,7 @@ export default function ImageSourcesPanel({ datasetId, banks = [], disabled = fa
   const fieldId = (field) => `image-source-${scope}-${field}`
 
   const refresh = useCallback(async () => {
-    if (fetching.current) return
+    if (fetching.current || changing.current) return
     fetching.current = true
     const version = generation.current
     try {
@@ -113,17 +114,33 @@ export default function ImageSourcesPanel({ datasetId, banks = [], disabled = fa
   useEffect(() => { setCredentials(emptyCredentials()) }, [credentialSource])
 
   async function perform(action) {
+    generation.current += 1
+    changing.current = true
     setBusy(true); setError(''); setNotice('')
     try {
       await action()
+      changing.current = false
       await refresh()
     } catch (failure) { setError(failure.message) }
-    finally { setBusy(false) }
+    finally { changing.current = false; setBusy(false) }
   }
 
-  const select = (ids, selected, all = false) => perform(async () => {
-    await postJson(`/api/image-sources/jobs/${jobId}/selection`, { ids, selected, all })
-  })
+  const select = (ids, selected, all = false) => {
+    const previous = job
+    const affected = new Set(ids)
+    setJob((current) => {
+      if (!current) return current
+      const delta = current.items.filter((item) => affected.has(item.id) && item.selected !== selected).length
+      return { ...current,
+        selected_count: all ? (selected ? current.count : 0) : current.selected_count + (selected ? delta : -delta),
+        items: current.items.map((item) => all || affected.has(item.id) ? { ...item, selected } : item),
+      }
+    })
+    return perform(async () => {
+      try { await postJson(`/api/image-sources/jobs/${jobId}/selection`, { ids, selected, all }) }
+      catch (failure) { setJob(previous); throw failure }
+    })
+  }
   const run = (action) => perform(async () => {
     await postJson(`/api/image-sources/jobs/${jobId}/${action}`, {})
   })
