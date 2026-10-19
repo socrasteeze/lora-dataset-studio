@@ -87,6 +87,14 @@ export default function BankQueuePanel({ queue, nameOf, onCancel, onRetry, onCle
                 <span data-queue-cell="status" className={`${STATUS} bg-surface-raised text-content-muted`}>Waiting</span>
               )}
             </span>
+            {/* Keep the top-row control before the detail-row Retry in tab order. */}
+            <button type="button" onClick={() => onCancel(it.bank_id)}
+              aria-label={it.state === 'running'
+                ? `Stop ${nameOf(it.bank_id)} and remove it from queue`
+                : `Remove ${nameOf(it.bank_id)} from queue`}
+              data-queue-cell="control" className={`${CONTROL} text-content-subtle group-hover:text-content hover:text-rose-300 focus-visible:text-rose-300`}>
+              ✕
+            </button>
             {/* Which machine, and why it hasn't started. The snapshot has
                   published both all along and this panel dropped them: twelve
                   banks queued to a peer looked byte-identical to twelve local
@@ -112,15 +120,6 @@ export default function BankQueuePanel({ queue, nameOf, onCancel, onRetry, onCle
                 aria-label={`Retry ${nameOf(it.bank_id)}`}
                 className={`${ACTION} flex-none border-indigo-400/50 text-indigo-200`}>Retry</button>}
             </span>}
-            {/* A small glyph in a finger-sized box: 40 px below lg, compact on
-                a desktop. */}
-            <button type="button" onClick={() => onCancel(it.bank_id)}
-              aria-label={it.state === 'running'
-                ? `Stop ${nameOf(it.bank_id)} and remove it from queue`
-                : `Remove ${nameOf(it.bank_id)} from queue`}
-              data-queue-cell="control" className={`${CONTROL} text-content-subtle group-hover:text-content hover:text-rose-300 focus-visible:text-rose-300`}>
-              ✕
-            </button>
           </li>
         ))}
       </ol>
