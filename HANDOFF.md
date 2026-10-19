@@ -3,7 +3,7 @@
 **Updated:** 2026-10-18 | **Branch:** validation/identity-upstream | **Source base:** 5d32d6ceb | **Main base:** 5306f107f
 
 ## State
-The identity implementation qualified in cloud at be06ddbab26a32e5d4032201c8a19cfb4b5e0851. Seven upstream source ports now join it on validation/identity-upstream. Combined cloud qualification is pending. The operator authorized clean landing on origin/main and the Overwatch baseline update. The running checkout is unchanged. Activation and real recognition accuracy remain open.
+The identity implementation qualified in cloud at be06ddbab26a32e5d4032201c8a19cfb4b5e0851. Seven upstream source ports now join it on validation/identity-upstream. Combined cloud qualification is pending. The operator authorized clean landing on origin/main and the Overwatch baseline update. The running checkout is unchanged. Activation is planned after qualification and an idle-state check, with a local metadata backup. Real recognition accuracy remains open.
 
 ## Done this session
 - Added identity records, per-subject references, corrections, rejected pairs, undo and shared filters in backend/app/services/identity_learning.py.
@@ -18,7 +18,7 @@ The identity implementation qualified in cloud at be06ddbab26a32e5d4032201c8a19c
 - Displayed subject previews now use the same reviewed pixel hash as assignment. Pixel replacement clears old crop/single-character choices and blocks learning until the new preview loads. The cloud probe replaces a synthetic image between review and Assign, expects 409, then checks fresh crop dimensions before retrying.
 
 ## Open
-1. Complete exact-head cloud Gates, Studio/identity/Bank/Settings/curation browser checks and the Linux startup-port check. Then land the qualified branch on origin/main and advance only the reviewed LDS baseline in Overwatch. Preserve its unrelated existing config edits. Runtime activation still needs explicit authorization before updating or restarting the running checkout.
+1. Complete exact-head cloud Gates, Studio/identity/Bank/Settings/curation browser checks and the Linux startup-port check. Then land the qualified branch on origin/main and advance only the reviewed LDS baseline in Overwatch. Preserve its unrelated existing config edits. As announced for the requested live Bank repair, activate only while idle: stop the dedicated supervisor/backend, back up local metadata, switch the checkout, then restart with the same profile, bind and port. Do not cancel active work.
 2. The operator chose a local accuracy set. Await its location/labels and explicit local-evaluation authorization; keep those images local and report wrong names, misses, abstentions and provenance. Similarity thresholds remain unmeasured heuristics.
 3. Carry forward physical-device/trainer gates from 5d32d6ceb:HANDOFF.md. The prior picked-image import and Qwen preset ports are included in the qualified identity source. The original desktop tag timeout's exact cause remains unproven; automatic and manual recovery passed forced-failure checks.
 4. Added operator report: Bank's Video tab shows an inline render fallback. Live browser access is unavailable; the server log has no matching backend exception. Await the first browser ErrorBoundary line. Prepared a concrete recovery repair: plugin imports have panel-specific reload limits, unsaved forms suppress automatic reload, and lane failures show Reload Page without squeezing Images. The enabled-Video cloud fixture checks five normal states and 15 transient/permanent/dirty-form cases, including the Images and recovery target sizes. Do not claim the live cause from the screenshot alone.
@@ -53,7 +53,7 @@ Decision: retain the seven named source ports, then qualify and land them with t
 - Scrubbed task-branch pushes may transport cloud validation; main needs passing Gates and landing authorization.
 
 ## Traps
-- Do not switch, rebuild or migrate the running checkout; retain its unresolved activation gate.
+- Do not switch, rebuild or migrate the running checkout before cloud qualification and the idle-state/metadata-backup checks.
 - Isolate runtime paths and inherited profile identity before application imports, which can mutate schema/state.
 - Local tests, fixture-backed checks and probes remain unauthorized; selecting a future local corpus did not authorize a run. Static lint/build/privacy scans are permitted.
 - Bank clusters are disposable local numbers, not permanent identities.
@@ -62,6 +62,7 @@ Decision: retain the seven named source ports, then qualify and land them with t
 
 ## Verify
 Local Ruff, ESLint (zero errors), production build, whitespace and publishable-file privacy scan passed. Outbound inventory is unchanged. Tests/probes have not run locally.
+Run 39181130238 at 0a0cbd70b completed with 10083 backend/tooling tests passed, 15 skips and no backend failure. Linux startup (13 cases), all bundled Python suites, Bank/Settings (including 15 tab recovery states), curation (45 states), identity (20 states plus recovery) and Studio (10 states) passed. Core frontend found two integration errors: an assertion still expected the old prompt capitalization, and the server-restart news target used a workspace query instead of /settings/server. Both are corrected for the next exact-head run. Main and the running app remain unchanged.
 Combined run 39176250128 at 40a4c8ce0 passed Linux ports and the existing Bank/Settings, curation and identity browser cases. Backend: 10082 passed, one workflow-contract failure and 15 skips. Core frontend found one introduced guide ellipsis. The Studio probe used steps_list although the client sends steps. All three integration repairs are staged for the next exact-head cloud run. The Windows workflow guard still forbids replaying targeted pytest before its full suite; the independent Linux job covers platform-specific bind rules.
 Fork Gates run 39172784150 succeeded at be06ddbab26a32e5d4032201c8a19cfb4b5e0851. Its full Gates receipt reports Succeeded=true and zero exit codes for every step, including both linters, build, served plugin startup, core/bundled frontend, bundled Python and the full backend/tooling suite. Backend JUnit: 10063 passed, 14 skipped, zero errors/failures.
 The same exact-head browser receipts passed 20 identity cases, 5 folder-undo cases, stale-pixel/preview/crop recovery, Bank/Settings and curation checks. Folder Undo works even when the bank has only one folder, where the old Subfolder menu is hidden. No live declarations were changed.

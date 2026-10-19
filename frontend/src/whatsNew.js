@@ -88,7 +88,7 @@ export const WHATS_NEW = [
     id: '2026-10-18-z-server-restart', date: '2026-10-18',
     title: 'Reconnect after a server restart',
     blurb: 'LDS waits for the restarted server before reconnecting. Fixed ports stay fixed, and Linux restarts reuse ports left by closed connections.',
-    to: '/settings?section=server',
+    to: '/settings/server',
   },
   {
     id: '2026-10-18-z-plugin-tab-recovery', date: '2026-10-18',
