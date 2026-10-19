@@ -144,7 +144,7 @@ export default function ImageSourcesPanel({ datasetId, banks = [], disabled = fa
         </div>}
         <div className="grid min-w-0 gap-3 lg:grid-cols-2">
           <label htmlFor={fieldId('provider')} className="min-w-0 space-y-1 text-xs">Search Preset
-            <Select id={fieldId('provider')} value={provider} disabled={busy}
+            <Select id={fieldId('provider')} aria-label="Search Preset" value={provider} disabled={busy}
               onChange={(event) => setProvider(event.target.value)} className="min-h-10 w-full text-base lg:text-sm">
               <option value="">Any Source URL</option>
               {Object.entries(SOURCE_NAMES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
@@ -163,20 +163,20 @@ export default function ImageSourcesPanel({ datasetId, banks = [], disabled = fa
               onChange={(event) => setLimit(event.target.value)} className="min-h-10 w-full text-base lg:text-sm" />
           </label>
           <label htmlFor={fieldId('engine')} className="min-w-0 space-y-1 text-xs">Downloader
-            <Select id={fieldId('engine')} value={engine} disabled={busy}
+            <Select id={fieldId('engine')} aria-label="Downloader" value={engine} disabled={busy}
               onChange={(event) => setEngine(event.target.value)} className="min-h-10 w-full text-base lg:text-sm">
               <option value="auto">Auto</option><option value="gallery-dl">gallery-dl</option><option value="yt-dlp">yt-dlp</option>
             </Select>
           </label>
           <label htmlFor={fieldId('media')} className="min-w-0 space-y-1 text-xs">Select Media
-            <Select id={fieldId('media')} value={media} disabled={busy}
+            <Select id={fieldId('media')} aria-label="Select Media" value={media} disabled={busy}
               onChange={(event) => setMedia(event.target.value)} className="min-h-10 w-full text-base lg:text-sm">
               <option value="images">Images And ZIPs</option><option value="videos">Videos</option><option value="all">All Media</option>
             </Select>
           </label>
           {!datasetId && <>
             <label htmlFor={fieldId('bank')} className="min-w-0 space-y-1 text-xs">Destination
-              <Select id={fieldId('bank')} value={target} disabled={busy}
+              <Select id={fieldId('bank')} aria-label="Destination" value={target} disabled={busy}
                 onChange={(event) => setTarget(event.target.value)} className="min-h-10 w-full text-base lg:text-sm">
                 <option value="">New Bank</option>
                 {banks.map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
@@ -234,7 +234,7 @@ export default function ImageSourcesPanel({ datasetId, banks = [], disabled = fa
             setJobId(created.id); setJob(null); setOffset(0); setFilter('')
           })}>Scan</button>
         {jobs.length > 0 && <label htmlFor={fieldId('jobs')} className="block min-w-0 space-y-1 text-xs">Jobs
-          <Select id={fieldId('jobs')} className="min-h-10 w-full text-base lg:text-sm" value={jobId}
+          <Select id={fieldId('jobs')} aria-label="Jobs" className="min-h-10 w-full text-base lg:text-sm" value={jobId}
             onChange={(event) => { setJobId(event.target.value); setJob(null); setOffset(0) }}>
             {jobs.map((entry) => <option key={entry.id} value={entry.id}>{sourceName(entry.provider)} · {entry.name} · {jobLabel(entry)}</option>)}
           </Select>
