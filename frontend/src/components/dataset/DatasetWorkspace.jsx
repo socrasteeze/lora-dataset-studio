@@ -1092,68 +1092,72 @@ export default function DatasetWorkspace({ ds, onBack }) {
        * relative z-30: the header is a flex item; without its own stacking context, the More
        * menu's z-20 would remain trapped below later siblings.
        */}
-      <div data-probe-chrome="header" className="relative z-30 flex items-center gap-x-2 gap-y-1 flex-wrap">
+      <div data-probe-chrome="header" className="relative z-30 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
         {/* One control height across the header: back, trigger chip, Export, More. */}
-        <button type="button" onClick={onBack}
-          className={`${btnShape()} border border-border bg-surface text-content-muted hover:text-content hover:bg-surface-raised`}>
-          <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Datasets
-        </button>
-        <h1 className="min-w-0 break-words text-xl font-semibold text-content">{d.name}</h1>
-        {isStyle ? (
-          <span title="This Style LoRA is always active when loaded; adjust its LoRA weight to control the effect."
-            className={`${controlHeight()} inline-flex items-center gap-1 px-2 rounded-md border border-cyan-400/40 bg-cyan-500/10 text-cyan-200 text-2xs`}>
-            always-on style · no trigger
-          </span>
-        ) : (
-          <button type="button"
-            onClick={async () => { const res = await copyText(d.trigger_word || ''); if (!res.ok) toast.error(`Could not copy the trigger word — ${res.reason}.`); }}
-            title="Copy the trigger word (to put in your prompts)"
-            className={`${controlHeight()} inline-flex items-center gap-1 px-2 rounded-md border border-indigo-400/40 bg-indigo-500/10 text-2xs lg:text-sm`}>
-            <span className="text-content-subtle">trigger:</span>
-            <code className="text-indigo-300 font-semibold">{d.trigger_word || '—'}</code>
-            <Copy aria-hidden="true" className="h-3 w-3 text-content-subtle" />
+        <div className="flex min-w-0 items-center gap-2 sm:max-w-[50%]">
+          <button type="button" onClick={onBack}
+            className={`${btnShape({ noShrink: true })} border border-border bg-surface text-content-muted hover:text-content hover:bg-surface-raised`}>
+            <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Datasets
           </button>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          <button type="button" disabled={!kept} onClick={exportZipGuarded}
-            className={btnClass({ variant: 'primary' })}>
-            <Download aria-hidden="true" className="h-4 w-4" />Export ZIP ({kept})
-          </button>
-          {/*
-           * display:flex removes the native summary marker; items stay mounted because details
-           * only hides their display.
-           */}
-          <details className="relative">
-            <summary
-              title="More dataset actions — edit settings, body fidelity"
-              className={`${btnShape()} border border-border bg-surface text-content-muted hover:text-content hover:bg-surface-raised cursor-pointer select-none`}>
-              ⋯ More
-            </summary>
-            <div data-probe-chrome="more-menu" data-probe-panel="more-menu"
-              className="absolute right-0 top-full mt-1 z-20 w-72 rounded-lg border border-border bg-surface-overlay shadow-xl p-1.5 flex flex-col gap-0.5">
-              <button type="button" onClick={() => setSettingsOpen(true)}
-                title={isStyle ? 'Edit the Style dataset name and review its always-on behavior.' : 'Edit the dataset name, trigger word, and (for concept datasets) the concept description that drives the caption avoid-list.'}
-                className={MENU_ITEM}>
-                <Settings aria-hidden="true" className="h-4 w-4" /> Edit settings
-                <span className="ml-auto text-content-subtle text-2xs">
-                  {isStyle ? 'name · always-on' : `name · trigger${isConcept ? ' · concept' : ''}`}
-                </span>
-              </button>
-              {!isConceptual && (
-                <button type="button" disabled={ds.busy}
-                  onClick={() => ds.setDatasetFidelity?.(bodyFid ? 'face' : 'body')}
-                  title={bodyFid
-                    ? 'Body fidelity ON: captions also omit tattoos/scars/marks (they bind to the trigger), composition targets more bust/body shots, imports keep the full frame by default. Click to go back to face-only.'
-                    : 'Face-only fidelity (default): the LoRA learns the face; body shape follows the prompt. Click for FULL-BODY fidelity (body shape & marks bind to the trigger too).'}
-                  className={`${MENU_ITEM} ${bodyFid ? 'text-emerald-300' : ''}`}>
-                  <PersonStanding aria-hidden="true" className="h-4 w-4" /> Body fidelity
-                  <span className={`ml-auto text-2xs ${bodyFid ? 'text-emerald-300 font-semibold' : 'text-content-subtle'}`}>
-                    {bodyFid ? '✓ on' : 'off'}
+          <h1 className="min-w-0 break-words text-xl font-semibold text-content">{d.name}</h1>
+        </div>
+        <div className="flex min-w-0 flex-col gap-2 sm:ml-auto sm:min-w-[22rem] sm:flex-1 sm:flex-row sm:items-center">
+          {isStyle ? (
+            <span title="This Style LoRA is always active when loaded; adjust its LoRA weight to control the effect."
+              className={`${controlHeight()} min-w-0 max-w-full inline-flex items-center gap-1 px-2 rounded-md border border-cyan-400/40 bg-cyan-500/10 text-cyan-200 text-2xs sm:flex-1 lg:max-w-sm`}>
+              always-on style · no trigger
+            </span>
+          ) : (
+            <button type="button"
+              onClick={async () => { const res = await copyText(d.trigger_word || ''); if (!res.ok) toast.error(`Could not copy the trigger word — ${res.reason}.`); }}
+              title="Copy the trigger word (to put in your prompts)"
+              className={`${controlHeight()} min-w-0 max-w-full inline-flex items-center gap-1 px-2 rounded-md border border-indigo-400/40 bg-indigo-500/10 text-2xs lg:text-sm sm:flex-1 lg:max-w-sm`}>
+              <span className="shrink-0 text-content-subtle">trigger:</span>
+              <code title={d.trigger_word || undefined} className="min-w-0 truncate text-indigo-300 font-semibold">{d.trigger_word || '—'}</code>
+              <Copy aria-hidden="true" className="h-3 w-3 shrink-0 text-content-subtle" />
+            </button>
+          )}
+          <div className="grid grid-cols-2 gap-2 sm:ml-auto sm:flex sm:shrink-0 sm:items-center">
+            <button type="button" disabled={!kept} onClick={exportZipGuarded}
+              className={btnClass({ variant: 'primary' })}>
+              <Download aria-hidden="true" className="h-4 w-4" />Export ZIP ({kept})
+            </button>
+            {/*
+             * display:flex removes the native summary marker; items stay mounted because details
+             * only hides their display.
+             */}
+            <details className="relative">
+              <summary
+                title="More dataset actions — edit settings, body fidelity"
+                className={`${btnShape()} w-full border border-border bg-surface text-content-muted hover:text-content hover:bg-surface-raised cursor-pointer select-none sm:w-auto`}>
+                ⋯ More
+              </summary>
+              <div data-probe-chrome="more-menu" data-probe-panel="more-menu"
+                className="absolute right-0 top-full mt-1 z-20 w-72 rounded-lg border border-border bg-surface-overlay shadow-xl p-1.5 flex flex-col gap-0.5">
+                <button type="button" onClick={() => setSettingsOpen(true)}
+                  title={isStyle ? 'Edit the Style dataset name and review its always-on behavior.' : 'Edit the dataset name, trigger word, and (for concept datasets) the concept description that drives the caption avoid-list.'}
+                  className={MENU_ITEM}>
+                  <Settings aria-hidden="true" className="h-4 w-4" /> Edit settings
+                  <span className="ml-auto text-content-subtle text-2xs">
+                    {isStyle ? 'name · always-on' : `name · trigger${isConcept ? ' · concept' : ''}`}
                   </span>
                 </button>
-              )}
-            </div>
-          </details>
+                {!isConceptual && (
+                  <button type="button" disabled={ds.busy}
+                    onClick={() => ds.setDatasetFidelity?.(bodyFid ? 'face' : 'body')}
+                    title={bodyFid
+                      ? 'Body fidelity ON: captions also omit tattoos/scars/marks (they bind to the trigger), composition targets more bust/body shots, imports keep the full frame by default. Click to go back to face-only.'
+                      : 'Face-only fidelity (default): the LoRA learns the face; body shape follows the prompt. Click for FULL-BODY fidelity (body shape & marks bind to the trigger too).'}
+                    className={`${MENU_ITEM} ${bodyFid ? 'text-emerald-300' : ''}`}>
+                    <PersonStanding aria-hidden="true" className="h-4 w-4" /> Body fidelity
+                    <span className={`ml-auto text-2xs ${bodyFid ? 'text-emerald-300 font-semibold' : 'text-content-subtle'}`}>
+                      {bodyFid ? '✓ on' : 'off'}
+                    </span>
+                  </button>
+                )}
+              </div>
+            </details>
+          </div>
         </div>
       </div>
 

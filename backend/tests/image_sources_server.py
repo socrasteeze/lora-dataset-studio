@@ -83,7 +83,8 @@ def main():
     patch.setattr(capabilities, 'probe_image_source_deps', lambda: {'ok': True})
     with app.app_context():
         setup_state.complete_core()
-        dataset = FaceDataset(user_id=LOCAL_USER, name='Demo', trigger_word='demo', kind='concept')
+        dataset = FaceDataset(user_id=LOCAL_USER, name='Demo Dataset',
+                              trigger_word='demo_subject_(example_collection)', kind='concept')
         db.session.add(dataset)
         db.session.commit()
         dataset_id = dataset.id

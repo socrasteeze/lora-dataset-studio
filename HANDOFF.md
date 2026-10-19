@@ -8,7 +8,8 @@ yt-dlp and a configured host folder for operator-owned GDLOPS extractors.
 Frontend cloud qualification passed on source and bundle commit
 `d037bba2b5a0f9ff7758810d98420cd6c59f14f0`. The following handoff update changes
 documentation only. Backend behavior and live provider access remain unverified.
-Main and the running checkout remain unchanged.
+Main and the running checkout remain unchanged. The follow-up mobile header
+spacing fix is implemented but awaits its own cloud frontend qualification.
 
 ## Done this session
 - Added named/generic gallery-dl and yt-dlp resolution, nested media windows, local extractor loading, durable jobs and explicit restart recovery.
@@ -21,6 +22,7 @@ Main and the running checkout remain unchanged.
 - Kept action positions fixed during active jobs. The source probe holds synthetic downloads open to measure busy layouts and requires an accepted import response.
 - Completed cloud run 39184077483 on the exact source and bundle above. All source, Bank and curation browser checks passed. Frontend Node suites reported 6306 passed, 4 skipped and zero failures.
 - Updated Guide, fork policy and outbound inventory. Backend source lint and the frontend build pass. ESLint has no errors and 32 existing warnings.
+- Follow-up: stacked the active profile below the app title, grouped dataset identity and actions, gave phone actions equal widths, and bounded long trigger words. Added cloud checks for header spacing, long text and More-menu stability. New rendered results are pending.
 
 ## Open
 1. Backend tests are disabled by direct operator order on 2026-10-18, until explicitly re-enabled. Do not run or dispatch them, including backend-bearing Quick/Gates phases. Static lint is permitted. This branch is not qualified to land on main.

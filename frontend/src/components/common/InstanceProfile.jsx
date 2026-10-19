@@ -11,5 +11,5 @@ export default function InstanceProfile() {
     return () => { live = false }
   }, [])
   return <span aria-label="Active Profile" title={name}
-    className="block min-h-4 max-w-48 truncate text-xs font-normal text-content-muted">{name}</span>
+    className="block min-h-4 max-w-full truncate text-xs font-normal text-content-muted">{name}</span>
 }
