@@ -5,11 +5,15 @@ This fork uses local tools and private-network API targets. Image Sources is an 
 ## Image Source Credentials
 
 Open **Image Sources > Credentials** on the Bank list or in Dataset imports.
-Enter its URL or choose a search preset before saving. Credentials follow the
-URL's source, even when a different search preset is selected. Username,
+For a saved job, credentials follow that job's source. With New Scan open,
+enter a URL or choose a search preset; the URL takes priority. The source label
+identifies which credentials will change. Username,
 Password, API Key, User ID, Cookies and OAuth token fields apply only to that
 source. Fields remain blank after save; the API never returns saved values.
-Saving empty fields clears that source's values.
+Blank fields preserve saved values. Enter only the values you want to update.
+Use **Clear Credentials**, then **Confirm Clear**, to remove all credentials
+for the displayed source. **Discard Draft** clears unsaved edits only.
+Save or discard credential edits before changing the source or switching jobs.
 Cookies use `name=value; name=value` format. The application does not read a
 browser profile or import browser cookies on its own.
 
@@ -29,11 +33,12 @@ and the local media tool. It does not install or replace a GPU runtime.
 
 ## Image Source Extractors
 
-Open **Image Sources > Extractor Settings** on either surface. **Extractor
+Open **Image Sources > New Scan > Advanced > Extractor Settings** on either surface. **Extractor
 Folder** stores `image_sources.extractors_dir` in the host configuration. Choose
 a directory with 1-200 Python extractor modules. Use **Browse** to navigate
 host drives from any client, or type its host path. **Save Folder** validates
-the directory. A failed save preserves the typed path. Clear and save the field
+the directory. A failed save preserves the typed path. **Reset Folder** discards
+the unsaved path. Clear and save the field
 to use only built-in extractors. Stop all queued and running source jobs before
 changing this shared folder.
 

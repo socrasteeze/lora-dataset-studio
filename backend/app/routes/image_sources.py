@@ -128,6 +128,8 @@ def action(job_id, action):
     app = current_app._get_current_object()
     if action == 'stop':
         service.stop(app, job)
+    elif action == 'previews':
+        service.launch(app, job, action, preview_ids=_body().get('ids'))
     else:
         service.launch(app, job, job.phase if action == 'resume' else action)
     return jsonify({'ok': True}), 202
@@ -177,4 +179,7 @@ def file(job_id, asset_id):
     path = service.local_path(job, asset)
     if path is None or not path.is_file():
         return jsonify({'error': 'Download this original first.'}), 404
-    return send_file(path, as_attachment=True, download_name=f'original-{asset.id}{path.suffix}')
+    inline = request.args.get('inline') == '1'
+    if inline and asset.kind != 'image':
+        raise ValueError('Only downloaded images can open in the image viewer.')
+    return send_file(path, as_attachment=not inline, download_name=f'original-{asset.id}{path.suffix}')

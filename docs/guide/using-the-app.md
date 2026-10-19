@@ -3,6 +3,9 @@
 ## Image Sources
 
 Open **Image Sources** on the Bank list or in a Dataset's import section.
+Use **New Scan** to create a job, or choose a saved job from **Jobs**.
+Each **Current Job** shows its saved source and import destination. Changes in
+New Scan apply only to the next job; they do not redirect an existing import.
 Install the optional source packages with **Install Sources** if required. The
 same **Source Downloaders** action is available in Setup. Paste a public source
 URL. Named gallery-dl and yt-dlp extractors, nested albums, thread boards and
@@ -16,7 +19,7 @@ support. **Downloader** defaults to Auto; it can select gallery-dl or yt-dlp.
 **Select Media** defaults to images and ZIPs. Choose Videos or All Media to
 select those results by default. You can also select individual result cards.
 
-**Extractor Settings** can load your GDLOPS custom modules from a host folder.
+**New Scan > Advanced > Extractor Settings** can load your GDLOPS custom modules from a host folder.
 Use the shared folder browser or type the host path, then select **Save Folder**.
 Only trusted local Python modules belong there. The folder stays on the host
 and applies to both Bank and Dataset. GDLOPS private code is not bundled. See
@@ -24,21 +27,32 @@ and applies to both Bank and Dataset. GDLOPS private code is not bundled. See
 
 1. Choose a destination. Bank can use a new named Bank or an existing Bank.
 2. Select **Scan**. The default limit is 200 media entries; each pass permits 1-1000.
-3. Use **Load Previews** to cache previews for the first 24 selected items.
+3. Use **Load Previews** to cache image previews for the visible page, up to 24 items. This does not change selection.
 4. Use **Clear All**, a results filter, and **Select Page** to narrow a selection.
 5. Select **Download** to fetch the selected originals.
 6. Select **Import Images** to add compatible verified images for review.
 
-Filters change the view. Actions use selected items across all result pages.
+Filters change the view. Download and Import Images use selected items across all result pages.
+Load Previews uses the visible page, including images that are not selected.
+The highlighted action and the next-step message guide the job through preview,
+download and import. Import Images is available when selected downloaded images
+remain to import. Advanced holds the scan limit, downloader and media options.
 Previews never substitute for originals. A source without preview metadata
 shows **No Preview** until its image downloads. The results grid displays 24
 items at a time. The saved job list retains the latest 30 jobs in the interface.
+Click an image to open the shared image viewer. Use pinch, wheel or double-tap
+to zoom, and the arrows to move through available images on the current page.
+The viewer shows the cached original after download; otherwise it shows a
+thumbnail and identifies it as such. The selection checkbox stays separate
+from the preview. Opening the viewer makes no request to the source site.
 **Save Original** downloads a cached file to your client. Videos, other files
 and archives can be saved without entering static image intake. Animated images
 remain downloadable but cannot enter that intake.
 
 Each job keeps its source cursor, selection, downloaded checksums and import
 state. **Stop** preserves completed files. **Resume** retries the last action.
+For previews, Resume retries the same image batch. Load Previews starts a batch
+for the page currently shown.
 After a restart, jobs show **Interrupted** and require Resume. **Scan More**
 continues the media window; changed remote listings can shift that window.
 Use **Rescan** to restart the media window and refresh temporary download URLs

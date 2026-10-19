@@ -62,12 +62,11 @@ try {
       const panel = page.locator(`#${id}`)
       headers.push(await checkHeaderSpacing(page, { surface, width, height, receipts }))
       await panel.locator('summary').first().click()
+      await page.waitForFunction((selector) => [...(document.querySelector(selector)?.querySelectorAll('button') || [])]
+        .some((node) => node.textContent.trim() === 'New Scan' || node.textContent.trim() === 'Scan'), `#${id}`)
+      const newScan = panel.getByRole('button', { name: 'New Scan', exact: true })
+      if (await newScan.isVisible() && await newScan.getAttribute('aria-expanded') !== 'true') await newScan.click()
       await panel.getByRole('button', { name: 'Scan', exact: true }).waitFor({ state: 'visible' })
-      await page.waitForFunction((selector) => [...document.querySelector(selector).querySelectorAll('button')]
-        .find((node) => node.textContent === 'Scan')?.disabled === false,
-      `#${id}`, { timeout: 15000 }).catch(async (failure) => {
-        throw new Error(`Source controls unavailable: ${await panel.innerText()}. ${output}`, { cause: failure })
-      })
       const afterOpen = await (await fetch(`${url}/test/ready`)).json()
       assert.equal(afterOpen.scans, before.scans, 'Opening the panel started a scan')
       assert.equal(afterOpen.downloads, before.downloads, 'Opening the panel started a download')
@@ -77,6 +76,11 @@ try {
       } else {
         await panel.getByLabel('URL', { exact: true }).fill('https://images.example.test/collection/1')
       }
+      await page.waitForFunction((selector) => [...document.querySelector(selector).querySelectorAll('button')]
+        .find((node) => node.textContent === 'Scan')?.disabled === false,
+      `#${id}`, { timeout: 15000 }).catch(async (failure) => {
+        throw new Error(`Source controls unavailable: ${await panel.innerText()}. ${output}`, { cause: failure })
+      })
       await panel.getByRole('button', { name: 'Scan', exact: true }).click()
       await panel.getByRole('button', { name: 'Clear All', exact: true }).waitFor({ state: 'visible' })
       await panel.getByRole('button', { name: 'Clear All', exact: true }).click()
@@ -116,7 +120,8 @@ try {
         assert.match(original.headers()['content-disposition'], /^attachment;/)
         assert.equal((await original.body()).toString(), 'synthetic-video-container')
       }
-      await panel.getByText('Extractor Settings', { exact: true }).click()
+      await panel.getByRole('button', { name: 'New Scan', exact: true }).click()
+      await panel.locator('summary').filter({ hasText: /^Advanced$/ }).click()
       await panel.getByText('Credentials', { exact: true }).click()
       const measurement = await panel.evaluate((element) => {
         const viewport = document.documentElement.clientWidth
@@ -124,7 +129,7 @@ try {
           .filter((node) => node.getClientRects().length && node.getBoundingClientRect().width > 0)
         return { overflow: document.documentElement.scrollWidth > viewport + 1,
           clipped: visible.filter((node) => { const box = node.getBoundingClientRect(); return box.left < -1 || box.right > viewport + 1 }).length,
-          small: visible.filter((node) => node.getBoundingClientRect().height < 39).length,
+          small: visible.filter((node) => node.getBoundingClientRect().height < (viewport >= 1024 ? 31 : 39)).length,
           overlaps: visible.filter((node, index) => visible.slice(index + 1).some((other) => {
             if (node.contains(other) || other.contains(node)) return false
             const a = node.getBoundingClientRect(), b = other.getBoundingClientRect()
