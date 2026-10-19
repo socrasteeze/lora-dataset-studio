@@ -15,7 +15,7 @@ const root = fileURLToPath(new URL('../../', import.meta.url))
 const runtime = await mkdtemp(path.join(tmpdir(), 'lds-image-sources-'))
 const receipts = path.join(root, '.git', 'lds-gates-validation')
 const cases = []
-let server, browser
+let server, browser, currentPage, currentPanelId
 let output = ''
 let failureText = null
 let serverUrl
@@ -47,12 +47,14 @@ try {
       console.log(`Checking Image Sources ${surface} ${width}x${height}`)
       const context = await browser.newContext({ viewport: { width, height } })
       const page = await context.newPage()
+      currentPage = page
       const errors = []
       page.on('pageerror', (error) => errors.push(error.message))
       if (surface === 'dataset') await page.addInitScript((id) => localStorage.setItem('datasetCurrentId', String(id)), ready.dataset_id)
       const before = await (await fetch(`${url}/test/ready`)).json()
       await page.goto(`${url}/#/${surface === 'bank' ? 'bank' : 'datasets?section=add'}`)
       const id = `image-sources-${surface === 'bank' ? 'bank' : `dataset-${ready.dataset_id}`}`
+      currentPanelId = id
       const panel = page.locator(`#${id}`)
       await panel.locator('summary').first().click()
       await panel.getByRole('button', { name: 'Scan', exact: true }).waitFor({ state: 'visible' })
@@ -124,6 +126,18 @@ try {
 } catch (failure) {
   failureText = String(failure.stack || failure)
   console.error(failure)
+  if (currentPage && !currentPage.isClosed()) {
+    console.error('Source panel state:', await currentPage.evaluate((id) => {
+      const element = document.getElementById(id)
+      return { present: Boolean(element),
+        status: [...(element?.querySelectorAll('[role=status]') || [])].map((node) => node.textContent),
+        errors: [...(element?.querySelectorAll('[role=alert]') || [])].map((node) => node.textContent) }
+    }, currentPanelId).catch(() => 'Page unavailable'))
+  }
+  try {
+    const debug = await fetch(`${serverUrl}/test/debug`, { signal: AbortSignal.timeout(5000) })
+    console.error('Source queue state:', debug.status, await debug.text())
+  } catch (error) { console.error('Source queue debug:', error.message) }
   console.error(output)
   throw failure
 } finally {

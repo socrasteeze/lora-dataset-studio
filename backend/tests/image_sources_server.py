@@ -87,6 +87,17 @@ def main():
     def ready():
         return jsonify({'dataset_id': dataset_id, **calls})
 
+    @app.get('/test/debug')
+    def debug():
+        import faulthandler
+        faulthandler.dump_traceback(file=sys.stderr, all_threads=True)
+        from app.models import ImageSourceJob
+        control = sources.runtime(app)
+        return jsonify({'active': control['active'],
+                        'worker_alive': bool(control['worker'] and control['worker'].is_alive()),
+                        'jobs': [{key: getattr(job, key) for key in ('id', 'state', 'phase', 'done', 'error')}
+                                 for job in ImageSourceJob.query.order_by(ImageSourceJob.created_at.desc())]})
+
     @app.post('/test/shutdown')
     def shutdown():
         import threading
