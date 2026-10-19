@@ -107,7 +107,7 @@ try {
       assert.equal(launches[0].inject_trigger, false)
       assert.equal(launches[0].strengths, undefined)
       assert.deepEqual(launches[0].cfgs, [family === 'moss' ? 3 : 1])
-      assert.deepEqual(launches[0].steps_list, [family === 'moss' ? 50 : 8])
+      assert.deepEqual(launches[0].steps, [family === 'moss' ? 50 : 8])
       assert.ok(!launches[0].permanent_loras?.length)
       const layout = await page.evaluate(() => {
         const controls = [document.querySelector('[aria-label="Model Family"]'),

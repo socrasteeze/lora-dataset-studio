@@ -335,8 +335,16 @@ def test_pull_requests_keep_one_complete_windows_qualification():
     assert 'node frontend/scripts/bankOtherTagsProbe.mjs' in fork
     assert "steps.browser_checks.outcome == 'failure'" in fork
     assert 'github.head_ref || github.ref_name' in fork
-    # Targeted pytest replays belong in diagnosis, not before the same full suite.
-    assert '-m pytest' not in fork
+    # Do not replay targeted cases before the complete Windows qualification.
+    # A separate Linux job verifies the bind behavior that Windows cannot run.
+    windows_job = fork.split('  gates:', 1)[1]
+    assert 'runs-on: windows-latest' in windows_job
+    assert '-m pytest' not in windows_job
+    linux_job = fork.split('  linux_startup:', 1)[1].split('  gates:', 1)[0]
+    assert 'runs-on: ubuntu-latest' in linux_job
+    assert linux_job.count('-m pytest') == 1
+    assert '-m pytest backend/tests/test_port_utils.py -q' in linux_job
+    assert '-Phase Gates' not in linux_job
     driver = (_ROOT / 'scripts/gates.ps1').read_text(encoding='utf-8')
     assert 'pytest backend/tests scripts/tests -q -rf -n 8 --dist loadfile' in driver
     assert 'Invoke-Quick -FullSuiteFollows' in driver

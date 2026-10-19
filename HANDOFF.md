@@ -21,6 +21,7 @@ The identity implementation qualified in cloud at be06ddbab26a32e5d4032201c8a19c
 1. Complete exact-head cloud Gates, Studio/identity/Bank/Settings/curation browser checks and the Linux startup-port check. Then land the qualified branch on origin/main and advance only the reviewed LDS baseline in Overwatch. Preserve its unrelated existing config edits. Runtime activation still needs explicit authorization before updating or restarting the running checkout.
 2. The operator chose a local accuracy set. Await its location/labels and explicit local-evaluation authorization; keep those images local and report wrong names, misses, abstentions and provenance. Similarity thresholds remain unmeasured heuristics.
 3. Carry forward physical-device/trainer gates from 5d32d6ceb:HANDOFF.md. The prior picked-image import and Qwen preset ports are included in the qualified identity source. The original desktop tag timeout's exact cause remains unproven; automatic and manual recovery passed forced-failure checks.
+4. Added operator report: Bank's Video tab shows an inline render fallback. Live browser access is unavailable; the server log has no matching backend exception. Await the first browser ErrorBoundary line. Cloud Bank fixtures now enable Video and check both lane links at all five sizes, with caught component errors retained in the receipt. Do not claim the live cause from the screenshot alone.
 
 ## Upstream review carried forward
 
@@ -61,6 +62,7 @@ Decision: retain the seven named source ports, then qualify and land them with t
 
 ## Verify
 Local Ruff, ESLint (zero errors), production build, whitespace and publishable-file privacy scan passed. Outbound inventory is unchanged. Tests/probes have not run locally.
+Combined run 39176250128 at 40a4c8ce0 passed Linux ports and the existing Bank/Settings, curation and identity browser cases. Backend: 10082 passed, one workflow-contract failure and 15 skips. Core frontend found one introduced guide ellipsis. The Studio probe used steps_list although the client sends steps. All three integration repairs are staged for the next exact-head cloud run. The Windows workflow guard still forbids replaying targeted pytest before its full suite; the independent Linux job covers platform-specific bind rules.
 Fork Gates run 39172784150 succeeded at be06ddbab26a32e5d4032201c8a19cfb4b5e0851. Its full Gates receipt reports Succeeded=true and zero exit codes for every step, including both linters, build, served plugin startup, core/bundled frontend, bundled Python and the full backend/tooling suite. Backend JUnit: 10063 passed, 14 skipped, zero errors/failures.
 The same exact-head browser receipts passed 20 identity cases, 5 folder-undo cases, stale-pixel/preview/crop recovery, Bank/Settings and curation checks. Folder Undo works even when the bank has only one folder, where the old Subfolder menu is hidden. No live declarations were changed.
 Receipts are retained under the worktree Git metadata in lds-gates-validation/cloud-39172784150. Run: https://github.com/socrasteeze/lora-dataset-studio/actions/runs/39172784150.
