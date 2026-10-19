@@ -73,8 +73,9 @@ it; `CLAUDE.md` step 2 is only about that granularity. A PR that changes
 **This fork is local-only for image generation** (no Nano Banana / OpenAI Setup
 keys). After a cherry-pick from the read-only `upstream` remote, rebuild
 `frontend/dist` even if you only took upstream's dist commit. Flask serves the
-bundle, and an upstream bundle can resurrect removed UI. See `FORK_NOTES.md` and run
-`node --test tests/local-only-engines-contract.test.mjs` from `frontend/`.
+bundle, and an upstream bundle can resurrect removed UI. See `FORK_NOTES.md`.
+When tests are requested, run `node --test tests/local-only-engines-contract.test.mjs`
+from `frontend/`.
 
 Flask serves `frontend/dist` **off disk, per request**, so a rebuilt bundle
 reaches every browser the moment it is written while the Python process keeps
@@ -93,8 +94,15 @@ pip install -r backend/requirements-torch-tests.txt
 python -m pytest backend/tests -q -n 8 --dist loadfile
 ```
 
-Run tests in a separate cloud task unless the operator explicitly permits a
-local run. The full fork gate is `scripts/gates.ps1 -Phase Gates`. It uses eight
+For agent work, tests require an explicit operator request. This includes cloud
+tests, local tests, responsive probes, fixture-backed checks and test-bearing
+gate phases. Implementation, enhancement, clean, commit and push requests do
+not authorize tests. Use `[skip ci]` on delivery pushes without test permission;
+report unrun or incomplete checks and preserve the CI definitions.
+
+When tests are requested, run only that scope in a separate cloud task unless
+the operator explicitly permits a local run. The full fork gate is
+`scripts/gates.ps1 -Phase Gates`. It uses eight
 pytest workers and keeps each file together with `--dist loadfile`. Ordinary
 push CI and release validation use four workers on their hosted runners. All
 three numerical-library thread pools (`OMP_NUM_THREADS`, `MKL_NUM_THREADS`,
@@ -131,9 +139,9 @@ tests pass locally and fail on the release tag.
 
 `requirements-dev.txt` is the common CI/release baseline. CI adds the CPU-only `requirements-torch-tests.txt` overlay when training-state code changes (and for manual runs), while the release job always adds it. A suite green against a different set of packages is not evidence about CI: a stray `pytest-flask` on one dev machine once made nine tests pass locally and fail on the release tag. (The suite runs with `-p no:flask` for that reason; you do not need to uninstall anything.)
 
-Release validation installs both declared requirement files. Run it in the cloud before landing. If you add or change behavior, add or update a test for it. The suite mocks external tools (ComfyUI, ai-toolkit, Ollama), so it runs without a GPU or any of those installed.
+Release validation installs both declared requirement files. When requested, run it in the cloud before landing. If test work is requested for changed behavior, add or update a test for it. The suite mocks external tools (ComfyUI, ai-toolkit, Ollama), so it runs without a GPU or any of those installed.
 
-For the frontend, run `npm test` from `frontend/` in the cloud (it loads the
+When frontend tests are requested, run `npm test` from `frontend/` in the cloud (it loads the
 SDK resolver and includes core and bundled-plugin contracts) and finish with a
 successful `npm run build`. Tests live in two places, on purpose:
 

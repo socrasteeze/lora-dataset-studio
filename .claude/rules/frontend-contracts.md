@@ -28,9 +28,11 @@ nothing — so those assertions prove a class is WRITTEN, never that the screen
 works. Three responsive regressions shipped through that gap in one week, each
 one found by a person holding a phone.
 
-**So a change that touches layout is not verified until the probe has run** —
-on the page the change touches, against an instance that holds something to
-open (a bank, a dataset, LoRA files for the Studio):
+Run tests and responsive probes only on an explicit user request, as required
+by `AGENTS.md`. When rendered validation is requested, run the probe on the
+affected page against an isolated instance that holds something to open
+(a bank, a dataset, LoRA files for the Studio). Without that run, report rendered
+validation as not run:
 
 ```
 cd frontend && npm run probe:responsive -- --url http://127.0.0.1:5173/#/canvas
