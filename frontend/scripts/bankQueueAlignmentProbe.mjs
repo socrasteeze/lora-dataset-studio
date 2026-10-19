@@ -138,6 +138,10 @@ export async function checkBankQueueAlignment({ browser, url, root, receipts, py
         await waiting.waitFor({ state: 'detached' })
         outcomes.push({ width, height, state: 'remove', geometry: await measure(panel, width), passed: true })
         const failed = panel.locator('[data-queue-row="queued"][data-bank-id="20"]')
+        await failed.locator('[data-queue-cell="control"]').focus()
+        await page.keyboard.press('Tab')
+        assert.equal(await failed.getByRole('button', { name: /^Retry / }).evaluate((node) => node === document.activeElement),
+          true, 'Keyboard order must follow the top control then the detail-row Retry')
         await failed.getByRole('button', { name: /^Retry / }).click()
         await page.waitForFunction(() => document.querySelector('[data-queue-row="queued"][data-bank-id="20"] [data-queue-cell="status"]')?.textContent === 'Waiting')
         outcomes.push({ width, height, state: 'retry', geometry: await measure(panel, width), passed: true })
