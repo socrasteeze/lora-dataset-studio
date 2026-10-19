@@ -3,43 +3,43 @@
 **Updated:** 2026-10-19 | **Branch:** validation/image-source-importer | **Base:** 5306f107f
 
 ## State
-The scraper layout is delivered. Bank review now renders outside page spacing and lets its controls scroll in short windows.
-Build and lint pass. Source and bundle use separate commits with [skip ci]; tests, CI and responsive probes remain off.
+Full-subject Auto-Center is implemented in the shared Crop editor for Bank, Dataset and references.
+Build and lint pass. No tests, model calls or rendered validation ran during implementation; delivery keeps CI off.
 
 ## Done this session
-- Separated New Scan from saved jobs and displayed the actual source and destination for each job.
-- Preserved blank credential fields, added explicit confirmed clearing, and retained unsaved edits on failure.
-- Bound preview requests to visible image IDs, retained that batch for Resume, and kept download selection independent.
-- Reused the shared image viewer for zoom and page navigation, with cached originals and explicit thumbnail/error notices.
-- Aligned desktop control sections and thumbnail metadata with shared grid rows; removed repeated help text while keeping destination, selection-scope and credential guidance.
-- Fixed Bank review viewport overflow by rendering at the document root and allowing the control panel to shrink and scroll; kept server-rendering compatibility.
+- Added Full Subject (default) and Face & Head suggestions to the shared crop editor.
+- Added a bounded, metadata-free preview endpoint through the existing local vision provider and GPU ownership window.
+- Kept the detected subject inside the crop; refused incompatible ratios and reported edge-limited centering.
+- Retained the crop selection on failed saves and ignored stale or cancelled suggestion responses.
+- Fitted the image and handles to the space left by the crop controls, including wrapped status text.
+- Updated README, Guide, help and What's New; added parser/geometry regression cases without running them.
 
 ## Open
-1. Tests, responsive probes and live-provider checks were not run; run only an explicitly requested scope. This delivery does not claim full qualification.
+1. Tests, model detection accuracy and rendered behavior are unverified. Run only an explicitly requested scope; this delivery does not claim qualification.
 2. Main has advanced beyond this branch's base. Reconcile current main before landing if integration is requested; preserve the running checkout.
-3. Backend behavior and provider access remain unverified. Use operator-selected sources and credentials for any later authorized live checks.
-4. Physical phone/PWA acceptance remains unverified. Prior rendered qualification does not cover these changes.
+3. The backend must restart after this branch is installed to register the new endpoint. The existing local vision model must be configured in Setup.
+4. Physical phone/PWA acceptance remains unverified. Earlier source-panel screenshots do not cover Auto-Center.
 
 ## Decisions
-- Confirmed layout: two columns of text and controls above the full-width image grid. Desktop headings, fields, actions and options share grid rows; controls stack below 1024px.
-- Match the Bank's medium thumbnail density and 3:4 framing, with aligned metadata/link rows. The viewer retains the uncropped image.
-- Keep saved job destinations fixed; New Scan settings create a separate job.
-- Preview the visible page, up to 24 images, regardless of download selection; persist its IDs for restart recovery.
-- Blank credential fields preserve stored values. Clear Credentials is a separate confirmed action.
-- The viewer uses local cached images and supplies no library ID, so it exposes no generation or repair actions.
-- Preserve all public gallery-dl/yt-dlp sources and the trusted local GDLOPS loader. Do not copy private extractor code.
-- Keep manual actions, Pending imports, original bytes and source tags separate from captions. No automatic online resume or subscriptions.
+- Full Subject keeps the visible body and trims unused surrounding space with roughly 10% padding per edge; the user reviews before pressing Crop.
+- Bank, Dataset and reference editors analyze their exact loaded preview, with normalized coordinates mapped back to natural pixels.
+- Auto-Center uses the configured local vision model only after a click. It adds no package, model download or external service.
+- Cache detection per image URL and framing; ratio changes reuse it. A ratio that cuts the detected subject is refused.
+- Apply preserves the existing crop contracts: Bank saves a derivative; Dataset crops its training image and caps its long side at 1024 without enlargement.
+- Failures retain the current box. Cancel closes without applying; an in-flight model call may finish, but the endpoint never edits a file.
+- Manual handles remain available when vision setup or detection fails.
+- Preserve the accepted scraper layout and the Bank review portal/scrollable footer from the preceding delivery.
 
 ## Traps
-- Do not switch, rebuild or restart the original running checkout as part of this branch work.
-- Never import create_app against production state. Isolate all five LDS runtime paths before an explicitly authorized test run.
-- Never run or trigger tests without an explicit request. Every push must have [skip ci] on its tip unless CI tests are requested.
-- Keep frontend source and the rebuilt frontend/dist in separate commits. A task-branch push does not land main.
-- Only image assets may use inline cached-file responses. Other media remains an attachment.
-- Keep the Bank review portal: the workspace's vertical-spacing rule must not add margin to a full-height fixed dialog. The footer must remain scrollable when space is tight.
+- Do not switch, rebuild or restart the original running checkout as part of branch work.
+- Never import create_app against production state. Isolate all five LDS runtime paths before an authorized runtime check.
+- Never run or trigger tests without an explicit request. Every push must have [skip ci] unless CI tests are requested.
+- Keep frontend source and the rebuilt frontend/dist in separate commits. Branch publication does not land main.
+- Do not move Auto-Center inference into mount effects or passive requests; the explicit action may load the configured local model.
+- Keep failed-save exceptions reaching CropModal so Bank and Dataset editors retain their selections.
 
 ## Verify
-Permitted static checks for this wave:
+Permitted static/build commands:
 ```powershell
 .venv/Scripts/python.exe -m ruff check .
 cd frontend
@@ -47,9 +47,8 @@ npm run lint
 npm run build
 ```
 Use the configured pinned interpreter when the task worktree has no .venv.
-Review the diff and run the static scanner from scripts/scan-sensitive.sh before delivery.
-Completed: Ruff passed; ESLint passed with 32 existing warnings and zero errors; the production frontend build passed.
-The delivery privacy scan inspected 3044 tracked/untracked text files with zero findings. Attribution matches were reviewed as legitimate code, product references and audit history. The final diff has no whitespace errors.
-Requested screenshots used an isolated synthetic server and the rebuilt bundle at desktop and phone widths. Captures were redacted and metadata-stripped; the servers stopped afterward.
-No backend tests, frontend tests, responsive probes or live-provider downloads ran for this follow-up. Screenshot capture does not qualify the full application or a physical phone.
-The later Bank review viewport repair used build, both linters and source inspection only. No rendered validation or tests ran for that repair.
+Completed: Ruff passed; ESLint passed with 32 existing warnings and zero errors; production frontend build passed.
+The static outbound inventory is unchanged. The new endpoint reuses reviewed local vision transports and writes no image files.
+Privacy inspection covered 3048 tracked/untracked text files with zero findings; attribution inspection has no unresolved findings.
+Regression files: backend/tests/test_auto_center.py and frontend/src/components/dataset/autoCenterCrop.test.js. Neither ran.
+No backend/frontend tests, responsive probes, fixture captures or model/GPU inference ran for Auto-Center.

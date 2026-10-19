@@ -2503,6 +2503,35 @@ export into a **new** bank, and start curating again. Both edits now happen in
 the bank itself, so the loop is *curate → edit → re-analyse → promote*, in one
 place. (Asked for by nofaceman on Discord, backed by mr.arrow.)
 
+### Auto-center a crop
+
+Open **Crop** in Bank Review or a Dataset, choose **Full Subject**, then click
+**Auto-Center**. It proposes a tighter box around the entire visible subject.
+For a full-body image on a plain background, this removes unused surrounding
+space with about 10% margin on each side of the detected figure. **Face & Head**
+is available when you want a head crop instead.
+
+Auto-Center uses the local vision model configured in Setup. It analyzes a small,
+upright preview only after you click the button. It does not save or replace an
+image. Review the box, drag its handles if needed, then press **Crop** to apply it.
+The model can miss parts or choose the wrong subject, so review every proposal.
+
+Choose **Free** for the most flexible framing, or select an aspect ratio first.
+A ratio that cannot contain the detected subject is refused instead of cutting
+it off. Near an image edge, the whole detected subject takes priority over exact
+centering. Changing the ratio and clicking Auto-Center again reuses the detection.
+
+If detection fails, the existing box stays in place. **Open Setup** is available
+when the local vision model needs attention; manual cropping remains available.
+A failed save keeps the editor and the crop selection open.
+
+The same controls are available for Dataset images and primary/extra references.
+Applying a crop uses each surface's existing rules: Bank preserves source files
+and saves an editable copy; Dataset crops its training image and caps the long
+side at 1024 pixels without enlarging smaller crops.
+
+### Manual crop and edit history
+
 **✂ Crop** is per image, in **▶ Review** — the only place a bank shows a picture
 big enough to draw a box on. Open Review (or press ▶ on a tile), then click
 **✂ Crop** or press `C`. Drag the box, or snap it to a ratio, and confirm.

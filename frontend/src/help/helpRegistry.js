@@ -84,6 +84,10 @@ const action = (id, title, keywords, route, chapter, anchor, tip) => ({
 });
 
 const TOPICS = [
+  { id: 'auto-center-crop', kind: 'action', title: 'Auto-Center Crop',
+    keywords: ['crop', 'center', 'subject', 'full body', 'blank space', 'framing', 'face', 'head'],
+    guide: { chapter: 'using-the-app', anchor: 'auto-center-a-crop' },
+    app: { route: '/bank' } },
   { id: 'image-sources', kind: 'action', title: 'Image Sources',
     keywords: ['booru', 'danbooru', 'gelbooru', 'e621', 'rule34', 'pawchive', 'image boards', 'gallery-dl', 'yt-dlp', 'download', 'original', 'zip'],
     guide: { chapter: 'using-the-app', anchor: 'image-sources' },

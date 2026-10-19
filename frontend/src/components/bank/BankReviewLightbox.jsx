@@ -273,16 +273,17 @@ export default function BankReviewLightbox({
 
   const cropCurrent = useCallback(async (box) => {
     const target = cropId
-    setCropId(null)
-    if (target == null || busy) return
+    if (target == null || busy) return false
     setBusy(true)
     setError(null)
     try {
       const d = await postJson(`/api/bank/${bankId}/image/${target}/crop`, box)
       applyEdit(target, d)
       setNotice(cropOutcomeMessage(d))
+      setCropId(null)
     } catch (e) {
       setError(e?.message || 'Could not crop that image — it was NOT changed.')
+      throw e
     } finally {
       setBusy(false)
     }

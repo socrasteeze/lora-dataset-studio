@@ -1,4 +1,5 @@
-/** Manual crop editor with a STRETCHABLE box: drag the 8 handles to resize, drag
+/** Shared crop editor with local Auto-Center suggestions and a stretchable box.
+ * Suggestions never save pixels. Drag the 8 handles to resize, drag
  * inside to move — any shape, not just square (training buckets non-square
  * images fine). Ratio presets snap the box; `defaultAspect` presets the initial
  * ratio (the reference crop starts at 1:1 — its historical convention — but
@@ -7,10 +8,12 @@
  * Returns the box in NATURAL image pixels, same contract as before.
  * Custom implementation (no react-easy-crop): that lib pins a fixed frame and
  * moves the image under it — it cannot stretch the selection itself. */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { postForm } from '../../api/fetchClient';
+import { autoCenterCrop, cropPreviewBlob } from './autoCenterCrop.js';
 
 const ASPECTS = [
-  ['free', null],
+  ['Free', null],
   ['1:1', 1],
   ['3:4', 3 / 4],
   ['2:3', 2 / 3],
@@ -58,9 +61,95 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
   const [nat, setNat] = useState(null);        // {W, H} natural size
   const [box, setBox] = useState(null);        // crop box in NATURAL px
   const [aspect, setAspect] = useState(lockSquare ? 1 : defaultAspect);   // null = free
+  const [framing, setFraming] = useState('subject');
+  const [autoBusy, setAutoBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [setupRequired, setSetupRequired] = useState(false);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const framingId = useId();
   const imgRef = useRef(null);
+  const viewportRef = useRef(null);
   const cancelRef = useRef(null);
   const dragRef = useRef(null);                // {mode, start, startBox}
+  const requestRef = useRef(null);
+  const requestVersion = useRef(0);
+  const detection = useRef(null);
+  const mounted = useRef(true);
+  const savingRef = useRef(false);
+  const busy = autoBusy || saving;
+
+  useEffect(() => {
+    mounted.current = true;
+    detection.current = null;
+    setAutoBusy(false); setError(''); setNotice(''); setSetupRequired(false);
+    return () => {
+      mounted.current = false;
+      requestVersion.current += 1;
+      requestRef.current?.abort();
+      requestRef.current = null;
+    };
+  }, [imageUrl]);
+
+  const autoCenter = async () => {
+    if (!nat || requestRef.current || savingRef.current) return;
+    const controller = new AbortController();
+    requestRef.current = controller;
+    const version = ++requestVersion.current;
+    setAutoBusy(true); setError(''); setNotice(''); setSetupRequired(false);
+    dragRef.current = null;
+    try {
+      let found = detection.current;
+      if (!found || found.imageUrl !== imageUrl || found.framing !== framing) {
+        const blob = await cropPreviewBlob(imgRef.current);
+        if (controller.signal.aborted) return;
+        const form = new FormData();
+        form.append('file', blob, 'preview.jpg');
+        form.append('framing', framing);
+        const result = await postForm('/api/image/auto-center', form, { signal: controller.signal });
+        found = { imageUrl, framing, bounds: result.box };
+      }
+      if (!mounted.current || version !== requestVersion.current) return;
+      detection.current = found;
+      const suggestion = autoCenterCrop(found.bounds, nat.W, nat.H, lockSquare ? 1 : aspect);
+      setBox(suggestion.box);
+      setNotice(suggestion.edgeLimited
+        ? 'An image edge limits centering. Review the box before saving.'
+        : 'Review the centered box, then choose Crop.');
+    } catch (failure) {
+      if (mounted.current && version === requestVersion.current && failure.name !== 'AbortError') {
+        setError(failure.body?.detail || failure.message || 'Auto-Center failed. Adjust the crop manually.');
+        setSetupRequired(Boolean(failure.body?.setup_required));
+      }
+    } finally {
+      if (version === requestVersion.current) {
+        requestRef.current = null;
+        if (mounted.current) setAutoBusy(false);
+      }
+    }
+  };
+
+  const save = async (action) => {
+    if (savingRef.current || requestRef.current) return;
+    savingRef.current = true;
+    setSaving(true); setError(''); setNotice(''); setSetupRequired(false);
+    dragRef.current = null;
+    try {
+      if (await action() === false) throw new Error('The crop was not saved. Your selection is still here.');
+    } catch (failure) {
+      if (mounted.current) setError(failure.message || 'The crop was not saved. Your selection is still here.');
+    } finally {
+      savingRef.current = false;
+      if (mounted.current) setSaving(false);
+    }
+  };
+
+  const cancel = useCallback(() => {
+    if (savingRef.current) return;
+    requestRef.current?.abort();
+    onCancel();
+  }, [onCancel]);
 
   const onImgLoad = (e) => {
     const W = e.target.naturalWidth; const H = e.target.naturalHeight;
@@ -78,18 +167,24 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
 
   // Escape closes; initial focus on Cancel.
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onCancel(); };
+    const onKey = (e) => { if (e.key === 'Escape') cancel(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onCancel]);
+  }, [cancel]);
   useEffect(() => { cancelRef.current?.focus(); }, []);
-  // The overlay maps natural px -> displayed px via the live img rect: re-render
-  // on window resize so it stays glued to the image.
-  const [, forceRender] = useState(0);
+  // Keep the image and its handles fitted when status text or controls wrap.
   useEffect(() => {
-    const onResize = () => forceRender((n) => n + 1);
+    const onResize = () => {
+      const el = viewportRef.current;
+      if (!el) return;
+      setViewport((old) => old.width === el.clientWidth && old.height === el.clientHeight
+        ? old : { width: el.clientWidth, height: el.clientHeight });
+    };
+    onResize();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(onResize);
+    if (viewportRef.current) observer?.observe(viewportRef.current);
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    return () => { observer?.disconnect(); window.removeEventListener('resize', onResize); };
   }, []);
 
   const scale = () => {
@@ -98,6 +193,7 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
   };
 
   const startDrag = (e, mode) => {
+    if (busy) return;
     e.preventDefault(); e.stopPropagation();
     e.currentTarget.setPointerCapture?.(e.pointerId);
     dragRef.current = { mode, sx: e.clientX, sy: e.clientY, start: { ...box } };
@@ -154,19 +250,26 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
   }, [onMove, endDrag]);
 
   const pickAspect = (value) => {
+    if (busy) return;
+    setError(''); setNotice(''); setSetupRequired(false);
     setAspect(value);
     if (value && box && nat) setBox(ratioBox(box, value, nat.W, nat.H));
   };
 
-  const s = scale();
+  const fit = nat && viewport.width && viewport.height
+    ? Math.min(1, viewport.width / nat.W, viewport.height / nat.H) : null;
+  const s = fit ?? scale();
   return (
     <div role="dialog" aria-modal="true" aria-label="Crop image"
       data-probe-chrome="crop-editor" data-probe-layer
       className="fixed inset-0 z-[9995] bg-black/85 flex flex-col p-3 sm:p-4">
-      <div className="relative flex-1 min-h-0 w-full max-w-4xl mx-auto flex items-center justify-center overflow-hidden">
-        <div className="relative inline-block max-h-full max-w-full">
+      <div ref={viewportRef} className="relative flex-1 min-h-0 w-full max-w-4xl mx-auto flex items-center justify-center overflow-hidden">
+        <div className="relative inline-block max-h-full max-w-full"
+          style={fit == null ? undefined : { width: nat.W * fit, height: nat.H * fit }}>
           <img ref={imgRef} src={imageUrl} alt="to crop" onLoad={onImgLoad} draggable={false}
-            className="max-h-[min(70dvh,calc(100dvh-10rem))] max-w-full object-contain select-none block" />
+            onError={() => { setNat(null); setBox(null); setError('The image could not load. Close the editor and try again.'); }}
+            className="max-h-full max-w-full object-contain select-none block"
+            style={fit == null ? undefined : { width: '100%', height: '100%' }} />
           {box && nat && (
             <div
               className="absolute border-2 border-indigo-400 cursor-move touch-none"
@@ -186,12 +289,30 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
           )}
         </div>
       </div>
-      <div className="shrink-0 w-full max-w-4xl mx-auto mt-3 flex flex-col gap-2">
+      <div className="max-h-[55dvh] shrink-0 w-full max-w-4xl mx-auto mt-3 flex flex-col gap-2 overflow-y-auto overscroll-contain">
+        <div className="grid grid-cols-2 gap-2">
+          <label htmlFor={framingId} className="sr-only">Auto-Center Framing</label>
+          <select id={framingId} value={framing} disabled={busy}
+            onChange={(event) => { setFraming(event.target.value); setError(''); setNotice(''); }}
+            className="min-h-11 min-w-0 rounded-lg border border-white/25 bg-surface px-2 text-base text-content lg:text-sm">
+            <option value="subject">Full Subject</option>
+            <option value="head">Face &amp; Head</option>
+          </select>
+          <button type="button" onClick={autoCenter} disabled={!nat || busy} aria-busy={autoBusy}
+            title="Suggest a crop with your configured local vision model. Review it before saving."
+            className="min-h-11 min-w-0 rounded-lg bg-white/10 px-2 py-2 text-sm font-semibold text-white disabled:opacity-40">
+            {autoBusy ? 'Finding Subject...' : 'Auto-Center'}
+          </button>
+        </div>
+        {error && <p role="alert" className="break-words text-sm text-rose-200">{error}</p>}
+        {notice && <p role="status" className="text-sm text-white/70">{notice}</p>}
+        {setupRequired && <a href="/#/setup" target="_blank" rel="noopener noreferrer"
+          className="flex min-h-10 items-center text-sm text-white underline">Open Setup</a>}
         {!lockSquare && (
           <div className="flex items-center gap-1.5 overflow-x-auto py-1" role="group" aria-label="Crop aspect ratio">
             <span className="text-white/60 text-xs">Ratio</span>
             {ASPECTS.map(([label, value]) => (
-              <button key={label} type="button" onClick={() => pickAspect(value)}
+              <button key={label} type="button" onClick={() => pickAspect(value)} disabled={busy}
                 aria-pressed={aspect === value}
                 className={`min-h-11 w-12 min-w-12 shrink-0 px-2 py-0.5 rounded text-xs font-semibold ${aspect === value
                   ? 'bg-indigo-500 text-gray-950'
@@ -203,19 +324,19 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
         )}
         <div className="ml-auto grid w-full max-w-sm grid-flow-col auto-cols-fr gap-2">
           {onReset && (
-            <button type="button" onClick={onReset}
+            <button type="button" onClick={() => save(onReset)} disabled={busy}
               title="Re-run the automatic head-crop on the original image"
               className="min-h-11 min-w-0 px-2 py-2 rounded-lg bg-surface text-content-muted text-sm">
               ↺ Reset to auto
             </button>
           )}
-          <button type="button" ref={cancelRef} onClick={onCancel}
+          <button type="button" ref={cancelRef} onClick={cancel} disabled={saving}
             className="min-h-11 min-w-0 px-2 py-2 rounded-lg bg-surface text-content text-sm">Cancel</button>
-          <button type="button" disabled={!box}
-            onClick={() => onConfirm({ x: Math.round(box.x), y: Math.round(box.y),
-                                       w: Math.round(box.w), h: Math.round(box.h) })}
+          <button type="button" disabled={!box || busy} aria-busy={saving}
+            onClick={() => save(() => onConfirm({ x: Math.round(box.x), y: Math.round(box.y),
+                                                 w: Math.round(box.w), h: Math.round(box.h) }))}
             className="min-h-11 min-w-0 px-2 py-2 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
-            Crop
+            {saving ? 'Saving...' : 'Crop'}
           </button>
         </div>
       </div>
