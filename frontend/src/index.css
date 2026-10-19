@@ -283,7 +283,7 @@
   :root[data-theme="dark"] { --app-header-h: 102px; }
   .app-header-workspaces > a,
   .app-header-tools > button,
-  .app-header-tools > .relative > button { min-height: 40px; }
+  .app-header-tools > .relative > button { min-height: 40px; min-width: 40px; }
 }
 @media (max-width: 1023px) {
   .app-header a,
