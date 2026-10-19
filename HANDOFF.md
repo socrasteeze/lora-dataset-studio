@@ -3,7 +3,7 @@
 **Updated:** 2026-10-19 | **Branch:** validation/image-source-importer | **Base:** 5306f107f
 
 ## State
-The source typography, row alignment and Bank-style image grid are implemented on the scraper branch.
+The scraper layout is delivered. Bank review now renders outside page spacing and lets its controls scroll in short windows.
 Build and lint pass. Source and bundle use separate commits with [skip ci]; tests, CI and responsive probes remain off.
 
 ## Done this session
@@ -12,7 +12,7 @@ Build and lint pass. Source and bundle use separate commits with [skip ci]; test
 - Bound preview requests to visible image IDs, retained that batch for Resume, and kept download selection independent.
 - Reused the shared image viewer for zoom and page navigation, with cached originals and explicit thumbnail/error notices.
 - Aligned desktop control sections and thumbnail metadata with shared grid rows; removed repeated help text while keeping destination, selection-scope and credential guidance.
-- Updated help, guides, future probe navigation, and the branch's test policy to match the operator's replacement instructions.
+- Fixed Bank review viewport overflow by rendering at the document root and allowing the control panel to shrink and scroll; kept server-rendering compatibility.
 
 ## Open
 1. Tests, responsive probes and live-provider checks were not run; run only an explicitly requested scope. This delivery does not claim full qualification.
@@ -36,7 +36,7 @@ Build and lint pass. Source and bundle use separate commits with [skip ci]; test
 - Never run or trigger tests without an explicit request. Every push must have [skip ci] on its tip unless CI tests are requested.
 - Keep frontend source and the rebuilt frontend/dist in separate commits. A task-branch push does not land main.
 - Only image assets may use inline cached-file responses. Other media remains an attachment.
-- The browser probe was adjusted for New Scan and Advanced navigation and the shared 32px desktop/40px touch contract; it was not executed.
+- Keep the Bank review portal: the workspace's vertical-spacing rule must not add margin to a full-height fixed dialog. The footer must remain scrollable when space is tight.
 
 ## Verify
 Permitted static checks for this wave:
@@ -52,3 +52,4 @@ Completed: Ruff passed; ESLint passed with 32 existing warnings and zero errors;
 The delivery privacy scan inspected 3044 tracked/untracked text files with zero findings. Attribution matches were reviewed as legitimate code, product references and audit history. The final diff has no whitespace errors.
 Requested screenshots used an isolated synthetic server and the rebuilt bundle at desktop and phone widths. Captures were redacted and metadata-stripped; the servers stopped afterward.
 No backend tests, frontend tests, responsive probes or live-provider downloads ran for this follow-up. Screenshot capture does not qualify the full application or a physical phone.
+The later Bank review viewport repair used build, both linters and source inspection only. No rendered validation or tests ran for that repair.

@@ -17,6 +17,7 @@
  * cursor with the error visible, so a decision is never silently dropped.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Flag as FlagIcon, PartyPopper, Shuffle } from 'lucide-react';
 import PluginSlot from '../../plugins/PluginSlot.jsx'
 import { contributionKey, createLayerTracker } from '../../plugins/layerTracker.js'
@@ -377,7 +378,7 @@ export default function BankReviewLightbox({
     return bits.join(' · ')
   }, [p.kept, p.rejected, p.skipped])
 
-  return (
+  const popup = (
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Review the bank image by image"
       data-probe-chrome="review" data-probe-layer
       className="bank-review-shell fixed inset-x-0 top-0 z-[9996] flex flex-col bg-black/95">
@@ -431,7 +432,7 @@ export default function BankReviewLightbox({
       )}
 
       {!done && (
-        <div className="bank-review-controls shrink-0 space-y-2 bg-black/60 px-4 pt-2.5">
+        <div className="bank-review-controls min-h-0 overflow-y-auto overscroll-contain space-y-2 bg-black/60 px-4 pt-2.5">
           <div className="min-h-5 text-center text-xs">
             {error ? <p role="alert" className="text-rose-300">{error} Try again.</p>
               : <p role="status" className="text-white/60">{busy ? 'Saving' : <span>{REVIEW_SHORTCUT_HINT}<span className="hidden lg:inline"> · {REVIEW_ARROW_HINT}</span></span>}</p>}
@@ -540,4 +541,6 @@ export default function BankReviewLightbox({
       )}
     </div>
   )
+  // Page spacing must not offset a dialog that already fills the viewport.
+  return typeof document === 'undefined' ? popup : createPortal(popup, document.body)
 }
