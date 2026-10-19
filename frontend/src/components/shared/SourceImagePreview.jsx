@@ -28,7 +28,7 @@ export default function SourceImagePreview({ jobId, items, itemId, onItemChange,
         onClose={onClose}
         onPrev={index > 0 ? () => onItemChange(items[index - 1].id) : null}
         onNext={index + 1 < items.length ? () => onItemChange(items[index + 1].id) : null} />
-      <div className="pointer-events-none fixed bottom-4 left-3 right-3 z-[9998] text-center text-xs text-white">
+      <div className="pointer-events-none fixed bottom-4 left-3 right-3 z-[9998] text-center text-sm text-white">
         <span className="inline-block max-w-full rounded bg-black/80 px-3 py-2">
           {failed ? <span role="alert">The cached image is unavailable. Close the preview and download it again.</span>
             : <>{index + 1} / {items.length} · {item.downloaded ? 'Original' : 'Thumbnail. Download the original for full detail.'}</>}
