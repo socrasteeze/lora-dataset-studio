@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-19-auto-center-crop', date: '2026-10-19', title: 'Center the Subject',
+    blurb: 'Auto-Center proposes a crop around the full subject in Bank and Dataset editors. Review and adjust the box before saving. It uses your configured local vision model.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-19-bank-review-viewport', date: '2026-10-19', title: 'Reach Review Controls',
     blurb: 'Keep, Reject and Skip remain reachable in Bank review. The control panel scrolls in short windows.',
     to: '/bank',
