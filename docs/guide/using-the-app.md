@@ -3,24 +3,39 @@
 ## Image Sources
 
 Open **Image Sources** on the Bank list or in a Dataset's import section.
-Install the optional source package with **Install Sources** if required.
-Use a supported source URL, or leave URL blank and enter a booru **Tag Query**.
-Danbooru, Gelbooru, e621/e926, Rule34, Paheal and Pawchive have source adapters.
-Pawchive requires a profile or individual post URL. Support depends on the
-source's current access rules and the installed extractor. A refusal is not an
-empty successful download.
+Install the optional source packages with **Install Sources** if required. The
+same **Source Downloaders** action is available in Setup. Paste a public source
+URL. Named gallery-dl and yt-dlp extractors, nested albums, thread boards and
+generic pages use the same workflow. Only an unsupported URL advances to the
+next downloader; authentication and network failures stop visibly.
+
+**Search Preset** provides tag queries for Danbooru, Gelbooru, e621/e926, Rule34
+and Paheal. Choose a preset and leave URL blank to use **Tag Query**. Pawchive
+requires a profile or individual post URL. These presets do not limit URL
+support. **Downloader** defaults to Auto; it can select gallery-dl or yt-dlp.
+**Select Media** defaults to images and ZIPs. Choose Videos or All Media to
+select those results by default. You can also select individual result cards.
+
+**Extractor Settings** can load your GDLOPS custom modules from a host folder.
+Use the shared folder browser or type the host path, then select **Save Folder**.
+Only trusted local Python modules belong there. The folder stays on the host
+and applies to both Bank and Dataset. GDLOPS private code is not bundled. See
+[Source Extractors](settings-reference.md#image-source-extractors).
 
 1. Choose a destination. Bank can use a new named Bank or an existing Bank.
 2. Select **Scan**. The default limit is 200 media entries; each pass permits 1-1000.
 3. Use **Load Previews** to cache previews for the first 24 selected items.
 4. Use **Clear All**, a results filter, and **Select Page** to narrow a selection.
 5. Select **Download** to fetch the selected originals.
-6. Select **Import** to add verified images to the destination for review.
+6. Select **Import Images** to add compatible verified images for review.
 
 Filters change the view. Actions use selected items across all result pages.
 Previews never substitute for originals. A source without preview metadata
 shows **No Preview** until its image downloads. The results grid displays 24
 items at a time. The saved job list retains the latest 30 jobs in the interface.
+**Save Original** downloads a cached file to your client. Videos, other files
+and archives can be saved without entering static image intake. Animated images
+remain downloadable but cannot enter that intake.
 
 Each job keeps its source cursor, selection, downloaded checksums and import
 state. **Stop** preserves completed files. **Resume** retries the last action.
@@ -42,14 +57,18 @@ Download a selected ZIP to list its extracted images, then select those images
 for import. The original ZIP stays cached. Archives permit at most 1000 entries,
 512 MiB expanded content and a 200:1 expansion ratio per entry. Unsafe paths,
 links, encrypted archives, unsupported formats and invalid images fail visibly.
-RAR and 7z extraction are unavailable. Animated images do not enter the static
-image workflow.
+RAR and 7z extraction are unavailable. Extraction refusals retain the cached
+original and display an error. They are not successful image imports.
 
-Image downloads permit 64 MiB per image and 256 MiB per ZIP. Each job has a
-2 GiB cache limit and leaves a 256 MiB free-space reserve. Source errors and
-rate limits stop or fail work visibly; verified files remain available for retry.
-Downloads use public HTTPS only. Source credentials are write-only. Thread
-boards, subscriptions, online generation and publishing remain outside this workflow.
+Images permit 64 MiB. ZIP extraction permits a 256 MiB compressed archive.
+Other original downloads permit up to 1.75 GiB per file, within each job's
+2 GiB cache limit and a 256 MiB free-space reserve. Larger ZIPs remain available
+for **Save Original** without extraction. Source errors and rate limits stop or
+fail work visibly; verified files remain available for retry. Downloads use
+public HTTP(S), with public DNS addresses pinned for each connection. Source
+credentials are write-only. Live source access depends on the installed
+extractor, site changes and your credentials. Subscriptions, online generation
+and publishing remain outside this workflow.
 
 The workspace is a **guided flow**: each stage stays folded until the one
 before it is done, and the progress rail on the left tells you where you are

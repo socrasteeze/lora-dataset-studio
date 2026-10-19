@@ -5,9 +5,11 @@ This fork uses local tools and private-network API targets. Image Sources is an 
 ## Image Source Credentials
 
 Open **Image Sources > Credentials** on the Bank list or in Dataset imports.
-Choose the source before saving. Username, API Key, User ID and Cookies apply
-only to that source. Fields remain blank after save; the API reports presence
-without returning saved values. Saving empty fields clears that source's values.
+Enter its URL or choose a search preset before saving. Credentials follow the
+URL's source, even when a different search preset is selected. Username,
+Password, API Key, User ID, Cookies and OAuth token fields apply only to that
+source. Fields remain blank after save; the API never returns saved values.
+Saving empty fields clears that source's values.
 Cookies use `name=value; name=value` format. The application does not read a
 browser profile or import browser cookies on its own.
 
@@ -20,9 +22,30 @@ environment file. Configure them through the panel; do not place secrets in
 source URLs, `config.json`, exports or repository files. They do not enable
 publishing, Civitai browsing, or the retired general scraper.
 
-The **Install Sources** action installs the pinned optional gallery-dl package
-into the application interpreter and verifies the imports used by its worker.
-It does not install or replace a GPU runtime.
+The **Install Sources** action installs pinned gallery-dl, yt-dlp, native HLS
+decryption and a local FFmpeg binary into the application interpreter. Setup
+also lists this as **Source Downloaders**. The action verifies worker imports
+and the local media tool. It does not install or replace a GPU runtime.
+
+## Image Source Extractors
+
+Open **Image Sources > Extractor Settings** on either surface. **Extractor
+Folder** stores `image_sources.extractors_dir` in the host configuration. Choose
+a directory with 1-200 Python extractor modules. Use **Browse** to navigate
+host drives from any client, or type its host path. **Save Folder** validates
+the directory. A failed save preserves the typed path. Clear and save the field
+to use only built-in extractors. Stop all queued and running source jobs before
+changing this shared folder.
+
+Modules load before gallery-dl's built-ins, using gallery-dl's module loader.
+This allows the operator's local GDLOPS adapters without copying private source
+code into LDS. Modules execute as trusted local code. A missing drive or failed
+module import fails the action; it never silently omits configured adapters.
+
+**Extractor Name** is an optional gallery-dl site prefix for the next job.
+Leave it blank for automatic detection. Control extractors and command-line
+arguments are refused. A named prefix requires Auto or gallery-dl. Each job
+retains its Downloader and Select Media choices; images and ZIPs are the default.
 
 Every setting in LoRA Dataset Studio, explained: what it does, its default, when to change it, and the traps to avoid.
 

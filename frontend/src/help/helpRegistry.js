@@ -85,12 +85,16 @@ const action = (id, title, keywords, route, chapter, anchor, tip) => ({
 
 const TOPICS = [
   { id: 'image-sources', kind: 'action', title: 'Image Sources',
-    keywords: ['booru', 'danbooru', 'gelbooru', 'e621', 'rule34', 'pawchive', 'download', 'original', 'zip'],
+    keywords: ['booru', 'danbooru', 'gelbooru', 'e621', 'rule34', 'pawchive', 'image boards', 'gallery-dl', 'yt-dlp', 'download', 'original', 'zip'],
     guide: { chapter: 'using-the-app', anchor: 'image-sources' },
     app: { route: '/bank' } },
   { id: 'image-source-credentials', kind: 'setting', title: 'Source Credentials',
     keywords: ['booru', 'api key', 'cookies', 'source', 'credentials'],
     guide: { chapter: 'settings-reference', anchor: 'image-source-credentials' },
+    app: { route: '/bank' } },
+  { id: 'image-source-extractors', kind: 'setting', title: 'Source Extractors',
+    keywords: ['GDLOPS', 'custom', 'extractor', 'folder', 'gallery-dl', 'yt-dlp', 'downloader', 'media'],
+    guide: { chapter: 'settings-reference', anchor: 'image-source-extractors' },
     app: { route: '/bank' } },
   // ---- Settings: section-level topics (kind 'section') --------------------
   { id: 'settings-how', kind: 'section', title: 'How settings work',

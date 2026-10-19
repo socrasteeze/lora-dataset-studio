@@ -50,7 +50,16 @@ def sources():
     return jsonify({'providers': [{'id': key, 'name': name, 'credentials_saved': bool(saved.get(key))}
                                   for key, (name, _) in metadata.PROVIDERS.items()],
                     'capability': probe_image_source_deps(),
+                    'settings': service.settings(),
                     'jobs': [service.payload(job) for job in jobs]})
+
+
+@bp.post('/settings')
+@_locked
+def settings():
+    if Job.query.filter(Job.state.in_(('queued', 'running'))).first():
+        raise ValueError('Stop queued and running source jobs before changing extractors.')
+    return jsonify({'ok': True, **service.save_settings(_body())})
 
 
 @bp.post('/credentials/<provider>')
@@ -85,7 +94,18 @@ def create():
         raise ValueError('Enter a Bank name with at most 100 characters.')
     if not probe_image_source_deps()['ok']:
         return jsonify({'error': 'Install image sources before scanning.', 'action': 'image_source_extras'}), 409
+    engine, media, forced = data.get('engine', 'auto'), data.get('media', 'images'), data.get('extractor', '')
+    if engine not in ('auto', 'gallery-dl', 'yt-dlp') or media not in ('images', 'videos', 'all'):
+        raise ValueError('Choose a valid downloader and media filter.')
+    if (not isinstance(forced, str) or len(forced) > 80
+            or forced and not re.fullmatch('[a-z0-9][a-z0-9_-]*', forced)
+            or forced in ('directlink', 'g', 'generic', 'noop', 'oauth', 'r', 'recursive', 'ytdl')):
+        raise ValueError('Enter an extractor name without arguments.')
+    if forced and engine == 'yt-dlp':
+        raise ValueError('Use Auto or gallery-dl with a named gallery-dl extractor.')
+    import json
     job = Job(user_id=cfg.LOCAL_USER, provider=provider, url=url, limit=limit,
+              options_json=json.dumps({'engine': engine, 'media': media, 'extractor': forced}),
               destination=destination, target_id=target_id, name=name.strip())
     db.session.add(job)
     db.session.commit()
@@ -133,7 +153,7 @@ def selection(job_id):
     if len(assets) != len(set(ids)):
         raise ValueError('The selection contains an item outside this job.')
     for asset in assets:
-        asset.selected = data['selected'] and asset.kind != 'unsupported'
+        asset.selected = data['selected']
     db.session.commit()
     return jsonify({'ok': True})
 
@@ -148,3 +168,13 @@ def preview(job_id, asset_id):
     if not path.is_file() or path.is_symlink():
         return jsonify({'error': 'Load previews or download this image first.'}), 404
     return send_file(path, mimetype='image/jpeg', conditional=True, max_age=0)
+
+
+@bp.get('/jobs/<job_id>/file/<int:asset_id>')
+def file(job_id, asset_id):
+    job = _job(job_id)
+    asset = Asset.query.filter_by(job_id=job.id, id=asset_id).first_or_404()
+    path = service.local_path(job, asset)
+    if path is None or not path.is_file():
+        return jsonify({'error': 'Download this original first.'}), 404
+    return send_file(path, as_attachment=True, download_name=f'original-{asset.id}{path.suffix}')

@@ -55,6 +55,7 @@ _V3_KREA_REF_BOOST = 0.25
 _V3_KREA_STEPS = 8
 
 DEFAULTS = {
+    'image_sources': {'extractors_dir': ''},
     'plugins': {'enabled': {}},
     # host: '127.0.0.1' = this machine only ; '0.0.0.0' = reachable from the LAN
     # (phone, tablet, another PC) — the Settings "Server" card's LAN toggle just

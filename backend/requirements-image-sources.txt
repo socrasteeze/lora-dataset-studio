@@ -1,2 +1,5 @@
 # Optional image acquisition. Install only through the explicit Setup action.
 gallery-dl==1.32.17
+yt-dlp==2026.8.19
+pycryptodomex==3.23.0
+imageio-ffmpeg==0.6.0

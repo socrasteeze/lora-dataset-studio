@@ -1,6 +1,6 @@
 > [!WARNING]
 
-This fork runs local generation and training. Image Sources adds operator-started booru, Rule34 and Pawchive acquisition. Online publishing, Civitai browsing and in-app update APIs remain disabled. Setup downloads require an explicit action; runtime models must already be present. See [Offline Workflows](docs/OFFLINE_WORKFLOWS.md).
+This fork runs local generation and training. Image Sources adds operator-started acquisition through gallery-dl, yt-dlp and configured local extractors. Online publishing, Civitai browsing and in-app update APIs remain disabled. Setup downloads require an explicit action; runtime models must already be present. See [Offline Workflows](docs/OFFLINE_WORKFLOWS.md).
 > **No affiliation with loradataset.com.** That website is not operated, endorsed, or supported by the LoRA Dataset Studio team. Any payments made to that service do not support this project. Use this repository and the links provided here to find our official downloads and community channels.
 
 # LoRA Dataset Studio V2
@@ -632,7 +632,7 @@ Every threshold behind these flags (sharpness, noise, NSFW, same-person similari
 
 ### The built-in web scraper
 
-**Image Sources** in Bank and Dataset imports scans Danbooru, Gelbooru, e621/e926, Rule34, Paheal and Pawchive. Paste a URL or enter a booru tag query. Select originals, download them, then import the verified local images for review. Source posts, tags, ratings and available dimensions remain attached. Original ZIP attachments can yield images without importing previews. Jobs and verified downloads survive a restart; Resume requires an explicit action. The former general scraper remains excluded. [Image Sources guide](docs/guide/using-the-app.md#image-sources)
+**Image Sources** in Bank and Dataset accepts the gallery-dl and yt-dlp provider catalogs, image boards, nested collections and generic public URLs. A host folder can add your local GDLOPS extractor modules. Paste a URL or use a booru search preset. Select originals, download them, then import compatible images for review. Source posts, tags, ratings and available dimensions remain attached. ZIP attachments can yield images; other media remains downloadable. Jobs and verified downloads survive a restart; Resume requires an explicit action. Live access depends on the installed extractor and source credentials. [Image Sources guide](docs/guide/using-the-app.md#image-sources)
 
 ## 3. Curate down to the keepers
 

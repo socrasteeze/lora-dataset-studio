@@ -803,7 +803,7 @@ def normalize_source_metadata(value, *, image_url=None):
         return None
     platform = value.get('platform')
     from .image_source_metadata import PROVIDERS, normalize as normalize_image_source
-    if platform in PROVIDERS:
+    if platform in PROVIDERS or value.get('acquisition') is True:
         return normalize_image_source(value)
     if platform == 'websearch':
         # Web search stores the source page without photographer credit.

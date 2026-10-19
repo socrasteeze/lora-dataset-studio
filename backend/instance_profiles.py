@@ -13,7 +13,7 @@ from urllib.parse import urlencode
 
 ROOT = Path(__file__).resolve().parent.parent
 SECRET_KEYS = ('HF_TOKEN', 'VAST_API_KEY', 'REDDIT_CLIENT_ID', 'CIVITAI_API_KEY',
-               'PEXELS_API_KEY', 'LMSTUDIO_API_KEY', 'LDS_ACCESS_TOKEN')
+               'PEXELS_API_KEY', 'LMSTUDIO_API_KEY', 'IMAGE_SOURCE_CREDENTIALS', 'LDS_ACCESS_TOKEN')
 PATH_KEYS = ('LDS_DATA_DIR', 'LDS_CONFIG', 'LDS_ENV', 'LDS_PLUGINS_DIR', 'LDS_EXTENSIONS_DIR')
 
 

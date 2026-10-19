@@ -55,6 +55,10 @@
     "github.com"
    ]
   },
+  "backend/app/scrape/image_source_engines.py": {
+   "calls": 3,
+   "hosts": []
+  },
   "backend/app/scrape/netfetch.py": {
    "calls": 1,
    "hosts": []
@@ -109,7 +113,7 @@
    ]
   },
   "backend/app/services/image_source_network.py": {
-   "calls": 2,
+   "calls": 4,
    "hosts": []
   },
   "backend/app/services/klein_edit_helper.py": {
