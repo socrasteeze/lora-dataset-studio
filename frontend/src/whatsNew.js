@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-19-bank-review-viewport', date: '2026-10-19', title: 'Reach Review Controls',
+    blurb: 'Keep, Reject and Skip remain reachable in Bank review. The control panel scrolls in short windows.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-19-source-review', date: '2026-10-19', title: 'Inspect Source Images',
     blurb: 'Source images open in the shared viewer with zoom and navigation. Page previews, visible job destinations and safe credential updates make imports easier to review.',
     to: '/bank',
