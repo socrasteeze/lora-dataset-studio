@@ -5,7 +5,12 @@ Current rules for this fork of perfectgf/lora-dataset-studio.
 There is no sync loop. The wave log that used to live here is
 `docs/history/FORK_CHANGELOG.md`, unchanged.
 
-The landing gate is `scripts/gates.ps1 -Phase Gates`.
+Agents run tests only on an explicit operator request, in cloud unless a local
+run is also authorized. Implementation and delivery requests do not authorize
+tests. Use `[skip ci]` on delivery pushes without test permission and record
+the unrun or incomplete checks. Keep the CI definitions intact.
+
+The full qualification gate, when requested, is `scripts/gates.ps1 -Phase Gates`.
 It runs the complete host/tooling suite once, with eight workers and file-local
 scheduling. Quick retains its own focused preflight. Pull requests and scrubbed
 `validation/**` pushes use Fork Gates; ordinary PR CI does not duplicate the
@@ -127,9 +132,10 @@ A topic count does not prove the wording was kept. Diff the ids.
 
 ## Divergence 11: no nightly branch
 
-This fork has no `nightly` branch and no reduced gate before `main`.
-Do not land work by skipping the backend suite.
-`scripts/gates.ps1 -Phase Gates` is the landing gate.
+This fork has no `nightly` branch. When full qualification is requested, use
+`scripts/gates.ps1 -Phase Gates`; do not substitute a reduced backend suite.
+An operator request to deliver without tests takes precedence. Use `[skip ci]`
+and report that full qualification was not completed.
 
 ## Divergence 12: offline runtime
 
