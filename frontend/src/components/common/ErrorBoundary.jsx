@@ -46,6 +46,18 @@ class ErrorBoundary extends Component {
           </div>
         );
       }
+      if (this.props.compact) {
+        return (
+          <div role="alert" className="flex min-w-0 flex-1">
+            <span className="sr-only">This tab could not load.</span>
+            <button type="button" onClick={() => window.location.reload()}
+              title="This tab could not load. Reload the page."
+              className="min-h-10 min-w-0 flex-1 rounded-md border border-amber-500/40 px-2 py-1.5 text-sm text-amber-300 lg:min-h-0">
+              Reload Page
+            </button>
+          </div>
+        );
+      }
       // Inline boundary (e.g. a single widget): compact fallback.
       return (
         <div className="text-center py-8 text-content-muted" role="alert">

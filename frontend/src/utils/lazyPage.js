@@ -15,18 +15,20 @@
 // update gets its one reload too. sessionStorage can throw (private mode) —
 // then we skip straight to the error rather than risk the loop.
 import { lazy } from 'react'
+import { hasUnsavedWork } from '../hooks/useUnsavedWork.js'
 
 const RELOAD_FLAG = 'lds-chunk-reloaded'
 
-export function lazyPage(importer) {
+export function lazyPage(importer, { reloadKey = RELOAD_FLAG, preserveDrafts = false } = {}) {
   return lazy(() => importer().then((mod) => {
-    try { sessionStorage.removeItem(RELOAD_FLAG) } catch { /* private mode */ }
+    try { sessionStorage.removeItem(reloadKey) } catch { /* private mode */ }
     return mod
   }).catch((err) => {
+    if (preserveDrafts && hasUnsavedWork()) throw err
     let alreadyReloaded = true
     try {
-      alreadyReloaded = sessionStorage.getItem(RELOAD_FLAG) === '1'
-      if (!alreadyReloaded) sessionStorage.setItem(RELOAD_FLAG, '1')
+      alreadyReloaded = sessionStorage.getItem(reloadKey) === '1'
+      if (!alreadyReloaded) sessionStorage.setItem(reloadKey, '1')
     } catch { /* private mode: no way to bound a loop, so never start one */ }
     if (!alreadyReloaded) {
       window.location.reload()
