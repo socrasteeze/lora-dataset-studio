@@ -85,14 +85,14 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
-    id: '2026-10-18-header-spacing', date: '2026-10-18', title: 'Clearer Mobile Headers',
-    blurb: 'The active profile sits below the app title. Dataset controls use even gaps and equal action widths on phones. Long trigger words stay inside the copy button.',
-    to: '/datasets',
-  },
-  {
     id: '2026-10-18-image-sources', date: '2026-10-18', title: 'Collect Original Images',
     blurb: 'Collect originals through gallery-dl, yt-dlp and your local GDLOPS extractors. Resume interrupted jobs and import compatible images with source tags into Bank or Dataset. Other media remains downloadable. Sources run only from your actions.',
     to: '/bank',
+  },
+  {
+    id: '2026-10-18-header-spacing', date: '2026-10-18', title: 'Clearer Mobile Headers',
+    blurb: 'The active profile sits below the app title. Dataset controls use even gaps and equal action widths on phones. Long trigger words stay inside the copy button.',
+    to: '/datasets',
   },
   {
     id: '2026-10-16-storage-folder-selection',
