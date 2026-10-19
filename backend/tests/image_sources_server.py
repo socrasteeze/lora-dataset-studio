@@ -1,0 +1,134 @@
+"""Isolated, synthetic acquisition server for the cloud browser probe."""
+import io
+import os
+from pathlib import Path
+import sys
+import threading
+import zipfile
+
+
+def main():
+    runtime = Path(sys.argv[1]).resolve()
+    runtime.mkdir(parents=True, exist_ok=True)
+    for key, name in (('LDS_DATA_DIR', 'data'), ('LDS_CONFIG', 'config.json'),
+                      ('LDS_ENV', '.env'), ('LDS_PLUGINS_DIR', 'plugins'),
+                      ('LDS_EXTENSIONS_DIR', 'extensions')):
+        os.environ[key] = str(runtime / name)
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    import pytest
+    from PIL import Image
+    from public_plugin_fixture import create_test_app
+    from werkzeug.serving import make_server
+    from flask import jsonify
+    patch = pytest.MonkeyPatch()
+    app = create_test_app(runtime, patch, config_object={
+        'SQLALCHEMY_DATABASE_URI': f'sqlite:///{(runtime / "state.db").as_posix()}',
+    })
+    from app import capabilities, setup_state
+    from app.config import LOCAL_USER
+    from app.extensions import db
+    from app.models import FaceDataset
+    from app.services import image_sources as sources
+    calls = {'scans': 0, 'downloads': 0}
+    download_ready = threading.Event()
+    download_ready.set()
+    images = []
+    for index in range(28):
+        output = io.BytesIO()
+        Image.new('RGB', (320, 384), (20 + index * 4, 50, 90)).save(output, 'PNG')
+        images.append(output.getvalue())
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, 'w') as handle:
+        handle.writestr('image-01.png', images[27])
+
+    def scan(job, cancel, control):
+        calls['scans'] += 1
+        for index in range(job.position, min(27, job.position + job.limit)):
+            if cancel.is_set():
+                raise InterruptedError()
+            extension = 'zip' if index == 25 else 'mp4' if index == 26 else 'png'
+            yield [3, f'https://cdn.example.test/{index}.{extension}',
+                   {'id': index + 1, 'extension': extension,
+                    'tags': f'synthetic_{index} blue', 'tags_artist': ['demo_artist'],
+                    'width': 320, 'height': 384,
+                    'preview_url': f'https://cdn.example.test/{index}.png'}]
+
+    def fetch(url, **kwargs):
+        calls['downloads'] += 1
+        if url.endswith('.zip'):
+            return archive.getvalue()
+        if url.endswith('.mp4'):
+            return b'synthetic-video-container'
+        return images[int(url.rsplit('/', 1)[-1].split('.')[0])]
+
+    def download(job, cancel, control, extra=None):
+        if not extra or extra.get('action') != 'download':
+            raise AssertionError('Only synthetic downloads use this adapter.')
+        if not download_ready.wait(timeout=15):
+            raise ValueError('The synthetic download was not released.')
+        from app.models import ImageSourceAsset
+        for asset in ImageSourceAsset.query.filter_by(job_id=job.id, selected=True).order_by(ImageSourceAsset.id):
+            if asset.source_key not in extra['keys']:
+                continue
+            if cancel.is_set():
+                raise InterruptedError()
+            extension = {'archive': 'zip', 'video': 'mp4'}.get(asset.kind, 'png')
+            name = asset.source_key + '.' + extension
+            (Path(extra['directory']) / name).write_bytes(fetch(asset.url))
+            yield [4, asset.source_key, {'file': name}]
+
+    patch.setattr(sources, 'scan_events', scan)
+    patch.setattr(sources, 'worker_events', download)
+    patch.setattr(sources, 'fetch', fetch)
+    patch.setattr(capabilities, 'probe_image_source_deps', lambda: {'ok': True})
+    with app.app_context():
+        setup_state.complete_core()
+        dataset = FaceDataset(user_id=LOCAL_USER, name='Demo Dataset',
+                              trigger_word='demo_subject_(example_collection)', kind='concept')
+        db.session.add(dataset)
+        db.session.commit()
+        dataset_id = dataset.id
+
+    @app.get('/test/ready')
+    def ready():
+        return jsonify({'dataset_id': dataset_id, **calls})
+
+    @app.post('/test/hold-download')
+    def hold_download():
+        download_ready.clear()
+        return {'ok': True}
+
+    @app.post('/test/release-download')
+    def release_download():
+        download_ready.set()
+        return {'ok': True}
+
+    @app.get('/test/debug')
+    def debug():
+        import faulthandler
+        faulthandler.dump_traceback(file=sys.stderr, all_threads=True)
+        from app.models import ImageSourceJob
+        control = sources.runtime(app)
+        return jsonify({'active': control['active'],
+                        'worker_alive': bool(control['worker'] and control['worker'].is_alive()),
+                        'jobs': [{key: getattr(job, key) for key in ('id', 'state', 'phase', 'done', 'error')}
+                                 for job in ImageSourceJob.query.order_by(ImageSourceJob.created_at.desc())]})
+
+    @app.post('/test/shutdown')
+    def shutdown():
+        download_ready.set()
+        threading.Thread(target=server.shutdown, daemon=True).start()
+        return {'stopping': True}
+
+    server = make_server('127.0.0.1', int(sys.argv[2]), app, threaded=True)
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
+        with app.app_context():
+            db.session.remove()
+            db.engine.dispose()
+
+
+if __name__ == '__main__':
+    main()

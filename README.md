@@ -1,6 +1,6 @@
 > [!WARNING]
 
-This fork runs local workflows. Online publishing, scraping, Civitai browsing and in-app update APIs are disabled. Setup downloads require an explicit action; runtime models must already be present. See [Offline Workflows](docs/OFFLINE_WORKFLOWS.md).
+This fork runs local generation and training. Image Sources adds operator-started acquisition through gallery-dl, yt-dlp and configured local extractors. Online publishing, Civitai browsing and in-app update APIs remain disabled. Setup downloads require an explicit action; runtime models must already be present. See [Offline Workflows](docs/OFFLINE_WORKFLOWS.md).
 > **No affiliation with loradataset.com.** That website is not operated, endorsed, or supported by the LoRA Dataset Studio team. Any payments made to that service do not support this project. Use this repository and the links provided here to find our official downloads and community channels.
 
 # LoRA Dataset Studio V2
@@ -61,7 +61,7 @@ Four ways to fill a dataset, and one choice at creation that rewires everything 
 
 | Capability | What it provides |
 |---|---|
-| **Curation grid** | Keep/reject, crop, mirror, rotate, zoom, resize, multi-select and non-destructive upscale candidates from either engine — Klein re-renders detail (sharper, but skin and colour can shift), SeedVR2 resolves detail and leaves the original look alone |
+| **Curation grid** | Keep/reject, crop, Auto-Center the full subject with a local vision model, mirror, rotate, zoom, resize, multi-select and non-destructive upscale candidates from either engine — Klein re-renders detail (sharper, but skin and colour can shift), SeedVR2 resolves detail and leaves the original look alone |
 | **Identity and composition checks** | InsightFace similarity, score-based auto-triage, framing badges and a live Character composition meter |
 | **Model-matched captions** | Prose or booru form selected by target family, with kind-aware Concept leak checks and content-only Style rules |
 | **Local booru tagger** | Optional PixAI Tagger writes booru dataset captions from prepared local weights. Setup preparation requires an explicit action. Auto, prose, Concept and Bank captioning keep the existing engines. See [Captioning settings](docs/guide/settings-reference.md#pixai-device). |
@@ -640,7 +640,7 @@ Every threshold behind these flags (sharpness, noise, NSFW, same-person similari
 
 ### The built-in web scraper
 
-Online scraping is excluded from this fork. Import local files or folders, or upload files from your browser. Existing source metadata is retained. See [Offline Workflows](docs/OFFLINE_WORKFLOWS.md).
+**Image Sources** in Bank and Dataset accepts the gallery-dl and yt-dlp provider catalogs, image boards, nested collections and generic public URLs. A host folder can add your local GDLOPS extractor modules. Paste a URL or use a booru search preset. Inspect cached previews and downloaded originals in the shared image viewer, then import compatible images for review. Source posts, tags, ratings and available dimensions remain attached. ZIP attachments can yield images; other media remains downloadable. Jobs and verified downloads survive a restart; Resume requires an explicit action. Live access depends on the installed extractor and source credentials. [Image Sources guide](docs/guide/using-the-app.md#image-sources)
 
 ## 3. Curate down to the keepers
 
@@ -1043,7 +1043,7 @@ Use **Settings** for normal configuration. Native installs bind to `127.0.0.1` b
 The short version:
 
 - **Ordinary settings** are written to `config.json` (git-ignored, in your data directory). Copy `config.example.json` to `config.json` to edit by hand — but almost everything has a UI control in **Settings**.
-- **Secrets** (`HF_TOKEN` for a gated Setup download, and `CIVITAI_API_KEY` for a Civitai model download) live in `.env`, never in `config.json` or a commit — copy `.env.example` to `.env`. They do not enable publishing, browsing or scraping. This fork has no `GEMINI_API_KEY`, `OPENAI_API_KEY` or `VAST_API_KEY` to set. Saving `HF_CLOUD_TOKEN` is refused.
+- **Secrets** (`HF_TOKEN` for a gated Setup download, `CIVITAI_API_KEY` for a Civitai model download, and write-only `IMAGE_SOURCE_CREDENTIALS` for explicit source jobs) live in `.env`, never in `config.json` or a commit. Copy `.env.example` to `.env`. They do not enable publishing or Civitai browsing. This fork has no `GEMINI_API_KEY`, `OPENAI_API_KEY` or `VAST_API_KEY` to set. Saving `HF_CLOUD_TOKEN` is refused.
 - **A handful of environment variables** override paths: `LDS_DATA_DIR` (runtime data), `LDS_CONFIG` (path to `config.json`), `LDS_ENV` (path to `.env`), `LDS_HOST` (bind host, beats `server.host`), `FLASK_DEBUG` (`1` for Flask debug).
 - **The keys you most often touch** — `server.port` (default `5050`), `comfyui.api_url`, `ollama.vision_model`, `aitoolkit.dir`, `training.default_family` — are all in the [full reference](docs/guide/settings-reference.md#configjson-key-reference-all-keys).
 
@@ -1055,7 +1055,7 @@ To **rent another PC’s GPU** while keeping datasets on one machine, use **Sett
 
 Under the hood: the app has **no user accounts**, so on `127.0.0.1` (the default) that's fine, but any other bind would hand the whole network your GPU and datasets. On a non-loopback bind you can require an **access token**: with the token gate on, `run.py` generates one at boot (printed to the console with a ready-to-open URL) unless you set `LDS_ACCESS_TOKEN` yourself. Open `http://<machine>:<port>/?token=<token>` once from the remote device — a signed session cookie takes over from there. Requests from localhost never need the token. If your network is already locked down (VPN, authenticated reverse proxy), `LDS_ALLOW_UNAUTHENTICATED=1` disables the guard explicitly. The whole interface also works on a phone or tablet on your own network, so checking a run or triaging a bank does not need the machine that is training.
 
-**What leaves this machine.** Local workflows use prepared model files and local tools. Online publishing, scraping, Civitai browsing and in-app update APIs are disabled. Setup may fetch packages, node packs and weights only after an explicit action. Inference workers refuse public socket connections and training disables hub downloads and online experiment logging. Private-network peers receive work only through the existing operator actions. See [Offline Workflows](docs/OFFLINE_WORKFLOWS.md).
+**What leaves this machine.** Local workflows use prepared model files and local tools. Image Sources sends operator-selected public source requests and source credentials only after Scan, Load Previews, Download or Resume. It does not upload datasets or run scheduled subscriptions. Online publishing, Civitai browsing and in-app update APIs remain disabled. Setup may fetch packages, node packs and weights only after an explicit action. Inference workers refuse public socket connections and training disables hub downloads and online experiment logging. Private-network peers receive work only through the existing operator actions. See [Offline Workflows](docs/OFFLINE_WORKFLOWS.md).
 
 When the app is served on an address the public internet can reach — a rented pod's proxy hostname, a tunnel — set `LDS_PUBLIC=1`. That forces the access token on whatever the setting says, so the switch cannot be turned off into an open door, and generates a token at boot if none exists. It applies to non-loopback binds only, and `LDS_ALLOW_UNAUTHENTICATED=1` still overrides it for setups that authenticate elsewhere.
 

@@ -35,7 +35,7 @@ test('the lightbox is a layer', () => {
 test('the two chip rails do not overlap, and the second one folds on a phone held sideways', () => {
   // -mt-1 on the destinations rail put it 4 px under the sections rail
   assert.ok(!/destinations.*\n.*-mt-1/.test(workspace), 'the destinations rail pulls itself under the sections rail again');
-  assert.match(workspace, /data-probe-chrome="destinations"\n\s+className="relative -mx-4 overflow-x-auto px-4 pb-1 lg:hidden \[@media\(max-height:500px\)\]:hidden"/);
+  assert.match(workspace, /data-probe-chrome="destinations"\n\s+className="relative -mx-3 overflow-x-auto px-3 pb-1 sm:-mx-4 sm:px-4 lg:hidden \[@media\(max-height:500px\)\]:hidden"/);
 });
 
 test('controls reach 40 px below lg — the section chips, the header, the menu, the toolbar chips', () => {

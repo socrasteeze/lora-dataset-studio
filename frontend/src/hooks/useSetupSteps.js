@@ -773,6 +773,7 @@ export function brokenOrMissing(missing, invalid) {
 
 // Setup-installer action -> the short human label shown in the Install-everything list.
 export const INSTALL_ALL_ACTION_LABELS = {
+  image_source_extras: 'Source Downloaders',
   face_scoring: 'Face-similarity scoring',
   masks: 'Person masks',
   watermark_inpaint: 'Watermark inpainting',
@@ -997,6 +998,7 @@ function coreInstallCatalog(caps) {
     return item(action, present, mlOk || present, mlHint)
   }
   return [
+    item('image_source_extras', c.image_source_deps, true, ''),
     mlItem('face_scoring'),
     mlItem('masks'),
     item('watermark_inpaint', c.watermark_inpaint, true, ''),   // auto-provisions its own venv

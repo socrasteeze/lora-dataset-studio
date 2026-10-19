@@ -149,8 +149,9 @@ What stays off:
 
 - In-app online update checks and apply operations are unavailable. Maintain
   the checkout or replace the local release outside the app, then restart.
-- Civitai browsing, Hugging Face publishing and online media imports are
-  unavailable, even with a saved key. The scrape blueprint is not registered.
+- Civitai browsing, Hugging Face publishing and the former general online
+  media imports are unavailable, even with a saved key. The scrape blueprint
+  is not registered. Image Sources is the operator-authorized exception below.
 - External plugin ZIPs and any plugin outside the ten bundled ids are refused.
 - There is no plugin catalog and no usage-statistics collector. Installed
   plugins are listed by `GET /api/plugins/`, which also reports `can_manage`.
@@ -180,6 +181,40 @@ Still allowed: local file import/export, local generation and training,
 operator-started model/node-pack downloads and Setup installs, and the private
 network peers the operator entered. Stored credentials and historical link
 tables remain; they do not enable online runtime features.
+
+## Image Sources exception
+
+The operator authorized acquisition for the GDLOPS provider range. Boorus,
+Rule34 and Pawchive are examples, not a provider allowlist.
+The core `image_sources` blueprint owns this workflow. The old `scrape` plugin
+and its routes remain excluded. `offline_only()` remains true for every other
+existing caller. Image Sources does not restore publishing or online generation.
+
+Only explicit Scan, Scan More, Rescan, Load Previews, Download and Resume actions can
+start source requests. Import consumes verified local bytes. Boot marks queued
+or running source jobs interrupted without starting them. Status, cached preview
+and selection routes contact no provider. Source credentials are write-only.
+
+The child ignores ambient configuration and receives a scoped public HTTP(S)
+proxy. Connections resolve and pin public addresses, including redirects.
+Resolution tries named gallery-dl, named yt-dlp, generic gallery-dl, then generic
+yt-dlp. Only an unsupported URL advances the chain. Source-native downloaders
+retain authentication and stream behavior. Local FFmpeg merges media when
+required; arbitrary client options and postprocessor definitions are unavailable.
+`requirements-image-sources.txt` pins the optional engines. Setup verifies their
+actual imports after installation. The worker has no GPU dependency.
+
+GDLOPS custom extractor code has no distribution license. It is not copied here.
+An explicit host-folder setting loads operator-owned modules before built-ins.
+These modules execute as trusted local code and are not an isolation boundary.
+
+Manual jobs retain canonical provenance and separate download/import state.
+Exact bytes share a content identity; near-duplicate decisions stay in Bank.
+ZIP extraction has entry, expanded-size, path and image limits. Unsupported
+archives remain downloadable; extraction limits and errors stay visible.
+Animated images and other media can be downloaded but do not enter static image
+intake. Thread boards use the normal extractor catalog. Scheduled subscriptions
+and automatic remote resumes remain outside this wave. See the Guide.
 
 ## Mobile workflow contract
 

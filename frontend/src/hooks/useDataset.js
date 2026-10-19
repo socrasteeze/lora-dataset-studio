@@ -1169,31 +1169,31 @@ export function useDataset() {
 
   const crop = useCallback(async (imageId, box) => {
     const d = await postJson(`/api/dataset/image/${imageId}/crop`, box);
-    if (!d.ok) { toast.error(d.error || 'Unexpected error'); return; }
+    if (!d.ok) throw new Error(d.error || 'Could not save the crop.');
     await refresh();
     // Bump only this image's version — the rest of the grid keeps its cache (M1).
     setNonces((m) => ({ ...m, [imageId]: (m[imageId] || 0) + 1 }));
-  }, [refresh, toast]);
+  }, [refresh]);
 
   const cropRef = useCallback(async (box) => {
     const d = await postJson(`/api/dataset/${currentId}/ref/crop`, box);
-    if (!d.ok) { toast.error(d.error || 'Unexpected error'); return; }
+    if (!d.ok) throw new Error(d.error || 'Could not save the crop.');
     await refresh();
     setRefNonce((n) => n + 1);
-  }, [currentId, refresh, toast]);
+  }, [currentId, refresh]);
 
   // Crop ONE extra reference (identified by filename — extras have no numeric id).
   const cropExtraRef = useCallback(async (filename, box) => {
     const d = await postJson(`/api/dataset/${currentId}/ref/extra/crop`, { filename, ...box });
-    if (!d.ok) { toast.error(d.error || 'Unexpected error'); return; }
+    if (!d.ok) throw new Error(d.error || 'Could not save the crop.');
     await refresh();
     setRefNonce((n) => n + 1);
-  }, [currentId, refresh, toast]);
+  }, [currentId, refresh]);
 
   // Reset to the automatic head-crop (re-run on the kept original, no re-upload).
   const recropRefAuto = useCallback(async () => {
     const d = await postJson(`/api/dataset/${currentId}/ref/recrop-auto`, {});
-    if (!d.ok) { toast.error(d.error || 'Unexpected error'); return; }
+    if (!d.ok) throw new Error(d.error || 'Could not save the crop.');
     if (d.warning) toast.warning(d.warning); else toast.success('Reset to auto crop');
     await refresh();
     setRefNonce((n) => n + 1);

@@ -5,6 +5,7 @@ import { useToast } from '../components/common/Toast'
 import { useCapabilities } from '../context/CapabilitiesContext'
 import { HelpBadge } from '../help/HelpMode'
 import BankWorkspace from '../components/bank/BankWorkspace'
+import ImageSourcesPanel from '../components/shared/ImageSourcesPanel'
 import LaunchAllDialog from '../components/bank/LaunchAllDialog'
 import FolderPickerField from '../components/common/FolderPicker'
 import { Button, Input, Select, btnClass } from '../components/common/Controls.jsx'
@@ -819,6 +820,7 @@ export default function BankPage() {
         onClearWaiting={clearWaiting} onStopRunning={stopRunning} />
       {/* Second way in: the scraper's own destination. A bank no longer needs a
           folder you prepared by hand — you can fill one straight from the web. */}
+      <ImageSourcesPanel banks={banks || []} onImported={() => refresh()} />
       <PluginSlot slot="sources.panel" surface="bank" banks={banks} onDone={() => refresh()} />
 
       {banks == null ? (

@@ -60,7 +60,7 @@ test('the destinations rail under the dataset sections is covered too', () => {
   // the responsive probe's finding, not this test's: here only `relative` and
   // the rail's existence are the contract.)
   const src = read('src/components/dataset/DatasetWorkspace.jsx')
-  assert.match(src, /className="relative -mx-4 overflow-x-auto px-4 pb-1 lg:hidden \[@media\(max-height:500px\)\]:hidden"/)
+  assert.match(src, /className="relative -mx-3 overflow-x-auto px-3 pb-1 sm:-mx-4 sm:px-4 lg:hidden \[@media\(max-height:500px\)\]:hidden"/)
 })
 
 test('the reason is written down where the class is', () => {

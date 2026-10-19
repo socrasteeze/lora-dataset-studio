@@ -385,6 +385,7 @@ import { installAllPlan, INSTALL_ALL_ORDER } from './useSetupSteps.js';
 
 // A fully-installed snapshot; each test flips just the pieces it needs MISSING.
 const fullCaps = () => ({
+  image_source_deps: true,
   python: { ml_supported: true },
   face_scoring: true, masks: true, watermark_inpaint: true, wd14: true,
   // Three video probes, not two: the `video` install action ships PyAV AND a
@@ -458,7 +459,7 @@ test('installCatalog lists every app-installable component, present + available'
   // card, this menu is the per-piece repair path each of them also deserves.
   assert.deepEqual(
     installCatalog(fullCaps()).map((c) => c.action),
-    ['face_scoring', 'masks', 'watermark_inpaint', 'wd14', 'video',
+    ['image_source_extras', 'face_scoring', 'masks', 'watermark_inpaint', 'wd14', 'video',
       'shot_detect', 'video_text', 'ollama_model',
       'klein_model', 'klein_text_encoder', 'klein_vae', 'klein_lora',
       'klein_enhancement_lora',
@@ -478,7 +479,16 @@ test('installCatalog stays fully available for reinstall when all is green', () 
   // Plugin-owned install rows are tested by their owners. Core stays complete
   // without requiring an unregistered plugin contribution.
   const cat = installCatalog(fullCaps());
-  assert.ok(cat.length === 19 && cat.every((c) => c.available));
+  assert.ok(cat.length === 20 && cat.every((c) => c.available));
+});
+
+test('source downloaders expose repair and remain optional for core setup', () => {
+  const caps = { ...fullCaps(), image_source_deps: false };
+  const row = installCatalog(caps).find((item) => item.action === 'image_source_extras');
+  assert.equal(row.present, false);
+  assert.equal(row.available, true);
+  assert.equal(row.label, 'Source Downloaders');
+  assert.ok(!installAllPlan(caps).includes('image_source_extras'));
 });
 
 test('installCatalog marks missing ML extras not-present but still available', () => {

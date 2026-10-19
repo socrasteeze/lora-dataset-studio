@@ -49,6 +49,90 @@ Images, captions and Keep/Reject decisions stay unchanged. This does not restore
 The existing folder control also works: choose the folder under **Filters > Subfolder**, then choose **Not one person after all**.
 
 
+## Image Sources
+
+Open **Image Sources** on the Bank list or in a Dataset's import section.
+Use **New Scan** to create a job, or choose a saved job from **Jobs**.
+Each **Current Job** shows its saved source and import destination. Changes in
+New Scan apply only to the next job; they do not redirect an existing import.
+Install the optional source packages with **Install Sources** if required. The
+same **Source Downloaders** action is available in Setup. Paste a public source
+URL. Named gallery-dl and yt-dlp extractors, nested albums, thread boards and
+generic pages use the same workflow. Only an unsupported URL advances to the
+next downloader; authentication and network failures stop visibly.
+
+**Search Preset** provides tag queries for Danbooru, Gelbooru, e621/e926, Rule34
+and Paheal. Choose a preset and leave URL blank to use **Tag Query**. Pawchive
+requires a profile or individual post URL. These presets do not limit URL
+support. **Downloader** defaults to Auto; it can select gallery-dl or yt-dlp.
+**Select Media** defaults to images and ZIPs. Choose Videos or All Media to
+select those results by default. You can also select individual result cards.
+
+**New Scan > Advanced > Extractor Settings** can load your GDLOPS custom modules from a host folder.
+Use the shared folder browser or type the host path, then select **Save Folder**.
+Only trusted local Python modules belong there. The folder stays on the host
+and applies to both Bank and Dataset. GDLOPS private code is not bundled. See
+[Source Extractors](settings-reference.md#image-source-extractors).
+
+1. Choose a destination. Bank can use a new named Bank or an existing Bank.
+2. Select **Scan**. The default limit is 200 media entries; each pass permits 1-1000.
+3. Use **Load Previews** to cache image previews for the visible page, up to 24 items. This does not change selection.
+4. Use **Clear All**, a results filter, and **Select Page** to narrow a selection.
+5. Select **Download** to fetch the selected originals.
+6. Select **Import Images** to add compatible verified images for review.
+
+Filters change the view. Download and Import Images use selected items across all result pages.
+Load Previews uses the visible page, including images that are not selected.
+The highlighted action and the next-step message guide the job through preview,
+download and import. Import Images is available when selected downloaded images
+remain to import. Advanced holds the scan limit, downloader and media options.
+Previews never substitute for originals. A source without preview metadata
+shows **No Preview** until its image downloads. The results grid displays 24
+items at a time. The saved job list retains the latest 30 jobs in the interface.
+Click an image to open the shared image viewer. Use pinch, wheel or double-tap
+to zoom, and the arrows to move through available images on the current page.
+The viewer shows the cached original after download; otherwise it shows a
+thumbnail and identifies it as such. The selection checkbox stays separate
+from the preview. Opening the viewer makes no request to the source site.
+**Save Original** downloads a cached file to your client. Videos, other files
+and archives can be saved without entering static image intake. Animated images
+remain downloadable but cannot enter that intake.
+
+Each job keeps its source cursor, selection, downloaded checksums and import
+state. **Stop** preserves completed files. **Resume** retries the last action.
+For previews, Resume retries the same image batch. Load Previews starts a batch
+for the page currently shown.
+After a restart, jobs show **Interrupted** and require Resume. **Scan More**
+continues the media window; changed remote listings can shift that window.
+Use **Rescan** to restart the media window and refresh temporary download URLs
+without clearing selections or verified files. Each job permits at most 5000 items.
+Saved jobs have no schedule and never contact sources merely because a page opens.
+
+Image imports preserve supported static original bytes and orientation. Source
+posts, available dimensions, ratings and grouped tags remain separate from
+editable training captions. Repeated exact bytes do not add a second destination
+image. New images enter Pending review. Near-duplicate decisions remain yours.
+Existing review decisions and edited captions remain unchanged on import retry.
+
+Pawchive scans expand post details and request original attachments. ZIP files
+are download targets even though their extension is not an image extension.
+Download a selected ZIP to list its extracted images, then select those images
+for import. The original ZIP stays cached. Archives permit at most 1000 entries,
+512 MiB expanded content and a 200:1 expansion ratio per entry. Unsafe paths,
+links, encrypted archives, unsupported formats and invalid images fail visibly.
+RAR and 7z extraction are unavailable. Extraction refusals retain the cached
+original and display an error. They are not successful image imports.
+
+Images permit 64 MiB. ZIP extraction permits a 256 MiB compressed archive.
+Other original downloads permit up to 1.75 GiB per file, within each job's
+2 GiB cache limit and a 256 MiB free-space reserve. Larger ZIPs remain available
+for **Save Original** without extraction. Source errors and rate limits stop or
+fail work visibly; verified files remain available for retry. Downloads use
+public HTTP(S), with public DNS addresses pinned for each connection. Source
+credentials are write-only. Live source access depends on the installed
+extractor, site changes and your credentials. Subscriptions, online generation
+and publishing remain outside this workflow.
+
 The workspace is a **guided flow**: each stage stays folded until the one
 before it is done, and the progress rail on the left tells you where you are
 and what's blocking the next step. You never have to guess what comes next —
@@ -348,7 +432,7 @@ never an automatic continuation.
 Pick **Concept** at creation and describe the concept in the required field —
 the captioner needs to know exactly *what to omit*. What changes vs character:
 
-- **No reference photo.** Import local images, upload them from your browser, or promote bank keepers. **More > Import from folder** merges image/caption pairs from a local host folder. **Import dataset** accepts a ZIP. Online scraping is excluded.
+- **No reference photo.** Import local images, upload them from your browser, or promote bank keepers. **More > Import from folder** merges image/caption pairs from a local host folder. **Import dataset** accepts a ZIP. **Image Sources** can collect selected originals from supported sites.
 - **Captions invert**: they describe everything *except* the concept, so the
   concept is what binds to the trigger. The leak check watches for stray
   descriptions of it.
@@ -2479,6 +2563,35 @@ upscaling a shot used to mean leaving it: promote into a dataset, edit there,
 export into a **new** bank, and start curating again. Both edits now happen in
 the bank itself, so the loop is *curate → edit → re-analyse → promote*, in one
 place. (Asked for by nofaceman on Discord, backed by mr.arrow.)
+
+### Auto-center a crop
+
+Open **Crop** in Bank Review or a Dataset, choose **Full Subject**, then click
+**Auto-Center**. It proposes a tighter box around the entire visible subject.
+For a full-body image on a plain background, this removes unused surrounding
+space with about 10% margin on each side of the detected figure. **Face & Head**
+is available when you want a head crop instead.
+
+Auto-Center uses the local vision model configured in Setup. It analyzes a small,
+upright preview only after you click the button. It does not save or replace an
+image. Review the box, drag its handles if needed, then press **Crop** to apply it.
+The model can miss parts or choose the wrong subject, so review every proposal.
+
+Choose **Free** for the most flexible framing, or select an aspect ratio first.
+A ratio that cannot contain the detected subject is refused instead of cutting
+it off. Near an image edge, the whole detected subject takes priority over exact
+centering. Changing the ratio and clicking Auto-Center again reuses the detection.
+
+If detection fails, the existing box stays in place. **Open Setup** is available
+when the local vision model needs attention; manual cropping remains available.
+A failed save keeps the editor and the crop selection open.
+
+The same controls are available for Dataset images and primary/extra references.
+Applying a crop uses each surface's existing rules: Bank preserves source files
+and saves an editable copy; Dataset crops its training image and caps the long
+side at 1024 pixels without enlarging smaller crops.
+
+### Manual crop and edit history
 
 **✂ Crop** is per image, in **▶ Review** — the only place a bank shows a picture
 big enough to draw a box on. Open Review (or press ▶ on a tile), then click

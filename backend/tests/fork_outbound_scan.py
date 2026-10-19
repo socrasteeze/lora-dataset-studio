@@ -30,6 +30,7 @@ SKIP_PARTS = frozenset({'tests', 'test', '__pycache__', 'node_modules', 'dist',
 PY_CALL = re.compile(
     r'\brequests\.(?:get|post|put|patch|delete|head|request|Session)\s*\('
     r'|\bhttpx\.(?:get|post|put|patch|delete|head|request|stream|Client|AsyncClient)\s*\('
+    r'|\byt_dlp\.YoutubeDL\s*\(|\.extract_info\s*\('
     r'|\burlopen\s*\(|\burlretrieve\s*\(|\burllib\.request\.Request\s*\('
     r'|\baiohttp\.ClientSession\s*\(|\bHTTPS?Connection\s*\('
     r'|\bsocket\.create_connection\s*\(|\bwebsockets?\.connect\s*\('

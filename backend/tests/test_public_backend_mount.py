@@ -65,7 +65,8 @@ def test_store_factory_starts_without_external_plugins(factory):
     app = factory()
     assert app.extensions['lds_plugins'].records == {}
     assert app.test_client().get('/api/plugins', follow_redirects=True).status_code == 200
-    assert len(db.metadata.tables) == 43
+    assert len(db.metadata.tables) == 45
+    assert {'image_source_job', 'image_source_asset'} <= set(db.metadata.tables)
     assert {'dataset_import_receipt', 'dataset_duplicate_keep', 'bank_collection', 'bank_collection_member'} <= set(db.metadata.tables)
     assert {'named_identity', 'identity_subject', 'identity_evidence', 'identity_assignment',
             'identity_action', 'character_vocabulary'} <= set(db.metadata.tables)
@@ -76,7 +77,8 @@ def test_true_factory_each_product_alone(factory, pid):
     app = factory({pid})
     records = app.extensions['lds_plugins'].records
     assert records[pid].state == 'loaded', records[pid].error
-    assert len(db.metadata.tables) == 43
+    assert len(db.metadata.tables) == 45
+    assert {'image_source_job', 'image_source_asset'} <= set(db.metadata.tables)
     assert {'dataset_import_receipt', 'dataset_duplicate_keep', 'bank_collection', 'bank_collection_member'} <= set(db.metadata.tables)
     assert {'named_identity', 'identity_subject', 'identity_evidence', 'identity_assignment',
             'identity_action', 'character_vocabulary'} <= set(db.metadata.tables)

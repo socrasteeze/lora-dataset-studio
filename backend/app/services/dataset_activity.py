@@ -37,7 +37,7 @@ import time
 # WHOLE batch, not just the launch request.
 KINDS = ('watermark_detect', 'watermark_clean', 'caption', 'recaption',
          'analyze_faces', 'classify', 'generate', 'improve', 'edit_reference',
-         'bank_export', 'bank_import', 'training_export', 'backup')
+         'bank_export', 'bank_import', 'source_import', 'training_export', 'backup')
 
 # Kinds a user can gracefully STOP mid-batch (the ▶ Stop button). Only the
 # per-image captioning passes qualify: the worker checks the cancel flag at each

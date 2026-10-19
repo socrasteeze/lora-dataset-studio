@@ -12,6 +12,7 @@ export const CORE_GUIDE_ANCHORS = {
   "using-the-app": [
     "assign-identities",
     "undo-a-folder-group",
+    "image-sources",
     "the-character-walkthrough-reference-photo-trained-lora",
     "write-caption-txt",
     "review-training-duplicates",
@@ -71,6 +72,7 @@ export const CORE_GUIDE_ANCHORS = {
     "tune-the-bank-filter-thresholds",
     "what-editing-an-image-costs-it",
     "a-crop-is-never-enlarged",
+    "auto-center-a-crop",
     "why-a-re-run-button-is-greyed-out",
     "rotate-a-sideways-image",
     "crop-and-upscale-inside-a-bank",
@@ -145,6 +147,8 @@ export const CORE_GUIDE_ANCHORS = {
     "11-preview-quality-steps-and-cfg"
   ],
   "settings-reference": [
+    "image-source-credentials",
+    "image-source-extractors",
     "how-settings-work",
     "advanced-environment-overrides",
     "instance-profiles",
