@@ -150,10 +150,10 @@ def extractor_config(job, proxy):
         cookies = SimpleCookie()
         cookies.load(secret['cookies'])
         site['cookies'] = {key: value.value for key, value in cookies.items()}
-    if job.provider == 'pawchive':
-        site.update({'expand': True, 'original': True, 'previews': False,
-                     'sleep-request': '3-6'})
     options[job.provider] = site
+    # Apply by extractor category, including alternate public source domains.
+    options.setdefault('pawchive', {}).update(
+        {'expand': True, 'original': True, 'previews': False, 'sleep-request': '3-6'})
     directory = _extractor_directory(settings()['extractors_dir'])
     options['module-sources'] = [directory, None] if directory else [None]
     return {'extractor': options, 'output': {'jsonl': True, 'private': False},

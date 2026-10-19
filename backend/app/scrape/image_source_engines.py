@@ -110,7 +110,8 @@ def _gdl(request, generic=False):
     start, end = request.get('start', 0), request.get('start', 0) + request.get('limit', 200)
 
     def scope_cookies(extr):
-        if request.get('credentials', {}).get('cookies') and extr.category == first.category:
+        if (request.get('credentials', {}).get('cookies') and extr.category == first.category
+                and extr.cookies_domain == ''):
             # Generic extractors have an empty cookie domain by default.
             # Typed source cookies must never become domain-free cookies.
             extr.cookies_domain = urlsplit(request['url']).hostname.removeprefix('www.')
@@ -237,10 +238,14 @@ def _yt(request, generic=False):
             cookies = SimpleCookie()
             cookies.load(secret['cookies'])
             domain = urlsplit(request['url']).hostname.removeprefix('www.')
-            for key, value in cookies.items():
-                ydl.cookiejar.set_cookie(Cookie(0, key, value.value, None, False,
-                                               domain, True, False, '/', True,
-                                               False, None, True, None, None, {}))
+            domains = (['twitter.com', 'x.com'] if domain in ('twitter.com', 'x.com') else
+                       ['youtube.com'] if domain in ('youtu.be', 'm.youtube.com', 'music.youtube.com', 'youtube.com')
+                       else [domain])
+            for scope in domains:
+                for key, value in cookies.items():
+                    ydl.cookiejar.set_cookie(Cookie(0, key, value.value, None, False,
+                                                   scope, True, False, '/', True,
+                                                   False, None, True, None, None, {}))
     try:
         with yt_dlp.YoutubeDL(options) as ydl:
             cookies_for(ydl)

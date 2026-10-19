@@ -129,9 +129,10 @@ def test_extractor_proxy_rejects_private_connect_targets():
             assert b'403 Forbidden' in client.recv(1024)
 
 
-def test_pawchive_uses_expanded_originals_without_incremental_abort(source_context):
+@pytest.mark.parametrize('provider', ['pawchive', 'pawchive.st'])
+def test_pawchive_uses_expanded_originals_without_incremental_abort(source_context, provider):
     job = make_job()
-    job.provider = 'pawchive'
+    job.provider = provider
     config = sources.extractor_config(job, 'http://proxy.example.test')
     site = config['extractor']['pawchive']
     assert site['expand'] and site['original'] and not site['previews']
@@ -368,6 +369,48 @@ def test_resolver_falls_through_only_when_unsupported(monkeypatch, status, expec
     monkeypatch.setattr(engines, '_yt', lambda *args: calls.append('yt-dlp') or 0)
     assert engines.run({}) == (0 if status == 64 else status)
     assert calls == expected
+
+
+def test_configured_local_modules_load_before_builtins(tmp_path, monkeypatch):
+    import copy
+    import sys
+    from gallery_dl import config, extractor
+    from app.scrape import image_source_engines as engines
+    module = '_lds_synthetic_extractor_01'
+    (tmp_path / (module + '.py')).write_text('SYNTHETIC = True\n', encoding='utf-8')
+    old = copy.deepcopy(config._config)
+    monkeypatch.setattr(extractor, '_module_iter', extractor._module_iter)
+    try:
+        engines._configure({'proxy': 'http://proxy.example.test', 'config': {
+            'extractor': {'module-sources': [str(tmp_path), None]}}})
+        assert next(extractor._module_iter).__name__ == module
+    finally:
+        sys.modules.pop(module, None)
+        config.clear()
+        config._config.update(old)
+
+
+@pytest.mark.parametrize('domain,expected', [('', 'images.example.test'), ('.x.com', '.x.com')])
+def test_cookie_scope_preserves_extractor_domains(monkeypatch, domain, expected):
+    import copy
+    from gallery_dl import config, extractor
+    from gallery_dl.extractor.common import Extractor
+    from app.scrape import image_source_engines as engines
+    class Synthetic(Extractor):
+        category, subcategory = 'synthetic', 'post'
+        pattern = r'https://images\.example\.test/post/1'
+    instance = Synthetic.from_url('https://images.example.test/post/1')
+    instance.cookies_domain = domain
+    monkeypatch.setattr(extractor, 'find', lambda url: instance)
+    old = copy.deepcopy(config._config)
+    try:
+        config.clear()
+        assert engines._gdl({'url': instance.url, 'provider': 'synthetic',
+                             'credentials': {'cookies': 'demo=synthetic'}}) == 0
+        assert instance.cookies_domain == expected
+    finally:
+        config.clear()
+        config._config.update(old)
 
 
 def test_nested_gallery_scan_uses_one_media_window(monkeypatch):
