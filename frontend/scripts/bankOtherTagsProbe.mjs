@@ -67,8 +67,10 @@ try {
   const executablePath = findHeadlessShell(fs, path);
   assert.ok(executablePath, 'Install the cloud Chromium headless shell before running this check.');
   browser = await chromium.launch({ executablePath });
-  for (const mode of ['transient', 'permanent', 'draft']) {
-    const context = await browser.newContext({ viewport: { width: 360, height: 800 } });
+  const recoveryStates = viewports.flatMap(([width, height]) =>
+    ['transient', 'permanent', 'draft'].map((mode) => ({ width, height, mode })));
+  for (const { width, height, mode } of recoveryStates) {
+    const context = await browser.newContext({ viewport: { width, height }, hasTouch: width < 1024 });
     const page = await context.newPage();
     activePage = page;
     const errors = [];
@@ -116,10 +118,17 @@ try {
     assert.equal(requests, mode === 'draft' ? 1 : 2);
     const geometry = await lanes.evaluate((node) => {
       const box = node.getBoundingClientRect();
-      return { left: box.left, right: box.right, width: document.documentElement.clientWidth };
+      return { left: box.left, right: box.right, width: document.documentElement.clientWidth,
+        controls: [...node.querySelectorAll('a, button')].map((control) => {
+          const target = control.getBoundingClientRect();
+          return { left: target.left, right: target.right, width: target.width, height: target.height };
+        }) };
     });
     assert.ok(geometry.left >= -1 && geometry.right <= geometry.width+1);
-    laneRecovery.push({ mode, requests, passed: true });
+    assert.equal(geometry.controls.length, 2);
+    assert.ok(geometry.controls.every((target) => target.left >= -1 && target.right <= width+1 && target.width >= 40));
+    if (width < 1024) assert.ok(geometry.controls.every((target) => target.height >= 40));
+    laneRecovery.push({ width, height, mode, requests, geometry, passed: true });
     await context.close();
   }
   for (const [viewportIndex, [width, height]] of viewports.entries()) {
@@ -417,7 +426,7 @@ try {
       '--url', `${url}/#/settings/${section}`, '--states', 'resting', '--json']) });
   }
   assert.equal(laneOutcomes.length, viewports.length);
-  assert.equal(laneRecovery.length, 3);
+  assert.equal(laneRecovery.length, recoveryStates.length);
   await writeFile(path.join(receipts, 'other-tags.json'), JSON.stringify({ outcomes, settingsOutcomes, laneOutcomes, laneRecovery,
     responsive: probe, settingsResponsive: settingsProbe }, null, 2));
   console.log(`Bank checks passed at ${outcomes.length} sizes; ${settingsOutcomes.length} Settings route checks passed.\n${probe}\n${JSON.stringify(settingsProbe)}`);
