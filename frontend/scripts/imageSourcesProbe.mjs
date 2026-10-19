@@ -80,9 +80,23 @@ try {
       await page.waitForFunction((selector) => document.querySelector(selector)?.textContent.includes('1 Selected'), `#${id}`)
       await panel.getByRole('checkbox').nth(1).check()
       await page.waitForFunction((selector) => document.querySelector(selector)?.textContent.includes('2 Selected'), `#${id}`)
+      const actions = panel.locator('[data-source-actions]')
+      const actionBounds = (element) => [...element.querySelectorAll('button')].map((button) => {
+        const box = button.getBoundingClientRect()
+        return [box.left + window.scrollX, box.top + window.scrollY, box.width, box.height].map(Math.round)
+      })
+      const idleBounds = await actions.evaluate(actionBounds)
+      assert.equal((await context.request.post(`${url}/test/hold-download`)).status(), 200)
       await panel.getByRole('button', { name: 'Download', exact: true }).click()
+      await page.waitForFunction((selector) => document.querySelector(selector)?.textContent.includes('Download: Running'), `#${id}`)
+      assert.deepEqual(await actions.evaluate(actionBounds), idleBounds, 'Source actions moved while the job ran')
+      assert.equal((await context.request.post(`${url}/test/release-download`)).status(), 200)
       await page.waitForFunction((selector) => document.querySelector(selector)?.textContent.includes('2 Downloaded'), `#${id}`, { timeout: 30000 })
-      await panel.getByRole('button', { name: 'Import Images', exact: true }).click()
+      const selectedJob = await panel.getByRole('combobox', { name: 'Jobs', exact: true }).inputValue()
+      const imported = page.waitForResponse((response) => response.request().method() === 'POST'
+        && new URL(response.url()).pathname === `/api/image-sources/jobs/${selectedJob}/import`)
+      const [importResponse] = await Promise.all([imported, panel.getByRole('button', { name: 'Import Images', exact: true }).click()])
+      assert.equal(importResponse.status(), 202)
       await page.waitForFunction((selector) => document.querySelector(selector)?.textContent.includes('2 Imported'), `#${id}`, { timeout: 30000 })
       if (width === 1280 && surface === 'bank') {
         await panel.getByRole('button', { name: 'Next', exact: true }).click()
@@ -117,7 +131,7 @@ try {
       assert.deepEqual(errors, [])
       cases.push({ surface, width, height, ...measurement,
         input: surface === 'bank' ? 'search-preset' : 'public-url',
-        downloadOnlyVideo: width === 1280 && surface === 'bank',
+        downloadOnlyVideo: width === 1280 && surface === 'bank', busyLayoutChecked: true,
         interactions: width === 1280 && surface === 'bank' ? 11 : 7 })
       console.log(`Image Sources ${surface} ${width}x${height}: passed`)
       await context.close()
