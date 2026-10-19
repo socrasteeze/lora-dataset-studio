@@ -102,7 +102,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bank-other-tags-${{ github.event.pull_request.head.sha || github.sha }}
-          path: .git/lds-gates-validation/other-tags.json
+          path: |
+            .git/lds-gates-validation/other-tags.json
+            .git/lds-gates-validation/queue-alignment.json
+            .git/lds-gates-validation/queue-*.png
           include-hidden-files: true
           if-no-files-found: warn
 

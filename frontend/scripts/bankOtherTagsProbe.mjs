@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright-core';
 import { findHeadlessShell } from './responsiveProbe.mjs';
+import { checkBankQueueAlignment } from './bankQueueAlignmentProbe.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const runtime = await mkdtemp(path.join(tmpdir(), 'lds-other-tags-'));
@@ -67,6 +68,7 @@ try {
   const executablePath = findHeadlessShell(fs, path);
   assert.ok(executablePath, 'Install the cloud Chromium headless shell before running this check.');
   browser = await chromium.launch({ executablePath });
+  await checkBankQueueAlignment({ browser, url, root, receipts, python });
   const recoveryStates = viewports.flatMap(([width, height]) =>
     ['transient', 'permanent', 'draft'].map((mode) => ({ width, height, mode })));
   for (const { width, height, mode } of recoveryStates) {
