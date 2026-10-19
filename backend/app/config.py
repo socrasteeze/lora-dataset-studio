@@ -35,7 +35,7 @@ SECRET_KEYS = ('HF_TOKEN', 'VAST_API_KEY',
                # clear and GET /api/settings handed it back verbatim -- while every
                # other credential in this app is reported as presence only. A token
                # is a secret whatever it unlocks.
-               'LMSTUDIO_API_KEY')
+               'LMSTUDIO_API_KEY', 'IMAGE_SOURCE_CREDENTIALS')
 
 # A Krea install saved by a previous release can carry its old *defaults* in
 # config.json, so a changed DEFAULTS value alone would never reach it. This
@@ -55,6 +55,7 @@ _V3_KREA_REF_BOOST = 0.25
 _V3_KREA_STEPS = 8
 
 DEFAULTS = {
+    'image_sources': {'extractors_dir': ''},
     'plugins': {'enabled': {}},
     # host: '127.0.0.1' = this machine only ; '0.0.0.0' = reachable from the LAN
     # (phone, tablet, another PC) — the Settings "Server" card's LAN toggle just

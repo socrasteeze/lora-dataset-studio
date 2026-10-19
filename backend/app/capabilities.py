@@ -1437,6 +1437,14 @@ def python_ml_status() -> dict:
     }
 
 
+def probe_image_source_deps() -> dict:
+    ok = _cached_import('image_source_deps', sys.executable,
+                        'import gallery_dl.job, gallery_dl.extractor, yt_dlp, Cryptodome.Cipher.AES, requests, imageio_ffmpeg; imageio_ffmpeg.get_ffmpeg_exe()')
+    return {'ok': bool(ok), 'detail': 'Image sources are ready.' if ok else
+            'Install image sources from the Image Sources panel.',
+            'action': 'image_source_extras'}
+
+
 def probe_scrape_deps() -> dict:
     """The scraper's optional Python deps (requirements-scrape.txt). find_spec
     only (no import cost): the scrape stack runs IN-PROCESS, so the app's own
@@ -2681,6 +2689,7 @@ def _probe_uncached():
         'dlss5nr': probe_dlss5nr,
         'video_text': probe_video_text,
         'scrape_deps': probe_scrape_deps,
+        'image_source_deps': probe_image_source_deps,
         # Fork-only lane: another cached-but-possibly-cold `import onnxruntime`,
         # so it belongs in the pool with the rest rather than ahead of it.
         'wd14': probe_wd14,
@@ -2939,6 +2948,7 @@ def _probe_uncached():
         'dataset_import': _dataset_import_policy(),
         'python': python_ml_status(),
         'scrape_deps': scrape_deps['ok'],
+        'image_source_deps': results['image_source_deps']['ok'],
         # DIVERGENCE 1 (Civitai note, 2026-09-03) — upstream reports a
         # '📤 Civitai publishing' capability row here. The publisher is not
         # carried on this fork, and the row's own Setup destination is the

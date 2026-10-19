@@ -4,11 +4,11 @@ import test from 'node:test';
 
 const src = fs.readFileSync(new URL('./SourceAttribution.jsx', import.meta.url), 'utf8');
 
-test('it imports both platform renderers and dispatches by platform, nothing else', () => {
+test('acquisition provenance uses its shared renderer before legacy platform dispatch', () => {
   assert.match(src, /import PexelsAttribution from '\.\/PexelsAttribution'/);
   assert.match(src, /import WebImageSource from '\.\/WebImageSource'/);
   assert.match(src, /const platform = metadata && typeof metadata === 'object' \? metadata\.platform : null;/);
-  assert.match(src, /const Renderer = PLATFORM_RENDERERS\[platform\];/);
+  assert.match(src, /const Renderer = metadata\?\.acquisition === true \? ImageSourceAttribution : PLATFORM_RENDERERS\[platform\];/);
 });
 
 test('every currently-supported platform is wired to its own renderer', () => {

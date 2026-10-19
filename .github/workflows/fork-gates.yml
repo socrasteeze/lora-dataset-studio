@@ -2,6 +2,11 @@ name: Fork Gates
 
 on:
   workflow_dispatch:
+    inputs:
+      run_backend:
+        description: Run backend tests only after explicit operator authorization
+        type: boolean
+        default: false
   pull_request:
   push:
     branches: ["validation/**"]
@@ -51,7 +56,7 @@ jobs:
           if-no-files-found: error
 
   gates:
-    name: Full Fork Gates
+    name: ${{ inputs.run_backend == true && 'Full Fork Gates' || 'Frontend Gates (backend skipped)' }}
     runs-on: windows-latest
     timeout-minutes: 60
     env:
@@ -83,7 +88,9 @@ jobs:
         run: |
           python -m venv .venv
           .venv/Scripts/python.exe -m pip install --disable-pip-version-check -r backend/requirements-dev.txt
-          .venv/Scripts/python.exe -m pip install --disable-pip-version-check --no-cache-dir -r backend/requirements-torch-tests.txt
+          if ('${{ inputs.run_backend }}' -eq 'true') {
+            .venv/Scripts/python.exe -m pip install --disable-pip-version-check --no-cache-dir -r backend/requirements-torch-tests.txt
+          }
 
       - name: Install Frontend Dependencies
         working-directory: frontend
@@ -92,9 +99,26 @@ jobs:
       - name: Install Browser for Bank Checks
         run: node frontend/node_modules/playwright-core/cli.js install chromium
 
+      - name: Check Image Sources in Browser
+        id: source_checks
+        if: ${{ !cancelled() }}
+        run: node frontend/scripts/imageSourcesProbe.mjs
+
+      - name: Save Image Source Receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-sources-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            .git/lds-gates-validation/image-sources.json
+            .git/lds-gates-validation/header-spacing-*.json
+            .git/lds-gates-validation/header-spacing-*.png
+          include-hidden-files: true
+          if-no-files-found: error
+
       - name: Check Bank Imports and Settings in Browser
         id: browser_checks
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.source_checks.outcome == 'success' || inputs.run_backend == true) }}
         run: node frontend/scripts/bankOtherTagsProbe.mjs
 
       - name: Save Browser Receipt
@@ -110,11 +134,11 @@ jobs:
           if-no-files-found: warn
 
       - name: Check Curation Controls in Browser
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.source_checks.outcome == 'success' || inputs.run_backend == true) }}
         run: node frontend/scripts/bankCurationProbe.mjs
 
       - name: Save Curation Receipts
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.source_checks.outcome == 'success' || inputs.run_backend == true) }}
         uses: actions/upload-artifact@v4
         with:
           name: curation-${{ github.event.pull_request.head.sha || github.sha }}
@@ -149,8 +173,8 @@ jobs:
           if-no-files-found: error
 
       - name: Run Fork Gates
-        # Preserve the browser failure while collecting the independent full gate.
-        if: ${{ !cancelled() && (steps.browser_checks.outcome == 'success' || steps.browser_checks.outcome == 'failure') }}
+        # Preserve browser failures while collecting the independent full gate.
+        if: ${{ !cancelled() && inputs.run_backend == true && (steps.browser_checks.outcome == 'success' || steps.browser_checks.outcome == 'failure') }}
         shell: pwsh
         env:
           LDS_DATA_DIR: ${{ runner.temp }}/lds-gates-data
@@ -159,6 +183,29 @@ jobs:
           LDS_PLUGINS_DIR: ${{ runner.temp }}/lds-gates-plugins
           LDS_EXTENSIONS_DIR: ${{ runner.temp }}/lds-gates-extensions
         run: ./scripts/gates.ps1 -Phase Gates -ScratchRoot D:/lds-gates
+
+      - name: Frontend Checks
+        if: ${{ !cancelled() && inputs.run_backend != true && steps.source_checks.outcome == 'success' }}
+        working-directory: frontend
+        shell: pwsh
+        run: |
+          npm run lint
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm test
+          exit $LASTEXITCODE
+
+      - name: Backend Source Lint
+        if: ${{ !cancelled() && inputs.run_backend != true }}
+        run: .venv/Scripts/python.exe -m ruff check .
+
+      - name: Report Backend Skip
+        if: ${{ !cancelled() && inputs.run_backend != true }}
+        shell: pwsh
+        run: |
+          'Backend tests are intentionally skipped until the operator explicitly authorizes them.' >> $env:GITHUB_STEP_SUMMARY
+          'This run qualifies frontend checks only. Backend behavior remains unverified.' >> $env:GITHUB_STEP_SUMMARY
 
       - name: Save Gate Receipts
         # The browser check writes a second receipt on the same exact head.

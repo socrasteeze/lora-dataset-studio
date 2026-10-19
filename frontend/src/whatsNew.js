@@ -85,6 +85,21 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-19-source-review', date: '2026-10-19', title: 'Inspect Source Images',
+    blurb: 'Source images open in the shared viewer with zoom and navigation. Page previews, visible job destinations and safe credential updates make imports easier to review.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-19-bank-review-viewport', date: '2026-10-19', title: 'Reach Review Controls',
+    blurb: 'Keep, Reject and Skip remain reachable in Bank review. The control panel scrolls in short windows.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-19-auto-center-crop', date: '2026-10-19', title: 'Center the Subject',
+    blurb: 'Auto-Center proposes a crop around the full subject in Bank and Dataset editors. Review and adjust the box before saving. It uses your configured local vision model.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-18-zz-queue-alignment', date: '2026-10-18',
     title: 'Read Aligned Queues',
     blurb: 'Bank Queue keeps jobs and status badges in shared columns. Long names wrap, and phone rows keep job controls visible.',
@@ -116,11 +131,21 @@ export const WHATS_NEW = [
     to: '/studio',
   },
   {
+    id: '2026-10-18-image-sources', date: '2026-10-18', title: 'Collect Original Images',
+    blurb: 'Collect originals through gallery-dl, yt-dlp and your local GDLOPS extractors. Resume interrupted jobs and import compatible images with source tags into Bank or Dataset. Other media remains downloadable. Sources run only from your actions.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-18-identity-learning',
     date: '2026-10-18',
     title: 'Teach identities with the names you confirm',
     blurb: 'Assign people and anime characters in Bank or Dataset, then use confirmed examples for local match suggestions. Bulk unassign, corrections and Undo preserve your decisions; character recognition across art styles still needs a labeled accuracy check.',
     to: '/bank',
+  },
+  {
+    id: '2026-10-18-header-spacing', date: '2026-10-18', title: 'Clearer Mobile Headers',
+    blurb: 'The active profile sits below the app title. Dataset controls use even gaps and equal action widths on phones. Long trigger words stay inside the copy button.',
+    to: '/datasets',
   },
   {
     id: '2026-10-18-bank-tag-recovery',

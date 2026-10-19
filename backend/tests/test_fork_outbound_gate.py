@@ -111,6 +111,7 @@ def outside_attempts(monkeypatch):
 # network log on the Bank, Settings and Plugins pages), plus the update and
 # store routes whose automatic use Divergence 12 removed.
 PAGE_LOAD_ROUTES = (
+    '/api/image-sources',
     '/api/system/gpu-flags', '/api/banks', '/api/bank-queue', '/api/dataset/list',
     '/api/local-llm/models', '/api/system/queue', '/api/system/comfyui-recovery',
     '/api/cluster/activity', '/api/train/activity', '/api/settings',

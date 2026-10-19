@@ -1,5 +1,7 @@
 import PexelsAttribution from './PexelsAttribution';
 import WebImageSource from './WebImageSource';
+import ImageSourceAttribution from './ImageSourceAttribution';
+import { SOURCE_NAMES } from '../shared/imageSources.js';
 
 /**
  * Provenance is recorded for a GROWING list of scraper sources (Pexels today,
@@ -17,15 +19,15 @@ import WebImageSource from './WebImageSource';
 const PLATFORM_RENDERERS = {
   pexels: PexelsAttribution,
   websearch: WebImageSource,
+  ...Object.fromEntries(Object.keys(SOURCE_NAMES).map((key) => [key, ImageSourceAttribution])),
 };
 
 export default function SourceAttribution({ metadata, className = '' }) {
   const platform = metadata && typeof metadata === 'object' ? metadata.platform : null;
-  const Renderer = PLATFORM_RENDERERS[platform];
-  // Fail-closed on two independent axes: an unrecognized/missing platform never
-  // reaches a renderer, and the renderer itself re-validates the whole payload
-  // (its own allowlisted hosts, schemes, lengths) before it will render anything
-  // — a `platform: 'pexels'` tag alone is not proof the rest of the object is safe.
+  const Renderer = metadata?.acquisition === true ? ImageSourceAttribution : PLATFORM_RENDERERS[platform];
+  // The acquisition renderer validates public source links. Legacy renderers
+  // retain their own host allowlists. A platform or acquisition marker alone
+  // never bypasses the chosen renderer's payload validation.
   if (!Renderer) return null;
   return <Renderer metadata={metadata} className={className} />;
 }

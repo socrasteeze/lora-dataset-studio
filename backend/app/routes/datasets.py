@@ -2243,6 +2243,26 @@ def dataset_image_crop(image_id):
     return (jsonify({'ok': True}), 200) if ok else (jsonify({'error': 'not found'}), 404)
 
 
+@bp.post('/image/auto-center')
+def image_auto_center():
+    """Suggest bounds from the editor's exact preview, without changing files."""
+    from ..services import auto_center
+
+    upload = request.files.get('file')
+    if upload is None:
+        return jsonify({'error': 'An image preview is required.'}), 400
+    raw = upload.stream.read(auto_center.MAX_UPLOAD_BYTES + 1)
+    try:
+        result = auto_center.suggest_subject_box(raw, request.form.get('framing', 'subject'))
+    except auto_center.VisionUnavailable as exc:
+        return jsonify({'error': str(exc), 'setup_required': True}), 409
+    except auto_center.SubjectNotFound as exc:
+        return jsonify({'error': str(exc)}), 422
+    except Exception as exc:
+        return _map_error(exc)
+    return jsonify({'ok': True, **result})
+
+
 @bp.post('/dataset/image/<int:image_id>/mirror')
 def dataset_image_mirror(image_id):
     """Permanently flip one owned dataset image horizontally in place."""
