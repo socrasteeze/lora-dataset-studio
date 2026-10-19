@@ -1075,7 +1075,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
   // dataset) in a background job — we only pick the bank and refresh at the end.
   const bankImport = (
     <div className="min-w-0 space-y-3">
-    <ImageSourcesPanel datasetId={d.id} disabled={importBusy} onImported={() => ds.refresh()} />
+    <ImageSourcesPanel datasetId={d.id} datasetName={d.name} disabled={importBusy} onImported={() => ds.refresh()} />
     <BankImportPanel datasetId={d.id} disabled={importBusy}
       onImported={() => ds.refresh()} />
     </div>

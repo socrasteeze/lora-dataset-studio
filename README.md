@@ -632,7 +632,7 @@ Every threshold behind these flags (sharpness, noise, NSFW, same-person similari
 
 ### The built-in web scraper
 
-**Image Sources** in Bank and Dataset accepts the gallery-dl and yt-dlp provider catalogs, image boards, nested collections and generic public URLs. A host folder can add your local GDLOPS extractor modules. Paste a URL or use a booru search preset. Select originals, download them, then import compatible images for review. Source posts, tags, ratings and available dimensions remain attached. ZIP attachments can yield images; other media remains downloadable. Jobs and verified downloads survive a restart; Resume requires an explicit action. Live access depends on the installed extractor and source credentials. [Image Sources guide](docs/guide/using-the-app.md#image-sources)
+**Image Sources** in Bank and Dataset accepts the gallery-dl and yt-dlp provider catalogs, image boards, nested collections and generic public URLs. A host folder can add your local GDLOPS extractor modules. Paste a URL or use a booru search preset. Inspect cached previews and downloaded originals in the shared image viewer, then import compatible images for review. Source posts, tags, ratings and available dimensions remain attached. ZIP attachments can yield images; other media remains downloadable. Jobs and verified downloads survive a restart; Resume requires an explicit action. Live access depends on the installed extractor and source credentials. [Image Sources guide](docs/guide/using-the-app.md#image-sources)
 
 ## 3. Curate down to the keepers
 

@@ -5,7 +5,8 @@ Current rules for this fork of perfectgf/lora-dataset-studio.
 There is no sync loop. The wave log that used to live here is
 `docs/history/FORK_CHANGELOG.md`, unchanged.
 
-The landing gate is `scripts/gates.ps1 -Phase Gates`.
+Run tests only on an explicit user request. Delivery pushes use `[skip ci]`
+unless CI tests are requested. The full qualification command is `scripts/gates.ps1 -Phase Gates`.
 It runs the complete host/tooling suite once, with eight workers and file-local
 scheduling. Quick retains its own focused preflight. Pull requests and scrubbed
 `validation/**` pushes use Fork Gates; ordinary PR CI does not duplicate the

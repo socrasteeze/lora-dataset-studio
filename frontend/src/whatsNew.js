@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-19-source-review', date: '2026-10-19', title: 'Inspect Source Images',
+    blurb: 'Source images open in the shared viewer with zoom and navigation. Page previews, visible job destinations and safe credential updates make imports easier to review.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-18-image-sources', date: '2026-10-18', title: 'Collect Original Images',
     blurb: 'Collect originals through gallery-dl, yt-dlp and your local GDLOPS extractors. Resume interrupted jobs and import compatible images with source tags into Bank or Dataset. Other media remains downloadable. Sources run only from your actions.',
     to: '/bank',

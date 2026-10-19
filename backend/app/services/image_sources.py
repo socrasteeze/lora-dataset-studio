@@ -89,6 +89,8 @@ def _credentials():
 def save_credentials(provider, values):
     if not metadata.provider_id(provider) or not isinstance(values, dict):
         raise ValueError('Choose a source before saving credentials.')
+    if 'clear' in values and not isinstance(values['clear'], bool):
+        raise ValueError('Choose whether to clear the source credentials.')
     clean = {}
     for key in ('username', 'password', 'api_key', 'user_id', 'cookies', 'access_token',
                 'access_token_secret', 'client_id', 'client_secret', 'refresh_token'):
@@ -100,7 +102,11 @@ def save_credentials(provider, values):
             clean[key] = value
     with _credentials_lock:
         saved = _credentials()
-        saved[provider] = clean
+        if values.get('clear'):
+            saved.pop(provider, None)
+        elif clean:
+            previous = saved.get(provider, {})
+            saved[provider] = {**(previous if isinstance(previous, dict) else {}), **clean}
         cfg.set_secrets({_SECRET: json.dumps(saved)})
 
 
@@ -519,7 +525,10 @@ def _receive_downloads(job, pending, native, cancel, control, extra):
 
 
 def _previews(job, cancel):
-    assets = Asset.query.filter_by(job_id=job.id, selected=True).order_by(Asset.id).limit(24).all()
+    ids = json.loads(job.options_json or '{}').get('preview_ids')
+    assets = Asset.query.filter_by(job_id=job.id)
+    assets = assets.filter(Asset.id.in_(ids)) if ids is not None else assets.filter_by(selected=True)
+    assets = assets.order_by(Asset.id).limit(24).all()
     job.total = len(assets)
     for asset in assets:
         if cancel.is_set():
@@ -531,6 +540,8 @@ def _previews(job, cancel):
                     asset.thumbnail, max_bytes=8 * 1024 * 1024,
                     referer=json.loads(asset.metadata_json)['source_url'], cancel=cancel)
                 _preview(job, asset, raw)
+                if asset.error == 'The preview is unavailable. Download the original to inspect it.':
+                    asset.error = None
             except SourceNetworkError as exc:
                 asset.error = 'The preview is unavailable. Download the original to inspect it.'
                 db.session.commit()
@@ -603,7 +614,7 @@ def _drain(app):
                 db.session.remove()
 
 
-def launch(app, job, phase):
+def launch(app, job, phase, *, preview_ids=None):
     if phase not in ('scan', 'rescan', 'download', 'import', 'previews'):
         raise ValueError('Choose a valid job action.')
     control = runtime(app)
@@ -611,6 +622,18 @@ def launch(app, job, phase):
         db.session.refresh(job)
         if job.state in ('queued', 'running'):
             raise ValueError('This job already has queued or running work.')
+        if phase == 'previews' and preview_ids is not None:
+            if (not isinstance(preview_ids, list) or not 1 <= len(preview_ids) <= 24
+                    or any(not isinstance(value, int) or isinstance(value, bool) or value < 1
+                           for value in preview_ids) or len(set(preview_ids)) != len(preview_ids)):
+                raise ValueError('Choose up to 24 images from the visible page.')
+            count = Asset.query.filter(Asset.job_id == job.id, Asset.id.in_(preview_ids),
+                                       Asset.kind == 'image').count()
+            if count != len(preview_ids):
+                raise ValueError('Choose images from this job only.')
+            options = json.loads(job.options_json or '{}')
+            options['preview_ids'] = preview_ids
+            job.options_json = json.dumps(options)
         if phase == 'rescan':
             job.position, phase = 0, 'scan'
         if phase == 'scan' and job.position >= 5000:
@@ -648,12 +671,18 @@ def payload(job, *, include_assets=False, offset=0, query=''):
         'id', 'provider', 'url', 'state', 'phase', 'position', 'limit',
         'done', 'total', 'destination', 'target_id', 'name', 'error')}
     result['options'] = json.loads(job.options_json or '{}')
-    from sqlalchemy import case, func
+    from sqlalchemy import and_, case, func
     counts = db.session.query(func.count(Asset.id),
                               func.sum(case((Asset.selected.is_(True), 1), else_=0)),
                               func.sum(case((Asset.local_name.isnot(None), 1), else_=0)),
-                              func.sum(case((Asset.imported.is_(True), 1), else_=0))).filter(Asset.job_id == job.id).one()
-    for key, value in zip(('count', 'selected_count', 'downloaded_count', 'imported_count'), counts):
+                              func.sum(case((Asset.imported.is_(True), 1), else_=0)),
+                              func.sum(case((and_(Asset.selected.is_(True), Asset.local_name.is_(None),
+                                                  Asset.kind != 'unsupported'), 1), else_=0)),
+                              func.sum(case((and_(Asset.selected.is_(True), Asset.kind == 'image',
+                                                  Asset.local_name.isnot(None), Asset.imported.is_(False)), 1),
+                                            else_=0))).filter(Asset.job_id == job.id).one()
+    for key, value in zip(('count', 'selected_count', 'downloaded_count', 'imported_count',
+                           'pending_download_count', 'ready_import_count'), counts):
         result[key] = value or 0
     if include_assets:
         items = Asset.query.filter_by(job_id=job.id)

@@ -46,7 +46,8 @@ These rules apply to every edit in this tree.
 - When a request has more than one reading, state the reading you are using before editing.
 - Change only the lines the request needs. Do not refactor, reformat, or clean up adjacent code.
 - Prefer the smallest change that meets a stated check. Do not add flexibility that was not requested.
-- Name the check before editing, then run it. A skipped check is not a pass.
+- Name the check before editing. Run tests only on an explicit user request.
+  A skipped check is not a pass.
 - Remove imports, variables, and helpers that the edit itself made unused. Leave older unused code unless the request names it.
 
 ## Communication and scope
@@ -84,8 +85,9 @@ than creating a second policy for another agent.
 - Keep names, personal addresses, machine-specific paths, private network details
   and credentials out of tracked files, diagnostics and commit messages.
 - Reuse existing token/path redaction helpers. Use synthetic fixtures.
-- Run `backend/tests/test_no_personal_data.py`. Its optional private-name check
-  can skip when no external name list is configured; report that limit.
+- When tests are requested, include `backend/tests/test_no_personal_data.py`
+  in full qualification. Its optional private-name check can skip when no
+  external name list is configured; report that limit.
 - `create_app()` changes schema and runtime state. Never smoke-test production data.
 - Isolate `LDS_DATA_DIR`, `LDS_CONFIG`, `LDS_ENV`, `LDS_PLUGINS_DIR` and
   `LDS_EXTENSIONS_DIR` before importing the application for test runs.
@@ -124,7 +126,8 @@ than creating a second policy for another agent.
 - Bank and Dataset are two surfaces of one product. Check the other surface for
   every shared feature: captions, face scoring, quality, watermark/text tools,
   filters, sorting, crop and improvement controls.
-- Pin shared decisions with behavioral tests. Do not copy thresholds into two modules.
+- When test work is requested, pin shared decisions with behavioral tests.
+  Do not copy thresholds into two modules.
 - Identical behavior uses recognizable wording. Different behavior must not
   promise identical persistence or effects.
 - A new optional dependency, model or capability needs an actionable Setup path.
@@ -144,34 +147,34 @@ than creating a second policy for another agent.
 
 ## Validation
 
-Operator order, 2026-10-18: skip all backend tests, locally and in cloud, until
-the operator explicitly re-enables them. Do not dispatch backend test jobs or
-the backend-bearing Quick/Gates phases. Continue frontend checks and static
-lint. Report backend behavior as unverified. This does not authorize landing
-main without its required qualification.
-
 Use the repository's pinned `.venv` and the Node version required by the current
 manifests and `scripts/gates.ps1`. Historical test counts are not a current baseline.
 
-- Run tests in a separate cloud task by default. Do not start or rerun
-  tests, responsive probes, fixture-backed checks, or the test-bearing
-  `Quick`/`Gates` phases on the user's local machine without explicit permission
-  for that local run. An implementation, clean, commit, or push request does not
-  itself grant local-test permission. The commands below describe what the cloud
-  checkout must run; they do not authorize local execution.
-- Use the exact branch and commit for cloud validation. If the cloud task cannot
-  complete a required gate, report the gap and hold publication to main.
-- A scrubbed task branch may be committed and pushed so the cloud task can test
-  the exact source and bundle. This is validation transport, not a landing push.
-  Keep main unchanged until the required cloud gates pass.
+- Never run or trigger tests unless the user explicitly requests them. This
+  includes local and cloud tests, responsive probes, fixture-backed checks and
+  the test-bearing `Quick`/`Gates` phases. Implementation, enhancement, clean,
+  commit and push requests do not grant test permission.
+- Unless the user requests CI tests, put `[skip ci]` in the tip commit of every
+  push so delivery does not start them. Do not dispatch or rerun test workflows.
+  Preserve the workflow definitions and coverage for future authorized runs.
+- Complete the implementation and authorized delivery without requesting tests
+  as an extra approval step. Build and source/privacy inspection may proceed.
+  Report tests as not run or incomplete; do not claim qualification.
+- When tests are requested, run only the requested scope in a separate cloud
+  task unless the user explicitly permits a local run. Use the exact branch and
+  commit. The commands below define the available checks, not permission to run.
+- For requested full qualification, a scrubbed task branch may transport the
+  exact source and bundle to cloud. Keep main unchanged until those gates pass,
+  unless the user explicitly changes the requested validation scope.
 
 - Targeted backend tests: `.venv/Scripts/python.exe -m pytest
   backend/tests/test_name.py -q` on Windows, or the equivalent `.venv` path on
   other systems.
 - Targeted frontend tests: from `frontend`, run `node --import
   ./scripts/registerSdk.mjs --test <file>`. Bare discovery omits the SDK setup.
-- Before committing, run relevant tests, privacy and contract checks, and `npm test`.
-- Before a landing push, run `scripts/gates.ps1 -Phase Gates`. It includes
+- For requested full qualification, run relevant tests, privacy and contract
+  checks, and `npm test` before committing the qualified result.
+- The full qualification command is `scripts/gates.ps1 -Phase Gates`. It includes
   the full host/tooling suite, isolated bundled Python tests, frontend tests and
   required checks. The host suite uses eight workers with `--dist loadfile`.
 - Run both linters: `.venv/Scripts/python.exe -m ruff check .` and, from
@@ -182,9 +185,10 @@ manifests and `scripts/gates.ps1`. Historical test counts are not a current base
 - Use distinct short pytest scratch paths. Never reuse a live test run's basetemp.
 - Reproduce unexpected failures individually and compare with an unchanged
   baseline when needed. Do not dismiss a failure as flaky without evidence.
-- Layout changes require rendered checks on populated isolated fixtures. Run the
-  responsive probe on affected routes at portrait, landscape, tablet and desktop
-  sizes. Source regex tests prove classes exist, not that layout works.
+- When rendered validation is requested, use populated isolated fixtures and
+  the responsive probe on affected routes at portrait, landscape, tablet and
+  desktop sizes. Without that run, report rendered validation as not run.
+  Source regex tests prove classes exist, not that layout works.
 - Keep probe limits and coverage reporting intact. A skipped state is not a pass.
   Fix overflow, overlap and unreachable controls rather than weakening thresholds.
 - Review the final diff and distinguish completed code, tests, build, publication,
@@ -193,10 +197,10 @@ manifests and `scripts/gates.ps1`. Historical test counts are not a current base
 ## Delivery and fork boundaries
 
 - Use a task branch for substantial work. Preserve worktrees and unrelated edits.
-- Follow the user's delivery authorization. Scrub attribution and sensitive
-  data before committing or pushing a task branch for cloud validation. Run the
-  repository gates in a cloud task before landing on main. Never publish main on
-  the strength of source inspection alone.
+- Follow the user's delivery and test authorization. Scrub attribution and
+  sensitive data before committing or pushing. Run repository gates only when
+  requested. Delivery without tests must use `[skip ci]` and state that full
+  qualification was not completed.
 - `upstream` stays a read-only remote for an occasional cherry-pick.
 - Rebuild `frontend/dist` after frontend changes. The app serves it directly.
   When committing, keep source and the consolidated `build(frontend):` bundle
