@@ -16,6 +16,7 @@ const runtime = await mkdtemp(path.join(tmpdir(), 'lds-other-tags-'));
 const receipts = path.join(root, '.git', 'lds-gates-validation');
 const viewports = [[360, 800], [412, 915], [844, 390], [768, 1024], [1280, 800]];
 const outcomes = [];
+const laneOutcomes = [];
 const settingsOutcomes = [];
 const settingsSections = [...fs.readFileSync(path.join(root, 'frontend/src/components/settings/registry.js'), 'utf8')
   .matchAll(/\{ id: '([^']+)', title: '([^']+)'/g)].map((match) => ({ id: match[1], title: match[2] }));
@@ -70,6 +71,9 @@ try {
     const context = await browser.newContext({ viewport: { width, height } });
     const page = await context.newPage();
     const errors = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error' && message.text().includes('[ErrorBoundary]')) errors.push(message.text());
+    });
     activePage = page;
     activeErrors = errors;
     let tagReads = 0;
@@ -322,6 +326,26 @@ try {
       'Dataset destination controls must fit the viewport');
     settingsOutcomes.push({ section: 'storage-browser', width, height, lateMetadata: true,
       lateListingDraft: true, passed: true });
+    const lanePage = await context.newPage();
+    activePage = lanePage;
+    lanePage.on('pageerror', (error) => errors.push(error.message));
+    lanePage.on('console', (message) => {
+      if (message.type() === 'error' && message.text().includes('[ErrorBoundary]')) errors.push(message.text());
+    });
+    await lanePage.addInitScript(() => localStorage.removeItem('bankCurrentId'));
+    await lanePage.goto(`${url}/#/bank`);
+    const lanes = lanePage.getByRole('group', { name: 'Kind of bank', exact: true });
+    await lanes.getByRole('link', { name: /Video/ }).waitFor();
+    await lanes.getByRole('link', { name: 'Images', exact: true }).waitFor();
+    const laneBounds = await lanes.getByRole('link').evaluateAll((nodes) => nodes.map((node) => {
+      const box = node.getBoundingClientRect();
+      return { left: box.left, right: box.right, width: box.width, height: box.height };
+    }));
+    assert.equal(laneBounds.length, 2);
+    assert.ok(laneBounds.every((box) => box.left >= -1 && box.right <= width+1));
+    if (width < 1024) assert.ok(laneBounds.every((box) => box.width >= 40 && box.height >= 40));
+    laneOutcomes.push({ width, height, videoEnabled: true, passed: true });
+    await lanePage.close();
     assert.deepEqual(errors, []);
     outcomes.push({ width, height, firstPageBeforeSourceCheck: true, singleBankExclusions: true, passed: true });
     // Leave only the tagged demo bank for the existing probe's list primer.
@@ -336,14 +360,15 @@ try {
     settingsProbe.push({ section, result: await run(process.execPath, ['scripts/responsiveProbe.mjs',
       '--url', `${url}/#/settings/${section}`, '--states', 'resting', '--json']) });
   }
-  await writeFile(path.join(receipts, 'other-tags.json'), JSON.stringify({ outcomes, settingsOutcomes,
+  assert.equal(laneOutcomes.length, viewports.length);
+  await writeFile(path.join(receipts, 'other-tags.json'), JSON.stringify({ outcomes, settingsOutcomes, laneOutcomes,
     responsive: probe, settingsResponsive: settingsProbe }, null, 2));
   console.log(`Bank checks passed at ${outcomes.length} sizes; ${settingsOutcomes.length} Settings route checks passed.\n${probe}\n${JSON.stringify(settingsProbe)}`);
 } catch (error) {
   console.error(error.stack || error);
   try {
     fs.mkdirSync(receipts, { recursive: true });
-    await writeFile(path.join(receipts, 'other-tags.json'), JSON.stringify({ outcomes, settingsOutcomes,
+    await writeFile(path.join(receipts, 'other-tags.json'), JSON.stringify({ outcomes, settingsOutcomes, laneOutcomes,
       failure: { name: error.name, message: error.message },
       diagnostic: activePage && !activePage.isClosed() ? {
         viewport: activePage.viewportSize(), errors: activeErrors,

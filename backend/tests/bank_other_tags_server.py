@@ -21,7 +21,7 @@ def main():
     from werkzeug.serving import make_server
 
     patch = pytest.MonkeyPatch()
-    app = create_test_app(runtime, patch, config_object={
+    app = create_test_app(runtime, patch, enabled=('video',), config_object={
         'SQLALCHEMY_DATABASE_URI': f'sqlite:///{(runtime / "state.db").as_posix()}',
     })
     from app.config import LOCAL_USER

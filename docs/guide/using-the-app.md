@@ -209,7 +209,7 @@ training.
 Open **Test Studio → Base model only**, choose the **Model family** and its
 **Base model**, then enter a prompt or select a prompt batch. No trained dataset
 or LoRA is required. CFG, steps, format, seed and images per configuration work
-as usual. Images are saved in a **Test Studio · … (base model)** dataset; the
+as usual. Images go to a Test Studio dataset for the selected model family; the
 latest run for each family reopens when you return, including Stop and Resume.
 Select a LoRA above whenever you want to test its effect or compare checkpoints.
 
