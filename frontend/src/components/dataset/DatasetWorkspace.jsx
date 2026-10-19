@@ -1188,7 +1188,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
               Nothing overflows visibly, because the escapee is a 1 px box no
               one can see. */}
           <nav aria-label="Dataset sections" data-probe-chrome="sections"
-            className="relative -mx-4 overflow-x-auto px-4 pb-1 lg:hidden">
+            className="relative -mx-3 overflow-x-auto px-3 pb-1 sm:-mx-4 sm:px-4 lg:hidden">
             <ul className="m-0 flex list-none gap-2 p-0">
               {visibleSections.map((s) => <li key={s.id}>{navItem(s, true)}</li>)}
             </ul>
@@ -1198,7 +1198,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                one thing to give back: the section buttons above still reach every
                panel, this rail only jumps inside the open one. */
             <nav aria-label={`${sectionMeta[section].title} destinations`} data-probe-chrome="destinations"
-              className="relative -mx-4 overflow-x-auto px-4 pb-1 lg:hidden [@media(max-height:500px)]:hidden">
+              className="relative -mx-3 overflow-x-auto px-3 pb-1 sm:-mx-4 sm:px-4 lg:hidden [@media(max-height:500px)]:hidden">
               <ul id={`dataset-mobile-panels-${section}`} className="m-0 flex list-none gap-2 p-0">
                 {activePanels.map((destination) => (
                   <li key={destination.id}>{panelNavItem(section, destination, true)}</li>
