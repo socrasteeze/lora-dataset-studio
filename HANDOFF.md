@@ -20,22 +20,17 @@ The operator stopped testing and requires an explicit request for every future t
 
 ## Upstream review carried forward
 
-On 2026-10-18, upstream's default branch remained v2 at d566904e40f80f3513b4f9f0675f52cee69ec9d7. v1 remained 3fe3d4f0e29e28de583a6e22bce886c35e5ecd3f. The review started at fork 2f295a1a9, with merge base d13337cc3. The previous reviewed SHA 1d6670a5f was recovered from 5d32d6ceb:HANDOFF.md and matched Overwatch. It is an ancestor of the new head. The review window contains 57 commits; raw ancestry counts are not missing features.
+On 2026-10-19, upstream's default branch remained v2 at 1a150ab4c6eb50ccd887d8e6b2675430fb2dca5c. v1 remained 3fe3d4f0e29e28de583a6e22bce886c35e5ecd3f. The review started at fork acf4ee146, with merge base d13337cc3. The previous reviewed SHA d566904e4 matched Overwatch and is an ancestor of the new head. The review window contains 7 commits; raw ancestry counts are not missing features.
 
 | Upstream commits | Class and evidence |
 | --- | --- |
-| 92e1a0521, ea2010e10 | PORT + DIVERGENCE as 5c77f88e2 and 79ef1b21a. Health boot identity and the local Server restart use a shared wait helper. Divergence 12 keeps update banners and Maintenance's offline refusal unchanged. |
-| 690dc7972 | PORT + DIVERGENCE as b069902ee. Local base-model Studio runs need no LoRA. Divergence 10 keeps one help registry; compact styles and phone touch targets remain. |
-| ea9616243 | PORT + DIVERGENCE as 006e2fc2e. MOSS-Image uses prepared local files and explicit Setup actions. Preserve the pinned Apache-2.0 runtime NOTICE/license and the single help registry. No MOSS training lane is advertised. |
-| d21127d29, 69d3c84a0 | PORT as a4e606866 and 0048bd1d3. Guide anchor, explicit installer action and family contracts follow the adopted base-only generation behavior. |
-| e57a23e5d | PORT as 6fe9df903. Shared Linux TIME_WAIT probing and managed bind selection only; no Docker distribution or updater is restored. A Linux cloud case covers the platform-specific behavior. |
-| 569a51ef8, aeb1d8a1a, 34331e9be, e929e9e01, 68174a805, ece790abd, 195915512, 649604bf4, e48cbb321, 9b5991f92, adaace74e, 45a2c1980, 31717ad77 | SKIP-BUILD. Rebuild the fork bundle from its own source. |
-| 2122505f9, b1b581439, 73fce1eb2, ec01f8d40, 81c662ecc, 1b8501e84, 5713579b6, a4f6bf554, e90a64d85, 4f49c55a5, 19e974269, c3888fdb2, 2633d13e5, 8897e4377, 91243d2c7, 123ae9ada, 8f4371945, 057b5d064, 39e0e2a9e, f2353bbf7, b4e5e2d90, 2f39b2786, b2a281046, ecf552657, 92a299910, 62c637bcf, edf43a711, d09165661, 7ac09034e, 45c9de2b7, d566904e4 | REJECT. Patreon, external catalog/plugins, online updates and their docs/tests conflict with Distribution and Divergence 12. The fork has no live Patreon service to isolate. |
-| 55cb05ea7, 30cbeba7b, 686b34c1a, a7079a722 | REJECT. Upstream merge commits bring rejected access-line history; wanted source changes are picked individually. |
-| 3ad18cd67 | REJECT. The Docker updater is outside this fork's distribution. |
-| d4c9b3dbc | REJECT. Retain the fork version/channel and announce only adopted behavior. |
+| ceda138f1, b6a59b17d | REJECT. Patreon membership features on plugin catalog cards conflict with Distribution and Divergence 12. The catalog was removed in 6c056974f; `patreon_core.py` never existed in the fork. The What's New entry drops with the feature, per the 2026-10-18 Patreon precedent. |
+| ba60ca167, 87d4d8984 | SKIP-BUILD. Rebuild the fork bundle from its own source. |
+| bd5e42e6f | REJECT. Retain the fork version (`+fork`) and `APP_RELEASE_CHANNEL`. |
+| d0fbe41c7 | REJECT. Docker Ollama test timeout; the test was deleted with the packaged-image path in ad0439ff9 (Distribution, Divergence 5). |
+| 1a150ab4c | REJECT. Test fixture binds `lds_cloud_training.public_api_v1`; the cloud_training plugin is excluded in `fork-plugins.json` and removed in d9e94fc21 (Divergence 4). No fork test enables it, so the race cannot occur. |
 
-Decision: the seven named source ports qualified and landed with the identity work. A later review starts after `d566904e4`. Do not merge upstream/v1 or upstream/v2. Overwatch's full-SHA compare URL, review comment and subtitle now match this baseline; configuration validation and the rendered 000 IN SYNC row passed. Unrelated existing dashboard edits were preserved, and the dashboard was not restarted or committed.
+Decision: nothing ported. A later review starts after `1a150ab4c`. Do not merge upstream/v1 or upstream/v2.
 
 ## Decisions
 - Keep jobs/status/control columns aligned across queued and active Bank rows. Use two lines on narrow phones so names stay readable.
