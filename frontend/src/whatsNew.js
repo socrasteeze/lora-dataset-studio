@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-18-zz-queue-alignment', date: '2026-10-18',
+    title: 'Read Aligned Queues',
+    blurb: 'Bank Queue keeps jobs and status badges in shared columns. Long names wrap, and phone rows keep job controls visible.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-18-z-server-restart', date: '2026-10-18',
     title: 'Reconnect after a server restart',
     blurb: 'LDS waits for the restarted server before reconnecting. Fixed ports stay fixed, and Linux restarts reuse ports left by closed connections.',
