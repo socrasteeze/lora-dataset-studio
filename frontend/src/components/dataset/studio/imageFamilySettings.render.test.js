@@ -39,7 +39,7 @@ test('comparison displays its actual family and selected model defaults', () => 
   assert.match(html, /Base model \(Qwen-Image 2\.1\)/);
   assert.match(html, /CFG · Default 4\.0/);
   assert.match(html, /Steps · Default 30/);
-  assert.match(html, /Prompt \(optional\)/);
+  assert.match(html, /Prompt \(Optional\)/);
 });
 
 test('a model settings failure disables both comparison launch buttons and explains why', () => {
