@@ -64,7 +64,7 @@ def cache(job, asset, raw=None):
 
 
 @pytest.mark.parametrize('url', [
-    'http://danbooru.donmai.us/posts', 'https://danbooru.donmai.us.evil.test/posts',
+    'file:///private', 'https://internal.local/posts',
     'https://user:secret@danbooru.donmai.us/posts', 'https://127.0.0.1/posts',
     'https://danbooru.donmai.us:8443/posts',
     'https://danbooru.donmai.us/posts?api_key=synthetic',
@@ -98,7 +98,7 @@ def test_archive_is_not_an_image_or_preview():
     assert metadata.media_item('pawchive', 'https://pawchive.pw/service/user/1',
                                 'https://cdn.example.test/1.zip', {'extension': 'zip'})['kind'] == 'archive'
     assert metadata.media_item('danbooru', 'https://danbooru.donmai.us/posts',
-                                'https://cdn.example.test/1.webm', {'extension': 'webm'}) is None
+                                'https://cdn.example.test/1.webm', {'extension': 'webm'})['kind'] == 'video'
     assert metadata.media_item('pawchive', 'https://pawchive.pw/service/user/1',
                                 'https://cdn.example.test/1.png', {'extension': 'png', 'preview_only': True}) is None
 
@@ -150,7 +150,7 @@ def test_partial_scan_commits_progress_and_retains_metadata(source_context, monk
     db.session.expire_all()
     assert db.session.get(Job, job.id).position == 1
     assert Asset.query.filter_by(job_id=job.id).count() == 1
-    assert sources.extractor_config(job, 'http://proxy.example.test')['extractor']['file-range'] == '2-4'
+    assert 'file-range' not in sources.extractor_config(job, 'http://proxy.example.test')['extractor']
 
 
 def test_boot_recovery_never_launches_network(source_context, monkeypatch):
@@ -165,7 +165,7 @@ def test_verified_download_retry_uses_cached_bytes(source_context, monkeypatch):
     job = make_job()
     asset = make_asset(job)
     cache(job, asset)
-    monkeypatch.setattr(sources, 'fetch', lambda *a, **kw: pytest.fail('verified bytes downloaded again'))
+    monkeypatch.setattr(sources, 'worker_events', lambda *a, **kw: pytest.fail('verified bytes downloaded again'))
     sources._download(job, threading.Event())
     assert asset.local_name and not asset.error
 
@@ -176,7 +176,12 @@ def test_changed_cache_downloads_a_verified_replacement(source_context, monkeypa
     cache(job, asset)
     sources.local_path(job, asset).write_bytes(b'changed')
     calls = []
-    monkeypatch.setattr(sources, 'fetch', lambda *a, **kw: calls.append(True) or picture())
+    def worker(job, cancel, control, extra):
+        calls.append(True)
+        path = Path(extra['directory']) / (asset.source_key + '.png')
+        path.write_bytes(picture())
+        yield [4, asset.source_key, {'file': path.name}]
+    monkeypatch.setattr(sources, 'worker_events', worker)
     sources._download(job, threading.Event())
     assert calls == [True]
     assert hashlib.sha256(sources.local_path(job, asset).read_bytes()).hexdigest() == asset.sha256
@@ -222,6 +227,24 @@ def test_bank_import_preserves_bytes_tags_and_pending_review(source_context):
     from app.services.image_bank_service import get_bank
     path = Path(get_bank(cfg.LOCAL_USER, job.target_id).source_path) / rows[0].relpath
     assert path.read_bytes() == picture()
+
+
+def test_existing_bank_bytes_keep_caption_and_review_state(source_context):
+    from app.services import image_bank_service as banks
+    bank = banks._stage_import_bank(cfg.LOCAL_USER, 'Demo')
+    path = Path(bank.source_path) / 'image-01.png'
+    path.write_bytes(picture())
+    banks._insert_bank_images(bank.id, bank.source_path, ['image-01.png'])
+    row = BankImage.query.filter_by(bank_id=bank.id).one()
+    row.status, row.caption = 'keep', 'synthetic caption'
+    db.session.commit()
+    job = make_job(target_id=bank.id)
+    asset = make_asset(job)
+    cache(job, asset)
+    import_job(job, threading.Event())
+    assert BankImage.query.filter_by(bank_id=bank.id).count() == 1
+    assert row.status == 'keep' and row.caption == 'synthetic caption'
+    assert metadata.normalize(row.source_metadata)['sha256'] == asset.sha256
 
 
 def test_dataset_import_retries_once_and_leaves_caption_untouched(source_context):
@@ -299,24 +322,107 @@ def test_worker_uses_the_pinned_gallery_job_without_a_network_request(monkeypatc
         pattern = r'https://example\.invalid/source'
 
         def items(self):
-            yield Message.Directory, {'id': 1}
+            yield Message.Directory, '', {'id': 1}
             yield Message.Url, 'https://cdn.example.test/1.png', {'id': 1, 'extension': 'png', 'tags': 'synthetic'}
 
     old_config, old_logging = copy.deepcopy(config._config), logging.root.manager.disable
     output = io.StringIO()
     monkeypatch.setattr(extractor, 'find', lambda url, *a, **kw: Synthetic.from_url(url))
     monkeypatch.setattr(sys, 'stdin', io.StringIO(json.dumps({
-        'url': 'https://example.invalid/source', 'config': {'output': {'jsonl': True},
-        'extractor': {'file-range': '1-1'}}})))
+        'provider': 'synthetic', 'url': 'https://example.invalid/source',
+        'proxy': 'http://proxy.example.test', 'limit': 1,
+        'config': {'output': {'jsonl': True}, 'extractor': {}}})))
     monkeypatch.setattr(sys, 'stdout', output)
     try:
         assert image_source_worker.main() == 0
         events = [json.loads(line) for line in output.getvalue().splitlines()]
-        assert next(event for event in events if event[0] == 3)[2]['tags'] == 'synthetic'
+        item = next(event for event in events if event[0] == 3)[2]['acquisition_item']
+        assert item['metadata']['tags']['general'] == ['synthetic']
     finally:
         config.clear()
         config._config.update(old_config)
         logging.disable(old_logging)
+
+
+@pytest.mark.parametrize('url,provider', [
+    ('https://www.pixiv.net/artworks/1', 'pixiv.net'),
+    ('https://x.com/demo/status/1', 'twitter'),
+    ('https://youtu.be/synthetic', 'youtube'),
+    ('http://boards.example.test/thread/1', 'boards.example.test'),
+])
+def test_all_public_source_hosts_are_candidates(url, provider):
+    assert metadata.source_url(url)[0] == provider
+    value = metadata.normalize({'platform': provider, 'acquisition': True,
+                                'source_url': url, 'engine': 'yt-dlp'})
+    assert value is not None and value['source_url'] == url
+
+
+@pytest.mark.parametrize('status,expected', [(0, ['gallery-dl']), (16, ['gallery-dl']),
+                                           (4, ['gallery-dl']), (64, ['gallery-dl', 'yt-dlp'])])
+def test_resolver_falls_through_only_when_unsupported(monkeypatch, status, expected):
+    from app.scrape import image_source_engines as engines
+    calls = []
+    monkeypatch.setattr(engines, '_configure', lambda request: None)
+    monkeypatch.setattr(engines, 'emit', lambda value: None)
+    monkeypatch.setattr(engines, '_gdl', lambda *args: calls.append('gallery-dl') or status)
+    monkeypatch.setattr(engines, '_yt', lambda *args: calls.append('yt-dlp') or 0)
+    assert engines.run({}) == (0 if status == 64 else status)
+    assert calls == expected
+
+
+def test_nested_gallery_scan_uses_one_media_window(monkeypatch):
+    import copy
+    from gallery_dl import config, extractor
+    from gallery_dl.extractor.common import Extractor, Message
+    from app.scrape import image_source_engines as engines
+
+    class Album(Extractor):
+        category, subcategory = 'synthetic', 'album'
+        pattern = r'https://example\.invalid/album/(\d+)'
+        def items(self):
+            yield Message.Directory, '', {}
+            for index in range(2):
+                ident = int(self.groups[0]) * 2 + index
+                yield Message.Url, f'https://cdn.example.test/{ident}.png', {'id': ident, 'extension': 'png'}
+
+    class Collection(Extractor):
+        category, subcategory = 'synthetic', 'collection'
+        pattern = r'https://example\.invalid/source'
+        def items(self):
+            for index in range(3):
+                yield Message.Queue, f'https://example.invalid/album/{index}', {'_extractor': Album}
+
+    old = copy.deepcopy(config._config)
+    messages = []
+    monkeypatch.setattr(extractor, 'find', lambda url: Collection.from_url(url))
+    monkeypatch.setattr(engines, 'emit', messages.append)
+    try:
+        config.clear()
+        assert engines._gdl({'provider': 'synthetic', 'url': 'https://example.invalid/source',
+                             'start': 2, 'limit': 2, 'credentials': {}}) == 0
+        assert [message[2]['acquisition_item']['metadata']['post_id'] for message in messages] == ['2', '3']
+    finally:
+        config.clear()
+        config._config.update(old)
+
+
+def test_generic_media_is_downloadable_without_entering_image_intake(source_context, monkeypatch):
+    job = make_job(options_json=json.dumps({'media': 'all'}))
+    item = metadata.media_item('generic', 'https://images.example.test/post/1',
+                               'https://cdn.example.test/file.mp4', {'extension': 'mp4'})
+    asset = Asset(job_id=job.id, source_key=item['key'], url=item['url'], kind='video',
+                  metadata_json=json.dumps(item['metadata']))
+    db.session.add(asset)
+    db.session.commit()
+    def worker(job, cancel, control, extra):
+        path = Path(extra['directory']) / (asset.source_key + '.mp4')
+        path.write_bytes(b'synthetic-video-container')
+        yield [4, asset.source_key, {'file': path.name}]
+    monkeypatch.setattr(sources, 'worker_events', worker)
+    sources._download(job, threading.Event())
+    assert sources.local_path(job, asset).read_bytes() == b'synthetic-video-container'
+    with pytest.raises(ValueError, match='Select downloaded images'):
+        import_job(job, threading.Event())
 
 
 def test_cancelled_queued_job_never_claims_the_extractor(source_context, monkeypatch):

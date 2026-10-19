@@ -10,7 +10,7 @@ from ..models import BankImage, DatasetImportReceipt, FaceDatasetImage
 from . import bank_jobs, dataset_activity, face_dataset_service as datasets, image_bank_service as banks
 from . import image_source_metadata as metadata
 from .dataset_storage import dataset_path
-from .image_sources import Asset, IMAGE_BYTES, _image_bytes, local_path
+from .image_sources import Asset, IMAGE_BYTES, _checksum, _image_bytes, local_path
 
 
 def merge_metadata(old, new):
@@ -37,12 +37,34 @@ def _read(job, asset):
     return raw, _image_bytes(raw)
 
 
-def _bank_item(job, asset, bank, raw, extension):
+def _bank_hashes(bank, cancel):
+    known = {}
+    for row in BankImage.query.filter_by(bank_id=bank.id):
+        if cancel.is_set():
+            raise InterruptedError()
+        source = banks.abs_image_path(bank, row)
+        if source:
+            path = Path(source)
+            try:
+                if not path.is_symlink() and path.is_file() and path.stat().st_size <= IMAGE_BYTES:
+                    known.setdefault(_checksum(path), row)
+            except OSError:
+                continue  # An unavailable existing source cannot prove a duplicate.
+    return known
+
+
+def _bank_item(job, asset, bank, raw, extension, known):
     name = asset.sha256 + extension
     folder = Path(bank.source_path)
     path = folder / name
     if not folder.is_dir() or folder.is_symlink() or path.is_symlink():
         raise ValueError('The Bank folder is unavailable or contains an unsafe link.')
+    existing = known.get(asset.sha256)
+    if existing is not None:
+        existing.source_metadata = json.dumps(merge_metadata(existing.source_metadata, asset.metadata_json))
+        asset.imported, asset.error = True, None
+        db.session.commit()
+        return
     existing = BankImage.query.filter_by(bank_id=bank.id, relpath=name).first()
     if path.exists():
         if path.stat().st_size > IMAGE_BYTES or hashlib.sha256(path.read_bytes()).hexdigest() != asset.sha256:
@@ -67,6 +89,7 @@ def _bank_item(job, asset, bank, raw, extension):
     else:
         banks._insert_bank_images(bank.id, str(folder), [name],
                                   source_metadata_by_relpath={name: asset.metadata_json})
+    known[asset.sha256] = BankImage.query.filter_by(bank_id=bank.id, relpath=name).one()
     asset.imported, asset.error = True, None
     db.session.commit()
 
@@ -123,8 +146,9 @@ def import_job(job, cancel):
             job.target_id = bank.id
             db.session.commit()
         with bank_jobs.mutation_lease(bank.id, 'source_import', total=len(assets)):
+            known = _bank_hashes(bank, cancel)
             _import_items(job, assets, cancel,
-                          lambda asset, raw, ext: _bank_item(job, asset, bank, raw, ext))
+                          lambda asset, raw, ext: _bank_item(job, asset, bank, raw, ext, known))
     else:
         if not datasets.get_dataset(job.user_id, job.target_id):
             raise ValueError('The destination Dataset no longer exists. Create a new source job.')
@@ -149,9 +173,11 @@ def _import_items(job, assets, cancel, perform):
         try:
             raw, extension = _read(job, asset)
             perform(asset, raw, extension)
-        except (ValueError, OSError):
+        except (ValueError, OSError) as exc:
             db.session.rollback()
-            asset.error = 'The image import failed. Its downloaded original remains available.'
+            asset.error = (str(exc)[:240] + '. Save Original remains available.'
+                           if isinstance(exc, ValueError) and str(exc).startswith('source image ')
+                           else 'The image import failed. Its downloaded original remains available.')
             failures += 1
         job.done += 1
         db.session.commit()

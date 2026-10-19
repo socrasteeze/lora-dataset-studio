@@ -24,7 +24,7 @@ const PLATFORM_RENDERERS = {
 
 export default function SourceAttribution({ metadata, className = '' }) {
   const platform = metadata && typeof metadata === 'object' ? metadata.platform : null;
-  const Renderer = PLATFORM_RENDERERS[platform];
+  const Renderer = metadata?.acquisition === true ? ImageSourceAttribution : PLATFORM_RENDERERS[platform];
   // Fail-closed on two independent axes: an unrecognized/missing platform never
   // reaches a renderer, and the renderer itself re-validates the whole payload
   // (its own allowlisted hosts, schemes, lengths) before it will render anything

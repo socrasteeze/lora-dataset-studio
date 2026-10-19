@@ -1,4 +1,4 @@
-"""Public-only, DNS-pinned HTTPS for explicitly started acquisition jobs.
+"""Public-only, DNS-pinned HTTP(S) for explicitly started acquisition jobs.
 
 The scoped CONNECT proxy applies the same rule inside gallery-dl's child.
 No URL, cookie, query, or source filename enters a diagnostic message.
@@ -17,7 +17,7 @@ import threading
 import time
 from urllib.parse import urljoin, urlsplit
 
-from .image_source_metadata import https_url
+from .image_source_metadata import web_url
 
 
 class SourceNetworkError(ValueError):
@@ -50,15 +50,20 @@ class _PinnedHTTPS(http.client.HTTPSConnection):
             raise
 
 
+class _PinnedHTTP(http.client.HTTPConnection):
+    def connect(self):
+        self.sock = socket.create_connection((public_address(self.host, self.port), self.port), self.timeout)
+
+
 def fetch(url, *, max_bytes, referer, cancel=None):
-    """Bound bytes and redirects; resolve and pin each actual TLS connection."""
+    """Bound bytes and redirects; resolve and pin each actual connection."""
     for _ in range(4):
         if cancel and cancel.is_set():
             raise InterruptedError()
-        url = https_url(url)
+        url = web_url(url)
         parts = urlsplit(url)
-        connection = _PinnedHTTPS(parts.hostname, timeout=15,
-                                  context=ssl.create_default_context())
+        connection = (_PinnedHTTPS(parts.hostname, timeout=15, context=ssl.create_default_context())
+                      if parts.scheme == 'https' else _PinnedHTTP(parts.hostname, timeout=15))
         try:
             connection.request('GET', parts.path + ('?' + parts.query if parts.query else ''),
                                headers={'User-Agent': 'LDS-Image-Import/1.0',
@@ -137,7 +142,7 @@ class _Tunnel(socketserver.BaseRequestHandler):
             header.extend(chunk)
         lines = bytes(header).decode('ascii', errors='strict').split('\r\n')
         parts = lines[0].split()
-        if len(parts) != 3 or parts[0] != 'CONNECT':
+        if len(parts) != 3:
             self.request.sendall(b'HTTP/1.1 403 Forbidden\r\n\r\n')
             return
         headers = dict(line.split(':', 1) for line in lines[1:] if ':' in line)
@@ -146,6 +151,8 @@ class _Tunnel(socketserver.BaseRequestHandler):
         if not hmac.compare_digest(auth, expected):
             self.request.sendall(b'HTTP/1.1 407 Proxy Authentication Required\r\n\r\n')
             return
+        if parts[0] != 'CONNECT':
+            return self._forward(parts, headers)
         target = urlsplit('https://' + parts[1])
         if (target.port != 443 or not target.hostname or target.username or target.password
                 or target.path or target.query or target.fragment):
@@ -167,6 +174,41 @@ class _Tunnel(socketserver.BaseRequestHandler):
                     if not data:
                         return
                     (upstream if source is self.request else self.request).sendall(data)
+
+    def _forward(self, parts, headers):
+        """Public HTTP forwarding for sources that do not provide HTTPS."""
+        try:
+            url = urlsplit(web_url(parts[1]))
+            if url.scheme != 'http' or parts[0] not in ('GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'):
+                raise ValueError()
+            lower = {key.lower(): value.strip() for key, value in headers.items()}
+            length = lower.get('content-length', '0')
+            if not length.isdecimal() or int(length) > 1024 * 1024 or 'transfer-encoding' in lower:
+                raise ValueError()
+            address = public_address(url.hostname, 80)
+            upstream = socket.create_connection((address, 80), timeout=15)
+        except (ValueError, OSError):
+            self.request.sendall(b'HTTP/1.1 403 Forbidden\r\n\r\n')
+            return
+        with upstream:
+            target = url.path + ('?' + url.query if url.query else '')
+            outgoing = [f'{parts[0]} {target} HTTP/1.1', f'Host: {url.netloc}', 'Connection: close']
+            outgoing += [f'{key}: {value.strip()}' for key, value in headers.items()
+                         if key.lower() not in ('host', 'connection', 'proxy-connection', 'proxy-authorization')]
+            upstream.sendall(('\r\n'.join(outgoing) + '\r\n\r\n').encode('ascii'))
+            remaining = int(length)
+            while remaining:
+                data = self.request.recv(min(65536, remaining))
+                if not data:
+                    return
+                upstream.sendall(data)
+                remaining -= len(data)
+            deadline = time.monotonic() + 300
+            while time.monotonic() < deadline:
+                data = upstream.recv(65536)
+                if not data:
+                    return
+                self.request.sendall(data)
 
 
 @contextlib.contextmanager

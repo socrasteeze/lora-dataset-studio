@@ -16,9 +16,11 @@ import subprocess
 import sys
 import threading
 import time
+import warnings
 import zipfile
 
 from PIL import Image
+import psutil
 
 from .. import config as cfg
 from ..extensions import db
@@ -31,6 +33,22 @@ ARCHIVE_BYTES = 256 * 1024 * 1024
 JOB_BYTES = 2 * 1024 * 1024 * 1024
 _SECRET = 'IMAGE_SOURCE_CREDENTIALS'
 _credentials_lock = threading.Lock()
+
+
+def _kill_process(process):
+    """Stop this job's native downloader and any local media merge children."""
+    if process.poll() is not None:
+        return
+    try:
+        parent = psutil.Process(process.pid)
+        for child in parent.children(recursive=True):
+            try:
+                child.kill()
+            except psutil.Error:
+                pass
+        parent.kill()
+    except psutil.NoSuchProcess:
+        pass
 
 
 def runtime(app):
@@ -69,10 +87,11 @@ def _credentials():
 
 
 def save_credentials(provider, values):
-    if provider not in metadata.PROVIDERS or not isinstance(values, dict):
-        raise ValueError('Choose a supported source.')
+    if not metadata.provider_id(provider) or not isinstance(values, dict):
+        raise ValueError('Choose a source before saving credentials.')
     clean = {}
-    for key in ('username', 'api_key', 'user_id', 'cookies'):
+    for key in ('username', 'password', 'api_key', 'user_id', 'cookies', 'access_token',
+                'access_token_secret', 'client_id', 'client_secret', 'refresh_token'):
         value = values.get(key, '')
         if (not isinstance(value, str) or len(value) > 8192
                 or any(ord(char) < 32 for char in value)):
@@ -85,13 +104,40 @@ def save_credentials(provider, values):
         cfg.set_secrets({_SECRET: json.dumps(saved)})
 
 
+def settings():
+    return {'extractors_dir': cfg.get('image_sources.extractors_dir') or ''}
+
+
+def _extractor_directory(value):
+    if not value:
+        return ''
+    try:
+        folder = Path(value).expanduser().resolve(strict=True)
+        files = list(folder.glob('*.py'))
+        if not folder.is_dir() or not 1 <= len(files) <= 200:
+            raise ValueError('Choose a directory with 1-200 local extractor modules.')
+        if any(path.is_symlink() for path in files):
+            raise ValueError('Extractor module links are not supported.')
+    except OSError as exc:
+        raise ValueError('The host cannot read the extractor directory. Check its permissions or drive connection.') from exc
+    return str(folder)
+
+
+def save_settings(values):
+    value = values.get('extractors_dir', '')
+    if not isinstance(value, str) or len(value) > 4096:
+        raise ValueError('Enter a valid host extractor directory.')
+    value = _extractor_directory(value)
+    cfg.save_config({'image_sources': {'extractors_dir': value}})
+    return settings()
+
+
 def extractor_config(job, proxy):
     from http.cookies import SimpleCookie
     secret = _credentials().get(job.provider, {})
     options = {'proxy': proxy, 'proxy-env': False, 'netrc': False,
                'timeout': 20, 'retries': 0,
-               'file-range': f'{job.position + 1}-{job.position + job.limit}',
-               'sleep-request': '1-2', 'sleep-429': 0,
+               'sleep-429': 0,
                'external': False, 'parent': False, 'metadata': True,
                'tags': True}
     site = {}
@@ -106,20 +152,27 @@ def extractor_config(job, proxy):
         site['cookies'] = {key: value.value for key, value in cookies.items()}
     if job.provider == 'pawchive':
         site.update({'expand': True, 'original': True, 'previews': False,
-                     'sleep-request': '3-6', 'max-posts': job.limit})
+                     'sleep-request': '3-6'})
     options[job.provider] = site
-    return {'extractor': options, 'output': {'jsonl': True, 'private': False}}
+    directory = _extractor_directory(settings()['extractors_dir'])
+    options['module-sources'] = [directory, None] if directory else [None]
+    return {'extractor': options, 'output': {'jsonl': True, 'private': False},
+            'cache': {'file': str(root(job) / 'extractor-cache.sqlite3')}}
 
 
-def scan_events(job, cancel, control):
+def worker_events(job, cancel, control, extra=None):
     """Stream capped JSONL. The child sees only its explicit configuration."""
     if cancel.is_set():
         raise InterruptedError()
+    # Validate configured modules before starting the child. The mounted host
+    # directory can become unavailable between Save and an explicit job action.
+    _extractor_directory(settings()['extractors_dir'])
     with extractor_proxy() as proxy:
         environment = {key: value for key, value in os.environ.items()
                        if key.upper() in {'SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP',
                                           'LANG', 'LC_ALL'}}
-        environment.update(PYTHONUTF8='1', PYTHONIOENCODING='utf-8', PYTHONNOUSERSITE='1')
+        environment.update(PYTHONUTF8='1', PYTHONIOENCODING='utf-8', PYTHONNOUSERSITE='1',
+                           PYTHONDONTWRITEBYTECODE='1')
         worker = Path(__file__).resolve().parents[1] / 'scrape' / 'image_source_worker.py'
         with control['lock']:
             if cancel.is_set():
@@ -155,12 +208,25 @@ def scan_events(job, cancel, control):
         reader = threading.Thread(target=read, daemon=True)
         reader.start()
         try:
-            process.stdin.write(json.dumps({'url': job.url, 'config': extractor_config(job, proxy)}).encode())
+            root(job).mkdir(parents=True, exist_ok=True)
+            options = json.loads(job.options_json or '{}')
+            request = {'action': 'scan', 'url': job.url, 'provider': job.provider,
+                       'config': extractor_config(job, proxy), 'proxy': proxy,
+                       'credentials': _credentials().get(job.provider, {}),
+                       'engine': options.get('engine', 'auto'), 'start': job.position,
+                       'limit': job.limit, 'force_extractor': options.get('extractor', '')}
+            request.update(extra or {})
+            process.stdin.write(json.dumps(request).encode())
             process.stdin.close()
             deadline, used = time.monotonic() + 900, 0
             while True:
                 if cancel.is_set():
                     raise InterruptedError()
+                if extra and extra.get('action') == 'download':
+                    used_disk = sum(path.stat().st_size for path in root(job).rglob('*')
+                                    if path.is_file() and not path.is_symlink())
+                    if used_disk > JOB_BYTES or shutil.disk_usage(root(job)).free < 256 * 1024 * 1024:
+                        raise SourceNetworkError('The source job reached its storage limit.', 'storage')
                 if time.monotonic() > deadline:
                     raise ValueError('The scan reached its time limit. Resume to continue.')
                 try:
@@ -185,13 +251,26 @@ def scan_events(job, cancel, control):
         finally:
             stop_reader.set()
             if process.poll() is None:
-                process.kill()
+                _kill_process(process)
             process.wait(timeout=10)
             process.stdout.close()
             if process.stdin and not process.stdin.closed:
                 process.stdin.close()
             reader.join(timeout=2)
             control['process'] = None
+
+
+def scan_events(job, cancel, control):
+    yield from worker_events(job, cancel, control)
+
+
+def _source_failure(kind):
+    message = {
+        'unsupported': 'No extractor accepts this URL. Check the URL, downloader or local extractor folder.',
+        'auth': 'The source requires access. Save its credentials, then select Resume.',
+        'configuration': 'The source modules could not load. Check Extractor Folder and install source packages.',
+    }.get(kind, 'The source action failed. Check source access or retry later.')
+    return SourceNetworkError(message, kind or 'network')
 
 
 def _scan(job, cancel, control):
@@ -202,25 +281,29 @@ def _scan(job, cancel, control):
             raise InterruptedError()
         if event[0] == -1:
             kind = event[1].get('kind') if len(event) > 1 and isinstance(event[1], dict) else None
-            raise SourceNetworkError('The source refused the scan. Check credentials or retry later.', kind or 'network')
+            raise _source_failure(kind)
         if event[0] != 3 or len(event) < 3 or not isinstance(event[2], dict):
             continue
         if job.position - start >= job.limit:
             break
-        item = metadata.media_item(job.provider, job.url, event[1], event[2])
+        item = (event[2]['acquisition_item'] if 'acquisition_item' in event[2]
+                else metadata.media_item(job.provider, job.url, event[1], event[2]))
         if item and item['key'] not in known:
             if len(known) >= 5000:
                 raise ValueError('This job reached 5000 items. Create a narrower source query.')
+            selected = json.loads(job.options_json or '{}').get('media', 'images')
             db.session.add(Asset(job_id=job.id, source_key=item['key'], url=item['url'],
                                  thumbnail=item['thumbnail'], kind=item['kind'],
-                                 selected=item['kind'] != 'unsupported',
-                                 error=('RAR and 7z extraction are unavailable. Use a ZIP or direct images.'
-                                        if item['kind'] == 'unsupported' else None),
+                                 selected=(selected == 'all' or item['kind'] in ('image', 'archive')
+                                           if selected != 'videos' else item['kind'] == 'video'),
                                  metadata_json=json.dumps(item['metadata'])))
             known.add(item['key'])
         elif item:
             existing = Asset.query.filter_by(job_id=job.id, source_key=item['key']).one()
             existing.url, existing.thumbnail = item['url'], item['thumbnail']
+            if existing.sha256:
+                item['metadata']['sha256'] = existing.sha256
+            existing.metadata_json = json.dumps(item['metadata'])
         job.position += 1
         job.done += 1
         db.session.commit()
@@ -230,7 +313,7 @@ def _scan(job, cancel, control):
 
 def _space(job, amount):
     root(job).mkdir(parents=True, exist_ok=True)
-    used = sum(path.stat().st_size for path in root(job).iterdir()
+    used = sum(path.stat().st_size for path in root(job).rglob('*')
                if path.is_file() and not path.is_symlink())
     if used + amount > JOB_BYTES:
         raise SourceNetworkError('The job reached its 2 GiB storage limit.', 'storage')
@@ -259,8 +342,24 @@ def _image_bytes(raw):
     return _preserved_import_extension(raw, label='source image')
 
 
+def _original_extension(raw):
+    from .face_dataset_service import _validate_import_header_dimensions
+    if len(raw) > IMAGE_BYTES:
+        raise ValueError('The image exceeds the 64 MiB download limit.')
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', Image.DecompressionBombWarning)
+        with Image.open(io.BytesIO(raw)) as image:
+            _validate_import_header_dimensions(image, label='source image')
+            extension = {'JPEG': '.jpg', 'PNG': '.png', 'WEBP': '.webp',
+                         'AVIF': '.avif', 'GIF': '.gif'}.get(image.format)
+            if extension is None:
+                raise ValueError('The original image format is unsupported.')
+            image.verify()
+    return extension
+
+
 def _preview(job, asset, raw):
-    _image_bytes(raw)
+    _original_extension(raw)
     with Image.open(io.BytesIO(raw)) as image:
         image.thumbnail((320, 320))
         out = io.BytesIO()
@@ -294,7 +393,7 @@ def _archive(job, asset, raw, cancel):
             if entry.is_dir() or entry.filename.rsplit('.', 1)[-1].lower() not in metadata.IMAGE_EXTENSIONS:
                 continue
             data = archive.read(entry)
-            extension = _image_bytes(data)
+            extension = _original_extension(data)
             checksum = hashlib.sha256(data).hexdigest()
             key = hashlib.sha256(f'{asset.source_key}:{index}:{checksum}'.encode()).hexdigest()
             child = Asset.query.filter_by(job_id=job.id, source_key=key).first()
@@ -303,6 +402,7 @@ def _archive(job, asset, raw, cancel):
                     raise ValueError('This job reached its 5000-item limit. Use a smaller source selection.')
                 meta = json.loads(asset.metadata_json)
                 meta['sha256'] = checksum
+                meta['extension'] = extension.removeprefix('.')
                 child = Asset(job_id=job.id, source_key=key, url=asset.url,
                               kind='image', selected=True, sha256=checksum,
                               metadata_json=json.dumps(meta), local_name=checksum + extension)
@@ -313,57 +413,109 @@ def _archive(job, asset, raw, cancel):
                 db.session.commit()
 
 
-def _download(job, cancel):
+def _download(job, cancel, control=None):
+    """Use source-native authentication, streams and custom extractor behavior."""
+    if control is None:
+        from flask import current_app
+        control = runtime(current_app._get_current_object())
     assets = Asset.query.filter_by(job_id=job.id, selected=True).order_by(Asset.id).all()
     job.total = len(assets)
-    db.session.commit()
+    pending = {}
     for asset in assets:
         if cancel.is_set():
             raise InterruptedError()
-        try:
-            if asset.kind == 'unsupported':
-                raise ValueError('This archive format cannot be imported.')
-            path = local_path(job, asset)
-            cached = path is not None and path.is_file()
-            if cached:
-                if path.stat().st_size > (ARCHIVE_BYTES if asset.kind == 'archive' else IMAGE_BYTES):
-                    raise ValueError('The cached file exceeds the download limit.')
-                raw = path.read_bytes()
-                if hashlib.sha256(raw).hexdigest() != asset.sha256:
-                    cached = False
-            if not cached:
-                maximum = ARCHIVE_BYTES if asset.kind == 'archive' else IMAGE_BYTES
-                _space(job, maximum)
-                raw = fetch(asset.url, max_bytes=maximum,
-                            referer=json.loads(asset.metadata_json)['source_url'], cancel=cancel)
-            checksum = hashlib.sha256(raw).hexdigest()
-            if asset.kind == 'archive':
-                _archive(job, asset, raw, cancel)
-                extension = '.zip'
-            else:
-                extension = _image_bytes(raw)
-            if not cached:
-                _write(job, checksum + extension, raw)
-            asset.sha256, asset.local_name, asset.error = checksum, checksum + extension, None
-            meta = json.loads(asset.metadata_json)
-            meta['sha256'] = checksum
-            asset.metadata_json = json.dumps(meta)
-            if asset.kind == 'image':
-                _preview(job, asset, raw)
-        except SourceNetworkError as exc:
-            asset.error = str(exc)
-            db.session.commit()
-            if exc.kind in ('rate_limit', 'auth', 'storage'):
-                raise
-        except (ValueError, OSError, zipfile.BadZipFile):
-            asset.error = 'The file failed validation or download. Retry this item.'
-        job.done += 1
-        db.session.commit()
-        if not cached and cancel.wait(1):
+        path = local_path(job, asset)
+        if path and path.is_file() and not path.is_symlink():
+            valid = _checksum(path) == asset.sha256
+            if valid:
+                if asset.kind == 'archive':
+                    _extract_cached_archive(job, asset, path, cancel)
+                elif asset.kind == 'image':
+                    _preview(job, asset, path.read_bytes())
+                    asset.error = None
+                job.done += 1
+                continue
+        pending[asset.source_key] = asset
+    db.session.commit()
+    if not pending:
+        return
+    native = root(job) / 'native'
+    if native.is_symlink():
+        raise ValueError('The download directory contains an unsafe link.')
+    native.mkdir(parents=True, exist_ok=True)
+    groups = {}
+    for key, asset in pending.items():
+        meta = json.loads(asset.metadata_json)
+        groups.setdefault((meta.get('engine', 'gallery-dl'), meta.get('generic', False)), []).append(key)
+    for (engine, generic), keys in groups.items():
+        extra = {'action': 'download', 'engine': engine, 'generic': generic, 'directory': str(native),
+                 'keys': keys, 'max_bytes': JOB_BYTES - 256 * 1024 * 1024,
+                 'targets': [{'key': key, 'page': json.loads(pending[key].metadata_json)['source_url']}
+                             for key in keys]}
+        _receive_downloads(job, pending, native, cancel, control, extra)
+    if pending:
+        raise ValueError('The source did not return every selected item. Rescan to refresh its media URLs.')
+
+
+def _checksum(path):
+    checksum = hashlib.sha256()
+    with path.open('rb') as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b''):
+            checksum.update(chunk)
+    return checksum.hexdigest()
+
+
+def _extract_cached_archive(job, asset, path, cancel):
+    try:
+        if path.stat().st_size > ARCHIVE_BYTES:
+            raise ValueError('The ZIP exceeds the 256 MiB extraction limit. Save Original remains available.')
+        _archive(job, asset, path.read_bytes(), cancel)
+        asset.error = None
+    except (ValueError, OSError, zipfile.BadZipFile):
+        asset.error = 'The ZIP cannot be extracted safely. Save Original remains available.'
+    db.session.commit()
+
+
+def _receive_downloads(job, pending, native, cancel, control, extra):
+    for event in worker_events(job, cancel, control, extra):
+        if cancel.is_set():
             raise InterruptedError()
-    failures = Asset.query.filter_by(job_id=job.id, selected=True).filter(Asset.error.isnot(None)).count()
-    if failures:
-        raise ValueError(f'{failures} item(s) failed. Verified downloads remain available.')
+        if event[0] == -1:
+            kind = event[1].get('kind') if len(event) > 1 and isinstance(event[1], dict) else None
+            raise _source_failure(kind)
+        if len(event) < 3 or event[0] != 4 or event[1] not in pending or not isinstance(event[2], dict):
+            continue
+        asset = pending[event[1]]
+        path = native / str(event[2].get('file', ''))
+        if path.parent.resolve() != native.resolve() or not path.is_file() or path.is_symlink():
+            raise ValueError('The downloader returned an invalid file path.')
+        if not 0 < path.stat().st_size <= extra['max_bytes']:
+            raise ValueError('The downloaded file exceeds the job limit.')
+        checksum = _checksum(path)
+        extension = path.suffix.lower()
+        if asset.kind == 'image':
+            if path.stat().st_size > IMAGE_BYTES:
+                raise ValueError('The image exceeds the 64 MiB import limit.')
+            raw = path.read_bytes()
+            extension = _original_extension(raw)
+        if not extension or len(extension) > 12 or not extension[1:].isalnum():
+            extension = '.bin'
+        target = root(job) / (checksum + extension)
+        if target.is_symlink():
+            raise ValueError('The destination contains an unsafe link.')
+        os.replace(path, target)
+        asset.sha256, asset.local_name, asset.error = checksum, target.name, None
+        value = json.loads(asset.metadata_json)
+        value['sha256'] = checksum
+        asset.metadata_json = json.dumps(value)
+        db.session.commit()
+        if asset.kind == 'archive':
+            _extract_cached_archive(job, asset, target, cancel)
+        elif asset.kind == 'image':
+            _preview(job, asset, raw)
+        job.done += 1
+        pending.pop(event[1])
+        db.session.commit()
 
 
 def _previews(job, cancel):
@@ -428,7 +580,7 @@ def _drain(app):
                 if job.phase == 'scan':
                     _scan(job, cancel, control)
                 elif job.phase == 'download':
-                    _download(job, cancel)
+                    _download(job, cancel, control)
                 elif job.phase == 'previews':
                     _previews(job, cancel)
                 else:
@@ -485,7 +637,7 @@ def stop(app, job):
             control['cancel'].set()
             process = control['process']
             if process and process.poll() is None:
-                process.kill()
+                _kill_process(process)
         elif job.state == 'queued':
             job.state = 'cancelled'
             db.session.commit()
@@ -495,6 +647,7 @@ def payload(job, *, include_assets=False, offset=0, query=''):
     result = {key: getattr(job, key) for key in (
         'id', 'provider', 'url', 'state', 'phase', 'position', 'limit',
         'done', 'total', 'destination', 'target_id', 'name', 'error')}
+    result['options'] = json.loads(job.options_json or '{}')
     from sqlalchemy import case, func
     counts = db.session.query(func.count(Asset.id),
                               func.sum(case((Asset.selected.is_(True), 1), else_=0)),

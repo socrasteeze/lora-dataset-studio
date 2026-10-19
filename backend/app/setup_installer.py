@@ -530,7 +530,7 @@ _FLASK_VENV_INCOMPATIBLE = frozenset({_WATERMARK_PKG})
 #                 Windows). The ~400 MB of WEIGHTS are not a pip concern — the
 #                 child fetches those on first run (see services/wd14_tagger.py).
 _CAPABILITY_PACKAGES = {
-    'image_source_extras': ('gallery-dl',),
+    'image_source_extras': ('gallery-dl', 'yt-dlp', 'pycryptodomex', 'imageio-ffmpeg'),
     'face_scoring': ('insightface', 'onnxruntime', 'numpy', 'opencv-python-headless'),
     'masks': ('rembg', 'onnxruntime', 'numpy', 'opencv-python-headless'),
     'watermark_inpaint': (_WATERMARK_PKG,),
@@ -3319,7 +3319,7 @@ def _run_image_source_extras(action):
     if result != 0:
         return result
     ok = capabilities._import_ok(sys.executable,
-                                 'import gallery_dl.job, gallery_dl.extractor, requests')
+                                 'import gallery_dl.job, gallery_dl.extractor, yt_dlp, Cryptodome.Cipher.AES, requests, imageio_ffmpeg; imageio_ffmpeg.get_ffmpeg_exe()')
     if ok is not True:
         _append(action, 'The source packages did not pass the import check. Select Retry.')
         return 1

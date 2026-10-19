@@ -56,7 +56,22 @@ def main():
             return archive.getvalue()
         return images[int(url.rsplit('/', 1)[-1].split('.')[0])]
 
+    def download(job, cancel, control, extra=None):
+        if not extra or extra.get('action') != 'download':
+            raise AssertionError('Only synthetic downloads use this adapter.')
+        from app.models import ImageSourceAsset
+        for asset in ImageSourceAsset.query.filter_by(job_id=job.id, selected=True).order_by(ImageSourceAsset.id):
+            if asset.source_key not in extra['keys']:
+                continue
+            if cancel.is_set():
+                raise InterruptedError()
+            extension = 'zip' if asset.kind == 'archive' else 'png'
+            name = asset.source_key + '.' + extension
+            (Path(extra['directory']) / name).write_bytes(fetch(asset.url))
+            yield [4, asset.source_key, {'file': name}]
+
     patch.setattr(sources, 'scan_events', scan)
+    patch.setattr(sources, 'worker_events', download)
     patch.setattr(sources, 'fetch', fetch)
     patch.setattr(capabilities, 'probe_image_source_deps', lambda: {'ok': True})
     with app.app_context():

@@ -1439,7 +1439,7 @@ def python_ml_status() -> dict:
 
 def probe_image_source_deps() -> dict:
     ok = _cached_import('image_source_deps', sys.executable,
-                        'import gallery_dl.job, gallery_dl.extractor, requests')
+                        'import gallery_dl.job, gallery_dl.extractor, yt_dlp, Cryptodome.Cipher.AES, requests, imageio_ffmpeg; imageio_ffmpeg.get_ffmpeg_exe()')
     return {'ok': bool(ok), 'detail': 'Image sources are ready.' if ok else
             'Install image sources from the Image Sources panel.',
             'action': 'image_source_extras'}

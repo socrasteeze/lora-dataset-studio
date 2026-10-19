@@ -144,6 +144,12 @@ than creating a second policy for another agent.
 
 ## Validation
 
+Operator order, 2026-10-18: skip all backend tests, locally and in cloud, until
+the operator explicitly re-enables them. Do not dispatch backend test jobs or
+the backend-bearing Quick/Gates phases. Continue frontend checks and static
+lint. Report backend behavior as unverified. This does not authorize landing
+main without its required qualification.
+
 Use the repository's pinned `.venv` and the Node version required by the current
 manifests and `scripts/gates.ps1`. Historical test counts are not a current baseline.
 

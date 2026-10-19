@@ -35,6 +35,9 @@ try {
     await delay(500)
   }
   assert.ok(ready, `Synthetic source server did not start. ${output}`)
+  const catalogResponse = await fetch(`${url}/api/image-sources`)
+  assert.equal(catalogResponse.status, 200, `Source catalog unavailable. ${output}`)
+  assert.equal((await catalogResponse.json()).capability.ok, true)
   browser = await chromium.launch({ executablePath: findHeadlessShell(fs, path) })
   for (const [width, height] of [[360, 800], [412, 915], [844, 390], [768, 1024], [1280, 800]]) {
     for (const surface of ['bank', 'dataset']) {
@@ -50,9 +53,15 @@ try {
       const panel = page.locator(`#${id}`)
       await panel.locator('summary').first().click()
       await panel.getByRole('button', { name: 'Scan', exact: true }).waitFor({ state: 'visible' })
+      await page.waitForFunction((selector) => [...document.querySelector(selector).querySelectorAll('button')]
+        .find((node) => node.textContent === 'Scan')?.disabled === false,
+      `#${id}`, { timeout: 15000 }).catch(async (failure) => {
+        throw new Error(`Source controls unavailable: ${await panel.innerText()}. ${output}`, { cause: failure })
+      })
       const afterOpen = await (await fetch(`${url}/test/ready`)).json()
       assert.equal(afterOpen.scans, before.scans, 'Opening the panel started a scan')
       assert.equal(afterOpen.downloads, before.downloads, 'Opening the panel started a download')
+      await panel.getByLabel('Search Preset', { exact: true }).selectOption('danbooru')
       await panel.getByLabel('Tag Query', { exact: true }).fill('synthetic_tag')
       await panel.getByRole('button', { name: 'Scan', exact: true }).click()
       await panel.getByRole('button', { name: 'Clear All', exact: true }).waitFor({ state: 'visible' })
@@ -64,8 +73,10 @@ try {
       await page.waitForFunction((selector) => document.querySelector(selector)?.textContent.includes('2 Selected'), `#${id}`)
       await panel.getByRole('button', { name: 'Download', exact: true }).click()
       await page.waitForFunction((selector) => document.querySelector(selector)?.textContent.includes('2 Downloaded'), `#${id}`, { timeout: 30000 })
-      await panel.getByRole('button', { name: 'Import', exact: true }).click()
+      await panel.getByRole('button', { name: 'Import Images', exact: true }).click()
       await page.waitForFunction((selector) => document.querySelector(selector)?.textContent.includes('2 Imported'), `#${id}`, { timeout: 30000 })
+      await panel.getByText('Extractor Settings', { exact: true }).click()
+      await panel.getByText('Credentials', { exact: true }).click()
       const measurement = await panel.evaluate((element) => {
         const viewport = document.documentElement.clientWidth
         const visible = [...element.querySelectorAll('button, input:not([type=checkbox]), select, a, summary')]
@@ -89,6 +100,9 @@ try {
   }
   await mkdir(receipts, { recursive: true })
   await writeFile(path.join(receipts, 'image-sources.json'), JSON.stringify({ cases, skipped: 0 }, null, 2))
+} catch (failure) {
+  console.error(output)
+  throw failure
 } finally {
   await browser?.close()
   server?.kill()

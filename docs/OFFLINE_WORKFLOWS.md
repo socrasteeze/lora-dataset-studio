@@ -21,11 +21,14 @@ does not load a repository `.env` through Flask on startup.
 ## Preparation
 
 Image Sources is a narrow operator-started acquisition exception. Bank and
-Dataset expose the same controls for supported booru, Rule34 and Pawchive URLs.
-Scan, Scan More, Rescan, Load Previews, Download and Resume can contact these sources.
+Dataset expose the same controls for gallery-dl, yt-dlp, image boards and generic
+public URLs. A configured host folder can add local GDLOPS extractor modules.
+Scan, Scan More, Rescan, Load Previews, Download and Resume can contact sources.
 Import uses verified local files. Page loads and cached previews stay local.
 No dataset or existing local image is uploaded. A restart requires Resume.
 There are no subscriptions or automatic background source checks.
+Custom extractor modules are trusted local code. They are not bundled from
+GDLOPS and do not gain permission to run on page load.
 
 Setup may download packages, node packs and model weights only after an
 operator starts the action. This retains the existing preparation workflow.
