@@ -3,6 +3,7 @@ import io
 import os
 from pathlib import Path
 import sys
+import threading
 import zipfile
 
 
@@ -29,6 +30,8 @@ def main():
     from app.models import FaceDataset
     from app.services import image_sources as sources
     calls = {'scans': 0, 'downloads': 0}
+    download_ready = threading.Event()
+    download_ready.set()
     images = []
     for index in range(28):
         output = io.BytesIO()
@@ -61,6 +64,8 @@ def main():
     def download(job, cancel, control, extra=None):
         if not extra or extra.get('action') != 'download':
             raise AssertionError('Only synthetic downloads use this adapter.')
+        if not download_ready.wait(timeout=15):
+            raise ValueError('The synthetic download was not released.')
         from app.models import ImageSourceAsset
         for asset in ImageSourceAsset.query.filter_by(job_id=job.id, selected=True).order_by(ImageSourceAsset.id):
             if asset.source_key not in extra['keys']:
@@ -87,6 +92,16 @@ def main():
     def ready():
         return jsonify({'dataset_id': dataset_id, **calls})
 
+    @app.post('/test/hold-download')
+    def hold_download():
+        download_ready.clear()
+        return {'ok': True}
+
+    @app.post('/test/release-download')
+    def release_download():
+        download_ready.set()
+        return {'ok': True}
+
     @app.get('/test/debug')
     def debug():
         import faulthandler
@@ -100,7 +115,7 @@ def main():
 
     @app.post('/test/shutdown')
     def shutdown():
-        import threading
+        download_ready.set()
         threading.Thread(target=server.shutdown, daemon=True).start()
         return {'stopping': True}
 

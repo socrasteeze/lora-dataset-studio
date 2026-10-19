@@ -257,21 +257,20 @@ export default function ImageSourcesPanel({ datasetId, banks = [], disabled = fa
           </Select>
         </label>}
         {job && <div className="min-w-0 space-y-3">
-          <div role="status" className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
+          <div role="status" className="flex min-h-12 min-w-0 flex-wrap items-center gap-2 text-xs lg:min-h-6">
             <span>{jobLabel(job)}</span><span>{job.done}/{job.total || job.done}</span>
             <span>{job.selected_count} Selected</span><span>{job.downloaded_count} Downloaded</span><span>{job.imported_count} Imported</span>
           </div>
           {job.error && <p className="break-words text-xs text-amber-200">{job.error}</p>}
-          <div className="grid grid-cols-2 gap-2 lg:flex lg:flex-wrap">
-            {active ? <button type="button" className={button} disabled={busy} onClick={() => run('stop')}>Stop</button> : <>
-              <button type="button" className={button} disabled={controlsDisabled} onClick={() => run('scan')}>Scan More</button>
-              <button type="button" className={button} disabled={controlsDisabled} onClick={() => run('rescan')}>Rescan</button>
-              <button type="button" className={button} disabled={controlsDisabled || !job.selected_count} onClick={() => run('previews')}>Load Previews</button>
-              <button type="button" className={button} disabled={controlsDisabled || !job.selected_count} onClick={() => run('download')}>Download</button>
-              <button type="button" className={button} disabled={controlsDisabled || !job.downloaded_count} onClick={() => run('import')}>Import Images</button>
-              {['failed', 'cancelled', 'interrupted'].includes(job.state) && <button type="button" className={button}
-                disabled={controlsDisabled} onClick={() => run('resume')}>Resume</button>}
-            </>}
+          <div data-source-actions className="grid grid-cols-2 gap-2 lg:flex lg:flex-wrap">
+            <button type="button" className={button} disabled={controlsDisabled} onClick={() => run('scan')}>Scan More</button>
+            <button type="button" className={button} disabled={controlsDisabled} onClick={() => run('rescan')}>Rescan</button>
+            <button type="button" className={button} disabled={controlsDisabled || !job.selected_count} onClick={() => run('previews')}>Load Previews</button>
+            <button type="button" className={button} disabled={controlsDisabled || !job.selected_count} onClick={() => run('download')}>Download</button>
+            <button type="button" className={button} disabled={controlsDisabled || !job.downloaded_count} onClick={() => run('import')}>Import Images</button>
+            {['failed', 'cancelled', 'interrupted'].includes(job.state)
+              ? <button type="button" className={button} disabled={controlsDisabled} onClick={() => run('resume')}>Resume</button>
+              : <button type="button" className={button} disabled={busy || !active} onClick={() => run('stop')}>Stop</button>}
           </div>
           <label htmlFor={fieldId('filter')} className="block min-w-0 space-y-1 text-xs">Filter Results
             <Input id={fieldId('filter')} value={filter} className="min-h-10 w-full text-base lg:text-sm" maxLength="200"
