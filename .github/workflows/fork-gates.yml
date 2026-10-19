@@ -63,9 +63,23 @@ jobs:
       - name: Install Browser for Bank Checks
         run: node frontend/node_modules/playwright-core/cli.js install chromium
 
+      - name: Check Image Sources in Browser
+        id: source_checks
+        if: ${{ !cancelled() }}
+        run: node frontend/scripts/imageSourcesProbe.mjs
+
+      - name: Save Image Source Receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-sources-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .git/lds-gates-validation/image-sources.json
+          include-hidden-files: true
+          if-no-files-found: error
+
       - name: Check Bank Imports and Settings in Browser
         id: browser_checks
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.source_checks.outcome == 'success' || inputs.run_backend == true) }}
         run: node frontend/scripts/bankOtherTagsProbe.mjs
 
       - name: Save Browser Receipt
@@ -78,30 +92,17 @@ jobs:
           if-no-files-found: warn
 
       - name: Check Curation Controls in Browser
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.source_checks.outcome == 'success' || inputs.run_backend == true) }}
         run: node frontend/scripts/bankCurationProbe.mjs
 
       - name: Save Curation Receipts
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.source_checks.outcome == 'success' || inputs.run_backend == true) }}
         uses: actions/upload-artifact@v4
         with:
           name: curation-${{ github.event.pull_request.head.sha || github.sha }}
           path: .git/lds-gates-validation/curation*
           include-hidden-files: true
           if-no-files-found: error
-
-      - name: Check Image Sources in Browser
-        if: ${{ !cancelled() }}
-        run: node frontend/scripts/imageSourcesProbe.mjs
-
-      - name: Save Image Source Receipts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: image-sources-${{ github.event.pull_request.head.sha || github.sha }}
-          path: .git/lds-gates-validation/image-sources.json
-          include-hidden-files: true
-          if-no-files-found: warn
 
       - name: Run Fork Gates
         # Preserve browser failures while collecting the independent full gate.
@@ -116,7 +117,7 @@ jobs:
         run: ./scripts/gates.ps1 -Phase Gates -ScratchRoot D:/lds-gates
 
       - name: Frontend Checks
-        if: ${{ !cancelled() && inputs.run_backend != true }}
+        if: ${{ !cancelled() && inputs.run_backend != true && steps.source_checks.outcome == 'success' }}
         working-directory: frontend
         shell: pwsh
         run: |

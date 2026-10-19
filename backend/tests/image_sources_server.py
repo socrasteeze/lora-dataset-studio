@@ -87,7 +87,20 @@ def main():
     def ready():
         return jsonify({'dataset_id': dataset_id, **calls})
 
-    make_server('127.0.0.1', int(sys.argv[2]), app, threaded=True).serve_forever()
+    @app.post('/test/shutdown')
+    def shutdown():
+        import threading
+        threading.Thread(target=server.shutdown, daemon=True).start()
+        return {'stopping': True}
+
+    server = make_server('127.0.0.1', int(sys.argv[2]), app, threaded=True)
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
+        with app.app_context():
+            db.session.remove()
+            db.engine.dispose()
 
 
 if __name__ == '__main__':

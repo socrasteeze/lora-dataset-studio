@@ -1,6 +1,6 @@
 /** Cloud-only acquisition checks. Synthetic media; no public network. */
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import * as fs from 'node:fs'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
@@ -17,12 +17,15 @@ const receipts = path.join(root, '.git', 'lds-gates-validation')
 const cases = []
 let server, browser
 let output = ''
+let failureText = null
+let serverUrl
 try {
   const socket = createServer()
   await new Promise((resolve) => socket.listen(0, '127.0.0.1', resolve))
   const port = socket.address().port
   await new Promise((resolve) => socket.close(resolve))
   const url = `http://127.0.0.1:${port}`
+  serverUrl = url
   const python = path.join(root, '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python')
   server = spawn(python, [path.join(root, 'backend/tests/image_sources_server.py'), runtime, String(port)],
     { cwd: root, windowsHide: true, env: { ...process.env, PYTHONUTF8: '1' } })
@@ -118,14 +121,28 @@ try {
       await context.close()
     }
   }
-  await mkdir(receipts, { recursive: true })
-  await writeFile(path.join(receipts, 'image-sources.json'), JSON.stringify({ cases, skipped: 0 }, null, 2))
 } catch (failure) {
+  failureText = String(failure.stack || failure)
+  console.error(failure)
   console.error(output)
   throw failure
 } finally {
+  await mkdir(receipts, { recursive: true })
+  await writeFile(path.join(receipts, 'image-sources.json'), JSON.stringify({ cases,
+    expectedCases: 10, skipped: 10 - cases.length,
+    complete: cases.length === 10 && failureText === null, failure: failureText }, null, 2))
   await browser?.close()
-  server?.kill()
-  if (server && server.exitCode === null) await new Promise((resolve) => server.once('exit', resolve))
-  await rm(runtime, { recursive: true, force: true })
+  if (server && server.exitCode === null) {
+    const exited = new Promise((resolve) => server.once('exit', resolve))
+    try { await fetch(`${serverUrl}/test/shutdown`, { method: 'POST', signal: AbortSignal.timeout(5000) }) }
+    catch { /* Startup can fail before the fixture endpoint exists. */ }
+    if (!await Promise.race([exited.then(() => true), delay(10000, false, { ref: false })])) {
+      if (process.platform === 'win32') execFileSync('taskkill', ['/PID', String(server.pid), '/T', '/F'], { windowsHide: true })
+      else server.kill()
+      await exited
+    }
+  }
+  assert.ok(path.resolve(runtime).startsWith(path.resolve(tmpdir()) + path.sep)
+    && path.basename(runtime).startsWith('lds-image-sources-'))
+  await rm(runtime, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 }
