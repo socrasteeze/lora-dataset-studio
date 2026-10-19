@@ -40,10 +40,10 @@ def main():
 
     def scan(job, cancel, control):
         calls['scans'] += 1
-        for index in range(job.position, min(26, job.position + job.limit)):
+        for index in range(job.position, min(27, job.position + job.limit)):
             if cancel.is_set():
                 raise InterruptedError()
-            extension = 'zip' if index == 25 else 'png'
+            extension = 'zip' if index == 25 else 'mp4' if index == 26 else 'png'
             yield [3, f'https://cdn.example.test/{index}.{extension}',
                    {'id': index + 1, 'extension': extension,
                     'tags': f'synthetic_{index} blue', 'tags_artist': ['demo_artist'],
@@ -54,6 +54,8 @@ def main():
         calls['downloads'] += 1
         if url.endswith('.zip'):
             return archive.getvalue()
+        if url.endswith('.mp4'):
+            return b'synthetic-video-container'
         return images[int(url.rsplit('/', 1)[-1].split('.')[0])]
 
     def download(job, cancel, control, extra=None):
@@ -65,7 +67,7 @@ def main():
                 continue
             if cancel.is_set():
                 raise InterruptedError()
-            extension = 'zip' if asset.kind == 'archive' else 'png'
+            extension = {'archive': 'zip', 'video': 'mp4'}.get(asset.kind, 'png')
             name = asset.source_key + '.' + extension
             (Path(extra['directory']) / name).write_bytes(fetch(asset.url))
             yield [4, asset.source_key, {'file': name}]

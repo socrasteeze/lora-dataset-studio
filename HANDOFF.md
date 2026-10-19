@@ -1,6 +1,6 @@
 # HANDOFF
 
-**Updated:** 2026-10-18 | **Branch:** validation/image-source-importer | **Base:** 5306f107f | **Tree:** dirty
+**Updated:** 2026-10-18 | **Branch:** validation/image-source-importer | **Base:** 5306f107f | **Validation:** frontend only
 
 ## State
 Image Sources is implemented on the task branch. Coverage uses gallery-dl,
@@ -14,6 +14,8 @@ Main and the running checkout remain unchanged.
 - Shared Image Sources between Bank and Dataset. Preserved source tags separately from captions and kept new images pending review.
 - Added optional Setup installation, write-only credentials, source attribution, regression tests and a five-size cloud browser probe.
 - Fixed the first cloud findings: parsed API responses, Setup install reachability, secret inventory, core table counts and the synthetic gallery-dl message shape.
+- Preserved extractor cookie domains and applied Pawchive original expansion to alternate source domains. Added unexecuted backend regression cases for later authorization.
+- Repaired the second cloud findings: explicit select labels, the expanded Setup catalog fixture and the new reserved Guide anchor. Bank and curation browser checks passed in run 39181224076; source and Node repairs need a final cloud run.
 - Updated Guide, fork policy and outbound inventory. Backend source lint and the frontend build pass. ESLint has no errors and 32 existing warnings.
 
 ## Open

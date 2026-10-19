@@ -61,8 +61,12 @@ try {
       const afterOpen = await (await fetch(`${url}/test/ready`)).json()
       assert.equal(afterOpen.scans, before.scans, 'Opening the panel started a scan')
       assert.equal(afterOpen.downloads, before.downloads, 'Opening the panel started a download')
-      await panel.getByLabel('Search Preset', { exact: true }).selectOption('danbooru')
-      await panel.getByLabel('Tag Query', { exact: true }).fill('synthetic_tag')
+      if (surface === 'bank') {
+        await panel.getByLabel('Search Preset', { exact: true }).selectOption('danbooru')
+        await panel.getByLabel('Tag Query', { exact: true }).fill('synthetic_tag')
+      } else {
+        await panel.getByLabel('URL', { exact: true }).fill('https://images.example.test/collection/1')
+      }
       await panel.getByRole('button', { name: 'Scan', exact: true }).click()
       await panel.getByRole('button', { name: 'Clear All', exact: true }).waitFor({ state: 'visible' })
       await panel.getByRole('button', { name: 'Clear All', exact: true }).click()
@@ -75,6 +79,19 @@ try {
       await page.waitForFunction((selector) => document.querySelector(selector)?.textContent.includes('2 Downloaded'), `#${id}`, { timeout: 30000 })
       await panel.getByRole('button', { name: 'Import Images', exact: true }).click()
       await page.waitForFunction((selector) => document.querySelector(selector)?.textContent.includes('2 Imported'), `#${id}`, { timeout: 30000 })
+      if (width === 1280 && surface === 'bank') {
+        await panel.getByRole('button', { name: 'Next', exact: true }).click()
+        await panel.getByText('Video', { exact: true }).waitFor({ state: 'visible' })
+        await panel.getByRole('checkbox').nth(2).check()
+        await page.waitForFunction((selector) => document.querySelector(selector)?.textContent.includes('3 Selected'), `#${id}`)
+        await panel.getByRole('button', { name: 'Download', exact: true }).click()
+        await page.waitForFunction((selector) => document.querySelector(selector)?.textContent.includes('3 Downloaded'), `#${id}`)
+        const link = panel.getByRole('link', { name: 'Save Original', exact: true })
+        const original = await context.request.get(`${url}${await link.getAttribute('href')}`)
+        assert.equal(original.status(), 200)
+        assert.match(original.headers()['content-disposition'], /^attachment;/)
+        assert.equal((await original.body()).toString(), 'synthetic-video-container')
+      }
       await panel.getByText('Extractor Settings', { exact: true }).click()
       await panel.getByText('Credentials', { exact: true }).click()
       const measurement = await panel.evaluate((element) => {
@@ -93,7 +110,10 @@ try {
       })
       assert.deepEqual(measurement, { overflow: false, clipped: 0, small: 0, overlaps: 0 })
       assert.deepEqual(errors, [])
-      cases.push({ surface, width, height, ...measurement, interactions: 7 })
+      cases.push({ surface, width, height, ...measurement,
+        input: surface === 'bank' ? 'search-preset' : 'public-url',
+        downloadOnlyVideo: width === 1280 && surface === 'bank',
+        interactions: width === 1280 && surface === 'bank' ? 11 : 7 })
       console.log(`Image Sources ${surface} ${width}x${height}: passed`)
       await context.close()
     }

@@ -145,6 +145,7 @@ export const CORE_GUIDE_ANCHORS = {
   ],
   "settings-reference": [
     "image-source-credentials",
+    "image-source-extractors",
     "how-settings-work",
     "advanced-environment-overrides",
     "instance-profiles",
