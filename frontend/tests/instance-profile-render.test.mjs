@@ -11,7 +11,8 @@ test('profile identity reserves a bounded line before its response arrives', () 
   const html = render(InstanceProfile);
   assert.match(html, /aria-label="Active Profile"/);
   assert.match(html, /min-h-4/);
-  assert.match(html, /max-w-48/);
+  // The brand link owns the outer bound; the label must fit that link.
+  assert.match(html, /max-w-full/);
 });
 
 test('owned training paths remain readable but cannot be edited', () => {

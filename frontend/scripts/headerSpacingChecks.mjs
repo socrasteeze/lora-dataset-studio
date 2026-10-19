@@ -27,6 +27,7 @@ const readLayout = (dataset) => {
         && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1
     })).length,
     profileGap: profile.top - title.bottom,
+    profileWidth: profile.width,
     profileAligned: Math.abs(profile.left - title.left) <= 1,
     profileContained: profile.right <= brand.getBoundingClientRect().right + 1,
     actions: actions.map(bounds), controls: controls.length,
@@ -38,6 +39,7 @@ function assertLayout(layout, width) {
   for (const key of ['clipped', 'small', 'overlaps']) assert.equal(layout[key], 0, `${width}px header ${key}`)
   assert.equal(layout.overflow, false, `${width}px page overflow`)
   assert.ok(layout.profileGap >= 1, 'The profile touches the app title')
+  assert.ok(layout.profileWidth <= 193, 'The profile exceeds the 12rem brand limit')
   assert.ok(layout.profileAligned, 'The profile is not aligned with the app title')
   assert.ok(layout.profileContained, 'The profile escapes the brand link')
   if (width < 640 && layout.actions.length) {
