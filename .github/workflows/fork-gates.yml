@@ -73,7 +73,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: image-sources-${{ github.event.pull_request.head.sha || github.sha }}
-          path: .git/lds-gates-validation/image-sources.json
+          path: |
+            .git/lds-gates-validation/image-sources.json
+            .git/lds-gates-validation/header-spacing-*.json
+            .git/lds-gates-validation/header-spacing-*.png
           include-hidden-files: true
           if-no-files-found: error
 

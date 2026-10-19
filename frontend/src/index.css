@@ -289,7 +289,6 @@
   .app-header a,
   .app-header button { min-height: 40px; }
   .app-header button { min-width: 40px; }
-  .app-header-shell > a { display: inline-flex; align-items: center; }
 }
 
 /* ── Theme tokens ───────────────────────────────────────────────────────────

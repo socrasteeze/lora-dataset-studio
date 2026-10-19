@@ -291,8 +291,8 @@ function NavBar() {
     <header ref={headerRef} className="app-header border-b border-border bg-surface-overlay/90 backdrop-blur-sm sticky top-0 z-40">
       <div className="app-header-shell mx-auto flex max-w-5xl items-center gap-3 px-4 py-3 sm:gap-6">
         <NavLink to="/datasets" title="Back to the datasets page" onClick={goHome}
-          className="shrink-0 whitespace-nowrap bg-gradient-primary bg-clip-text text-base font-bold text-transparent no-underline">
-          LoRA Dataset Studio
+          className="flex min-w-0 max-w-48 flex-col items-start gap-0.5 whitespace-nowrap bg-gradient-primary bg-clip-text text-base font-bold text-transparent no-underline">
+          <span className="max-w-full truncate">LoRA Dataset Studio</span>
           <InstanceProfile />
         </NavLink>
         {/* Desktop: workspaces on the left, utilities grouped into icon menus
@@ -349,7 +349,7 @@ function NavBar() {
             <WhatsNewButton />
           </div>
         </nav>
-        <div className="ml-auto flex items-center gap-1 md:hidden">
+        <div className="ml-auto flex shrink-0 items-center gap-1 md:hidden">
           {/* Same chip; its label collapses to the dot + 🖥 below sm. */}
           <PeerWorkingChip activity={peerActivity} />
           <ActivityButton />

@@ -10,16 +10,19 @@ import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import { chromium } from 'playwright-core'
 import { findHeadlessShell } from './responsiveProbe.mjs'
+import { checkHeaderSpacing } from './headerSpacingChecks.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const runtime = await mkdtemp(path.join(tmpdir(), 'lds-image-sources-'))
 const receipts = path.join(root, '.git', 'lds-gates-validation')
 const cases = []
+const headers = []
 let server, browser, currentPage, currentPanelId
 let output = ''
 let failureText = null
 let serverUrl
 try {
+  await mkdir(receipts, { recursive: true })
   const socket = createServer()
   await new Promise((resolve) => socket.listen(0, '127.0.0.1', resolve))
   const port = socket.address().port
@@ -46,6 +49,7 @@ try {
     for (const surface of ['bank', 'dataset']) {
       console.log(`Checking Image Sources ${surface} ${width}x${height}`)
       const context = await browser.newContext({ viewport: { width, height } })
+      await context.route('**/api/instance-profile', (route) => route.fulfill({ json: { name: 'Demo Profile' } }))
       const page = await context.newPage()
       currentPage = page
       const errors = []
@@ -56,6 +60,7 @@ try {
       const id = `image-sources-${surface === 'bank' ? 'bank' : `dataset-${ready.dataset_id}`}`
       currentPanelId = id
       const panel = page.locator(`#${id}`)
+      headers.push(await checkHeaderSpacing(page, { surface, width, height, receipts }))
       await panel.locator('summary').first().click()
       await panel.getByRole('button', { name: 'Scan', exact: true }).waitFor({ state: 'visible' })
       await page.waitForFunction((selector) => [...document.querySelector(selector).querySelectorAll('button')]
@@ -137,6 +142,30 @@ try {
       await context.close()
     }
   }
+  for (const [width, height] of [[640, 800], [1024, 800], [1440, 900]]) {
+    const context = await browser.newContext({ viewport: { width, height } })
+    await context.route('**/api/instance-profile', (route) => route.fulfill({ json: { name: 'Demo Profile' } }))
+    const page = await context.newPage()
+    currentPage = page
+    await page.addInitScript((id) => localStorage.setItem('datasetCurrentId', String(id)), ready.dataset_id)
+    await page.goto(`${url}/#/datasets?section=add`)
+    headers.push(await checkHeaderSpacing(page, { surface: 'dataset', width, height, receipts }))
+    await context.close()
+  }
+  const responsive = spawn(process.execPath, [path.join(root, 'frontend/scripts/responsiveProbe.mjs'),
+    '--url', `${url}/#/datasets`, '--dataset-id', String(ready.dataset_id),
+    '--states', 'resting,more', '--viewports', '360x800,412x915,844x390,768x1024,1024x800,1280x800,1440x900', '--json'],
+  { cwd: root, windowsHide: true })
+  let responsiveOutput = '', responsiveErrors = ''
+  responsive.stdout.on('data', (chunk) => { responsiveOutput += chunk })
+  responsive.stderr.on('data', (chunk) => { responsiveErrors += chunk })
+  const exitCode = await new Promise((resolve, reject) => { responsive.once('error', reject); responsive.once('exit', resolve) })
+  const responsiveResult = JSON.parse(responsiveOutput)
+  await writeFile(path.join(receipts, 'header-spacing-responsive.json'), JSON.stringify(responsiveResult, null, 2))
+  assert.equal(exitCode, 0, `Dataset responsive check failed: ${responsiveOutput} ${responsiveErrors}`)
+  assert.equal(responsiveResult.measured, 14, 'Responsive header coverage is incomplete')
+  assert.deepEqual(responsiveResult.skipped, [])
+  console.log('Header spacing: 13 checks and 14 responsive states passed')
 } catch (failure) {
   failureText = String(failure.stack || failure)
   console.error(failure)
@@ -158,7 +187,8 @@ try {
   await mkdir(receipts, { recursive: true })
   await writeFile(path.join(receipts, 'image-sources.json'), JSON.stringify({ cases,
     expectedCases: 10, skipped: 10 - cases.length,
-    complete: cases.length === 10 && failureText === null, failure: failureText }, null, 2))
+    headers, expectedHeaderCases: 13, skippedHeaders: 13 - headers.length,
+    complete: cases.length === 10 && headers.length === 13 && failureText === null, failure: failureText }, null, 2))
   await browser?.close()
   if (server && server.exitCode === null) {
     const exited = new Promise((resolve) => server.once('exit', resolve))
