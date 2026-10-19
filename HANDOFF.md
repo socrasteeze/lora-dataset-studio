@@ -3,24 +3,26 @@
 **Updated:** 2026-10-19 | **Branch:** validation/image-source-importer | **Base:** 5306f107f
 
 ## State
-The five Image Sources usability fixes are implemented on the isolated task branch.
-This wave uses build, lint and source/privacy inspection only. Tests and rendered validation are not run or claimed.
+The source typography, row alignment and Bank-style image grid are implemented on the scraper branch.
+Build and lint pass. Source and bundle use separate commits with [skip ci]; tests, CI and responsive probes remain off.
 
 ## Done this session
 - Separated New Scan from saved jobs and displayed the actual source and destination for each job.
 - Preserved blank credential fields, added explicit confirmed clearing, and retained unsaved edits on failure.
 - Bound preview requests to visible image IDs, retained that batch for Resume, and kept download selection independent.
 - Reused the shared image viewer for zoom and page navigation, with cached originals and explicit thumbnail/error notices.
-- Restored shared desktop/mobile control sizing, moved expert fields into Advanced, and highlighted the next job action.
+- Aligned desktop control sections and thumbnail metadata with shared grid rows; removed repeated help text while keeping destination, selection-scope and credential guidance.
 - Updated help, guides, future probe navigation, and the branch's test policy to match the operator's replacement instructions.
 
 ## Open
-1. Tests, browser probes and live-provider checks were not run for this wave. Run only a scope explicitly requested by the operator.
+1. Tests, responsive probes and live-provider checks were not run; run only an explicitly requested scope. This delivery does not claim full qualification.
 2. Main has advanced beyond this branch's base. Reconcile current main before landing if integration is requested; preserve the running checkout.
 3. Backend behavior and provider access remain unverified. Use operator-selected sources and credentials for any later authorized live checks.
 4. Physical phone/PWA acceptance remains unverified. Prior rendered qualification does not cover these changes.
 
 ## Decisions
+- Confirmed layout: two columns of text and controls above the full-width image grid. Desktop headings, fields, actions and options share grid rows; controls stack below 1024px.
+- Match the Bank's medium thumbnail density and 3:4 framing, with aligned metadata/link rows. The viewer retains the uncropped image.
 - Keep saved job destinations fixed; New Scan settings create a separate job.
 - Preview the visible page, up to 24 images, regardless of download selection; persist its IDs for restart recovery.
 - Blank credential fields preserve stored values. Clear Credentials is a separate confirmed action.
@@ -47,5 +49,6 @@ npm run build
 Use the configured pinned interpreter when the task worktree has no .venv.
 Review the diff and run the static scanner from scripts/scan-sensitive.sh before delivery.
 Completed: Ruff passed; ESLint passed with 32 existing warnings and zero errors; the production frontend build passed.
-The static privacy scan inspected 3044 tracked/untracked text files with zero findings. The final diff has no whitespace errors.
-No backend tests, frontend tests, responsive probes, fixture server or real download ran in this wave.
+The delivery privacy scan inspected 3044 tracked/untracked text files with zero findings. Attribution matches were reviewed as legitimate code, product references and audit history. The final diff has no whitespace errors.
+Requested screenshots used an isolated synthetic server and the rebuilt bundle at desktop and phone widths. Captures were redacted and metadata-stripped; the servers stopped afterward.
+No backend tests, frontend tests, responsive probes or live-provider downloads ran for this follow-up. Screenshot capture does not qualify the full application or a physical phone.
