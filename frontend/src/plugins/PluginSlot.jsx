@@ -1,5 +1,6 @@
-import { Suspense, lazy, useMemo } from 'react'
+import { Suspense, useMemo } from 'react'
 import ErrorBoundary from '../components/common/ErrorBoundary'
+import { lazyPage } from '../utils/lazyPage.js'
 import { contributions } from './registry.js'
 
 /* A place in the core where plugins contribute — rendered as the list of
@@ -16,11 +17,16 @@ import { contributions } from './registry.js'
 
 const cache = new Map()
 
+function recoverablePanel(key, importer) {
+  // A successful page import must not reset a failed panel's reload limit.
+  return lazyPage(importer, { reloadKey: `lds-plugin-chunk-reloaded:${key}`, preserveDrafts: true })
+}
+
 function componentFor(item, surface) {
   const importer = (item.panels && item.panels[surface]) || item.panel
   if (typeof importer !== 'function') return null
   const key = `${item.plugin}:${item.id}:${surface}`
-  if (!cache.has(key)) cache.set(key, lazy(importer))
+  if (!cache.has(key)) cache.set(key, recoverablePanel(key, importer))
   return cache.get(key)
 }
 
@@ -31,7 +37,7 @@ export function hasContributions(slot, surface) {
 /** The lazy component for one importer, cached under `key` so a re-render
  *  never re-creates it (React would remount and lose the panel's state). */
 export function lazyPanel(key, importer) {
-  if (!cache.has(key)) cache.set(key, lazy(importer))
+  if (!cache.has(key)) cache.set(key, recoverablePanel(key, importer))
   return cache.get(key)
 }
 
@@ -61,7 +67,7 @@ export default function PluginSlot({ slot, surface, fallback = null, itemProps =
     [slot, surface, key])
   if (!rendered.length) return fallback
   return rendered.map(({ item, Component }) => Component && (
-    <ErrorBoundary key={`${item.plugin}:${item.id}`}>
+    <ErrorBoundary key={`${item.plugin}:${item.id}`} compact={slot === 'lanes'}>
       <Suspense fallback={null}>
         <Component surface={surface} {...hostProps} {...(typeof itemProps === 'function' ? itemProps(item) : null)} />
       </Suspense>

@@ -91,6 +91,12 @@ export const WHATS_NEW = [
     to: '/settings?section=server',
   },
   {
+    id: '2026-10-18-z-plugin-tab-recovery', date: '2026-10-18',
+    title: 'Recover a failed Bank tab',
+    blurb: 'Bank reloads once when a plugin tab cannot load. An unsaved form blocks that reload. If the tab still fails, Reload Page stays available beside Images.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-18-undo-folder-group',
     date: '2026-10-18',
     title: 'Undo a wrong person group from the grouping dialog',

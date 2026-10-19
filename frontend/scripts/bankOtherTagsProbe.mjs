@@ -17,6 +17,7 @@ const receipts = path.join(root, '.git', 'lds-gates-validation');
 const viewports = [[360, 800], [412, 915], [844, 390], [768, 1024], [1280, 800]];
 const outcomes = [];
 const laneOutcomes = [];
+const laneRecovery = [];
 const settingsOutcomes = [];
 const settingsSections = [...fs.readFileSync(path.join(root, 'frontend/src/components/settings/registry.js'), 'utf8')
   .matchAll(/\{ id: '([^']+)', title: '([^']+)'/g)].map((match) => ({ id: match[1], title: match[2] }));
@@ -66,6 +67,61 @@ try {
   const executablePath = findHeadlessShell(fs, path);
   assert.ok(executablePath, 'Install the cloud Chromium headless shell before running this check.');
   browser = await chromium.launch({ executablePath });
+  for (const mode of ['transient', 'permanent', 'draft']) {
+    const context = await browser.newContext({ viewport: { width: 360, height: 800 } });
+    const page = await context.newPage();
+    activePage = page;
+    const errors = [];
+    activeErrors = errors;
+    page.on('console', (message) => {
+      if (message.type() === 'error' && message.text().includes('[ErrorBoundary]')) errors.push(message.text());
+    });
+    await page.addInitScript(() => {
+      localStorage.removeItem('bankCurrentId');
+      sessionStorage.setItem('bank-probe-loads', String(Number(sessionStorage.getItem('bank-probe-loads') || 0) + 1));
+    });
+    let requests = 0;
+    let releaseImport;
+    const importGate = new Promise((resolve) => { releaseImport = resolve; });
+    await page.route((target) => /\/VideoLaneTab-[^/]+\.js$/.test(target.pathname), async (route) => {
+      requests += 1;
+      if (mode === 'draft') await importGate;
+      if (mode !== 'transient' || requests === 1) await route.abort('failed');
+      else await route.continue();
+    });
+    await page.goto(`${url}/#/bank`);
+    if (mode === 'draft') {
+      await page.locator('#bank-name').fill('Draft bank');
+      await page.waitForFunction(() => {
+        const event = new Event('beforeunload', { cancelable: true });
+        window.dispatchEvent(event);
+        return event.defaultPrevented;
+      });
+      releaseImport();
+    }
+    const lanes = page.getByRole('group', { name: 'Kind of bank', exact: true });
+    if (mode === 'transient') {
+      await lanes.getByRole('link', { name: /Video/ }).waitFor();
+      assert.deepEqual(errors, []);
+    } else {
+      await lanes.getByRole('button', { name: 'Reload Page', exact: true }).waitFor();
+      assert.ok(errors.length > 0 && errors.every((message) => /module|import/i.test(message)),
+        'Only the injected module failure may reach the boundary');
+      if (mode === 'draft') assert.equal(await page.locator('#bank-name').inputValue(), 'Draft bank');
+      await delay(1000);
+    }
+    await lanes.getByRole('link', { name: 'Images', exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => Number(sessionStorage.getItem('bank-probe-loads'))), mode === 'draft' ? 1 : 2,
+      'A permanent failure must not loop; a draft must not reload');
+    assert.equal(requests, mode === 'draft' ? 1 : 2);
+    const geometry = await lanes.evaluate((node) => {
+      const box = node.getBoundingClientRect();
+      return { left: box.left, right: box.right, width: document.documentElement.clientWidth };
+    });
+    assert.ok(geometry.left >= -1 && geometry.right <= geometry.width+1);
+    laneRecovery.push({ mode, requests, passed: true });
+    await context.close();
+  }
   for (const [viewportIndex, [width, height]] of viewports.entries()) {
     console.log(`Checking Bank at ${width}x${height}`);
     const context = await browser.newContext({ viewport: { width, height } });
@@ -361,14 +417,15 @@ try {
       '--url', `${url}/#/settings/${section}`, '--states', 'resting', '--json']) });
   }
   assert.equal(laneOutcomes.length, viewports.length);
-  await writeFile(path.join(receipts, 'other-tags.json'), JSON.stringify({ outcomes, settingsOutcomes, laneOutcomes,
+  assert.equal(laneRecovery.length, 3);
+  await writeFile(path.join(receipts, 'other-tags.json'), JSON.stringify({ outcomes, settingsOutcomes, laneOutcomes, laneRecovery,
     responsive: probe, settingsResponsive: settingsProbe }, null, 2));
   console.log(`Bank checks passed at ${outcomes.length} sizes; ${settingsOutcomes.length} Settings route checks passed.\n${probe}\n${JSON.stringify(settingsProbe)}`);
 } catch (error) {
   console.error(error.stack || error);
   try {
     fs.mkdirSync(receipts, { recursive: true });
-    await writeFile(path.join(receipts, 'other-tags.json'), JSON.stringify({ outcomes, settingsOutcomes, laneOutcomes,
+    await writeFile(path.join(receipts, 'other-tags.json'), JSON.stringify({ outcomes, settingsOutcomes, laneOutcomes, laneRecovery,
       failure: { name: error.name, message: error.message },
       diagnostic: activePage && !activePage.isClosed() ? {
         viewport: activePage.viewportSize(), errors: activeErrors,
