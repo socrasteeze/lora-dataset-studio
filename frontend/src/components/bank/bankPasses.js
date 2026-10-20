@@ -438,7 +438,7 @@ export const BANK_PASSES = {
     label: 'Classify framing',
     verb: 'Classify',
     endpoint: 'framing',
-    what: 'Tags face / bust / body / back.',
+    what: 'Tags face / bust / body / back. Optional Auto-Crop saves full-subject crops when confidence meets the minimum.',
     scopes: true,
     selection: true,
     redo: {

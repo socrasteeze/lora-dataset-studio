@@ -67,7 +67,8 @@ WATERMARK_KINDS = ('watermark_detect',)
 # into another screen's pass.
 TEXT_KINDS = ('text_detect',)
 
-STOPPABLE_KINDS = CANCELLABLE_KINDS + IMPROVE_KINDS + WATERMARK_KINDS + TEXT_KINDS
+FRAMING_KINDS = ('classify',)
+STOPPABLE_KINDS = CANCELLABLE_KINDS + IMPROVE_KINDS + WATERMARK_KINDS + TEXT_KINDS + FRAMING_KINDS
 
 # Safety TTL: an entry not touched for this long is purged on read even if end()
 # never ran (process alive but the batch thread died without unwinding). 30 min is
@@ -199,6 +200,8 @@ def begin_exclusive(dataset_id, kind, total=0, detail=None, engine=None):
         bucket = _purge_stale_locked(dataset_id, now)
         if bucket:
             return None
+        if kind in STOPPABLE_KINDS:
+            _discard_cancel(dataset_id, (kind,))
         token = f'{dataset_id}:{kind}:{next(_counter)}'
         entry = {
             'kind': kind, 'done': 0, 'total': int(total or 0),
@@ -258,6 +261,9 @@ def end(token):
             detail = entry.get('detail')
         if not bucket:
             _active.pop(dsid, None)
+        if kind in FRAMING_KINDS and not any(
+                item.get('kind') == kind for item in (bucket or {}).values()):
+            _discard_cancel(dsid, (kind,))
     if kind:
         bits = detail or (f'{done}/{total}' if total else (f'{done} done' if done else None))
         _log(dsid, f'{kind} finished', 'ok', detail=bits)

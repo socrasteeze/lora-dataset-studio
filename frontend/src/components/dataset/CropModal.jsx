@@ -1,5 +1,5 @@
-/** Shared crop editor with local Auto-Center suggestions and a stretchable box.
- * Suggestions never save pixels. Drag the 8 handles to resize, drag
+/** Shared crop editor with confidence-gated Auto-Crop and a stretchable box.
+ * Auto-Crop finds and saves a crop. Drag the 8 handles to resize, drag
  * inside to move — any shape, not just square (training buckets non-square
  * images fine). Ratio presets snap the box; `defaultAspect` presets the initial
  * ratio (the reference crop starts at 1:1 — its historical convention — but
@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { postForm } from '../../api/fetchClient';
 import { autoCenterCrop, cropPreviewBlob } from './autoCenterCrop.js';
+import AutoCropOptions, { DEFAULT_CROP_CONFIDENCE_PERCENT, validCropConfidence } from './AutoCropOptions.jsx';
 
 const ASPECTS = [
   ['Free', null],
@@ -62,10 +63,10 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
   const [box, setBox] = useState(null);        // crop box in NATURAL px
   const [aspect, setAspect] = useState(lockSquare ? 1 : defaultAspect);   // null = free
   const [framing, setFraming] = useState('subject');
+  const [cropConfidence, setCropConfidence] = useState(DEFAULT_CROP_CONFIDENCE_PERCENT);
   const [autoBusy, setAutoBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [setupRequired, setSetupRequired] = useState(false);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const framingId = useId();
@@ -83,7 +84,7 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
   useEffect(() => {
     mounted.current = true;
     detection.current = null;
-    setAutoBusy(false); setError(''); setNotice(''); setSetupRequired(false);
+    setAutoBusy(false); setError(''); setSetupRequired(false);
     return () => {
       mounted.current = false;
       requestVersion.current += 1;
@@ -93,11 +94,12 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
   }, [imageUrl]);
 
   const autoCenter = async () => {
-    if (!nat || requestRef.current || savingRef.current) return;
+    if (!nat || requestRef.current || savingRef.current || !validCropConfidence(cropConfidence)) return;
+    const minimum = Number(cropConfidence) / 100;
     const controller = new AbortController();
     requestRef.current = controller;
     const version = ++requestVersion.current;
-    setAutoBusy(true); setError(''); setNotice(''); setSetupRequired(false);
+    setAutoBusy(true); setError(''); setSetupRequired(false);
     dragRef.current = null;
     try {
       let found = detection.current;
@@ -107,19 +109,24 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
         const form = new FormData();
         form.append('file', blob, 'preview.jpg');
         form.append('framing', framing);
+        form.append('min_crop_confidence', String(minimum));
         const result = await postForm('/api/image/auto-center', form, { signal: controller.signal });
-        found = { imageUrl, framing, bounds: result.box };
+        found = { imageUrl, framing, bounds: result.box, confidence: result.confidence };
       }
       if (!mounted.current || version !== requestVersion.current) return;
       detection.current = found;
+      if (!Number.isFinite(found.confidence) || found.confidence < minimum) {
+        throw new Error('Confidence is below the minimum. Adjust the crop manually or lower the minimum.');
+      }
       const suggestion = autoCenterCrop(found.bounds, nat.W, nat.H, lockSquare ? 1 : aspect);
       setBox(suggestion.box);
-      setNotice(suggestion.edgeLimited
-        ? 'An image edge limits centering. Review the box before saving.'
-        : 'Review the centered box, then choose Crop.');
+      requestRef.current = null;
+      setAutoBusy(false);
+      await save(() => onConfirm({ x: Math.round(suggestion.box.x), y: Math.round(suggestion.box.y),
+        w: Math.round(suggestion.box.w), h: Math.round(suggestion.box.h) }));
     } catch (failure) {
       if (mounted.current && version === requestVersion.current && failure.name !== 'AbortError') {
-        setError(failure.body?.detail || failure.message || 'Auto-Center failed. Adjust the crop manually.');
+        setError(failure.body?.detail || failure.message || 'Auto-Crop failed. Adjust the crop manually.');
         setSetupRequired(Boolean(failure.body?.setup_required));
       }
     } finally {
@@ -133,7 +140,7 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
   const save = async (action) => {
     if (savingRef.current || requestRef.current) return;
     savingRef.current = true;
-    setSaving(true); setError(''); setNotice(''); setSetupRequired(false);
+    setSaving(true); setError(''); setSetupRequired(false);
     dragRef.current = null;
     try {
       if (await action() === false) throw new Error('The crop was not saved. Your selection is still here.');
@@ -251,7 +258,7 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
 
   const pickAspect = (value) => {
     if (busy) return;
-    setError(''); setNotice(''); setSetupRequired(false);
+    setError(''); setSetupRequired(false);
     setAspect(value);
     if (value && box && nat) setBox(ratioBox(box, value, nat.W, nat.H));
   };
@@ -291,21 +298,22 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
       </div>
       <div className="max-h-[55dvh] shrink-0 w-full max-w-4xl mx-auto mt-3 flex flex-col gap-2 overflow-y-auto overscroll-contain">
         <div className="grid grid-cols-2 gap-2">
-          <label htmlFor={framingId} className="sr-only">Auto-Center Framing</label>
+          <label htmlFor={framingId} className="sr-only">Auto-Crop Framing</label>
           <select id={framingId} value={framing} disabled={busy}
-            onChange={(event) => { setFraming(event.target.value); setError(''); setNotice(''); }}
+            onChange={(event) => { setFraming(event.target.value); setError(''); }}
             className="min-h-11 min-w-0 rounded-lg border border-white/25 bg-surface px-2 text-base text-content lg:text-sm">
             <option value="subject">Full Subject</option>
             <option value="head">Face &amp; Head</option>
           </select>
-          <button type="button" onClick={autoCenter} disabled={!nat || busy} aria-busy={autoBusy}
-            title="Suggest a crop with your configured local vision model. Review it before saving."
+          <button type="button" onClick={autoCenter} disabled={!nat || busy || !validCropConfidence(cropConfidence)} aria-busy={autoBusy}
+            title="Find and save a crop with your configured local vision model."
             className="min-h-11 min-w-0 rounded-lg bg-white/10 px-2 py-2 text-sm font-semibold text-white disabled:opacity-40">
-            {autoBusy ? 'Finding Subject...' : 'Auto-Center'}
+            {autoBusy ? 'Finding Subject...' : 'Auto-Crop'}
           </button>
         </div>
+        <AutoCropOptions enabled confidence={cropConfidence} onConfidenceChange={setCropConfidence}
+          disabled={busy} note="Auto-Crop saves immediately when confidence meets this minimum." />
         {error && <p role="alert" className="break-words text-sm text-rose-200">{error}</p>}
-        {notice && <p role="status" className="text-sm text-white/70">{notice}</p>}
         {setupRequired && <a href="/#/setup" target="_blank" rel="noopener noreferrer"
           className="flex min-h-10 items-center text-sm text-white underline">Open Setup</a>}
         {!lockSquare && (

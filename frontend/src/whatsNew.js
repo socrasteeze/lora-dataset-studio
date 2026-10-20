@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-19-zz-confidence-auto-crop', date: '2026-10-19', title: 'Apply Confident Crops',
+    blurb: 'Auto-Crop finds and saves a subject crop in one click. Framing can also crop its batch when confidence meets the chosen minimum, with a 90% default. Lower or missing scores leave pixels unchanged.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-19-source-review', date: '2026-10-19', title: 'Inspect Source Images',
     blurb: 'Source images open in the shared viewer with zoom and navigation. Page previews, visible job destinations and safe credential updates make imports easier to review.',
     to: '/bank',

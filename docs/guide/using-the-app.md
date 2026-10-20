@@ -2567,22 +2567,26 @@ place. (Asked for by nofaceman on Discord, backed by mr.arrow.)
 ### Auto-center a crop
 
 Open **Crop** in Bank Review or a Dataset, choose **Full Subject**, then click
-**Auto-Center**. It proposes a tighter box around the entire visible subject.
+**Auto-Crop**. It finds and saves a tighter box around the entire visible subject
+when the model's confidence meets **Minimum Confidence** (90% by default).
 For a full-body image on a plain background, this removes unused surrounding
 space with about 10% margin on each side of the detected figure. **Face & Head**
 is available when you want a head crop instead.
 
-Auto-Center uses the local vision model configured in Setup. It analyzes a small,
-upright preview only after you click the button. It does not save or replace an
-image. Review the box, drag its handles if needed, then press **Crop** to apply it.
-The model can miss parts or choose the wrong subject, so review every proposal.
+Auto-Crop uses the local vision model configured in Setup. It analyzes a small,
+upright preview only after you click the button. The same click saves an eligible
+crop; it does not wait for a second confirmation. The score is the model's own
+estimate, not measured recognition accuracy. The model can still choose a wrong
+box. Keep manual control by drawing the box and pressing **Crop** instead.
 
 Choose **Free** for the most flexible framing, or select an aspect ratio first.
 A ratio that cannot contain the detected subject is refused instead of cutting
 it off. Near an image edge, the whole detected subject takes priority over exact
-centering. Changing the ratio and clicking Auto-Center again reuses the detection.
+centering. After a failed save, changing the ratio and retrying Auto-Crop can
+reuse the detection in the open editor.
 
-If detection fails, the existing box stays in place. **Open Setup** is available
+If detection fails or confidence is missing or below the minimum, the image stays
+unchanged. **Open Setup** is available
 when the local vision model needs attention; manual cropping remains available.
 A failed save keeps the editor and the crop selection open.
 
@@ -2590,6 +2594,26 @@ The same controls are available for Dataset images and primary/extra references.
 Applying a crop uses each surface's existing rules: Bank preserves source files
 and saves an editable copy; Dataset crops its training image and caps the long
 side at 1024 pixels without enlarging smaller crops.
+
+### Auto-crop during Framing
+
+Enable **Auto-Crop** in the Framing controls, set **Minimum Confidence**, then
+start **Classify & Crop**. Auto-Crop stays off by default. The pass requests
+framing, full-subject bounds and crop confidence in the same vision call. Only
+valid boxes at or above the chosen minimum can change pixels. Missing, invalid
+or lower confidence skips the crop while normal framing classification continues.
+Confidence is an uncalibrated model estimate, not a guaranteed accuracy rate.
+
+Bank uses the launch window's status scope or selected image IDs. Dataset Framing
+uses all images with files, including rejected images. Auto-Crop includes images
+that already have a framing, so a completed classification does not hide the
+crop action. Both surfaces retain their existing crop save rules described above.
+
+Progress reports crops, skips and failures. Dataset results refresh changed image
+previews. **Stop Framing** stops a Dataset pass between images and prevents a new
+crop after the in-flight model call returns. Bank uses its existing **Stop**
+control. An automatic Dataset pass reserves the dataset against competing edits;
+changed source bytes are skipped, and a failed crop preparation keeps the input.
 
 ### Manual crop and edit history
 

@@ -1464,7 +1464,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       vision pass that fills them in lives right here, under the bar
                       that shows the gap. */}
                   <ClassifyFramingButton images={images} ollama={activeLocalLlm(caps)} capsLoading={capsLoading}
-                    busy={ds.busy} activity={act} onClassify={(n) => ds.classify(n)} />
+                    busy={ds.busy} activity={act} onClassify={(n, options) => ds.classify(n, options)}
+                    onStop={ds.stopClassify} />
                   <div id="ds-add-generate" tabIndex={-1} className="scroll-mt-20">
                     <Suspense fallback={null}>
                     <VariationCatalog key={`vc-${d.id}-${bodyFid}`} datasetId={d.id} busy={ds.generationBusy}
