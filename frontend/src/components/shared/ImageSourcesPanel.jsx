@@ -355,9 +355,13 @@ export default function ImageSourcesPanel({ datasetId, datasetName, banks = [], 
                   </div>
                   <div className="space-y-1 text-sm">
                     <p>Status</p>
-                    <div role="status" className="flex min-h-10 min-w-0 flex-wrap items-center gap-2 lg:min-h-8">
-                      <span>{jobLabel(job)}</span><span>{job.done}/{job.total || job.done}</span>
-                      <span>{job.selected_count} Selected</span><span>{job.downloaded_count} Downloaded</span><span>{job.imported_count} Imported</span>
+                    <div role="status" className="grid min-w-0 gap-1">
+                      <div className="flex min-w-0 flex-wrap items-center gap-x-2">
+                        <span>{jobLabel(job)}</span><span>{job.done}/{job.total || job.done}</span>
+                      </div>
+                      <div className="flex min-w-0 flex-wrap items-center gap-x-2">
+                        <span>{job.selected_count} Selected</span><span>{job.downloaded_count} Downloaded</span><span>{job.imported_count} Imported</span>
+                      </div>
                     </div>
                   </div>
                   {job.error && <p className="break-words text-sm text-amber-200">{job.error}</p>}

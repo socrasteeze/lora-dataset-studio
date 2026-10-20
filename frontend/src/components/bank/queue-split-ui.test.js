@@ -179,21 +179,29 @@ test('both destructive queue actions, and the running row ✕, ask first', () =>
 
 test('hovering, focusing or pressing a queue row tints the WHOLE row', () => {
   // The ✕ sits at the far end of the row; the tint ties it to its bank.
-  const row = panel.match(/const ROW = ([^\n]*\n[^\n]*\n[^\n]*)/);
+  const row = panel.match(/const ROW = ([\s\S]*?)(?=\nconst )/);
   assert.ok(row, 'the row class constant was not found');
   for (const cls of ['group', 'hover:bg-surface-raised', 'focus-within:bg-surface-raised',
     'active:bg-surface-raised', 'has-[:active]:bg-surface-raised']) {
     assert.ok(row[1].includes(cls), `the row is missing ${cls}`);
   }
-  assert.match(panel, /<li key=\{it\.bank_id\} className=\{ROW\}>/);
+  assert.match(panel, /<li key=\{it\.bank_id\} className=\{ROW\}[^>]*>/);
   assert.match(panel, /group-hover:text-content/);
 });
 
 test('queue buttons are finger-sized below lg and the ✕ names its bank', () => {
   assert.match(panel, /const ACTION = 'min-h-10 lg:min-h-0 /);
-  assert.match(panel, /inline-flex min-h-10 min-w-10 lg:min-h-0 lg:min-w-0 shrink-0/);
+  const control = panel.match(/const CONTROL = '([^']+)'/);
+  assert.ok(control, 'the control class constant was not found');
+  for (const cls of ['inline-flex', 'min-h-10', 'w-10', 'lg:min-h-0']) {
+    assert.ok(control[1].split(/\s+/).includes(cls), `control is missing ${cls}`);
+  }
   assert.match(panel, /`Remove \$\{nameOf\(it\.bank_id\)\} from queue`/);
   assert.match(panel, /`Stop \$\{nameOf\(it\.bank_id\)\} and remove it from queue`/);
-  // 360 px: the name and its chips wrap inside the row instead of pushing the ✕ off.
-  assert.match(panel, /flex min-w-0 grow flex-wrap items-center/);
+  // 360 px: the name and job wrap inside the flexible column beside the control.
+  assert.match(panel, /grid-cols-\[1\.25rem_minmax\(0,1fr\)_2\.5rem\]/);
+  for (const name of ['NAME', 'JOB']) {
+    const classes = panel.match(new RegExp(`const ${name} = '([^']+)'`));
+    assert.ok(classes[1].includes('min-w-0') && classes[1].includes('[overflow-wrap:anywhere]'));
+  }
 });

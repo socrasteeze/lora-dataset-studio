@@ -977,6 +977,9 @@ def probe_vast() -> dict:
 # said "already satisfied" for every package it knew about while `import rembg`
 # died on a dependency that was not in its list).
 CAPABILITY_IMPORTS = {
+    'image_source_extras': ('import gallery_dl.job, gallery_dl.extractor, yt_dlp, '
+                            'Cryptodome.Cipher.AES, requests, imageio_ffmpeg; '
+                            'imageio_ffmpeg.get_ffmpeg_exe()'),
     'face_scoring': 'import insightface, onnxruntime',
     'masks': 'import rembg',
     # numpy and PIL are named even though nothing pip-installs them directly:
@@ -1439,7 +1442,7 @@ def python_ml_status() -> dict:
 
 def probe_image_source_deps() -> dict:
     ok = _cached_import('image_source_deps', sys.executable,
-                        'import gallery_dl.job, gallery_dl.extractor, yt_dlp, Cryptodome.Cipher.AES, requests, imageio_ffmpeg; imageio_ffmpeg.get_ffmpeg_exe()')
+                        CAPABILITY_IMPORTS['image_source_extras'] + '; imageio_ffmpeg.get_ffmpeg_version()')
     return {'ok': bool(ok), 'detail': 'Image sources are ready.' if ok else
             'Install image sources from the Image Sources panel.',
             'action': 'image_source_extras'}

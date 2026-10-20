@@ -33,6 +33,7 @@ const HOSTS = [
   'src/pages/GalleryPage.jsx',
   '../bundled/canvas/frontend/components/canvas/LineageCanvas.jsx',
   'src/components/shared/CheckpointGalleryPanel.jsx',
+  'src/components/shared/SourceImagePreview.jsx',
   'src/components/dataset/PreviewLightbox.jsx',
   // The Test Studio (normal view AND run comparison) — it replaced its own
   // fifth lightbox with the shared viewer, exactly the move this contract

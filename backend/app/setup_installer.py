@@ -2490,6 +2490,7 @@ def _verify_capability_import(action, python, *, log_action=None) -> bool:
 
 _MISSING_MODULE_RE = re.compile(r"No module named ['\"]([\w.]+)['\"]")
 _CAPABILITY_LABEL = {'face_scoring': 'face scoring', 'masks': 'person masks',
+                      'image_source_extras': 'Image Sources',
                       'bank_scoring': 'bank scoring',
                       'bank_siglip2': 'SigLIP2 Bank semantics',
                       'watermark_inpaint': 'watermark inpainting',
@@ -2539,10 +2540,20 @@ def _verify_video_encoder(action, python) -> bool:
     return False
 
 
-# Post-install checks that go BEYOND the probe import, per action. A dict and not
-# a branch inside the gate: every other capability is fully described by its
-# import, and must not become stricter because this one is not.
-_CAPABILITY_EXTRA_CHECKS = {'video': _verify_video_encoder}
+def _verify_image_source_encoder(action, python) -> bool:
+    """Run the same imageio-ffmpeg binary that the source workers select."""
+    ok = capabilities._import_ok(
+        python, 'import imageio_ffmpeg; imageio_ffmpeg.get_ffmpeg_version()')
+    if ok is True:
+        _append(action, 'Source ffmpeg is ready.')
+        return True
+    _append(action, 'Source ffmpeg could not run. Select Retry to repair Image Sources.')
+    return False
+
+
+# Post-install checks beyond the probe import apply only to their owning action.
+_CAPABILITY_EXTRA_CHECKS = {'video': _verify_video_encoder,
+                          'image_source_extras': _verify_image_source_encoder}
 
 
 def _is_blocking_invalid(path, spec) -> bool:
@@ -3322,12 +3333,7 @@ def _run_image_source_extras(action):
     result = _run_ml_extras(action)
     if result != 0:
         return result
-    ok = capabilities._import_ok(sys.executable,
-                                 'import gallery_dl.job, gallery_dl.extractor, yt_dlp, Cryptodome.Cipher.AES, requests, imageio_ffmpeg; imageio_ffmpeg.get_ffmpeg_exe()')
-    if ok is not True:
-        _append(action, 'The source packages did not pass the import check. Select Retry.')
-        return 1
-    return 0
+    return 0 if _verify_capability_import(action, sys.executable) else 1
 
 
 _WORKERS = {**{a: _run_ml_extras for a in _PIP_REQUIREMENTS},

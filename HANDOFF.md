@@ -1,14 +1,17 @@
 # HANDOFF
 
-**Updated:** 2026-10-19 | **Branch:** main | **Base:** 26ca2c116
+**Updated:** 2026-10-19 | **Branch:** fix/cloud-qualification-20261019 | **Base:** b6bacc836
 
 ## State
-All Bank/Dataset pass families have been reviewed. Source 8eb711979 and bundle be92d4fa2 are active after an idle, backed-up restart: hardware-scaled worker budgets, adaptive CUDA Score batches, bounded ONNX sessions, unused face-head removal and rate-limited embedding checkpoints. Models used for scores/identity/pose, precision, thresholds, image validation and provenance stay intact. Tests and benchmarks remain off; no speedup is measured.
+Cloud repair is prepared for full qualification. Run 39358255898 tested b6bacc836: backend 10,210 passed / 3 failed / 15 skipped, frontend 6,318 passed / 4 failed / 4 skipped, bundled Python 229 passed and Linux startup 13 passed. Image Sources had an 8-pixel action shift; all other browser steps passed. The operator authorized repairs and a cloud rerun. No local tests are authorized.
+All Bank/Dataset pass families have been reviewed. Source 8eb711979 and bundle be92d4fa2 are active after an idle, backed-up restart: hardware-scaled worker budgets, adaptive CUDA Score batches, bounded ONNX sessions, unused face-head removal and rate-limited embedding checkpoints. Models used for scores/identity/pose, precision, thresholds, image validation and provenance stay intact. Cloud tests are authorized; live benchmarks remain off and no speedup is measured.
 Dataset Auto-Crop now shares Bank's status and grid-selection controls. The default is kept and undecided; a selection narrows that pool. Rejected images require an explicit bin/all scope. Empty selections cannot widen the run. Choices remain after a failed request. Source 66125fce8 and bundle 5b0f11dac are active after a controlled restart.
 Confidence-gated Auto-Crop is implemented in the image editor and as an opt-in Bank/Dataset Framing option. The shared server gate defaults to 90%; missing/invalid/lower confidence skips pixel writes. Confidence is an uncalibrated model estimate.
-Tests, rendered checks and inference remain off. A new healthy backend boot serves the matching built bundle. Dataset metadata and four saved configuration files are unchanged. Bank inventory and Forget Missing requests occurred during activation; the Bank image table changed while surviving rows stayed identical. Full qualification remains incomplete.
+Cloud tests and isolated rendered checks are authorized; live inference remains off. A new healthy backend boot serves the matching built bundle. Dataset metadata and four saved configuration files are unchanged. Bank inventory and Forget Missing requests occurred during activation; the Bank image table changed while surviving rows stayed identical. Full qualification remains incomplete.
 
 ## Done this session
+- Fixed the Image Sources status layout and added verification that its selected ffmpeg binary runs. Added broken/unconfirmed binary and failed-install regressions.
+- Updated the Score Stop test to select database write-back separately from inference batching. Reconciled the video schema inventory, lightbox hosts, queue layout contracts and Guide anchors without relaxing browser thresholds.
 - Added shared native thread budgets to inference worker environments, preserving stricter inherited limits and the parent environment. Quality scan and Score preparation use the same CPU-capacity policy.
 - Score batches CLIP and NSFW together, sizes batches from free CUDA memory, backs off on OOM and isolates other failures per image. Stop saves the current batch; runtime output reports its budget.
 - Face/angle and Dataset face sessions bound ONNX threads and disable idle spinning. Face/identity analysis keeps identity and 3D pose inputs while skipping unused heads; face masking uses detection only.
@@ -26,7 +29,7 @@ Tests, rendered checks and inference remain off. A new healthy backend boot serv
 - Activated source 46926f85b and bundle d1ca52fd0 after an idle-work check and local metadata/settings backup. Served entry and JavaScript bytes match the built bundle; no jobs or inference were started.
 
 ## Open
-0. Pass performance, numerical equivalence and full qualification remain unverified. Regressions are written but unrun; run only an explicitly requested scope. Normal Stop saves completed work; a forced process kill can require recomputation since the last successful checkpoint.
+0. Run full cloud qualification on the repair commit. Pass batching, OOM, resume, resource-budget and checkpoint tests passed in the first run; full qualification failed as recorded above. Live GPU performance remains unmeasured. Normal Stop saves completed work; a forced process kill can require recomputation since the last successful checkpoint.
 1. Auto-Crop confidence calibration, crop accuracy, rendered behavior and live providers remain unverified. Run only an explicitly requested scope. Fixture speedup qualification against aeb09dae9 also remains unrun.
 2. The operator chose a local identity accuracy set. Await its location/labels and explicit evaluation authorization; keep images local. Report wrong names, misses, abstentions and provenance. Similarity thresholds remain unmeasured heuristics.
 3. Physical phone/PWA acceptance, installed-source trainer compatibility and real GPU/training comparisons remain operator gates. Opt-in live encoder/Ollama checks were not run.
