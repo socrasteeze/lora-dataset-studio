@@ -48,6 +48,7 @@ def test_face_score_uses_cpu_provider_and_negative_context_id(monkeypatch):
     numpy = types.ModuleType('numpy')
     onnxruntime = types.ModuleType('onnxruntime')
     onnxruntime.get_available_providers = lambda: []
+    onnxruntime.SessionOptions = lambda: types.SimpleNamespace(add_session_config_entry=lambda *_: None)
     cv2 = types.ModuleType('cv2')
     cv2.BORDER_CONSTANT = 0
     cv2.imread = lambda _path: types.SimpleNamespace(shape=(640, 640, 3))
@@ -69,10 +70,13 @@ def test_face_score_uses_cpu_provider_and_negative_context_id(monkeypatch):
     })))
 
     assert module.main() == 1  # no fake face is intentional; initialization still ran
+    options = captured['init'].pop('sess_options')
+    assert 1 <= options.intra_op_num_threads <= 4 and options.inter_op_num_threads == 1
     assert captured['init'] == {
         'name': 'antelopev2',
         'root': '/models',
         'providers': ['CPUExecutionProvider'],
+        'allowed_modules': ['detection', 'recognition', 'landmark_3d_68'],
     }
     assert captured['prepare']['ctx_id'] == -1
 
@@ -118,6 +122,7 @@ def _face_scorer_with_providers(monkeypatch, providers):
 
     onnxruntime = types.ModuleType('onnxruntime')
     onnxruntime.get_available_providers = lambda: list(providers)
+    onnxruntime.SessionOptions = lambda: types.SimpleNamespace(add_session_config_entry=lambda *_: None)
     cv2 = types.ModuleType('cv2')
     cv2.BORDER_CONSTANT = 0
     cv2.imread = lambda _path: types.SimpleNamespace(shape=(640, 640, 3))

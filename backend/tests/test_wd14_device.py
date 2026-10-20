@@ -85,8 +85,9 @@ def _run_worker(monkeypatch, capsys, tmp_path, device, available, active):
     asked = {}
 
     class Session:
-        def __init__(self, _path, providers):
+        def __init__(self, _path, providers, sess_options):
             asked['providers'] = providers
+            asked['sess_options'] = sess_options
 
         def get_providers(self):
             return [active, CPU]
@@ -99,6 +100,7 @@ def _run_worker(monkeypatch, capsys, tmp_path, device, available, active):
 
     ort = types.ModuleType('onnxruntime')
     ort.get_available_providers = lambda: list(available)
+    ort.SessionOptions = lambda: types.SimpleNamespace(add_session_config_entry=lambda *_: None)
     ort.InferenceSession = Session
     monkeypatch.setitem(sys.modules, 'onnxruntime', ort)
     monkeypatch.setitem(sys.modules, 'cv2', types.ModuleType('cv2'))

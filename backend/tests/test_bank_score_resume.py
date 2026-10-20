@@ -97,6 +97,8 @@ def _install_stubs(monkeypatch, mod, calls, aes_ok=True, nsfw_ok=True,
                    fail_heads=()):
     torch = types.ModuleType('torch')
     torch.cuda = types.SimpleNamespace(is_available=lambda: False)
+    torch.set_num_threads = lambda count: None
+    torch.set_num_interop_threads = lambda count: None
 
     class _NoGrad:
         def __enter__(self):
@@ -154,6 +156,31 @@ def _run_child(mod, monkeypatch, request):
     rc = mod.main()
     lines = [ln for ln in out.getvalue().splitlines() if ln.strip()]
     return rc, json.loads(lines[-1])
+
+
+def _install_cuda_batches(monkeypatch, mod, calls, after_predict=None):
+    _install_stubs(monkeypatch, mod, calls)
+    sys.modules['torch'].cuda = types.SimpleNamespace(
+        is_available=lambda: True, mem_get_info=lambda: (24 * 1024 ** 3, 32 * 1024 ** 3))
+    monkeypatch.setattr(mod.os, 'cpu_count', lambda: 24)
+
+    def predict(entries, _plan, *_args):
+        results = []
+        for _path, prep in entries:
+            if prep['error'] is not None:
+                results.append({'error': prep['error']})
+                continue
+            value = prep['clip'].value
+            calls.append(value)
+            vector = np.zeros(768, dtype='float32')
+            vector[0 if value < 128 else 1] = 1.0
+            results.append({'error': None, 'embedding': vector,
+                            'aesthetic': 7.25, 'nsfw': 0.9, 'heads': {}})
+        if after_predict:
+            after_predict(entries)
+        return results
+
+    monkeypatch.setattr(mod, 'predict_adaptive', predict)
 
 
 def _images(tmp_path, spec):
@@ -838,3 +865,49 @@ def test_one_unreadable_image_does_not_discard_the_style_grouping(
     assert 'discarded' not in detail
     assert 'changed' not in detail, 'a failed image is not a changed one'
     assert '1 image(s) failed' in detail
+
+
+def test_cuda_stop_saves_the_whole_current_batch_and_resume_skips_it(tmp_path, monkeypatch):
+    mod = _load_child()
+    paths = _images(tmp_path, {f'example-{i}.jpg': i * 10 for i in range(12)})
+    cache = str(tmp_path / 'score-cache.npz')
+    cancel = tmp_path / 'score.cancel'
+    request = {'images': paths, 'cache': cache, 'cancel_file': str(cancel)}
+    calls = []
+    _install_cuda_batches(monkeypatch, mod, calls)
+
+    def stop_after_first_publication(line):
+        if line.startswith('[score] 1/'):
+            cancel.write_text('stop', encoding='utf-8')
+
+    monkeypatch.setattr(mod, '_log', stop_after_first_publication)
+    rc, stopped = _run_child(mod, monkeypatch, request)
+    assert rc == 0 and stopped['cancelled']
+    assert stopped['computed'] == 8 and stopped['cached'] == 8 and stopped['remaining'] == 4
+    assert len(calls) == 8 and set(mod._load_cache(cache)) == set(paths[:8])
+    assert stopped['runtime']['batch_size'] == 8
+    cancel.unlink()
+
+    resumed = _load_child()
+    calls = []
+    _install_cuda_batches(monkeypatch, resumed, calls)
+    rc, complete = _run_child(resumed, monkeypatch, request)
+    assert rc == 0 and complete['computed'] == 4 and complete['reused'] == 8
+    assert len(calls) == 4 and len(complete['clusters']) == 12
+
+
+def test_cuda_batch_does_not_publish_a_replaced_source(tmp_path, monkeypatch):
+    mod = _load_child()
+    paths = _images(tmp_path, {f'example-{i}.jpg': i * 10 for i in range(8)})
+    cache = str(tmp_path / 'score-cache.npz')
+
+    def replace_first(_entries):
+        path = pathlib.Path(paths[0])
+        path.write_bytes(path.read_bytes() + b'replacement')
+
+    _install_cuda_batches(monkeypatch, mod, [], after_predict=replace_first)
+    rc, data = _run_child(mod, monkeypatch, {'images': paths, 'cache': cache})
+    assert rc == 0 and data['computed'] == 8
+    assert data['results'][paths[0]]['state'] == 'error'
+    assert paths[0] not in mod._load_cache(cache)
+    assert all(data['results'][path]['state'] == 'ok' for path in paths[1:])

@@ -70,6 +70,12 @@ import os
 import sys
 from pathlib import Path
 
+_INFER_DIR = str(Path(__file__).resolve().parents[2] / 'infer')
+if _INFER_DIR not in sys.path:
+    sys.path.append(_INFER_DIR)
+from pass_resources import bounded_native_environment  # noqa: E402
+from pass_resources import prepare_workers as prepare_workers  # noqa: E402
+
 #: The interpreter flag that drops the per-user site-packages directory.
 NO_USER_SITE_FLAG = '-s'
 
@@ -116,7 +122,9 @@ def worker_env(python=None, base=None, **extra) -> dict:
     (a capability that reads ✗) is visible where the one it prevents is not.
 
     A fresh dict every time — callers mutate what they get back, and handing out
-    a view of ``os.environ`` would let one pass rewrite the whole process."""
+    a view of ``os.environ`` would let one pass rewrite the whole process.
+    Numerical-library thread counts are bounded by the shared hardware budget;
+    stricter caller limits remain in force."""
     env = dict(os.environ if base is None else base)
     if python is None or is_borrowed(python):
         env[NO_USER_SITE_ENV] = '1'
@@ -127,6 +135,7 @@ def worker_env(python=None, base=None, **extra) -> dict:
             env.pop(key, None)
         else:
             env[key] = str(value)
+    env = bounded_native_environment(env)
     # Runtime workers use files already installed on this machine. Setup's
     # explicit download jobs do not run through this inference environment.
     env['HF_HUB_OFFLINE'] = '1'

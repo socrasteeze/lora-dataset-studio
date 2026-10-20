@@ -3,7 +3,8 @@ embeddings, run in the DEDICATED "bank scoring" ML interpreter (torch/open_clip/
 transformers are not in the Flask venv). Same subprocess family as
 face_embed_infer.py; CUDA when available, else CPU.
 
-One CLIP forward per image feeds THREE outputs, so a mixed dump can be triaged by
+One CLIP embedding per image feeds THREE outputs; CUDA shares model calls across
+small batches. A mixed dump can be triaged by
 "nice vs ugly", "SFW vs NSFW" and "grouped by visual style" from a single pass:
 
   * aesthetic — the LAION improved-aesthetic MLP head on the (L2-normed) CLIP
@@ -73,13 +74,11 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 from _harness import _cancel_requested, _log, _write_count
+from score_pipeline import native_thread_limits, predict_adaptive, score_plan
+from pass_resources import CACHE_SAVE_SECONDS
 
 CACHE_EVERY = 50
-# ...and never more often than this: each save rewrites the whole cache.
-CACHE_SAVE_SECONDS = 60
-# Threads preparing images ahead of the GPU. Pillow and torch release the GIL
-# for decode and resize, so these run in parallel on real cores.
-PREP_WORKERS = max(1, min(8, (os.cpu_count() or 2) - 1))
+# The shared interval also limits how often the whole cache is rewritten.
 # JPEGs decode at a reduced DCT scale no smaller than this per side. Both
 # models see 384 px at most; measured on 120 large JPEGs of a real bank, CLIP
 # cosine to the full decode was 1.0000 median, 0.9956 at the 1st percentile,
@@ -541,7 +540,7 @@ def _incomplete(cache, path):
     return bool(entry) and entry[0] == 'ok' and (entry[1] is None or entry[2] is None)
 
 
-def main() -> int:
+def _main() -> int:
     raw = sys.stdin.read()
     try:
         req = json.loads(raw) if raw.strip() else {}
@@ -590,17 +589,22 @@ def main() -> int:
     # when no work ran at all, since heads are only loaded for real work.
     head_errors = {}
     image_errors = []
+    runtime = None
     if todo or holed:
         try:
+            import torch
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            runtime = score_plan(os.cpu_count(), device == 'cuda')
+            runtime['torch_threads'] = min(runtime['torch_threads'], int(os.environ['OMP_NUM_THREADS']))
+            torch.set_num_threads(runtime['torch_threads'])
+            torch.set_num_interop_threads(1)
             import numpy as np  # noqa: F401
             import open_clip
-            import torch
             from PIL import Image  # noqa: F401 — fail fast here, not once per image
         except Exception as e:  # noqa: BLE001 — clean JSON, never a mute traceback
             print(json.dumps({'ok': False, 'results': {}, 'clusters': {},
                               'error': import_report.import_failure(e)}), file=_OUT)
             return 1
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
         # Heads BEFORE CLIP, on purpose: whether a holed entry is worth re-running
         # is exactly "did the head that was missing come back?", and the answer
         # decides whether the ~1 GB CLIP load is needed at all. Loading CLIP first
@@ -645,17 +649,26 @@ def main() -> int:
                       'clusters': None}
             print(json.dumps(payload), file=_OUT)
             return 0
-        # The CPU half of each image (read, validate, decode, both resizes) runs
-        # ahead in a thread pool while this thread feeds the GPU — one image at a
-        # time left the card idle most of the pass. Results are still consumed
-        # strictly in ``work`` order, so every per-image rule below is unchanged.
+        if device == 'cuda':
+            try:
+                free_bytes, _ = torch.cuda.mem_get_info()
+                runtime['batch_size'] = score_plan(os.cpu_count(), True, free_bytes)['batch_size']
+            except RuntimeError:
+                _log('[phase] CUDA memory reading unavailable; scoring with batch 1')
+        _phase(f"scoring on {device.upper()}: batch {runtime['batch_size']}, "
+               f"{runtime['prepare_workers']} preparation worker(s), "
+               f"{runtime['torch_threads']} CPU thread(s) per Torch operation")
+        # Keep decoding ahead of inference without multiplying Torch's native
+        # thread pool by every preparation worker. Publish in input order, and
+        # finish the current prepared batch before honoring Stop.
         nsfw_proc = nsfw_bundle[1] if nsfw_ok else None
-        pool = ThreadPoolExecutor(max_workers=PREP_WORKERS)
+        pool = ThreadPoolExecutor(max_workers=runtime['prepare_workers'])
         pending = deque()
+        prepared = deque()
         queue = iter(work)
 
         def _fill():
-            while len(pending) < PREP_WORKERS * 2:
+            while len(pending) < runtime['prefetch']:
                 nxt = next(queue, None)
                 if nxt is None:
                     return
@@ -664,45 +677,70 @@ def main() -> int:
         try:
             _fill()
             i = 0
-            while pending:
-                p, future = pending.popleft()
-                _fill()
+            while pending or prepared:
+                if not prepared:
+                    entries = []
+                    for _ in range(min(runtime['batch_size'], len(pending))):
+                        p, future = pending.popleft()
+                        entries.append((p, future.result()))
+                        _fill()
+                    predictions = (predict_adaptive(
+                        entries, runtime, torch, clip_model, aes_head if aes_ok else None,
+                        nsfw_bundle if nsfw_ok else None, _reason, _log)
+                        if device == 'cuda' else [None] * len(entries))
+                    prepared.extend((p, prep, prediction, j == len(entries) - 1)
+                                    for j, ((p, prep), prediction) in enumerate(zip(entries, predictions)))
+                p, prep, prediction, batch_end = prepared.popleft()
                 i += 1
                 # A retried entry keeps the value of any head that is STILL down —
                 # overwriting a good aesthetic score with None because the nsfw
                 # model came back would trade one hole for another.
                 keep = cache.get(p) if p in retry_set else None
-                prep = future.result()
                 signature = prep['sig']
                 payload_hash = prep['hash']
                 changed_while_scoring = prep['changed']
                 try:
                     if prep['error'] is not None:
                         raise prep['error']
-                    with torch.no_grad():
-                        tens = prep['clip'].unsqueeze(0).to(device)
-                        emb = clip_model.encode_image(tens)
-                        emb = emb / emb.norm(dim=-1, keepdim=True)
-                        emb_np = emb.cpu().numpy()[0].astype('float32')
+                    if prediction is not None:
+                        if prediction['error'] is not None:
+                            raise prediction['error']
+                        emb_np = prediction['embedding']
                         if not np.isfinite(emb_np).all() or not np.any(emb_np):
                             raise ValueError('CLIP produced an invalid image embedding')
-                        aesthetic = keep[1] if keep else None
-                        if aes_ok:
-                            try:
-                                aesthetic = round(float(aes_head(emb)[0][0].item()), 3)
-                            except Exception as e:  # noqa: BLE001 — preserve CLIP and NSFW
-                                head_errors.setdefault('aesthetic', _reason(e))
-                        nsfw = keep[2] if keep else None
-                        if nsfw_ok:
-                            try:
-                                if prep['nsfw_error'] is not None:
-                                    raise prep['nsfw_error']
-                                model, _proc, nsfw_idx = nsfw_bundle
-                                logits = model(**prep['nsfw'].to(device)).logits
-                                probs = torch.softmax(logits, dim=-1)[0]
-                                nsfw = round(float(probs[nsfw_idx].item()), 4)
-                            except Exception as e:  # noqa: BLE001 — preserve CLIP and aesthetic
-                                head_errors.setdefault('nsfw', _reason(e))
+                        aesthetic = prediction['aesthetic']
+                        if aesthetic is None and keep:
+                            aesthetic = keep[1]
+                        nsfw = prediction['nsfw']
+                        if nsfw is None and keep:
+                            nsfw = keep[2]
+                        for head, error in prediction['heads'].items():
+                            head_errors.setdefault(head, error)
+                    else:
+                        with torch.no_grad():
+                            tens = prep['clip'].unsqueeze(0).to(device)
+                            emb = clip_model.encode_image(tens)
+                            emb = emb / emb.norm(dim=-1, keepdim=True)
+                            emb_np = emb.cpu().numpy()[0].astype('float32')
+                            if not np.isfinite(emb_np).all() or not np.any(emb_np):
+                                raise ValueError('CLIP produced an invalid image embedding')
+                            aesthetic = keep[1] if keep else None
+                            if aes_ok:
+                                try:
+                                    aesthetic = round(float(aes_head(emb)[0][0].item()), 3)
+                                except Exception as e:  # noqa: BLE001 — preserve CLIP and NSFW
+                                    head_errors.setdefault('aesthetic', _reason(e))
+                            nsfw = keep[2] if keep else None
+                            if nsfw_ok:
+                                try:
+                                    if prep['nsfw_error'] is not None:
+                                        raise prep['nsfw_error']
+                                    model, _proc, nsfw_idx = nsfw_bundle
+                                    logits = model(**prep['nsfw'].to(device)).logits
+                                    probs = torch.softmax(logits, dim=-1)[0]
+                                    nsfw = round(float(probs[nsfw_idx].item()), 4)
+                                except Exception as e:  # noqa: BLE001 — preserve CLIP and aesthetic
+                                    head_errors.setdefault('nsfw', _reason(e))
                     result = ('ok', aesthetic, nsfw, emb_np, signature, payload_hash)
                     # CLIP and the heads can take long enough for a live Bank path
                     # to be replaced.  Publish only while it still identifies the
@@ -728,7 +766,6 @@ def main() -> int:
                     elif keep is None:
                         cache[p] = ('error', None, None, zero, signature, payload_hash)
                     _log(f'[score] {i}/{len(work)} ERROR {e}')
-                    continue
                 finally:
                     if p in todo_set and p in cache:
                         fresh += 1
@@ -744,8 +781,8 @@ def main() -> int:
                         _write_count(cache_path, reused + fresh)
                         done_since_save = 0
                         last_save = time.monotonic()
-                _log(f'[score] {i}/{len(work)} {cache[p][0]}')
-                if _cancel_requested(cancel_file):   # clean stop between images
+                _log(f"[score] {i}/{len(work)} {cache.get(p, ('error',))[0]}")
+                if batch_end and _cancel_requested(cancel_file):
                     if cache_path:
                         _flush_cache(cache_path, cache)
                     _write_count(cache_path, reused + fresh)
@@ -759,7 +796,7 @@ def main() -> int:
                         'remaining': len(images) - reused - fresh,
                         'computed': computed, 'reused': reused,
                         'results': _results_from_cache(images, cache, True),
-                        'clusters': None}
+                        'clusters': None, 'runtime': runtime}
                     print(json.dumps(payload), file=_OUT)
                     return 0
         finally:
@@ -791,7 +828,7 @@ def main() -> int:
                   'cached': len(images), 'remaining': 0,
                   'computed': computed, 'reused': reused,
                   'results': _results_from_cache(images, cache, True),
-                  'clusters': None}
+                  'clusters': None, 'runtime': runtime}
         print(json.dumps(payload), file=_OUT)
         return 0
     # One more mute step worth naming: this JSON carries a line per image, and
@@ -800,8 +837,13 @@ def main() -> int:
     print(json.dumps({'ok': True, 'results': results, 'clusters': clusters,
                       'computed': computed, 'reused': reused,
                       'head_errors': head_errors,
-                      'image_errors': image_errors}), file=_OUT)
+                      'image_errors': image_errors, 'runtime': runtime}), file=_OUT)
     return 0
+
+
+def main() -> int:
+    with native_thread_limits():
+        return _main()
 
 
 if __name__ == '__main__':

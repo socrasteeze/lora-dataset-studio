@@ -57,6 +57,18 @@ def test_asking_for_a_worker_environment_never_edits_the_app_s_own():
     assert dict(os.environ) == before
 
 
+def test_every_infer_worker_uses_bounded_native_threads_and_keeps_stricter_limits(monkeypatch):
+    monkeypatch.setattr(os, 'cpu_count', lambda: 24)
+    original = {'OMP_NUM_THREADS': '1', 'MKL_NUM_THREADS': '32', 'EXAMPLE': 'preserved'}
+    env = infer_env.worker_env(base=original)
+    assert env['OMP_NUM_THREADS'] == '1'
+    assert env['MKL_NUM_THREADS'] == '4'
+    assert env['OPENBLAS_NUM_THREADS'] == '4'
+    assert env['NUMEXPR_NUM_THREADS'] == '4'
+    assert env['EXAMPLE'] == 'preserved'
+    assert original == {'OMP_NUM_THREADS': '1', 'MKL_NUM_THREADS': '32', 'EXAMPLE': 'preserved'}
+
+
 # --- the one interpreter this must NEVER be done to -------------------------------
 
 def test_our_own_interpreter_keeps_its_user_site_because_that_may_be_where_we_live():

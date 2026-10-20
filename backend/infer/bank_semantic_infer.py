@@ -24,6 +24,7 @@ import os
 from pathlib import Path
 import secrets
 import sys
+import time
 from typing import Any
 # A ._pth-pinned interpreter (ComfyUI portable's python_embeded) does not put
 # this script's directory on sys.path — restore it or the import below dies
@@ -32,6 +33,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 from _harness import _pooled_features
+from pass_resources import CACHE_SAVE_SECONDS
 
 
 CACHE_EVERY = 50
@@ -442,6 +444,7 @@ def main() -> int:
         return 1
 
     computed = ready_added = saved_since = 0
+    last_save = time.monotonic()
     zero = np.zeros(contract['dimension'], dtype='float32')
     if _cancel_requested(cancel_file):
         _write_count(cache_path, reused)
@@ -489,10 +492,12 @@ def main() -> int:
             saved_since += 1
             if state == 'ok':
                 ready_added += 1
-            if cache_path and saved_since >= CACHE_EVERY:
+            if (cache_path and saved_since >= CACHE_EVERY
+                    and time.monotonic() - last_save >= CACHE_SAVE_SECONDS):
                 _flush_cache(cache_path, cache, contract)
                 _write_count(cache_path, reused + ready_added)
                 saved_since = 0
+                last_save = time.monotonic()
         if state == 'ok':
             _log(f'[semantic] {index}/{len(todo)} ok')
         if _cancel_requested(cancel_file):

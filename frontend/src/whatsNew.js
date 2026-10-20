@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-19-zzzz-score-hardware-tuning',
+    date: '2026-10-19',
+    title: 'Reduce Pass Overhead',
+    blurb: 'Pass workers limit CPU threading; Score batches CUDA inference, face passes skip unused heads, and embedding caches limit full rewrites. Scoring models and thresholds stay intact; speedups remain unmeasured.',
+    to: '/guide/using-the-app#make-score-use-a-gpu-python-you-already-have',
+  },
+  {
     id: '2026-10-19-zzz-dataset-crop-scope',
     date: '2026-10-19',
     title: 'Crop only the Dataset images you choose',
