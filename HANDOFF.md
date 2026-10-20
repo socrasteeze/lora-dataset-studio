@@ -8,10 +8,10 @@ Ruff, ESLint and the production build passed during implementation. Tests, respo
 The local activation was separately authorized and verified. Publication does not restart the app or change dataset settings. Match the original base, images, captions and sample prompts before using the preset.
 ## Anima character captions (2026-10-20)
 
-Task branch: `fix/anima-character-captions`, based on recipe commit `f815689f3`. The operator authorized clean publication and activation without tests. Preserve the separate uncommitted storage work in the primary checkout. Activation must retain its source and controls.
+Source `1ad4b4bf3` and reconciled bundle `834df0aa7` are published to main and active after the operator-authorized restart. Preserve the separate uncommitted storage work in the primary checkout. The published bundle matches committed source; the local activation bundle also retains the pending storage controls.
 Anima Character batch and Caption Lab share visible-detail guidance for JoyCaption/local vision, retain prose as default, and preserve existing appearance/body omission controls. Tag mode requests lowercase words with spaces. Stored captions remain content-only; training/TXT/ZIP add the saved trigger. ZIP export normalizes repeated leading prefixes, and previews match whole triggers instead of substrings.
-Ruff and diff checks passed. ESLint passed with zero errors and 32 existing warnings. After integration with the recipe commit, the isolated production build passed in 7.09 seconds. No tests, responsive probes, inference, caption jobs or training ran. Prompt instructions do not establish caption accuracy.
-Delivery is in progress. Keep source and bundle commits separate and use [skip ci]. Existing captions and data were not changed. Record the activation receipt after the controlled restart. The earlier open items below remain pending.
+Ruff and diff checks passed. ESLint passed with zero errors and 32 existing warnings. The final publication build passed in 8.60 seconds; the activation build passed in 6.53 seconds. The publishable scan checked 3,089 text files with no privacy findings. No tests, responsive probes, inference, caption jobs or training ran. Prompt instructions do not establish caption accuracy.
+The new backend boot is healthy on the same profile. All 45 checked metadata tables and four settings files are unchanged; pending source hashes and served entry/four assets match the activation receipt. Rollback material and receipts remain in ignored Git storage under `anima-caption-activation-20261020`. Existing captions and images were not rewritten. Reload the client. The earlier open items below remain pending.
 
 **Updated:** 2026-10-20 | **Branch:** fix/pwa-bank-toolbar-spacing | **Base:** 8af39502f
 
