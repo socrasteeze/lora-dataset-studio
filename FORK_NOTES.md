@@ -16,6 +16,9 @@ scheduling. Quick retains its own focused preflight. Pull requests and scrubbed
 `validation/**` pushes use Fork Gates; ordinary PR CI does not duplicate the
 Windows backend run. Fresh per-test state and isolated plugin processes stay
 mandatory. Numerical libraries use one thread per pytest worker.
+Only immutable fixture inputs may be reused: release tests copy committed
+repositories and FP8 tests write cached model bytes into fresh files. Keep real
+Git, HTTP and CPU conversion behavior, test assertions and parameter sets.
 
 ## Distribution
 

@@ -1,23 +1,23 @@
 # HANDOFF
 
-**Updated:** 2026-10-19 | **Branch:** main | **Base:** deb460c3b
+**Updated:** 2026-10-19 | **Branch:** perf/test-suite-overhead | **Base:** aeb09dae9
 
 ## State
-Scraper branch c053c7d72 is merged into main through e8354e8b5, with rebuilt assets in bf0fedf2f.
-The app restarted successfully on the merged code. Static checks passed; tests and CI remain off, and full qualification is incomplete.
+Suite fixture overhead changes are implemented on perf/test-suite-overhead. Source comparison preserves all 75 existing test function bodies and decorators in the five affected Python files; one fixture-isolation regression was added.
+Tests and CI remain off. Static checks passed; runtime improvement and full qualification are unmeasured. Application runtime, frontend assets and workflow definitions are unchanged.
 
 ## Done this session
-- Combined Image Sources, source previews, header spacing, the Bank review viewport fix and Auto-Center with main's identity learning, Studio and aligned queue changes.
-- Preserved both route registrations, help entries and schema assertions; retained stable What's New identifiers in descending order.
-- Rebuilt merged assets in a separate build(frontend) commit, then fast-forwarded the running main checkout.
-- Backed up the active database and local settings under ignored Git storage before the controlled restart.
-- Verified a new healthy boot, the same profile and listener bind/port, matching served entry assets, unchanged settings hashes and unchanged row counts in all 44 existing metadata tables. The two Image Sources tables were added.
+- Release tests prepare one committed template per worker, then copy its worktree and Git metadata for each test. Added an unrun isolation regression.
+- FP8 tests cache only immutable serialized input bytes. Tensor shapes/dtypes, separate writable model files, real interpreter probes and CPU conversion workers remain.
+- Real HTTP fixture servers use a short shutdown poll; segmented transfers connect to their bound IPv4 address directly. Request timeouts, retry limits, barriers and existing assertions remain unchanged.
+- Updated CONTRIBUTING.md and FORK_NOTES.md with the fixture isolation rules. Ruff, ESLint, syntax/source comparison, whitespace and privacy inspection passed; no tests ran.
 
 ## Open
-1. Tests, rendered behavior, live provider access and Auto-Center model accuracy remain unverified. Run only an explicitly requested scope. Earlier source-panel screenshots do not cover Auto-Center.
-2. The operator chose a local identity accuracy set. Await its location/labels and explicit evaluation authorization; keep images local. Report wrong names, misses, abstentions and provenance. Similarity thresholds remain unmeasured heuristics.
-3. Physical phone/PWA acceptance, installed-source trainer compatibility and real GPU/training comparisons remain operator gates. Opt-in live encoder/Ollama checks were not run.
-4. If the Bank tab error recurs, collect the first browser ErrorBoundary line. The original live tab error and earlier desktop tag timeout have unconfirmed causes.
+1. Only if explicitly requested, qualify the exact new source and compare full-suite timing/coverage with aeb09dae9 on equivalent cloud runners. No speedup percentage is claimed for this wave.
+2. Tests, rendered behavior, live provider access and Auto-Center model accuracy remain unverified. Run only an explicitly requested scope. Earlier source-panel screenshots do not cover Auto-Center.
+3. The operator chose a local identity accuracy set. Await its location/labels and explicit evaluation authorization; keep images local. Report wrong names, misses, abstentions and provenance. Similarity thresholds remain unmeasured heuristics.
+4. Physical phone/PWA acceptance, installed-source trainer compatibility and real GPU/training comparisons remain operator gates. Opt-in live encoder/Ollama checks were not run.
+5. If the Bank tab error recurs, collect the first browser ErrorBoundary line. The original live tab error and earlier desktop tag timeout have unconfirmed causes.
 
 ## Decisions
 - Image Sources uses manual Scan, Load Previews, Download and Import Images actions. Opening a panel does not start network work.
@@ -26,6 +26,8 @@ The app restarted successfully on the merged code. Static checks passed; tests a
 - Preserve Bank derivative saves and Dataset training-image crop limits. Retain the selection after failed saves; refuse ratios that cut the detected subject.
 - Keep main's aligned queue columns and its shared human-confirmed identity records, correction/Undo behavior, subject regions and content/model provenance.
 - Every test run needs an explicit request. Delivery without tests uses [skip ci] and does not claim full qualification.
+- Reuse immutable fixture inputs only. Keep per-test writable files and Git metadata, fresh app/database/config/plugin state, and real integration transports.
+- Keep worker counts, loadfile scheduling, request budgets and test parameter sets. Optimize setup and teardown instead of reducing coverage.
 
 ## Traps
 - Build away from the running checkout. Backend activation needs a metadata backup and a controlled restart; do not import create_app against production as a check.
@@ -36,7 +38,9 @@ The app restarted successfully on the merged code. Static checks passed; tests a
 - Do not merge upstream branches. The upstream review below is carried forward unchanged.
 
 ## Verify
-Merged-tree Ruff passed. ESLint passed with zero errors and 32 existing warnings. Production build passed. Privacy scan covered 3072 text files with zero findings; attribution inspection has no unresolved findings. The reviewed outbound inventory is unchanged. Tests, model inference and rendered validation did not run. Read-only activation checks passed after the controlled restart; no model or provider work was started. Historical receipts qualify only their recorded commits.
+Static AST comparison against aeb09dae987dbe28a070774c90b9ccae6aa628de found no removed or changed existing test function bodies/decorators in the five modified Python files: 75 retained, one added. This was source parsing only; no test imports, collection, fixtures or execution occurred.
+Ruff passed. ESLint passed with zero errors and 32 existing warnings. Privacy inspection covered 3072 text files with zero findings. Whitespace inspection passed. No application, bundled runtime, frontend source/assets, workflow or test selection changes were made. A frontend rebuild is not needed. No tests or performance benchmarks ran; improvement and full qualification remain unverified.
+Prior application baseline aeb09dae9 records the merged scraper/Auto-Center activation and its metadata checkpoint. Those operational results are historical; this wave does not restart the app or exercise models/providers.
 Prior identity/upstream qualification: 2673a79faf05a5d01d1c85585585620be51a2bbf, Fork Gates 39183822421 and post-push CI 39185814233. Queue run 39189043465 was cancelled before full Gates finished; no further tests were authorized.
 Scraper tip c053c7d72 had successful lint/build/privacy inspection, with 32 existing ESLint warnings. Auto-Center regression files were written but never run; no live model call or rendered check was made.
 Permitted commands (use the existing pinned interpreter from the primary checkout when this worktree has no .venv):
@@ -44,7 +48,6 @@ Permitted commands (use the existing pinned interpreter from the primary checkou
 .venv/Scripts/python.exe -m ruff check .
 cd frontend
 npm run lint
-npm run build
 ```
 
 ### Carried-forward upstream review

@@ -123,6 +123,13 @@ in child processes. Tests of that transport use `@pytest.mark.runtime_imports`
 and supply subprocess doubles; the broken-interpreter regression intentionally
 uses its invalid executable. Real Torch bridge tests still execute normally.
 
+Release tests copy a module-scoped committed repository into each test's own
+directory. FP8 tests reuse immutable serialized model bytes with the same tensor
+shapes and dtypes, then write an independent file per test. Their real CPU
+interpreter probes and conversion workers remain in place. Local HTTP fixtures
+use IPv4 loopback directly and a short server shutdown poll. Request timeouts,
+retry limits and concurrency barriers stay unchanged.
+
 Do not increase worker counts to compensate for slow fixtures. Keep
 `--dist loadfile`: several files depend on file-local execution. Timing receipts
 and a backend JUnit report are saved under the Git directory's

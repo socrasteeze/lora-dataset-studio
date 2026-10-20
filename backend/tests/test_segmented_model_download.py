@@ -57,11 +57,13 @@ def server(mode='ranges'):
             self.end_headers()
             self.wfile.write(body)
 
-    httpd = ThreadingHTTPServer(('localhost', 0), Handler)
-    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    # Use the bound IPv4 address directly, without localhost's IPv6 fallback.
+    httpd = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    thread = threading.Thread(target=httpd.serve_forever,
+                              kwargs={'poll_interval': 0.01}, daemon=True)
     thread.start()
     try:
-        yield f'http://localhost:{httpd.server_port}/model', calls
+        yield f'http://127.0.0.1:{httpd.server_port}/model', calls
     finally:
         httpd.shutdown()
         httpd.server_close()

@@ -2,6 +2,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import zipfile
 
@@ -17,8 +18,10 @@ def git(repo, *args, **kwargs):
     return subprocess.check_output(['git', '-C', str(repo), *args], **kwargs)
 
 
-@pytest.fixture
-def repository(tmp_path):
+@pytest.fixture(scope='module')
+def repository_template(tmp_path_factory):
+    """Commit immutable release inputs once; tests use independent copies."""
+    tmp_path = tmp_path_factory.mktemp('release-template')
     repo = tmp_path / 'repo'
     repo.mkdir()
     git(repo, 'init', '-q')
@@ -49,6 +52,25 @@ def repository(tmp_path):
     git(repo, 'add', '--', *files)
     git(repo, 'commit', '-q', '-m', 'Synthetic committed release')
     return repo
+
+
+@pytest.fixture
+def repository(tmp_path, repository_template):
+    repo = tmp_path / 'repo'
+    shutil.copytree(repository_template, repo)
+    return repo
+
+
+def test_repository_copy_keeps_template_files_and_history_independent(repository, repository_template):
+    original = git(repository_template, 'rev-parse', 'HEAD')
+    version = repository_template / 'backend/app/version.py'
+    original_bytes = version.read_bytes()
+    (repository / 'backend/app/version.py').write_text('independent change\n', encoding='utf-8')
+    git(repository, 'add', '--', 'backend/app/version.py')
+    git(repository, 'commit', '-q', '-m', 'Change only the copied release')
+    assert git(repository, 'rev-parse', 'HEAD') != original
+    assert git(repository_template, 'rev-parse', 'HEAD') == original
+    assert version.read_bytes() == original_bytes
 
 
 def test_zip_uses_exact_committed_bytes_and_excludes_local_products(repository, tmp_path):
