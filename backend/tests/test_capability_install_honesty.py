@@ -285,6 +285,51 @@ def test_a_broken_encoder_does_not_fail_the_OTHER_capabilities(app, monkeypatch)
     assert rc == 0
 
 
+@pytest.mark.parametrize('binary_ready', [True, False, None])
+def test_image_sources_install_checks_its_worker_binary(app, monkeypatch, binary_ready):
+    from app import capabilities, setup_installer
+    calls = []
+    monkeypatch.setattr(setup_installer, '_append', lambda *_: None)
+    monkeypatch.setattr(setup_installer, '_run_ml_extras', lambda _: 0)
+
+    def imported(command, **_kwargs):
+        calls.append(('import', command))
+        return subprocess.CompletedProcess(command, 0, '', '')
+
+    def binary(python, expression):
+        calls.append(('binary', python, expression))
+        return binary_ready
+
+    monkeypatch.setattr(setup_installer.subprocess, 'run', imported)
+    monkeypatch.setattr(capabilities, '_import_ok', binary)
+    with app.app_context():
+        result = setup_installer._run_image_source_extras('image_source_extras')
+    assert result == (0 if binary_ready is True else 1)
+    assert [call[0] for call in calls] == ['import', 'binary']
+    assert calls[0][1][-1] == capabilities.CAPABILITY_IMPORTS['image_source_extras']
+    assert calls[1][1] == setup_installer.sys.executable
+    assert 'imageio_ffmpeg.get_ffmpeg_version()' in calls[1][2]
+
+
+def test_image_sources_install_failure_does_not_start_verification(monkeypatch):
+    from app import setup_installer
+    monkeypatch.setattr(setup_installer, '_run_ml_extras', lambda _: 7)
+    monkeypatch.setattr(setup_installer, '_verify_capability_import',
+                        lambda *_: pytest.fail('a failed install cannot reach verification'))
+    assert setup_installer._run_image_source_extras('image_source_extras') == 7
+
+
+def test_image_sources_probe_checks_the_binary_it_will_use(monkeypatch):
+    from app import capabilities
+    calls = []
+    monkeypatch.setattr(capabilities, '_cached_import',
+                        lambda *args: calls.append(args) or False)
+    assert capabilities.probe_image_source_deps()['ok'] is False
+    assert calls[0][1] == capabilities.sys.executable
+    assert calls[0][2].startswith(capabilities.CAPABILITY_IMPORTS['image_source_extras'])
+    assert calls[0][2].endswith('imageio_ffmpeg.get_ffmpeg_version()')
+
+
 def test_every_installed_binary_is_covered_by_a_post_install_check():
     """The family rule behind this fix: a package whose payload is a BINARY (not
     an importable module) cannot be verified by re-running the probe import, so

@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-19-zzzzz-source-readiness', date: '2026-10-19', title: 'Steady Source Controls',
+    blurb: 'Image Sources keeps its action buttons in place when a job starts. Setup checks that the source ffmpeg binary runs before reporting success.',
+    to: '/guide/using-the-app#image-sources',
+  },
+  {
     id: '2026-10-19-zzzz-score-hardware-tuning',
     date: '2026-10-19',
     title: 'Reduce Pass Overhead',

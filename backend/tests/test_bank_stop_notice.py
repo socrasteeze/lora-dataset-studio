@@ -132,13 +132,14 @@ def test_the_inference_phase_promises_the_scores_and_admits_the_grouping(app, tm
     assert 'style grouping' in first['cost']
     assert 'whole bank at once' in first['cost']
     assert first['wait'].startswith('Stopping —')
+    assert 'current scoring batch' in first['wait']
 
 
 def test_the_write_back_names_the_batch_the_stop_has_to_wait_out(app, tmp_path):
     from app.services.image_bank_service import _SCORE_COMMIT_EVERY
     seen = _score_phases(app, tmp_path)
     write_back = [s for s in seen['stop']
-                  if s.get('wait') and 'batch' in s['wait']]
+                  if s.get('wait') and 'rows' in s['wait']]
     assert write_back, 'the write-back phase published no promise'
     wait = write_back[0]['wait']
     # The number is the REAL commit budget, read from the module — a hard-coded
