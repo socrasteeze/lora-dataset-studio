@@ -4,19 +4,27 @@ import { Ruler } from 'lucide-react';
 import { HelpBadge } from '../../help/HelpMode';
 import { classifyFramingState } from './classifyFramingGate';
 import AutoCropOptions, { DEFAULT_CROP_CONFIDENCE_PERCENT, validCropConfidence } from './AutoCropOptions.jsx';
+import PassScopeChoices from '../shared/PassScopeChoices.jsx';
+import { DEFAULT_PASS_SCOPE, passBinWarning, passScopeCount } from '../bank/bankPassScope.js';
+import { datasetFramingScope } from './datasetFramingScope.js';
 
 /** 📐 Classify framing — sits right under the Composition bar, where the lack is
  * seen: imported without a shot type, or cropped since the last classify (crop
  * clears framing, same as the Bank). Auto-Crop remains available for image
  * files that already have a framing. */
 export default function ClassifyFramingButton({
-  images, ollama, capsLoading = false, busy = false, activity = null, onClassify, onStop,
+  images, selectedIds = [], ollama, capsLoading = false, busy = false, activity = null, onClassify, onStop,
 }) {
   const [autoCrop, setAutoCrop] = useState(false);
   const [cropConfidence, setCropConfidence] = useState(DEFAULT_CROP_CONFIDENCE_PERCENT);
+  const [scope, setScope] = useState(DEFAULT_PASS_SCOPE);
+  const [useSelection, setUseSelection] = useState(true);
   const s = classifyFramingState({ images, ollama, capsLoading, busy, activity });
   const total = Array.isArray(images) ? images.filter((image) => image?.filename).length : 0;
-  const count = autoCrop ? total : s.count;
+  const { payload, statuses, imageIds } = datasetFramingScope(images, selectedIds, scope);
+  const selectionActive = useSelection && selectedIds.length > 0;
+  const count = autoCrop ? (selectionActive ? imageIds.length : passScopeCount(payload, 'framing', scope, true)) : s.count;
+  const binWarning = autoCrop && !selectionActive ? passBinWarning(scope) : '';
   if (!s.visible && !total) return null;
 
   return (
@@ -25,9 +33,10 @@ export default function ClassifyFramingButton({
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" data-workspace-focus
           onClick={() => onClassify?.(count, autoCrop
-            ? { auto_crop: true, min_crop_confidence: Number(cropConfidence) / 100 } : undefined)}
+            ? { auto_crop: true, min_crop_confidence: Number(cropConfidence) / 100,
+              ...(selectionActive ? { image_ids: imageIds } : statuses ? { statuses } : {}) } : undefined)}
           disabled={s.disabled || !count || (autoCrop && !validCropConfidence(cropConfidence))}
-          title={autoCrop ? 'Classify all image files. Save crops when confidence meets the minimum.' : s.title}
+          title={autoCrop ? 'Classify images in this scope. Save crops when confidence meets the minimum.' : s.title}
           className="min-h-10 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-400/40 text-amber-200 text-sm font-semibold disabled:opacity-40">
           <Ruler aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{s.running ? s.label : autoCrop ? `Classify & Crop (${count})` : s.label}
         </button>
@@ -44,7 +53,16 @@ export default function ClassifyFramingButton({
       </div>
       <AutoCropOptions enabled={autoCrop} onEnabledChange={setAutoCrop}
         confidence={cropConfidence} onConfidenceChange={setCropConfidence} disabled={busy || s.running}
-        note="Saves full-subject crops for all image files, including rejected and already-classified images." />
+        note="Saves full-subject crops in this scope. Includes already-classified images." />
+      {autoCrop && <fieldset className="space-y-2" disabled={busy || s.running}>
+        <legend className="mb-2 text-xs font-semibold text-content">Scope</legend>
+        <PassScopeChoices payload={payload} passId="framing" scope={scope} redo
+          onScope={setScope} selectionSize={selectedIds.length}
+          useSelection={useSelection} onUseSelection={setUseSelection} disabled={busy || s.running} />
+        <p className="m-0 text-2xs text-content-subtle">Selections exclude rejected images. Choose a bin scope to include them.</p>
+        {binWarning && <p role="note" className="m-0 text-2xs text-amber-300/90">{binWarning}</p>}
+        {count === 0 && <p role="status" className="m-0 text-2xs text-content-subtle">No images in this scope. Choose another scope or change the selection.</p>}
+      </fieldset>}
       {s.blocked && (
         <p className="m-0 text-amber-300/90 text-2xs">
           ⚠ {s.blockedReason}{' '}

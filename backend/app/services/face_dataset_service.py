@@ -7176,7 +7176,7 @@ def _parse_classify(raw):
     return fr, (label or None)
 
 
-def _classify_pool(dataset_id, force=False):
+def _classify_pool(dataset_id, force=False, statuses=None, image_ids=None):
     """The rows the framing pass will classify.
 
     ONE definition for the job, matching the Bank's ``_framing_pool``: the
@@ -7185,19 +7185,24 @@ def _classify_pool(dataset_id, force=False):
 
     Default: every image that has a file and whose framing is still NULL —
     imported without a shot type, or cropped since the last classify (crop
-    clears framing, same as the Bank). ``force`` re-reads tagged files too
-    (the Bank's framing rescan; no dataset button exposes it).
+    clears framing, same as the Bank). ``force`` re-reads tagged files too.
+    Explicit statuses and image ids intersect this dataset's pool.
     """
     q = FaceDatasetImage.query.filter_by(dataset_id=dataset_id).filter(
         FaceDatasetImage.filename.isnot(None),
         FaceDatasetImage.filename != '')
     if not force:
         q = q.filter(FaceDatasetImage.framing.is_(None))
+    if statuses is not None:
+        q = q.filter(FaceDatasetImage.status.in_(statuses))
+    if image_ids is not None:
+        q = q.filter(FaceDatasetImage.id.in_(image_ids))
     return q
 
 
 def classify_images(user_id, dataset_id, force=False, report=None, *,
-                    auto_crop=False, min_crop_confidence=None):
+                    auto_crop=False, min_crop_confidence=None,
+                    statuses=None, image_ids=None):
     """Classify images via Qwen3-VL. Returns how many rows were written.
 
     Default fills images that still have no shot type (any source — a crop
@@ -7205,6 +7210,8 @@ def classify_images(user_id, dataset_id, force=False, report=None, *,
     every image that has a file (the Bank's framing ``rescan``).
     An empty vision answer leaves the row untouched, so a retry can finish it
     without wiping a value that was already there.
+    Auto-Crop defaults to kept and undecided images, including in a selection.
+    An explicit status scope can include rejected images. Ids never widen it.
 
     ``report``, when a dict, is filled with ``attempted`` / ``unanswered`` /
     ``missing`` / ``vanished`` so the UI can tell "looked at them, model said
@@ -7213,6 +7220,11 @@ def classify_images(user_id, dataset_id, force=False, report=None, *,
     _guard_not_bank_export(dataset_id)
     from . import auto_crop as crop_service
     auto_crop, minimum = crop_service.options(auto_crop, min_crop_confidence)
+    statuses = normalize_pass_statuses(statuses)
+    if auto_crop and statuses is None:
+        statuses = ['keep', 'pending']
+    if image_ids is not None:
+        image_ids = normalize_batch_image_ids(image_ids)
     try:
         from .vision_llm import describe_image as describe_image_ollama, unload_vision_model
     except ImportError:
@@ -7220,13 +7232,14 @@ def classify_images(user_id, dataset_id, force=False, report=None, *,
     ds = get_dataset(user_id, dataset_id)
     if not ds:
         return 0
-    rows = _classify_pool(dataset_id, force or auto_crop).all()
+    rows = _classify_pool(dataset_id, force or auto_crop, statuses, image_ids).all()
     # Ids, not ORM objects: see _live_image_row. The commit at the bottom of this
     # loop expires every row it has not reached, and a tile deleted from the grid
     # meanwhile used to kill the whole classification.
     row_ids = [img.id for img in rows]
     n = 0
     vanished = unanswered = missing = 0
+    scope_skipped = 0
     cropped = crop_skipped = crop_failed = 0
     cropped_ids = []
     prompt = crop_service.framing_prompt(CLASSIFY_PROMPT) if auto_crop else CLASSIFY_PROMPT
@@ -7249,8 +7262,11 @@ def classify_images(user_id, dataset_id, force=False, report=None, *,
             if img is None:      # deleted while the pass ran
                 vanished += 1
                 continue
-            if auto_crop and img.dataset_id != dataset_id:
+            if img.dataset_id != dataset_id:
                 vanished += 1
+                continue
+            if statuses is not None and img.status not in statuses:
+                scope_skipped += 1
                 continue
             path = _img_path(img) if img.filename else ''
             if not os.path.exists(path):
@@ -7276,12 +7292,17 @@ def classify_images(user_id, dataset_id, force=False, report=None, *,
             if dataset_activity.cancel_requested(dataset_id, dataset_activity.FRAMING_KINDS):
                 stopped = True
                 break
-            if auto_crop:
+            if auto_crop or statuses is not None or image_ids is not None:
                 current = _live_image_row(image_id)
                 if (current is None or current.dataset_id != dataset_id
                         or not current.filename or _img_path(current) != path):
                     vanished += 1
                     continue
+                if statuses is not None and current.status not in statuses:
+                    scope_skipped += 1
+                    continue
+                img = current
+            if auto_crop:
                 try:
                     fingerprint = bank_transfer_metadata.content_fingerprint_bytes(payload)
                     crop_service.require_unchanged(path, fingerprint)
@@ -7327,6 +7348,8 @@ def classify_images(user_id, dataset_id, force=False, report=None, *,
         report['unanswered'] = unanswered
         report['missing'] = missing
         report['vanished'] = vanished
+        if statuses is not None or image_ids is not None:
+            report['scope_skipped'] = scope_skipped
         if stopped:
             report['stopped'] = True
         if auto_crop:

@@ -282,10 +282,15 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
                                       // Which image the lightbox is currently on
                                       // (null when it is closed).
                                       viewingImageId = null,
-                                      onBulkBusyChange, onIdentityChanged }) {
+                                      onBulkBusyChange, onIdentityChanged, onSelectionChange }) {
   const toast = useToast();
   const { caps } = useCapabilities();
   const [selected, setSelected] = useState(() => new Set());
+  useEffect(() => {
+    const alive = new Set((images || []).filter((image) => image.filename).map((image) => image.id));
+    onSelectionChange?.(datasetId, [...selected].filter((id) => alive.has(id)));
+  }, [datasetId, selected, images, onSelectionChange]);
+  useEffect(() => () => onSelectionChange?.(datasetId, []), [datasetId, onSelectionChange]);
   // The last tile ticked without Shift — where a Shift-click range starts. A
   // ref: moving it must not redraw the grid.
   const selectAnchor = useRef(null);

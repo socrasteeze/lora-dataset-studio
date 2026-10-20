@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-19-zzz-dataset-crop-scope',
+    date: '2026-10-19',
+    title: 'Crop only the Dataset images you choose',
+    blurb: 'Dataset Auto-Crop now uses Bank’s scope and grid selection controls. Rejected images stay out by default; choose a bin scope to include them. The confidence minimum still controls every crop.',
+    to: '/guide/using-the-app#auto-crop-during-framing',
+  },
+  {
     id: '2026-10-19-zz-confidence-auto-crop', date: '2026-10-19', title: 'Apply Confident Crops',
     blurb: 'Auto-Crop finds and saves a subject crop in one click. Framing can also crop its batch when confidence meets the chosen minimum, with a 90% default. Lower or missing scores leave pixels unchanged.',
     to: '/bank',

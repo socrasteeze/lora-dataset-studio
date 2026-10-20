@@ -2604,10 +2604,15 @@ valid boxes at or above the chosen minimum can change pixels. Missing, invalid
 or lower confidence skips the crop while normal framing classification continues.
 Confidence is an uncalibrated model estimate, not a guaranteed accuracy rate.
 
-Bank uses the launch window's status scope or selected image IDs. Dataset Framing
-uses all images with files, including rejected images. Auto-Crop includes images
-that already have a framing, so a completed classification does not hide the
-crop action. Both surfaces retain their existing crop save rules described above.
+Bank and Dataset Auto-Crop share the same status and selection controls. The
+default scope includes kept and undecided images. Select kept only, undecided
+only, the bin, or all three explicitly. A current grid selection takes priority
+and limits the run to those image IDs; it still excludes rejected images. Choose
+a bin scope to process rejected images. Each scope shows its image count. An
+empty scope cannot start a run. Dataset keeps these choices after a failed run.
+Auto-Crop includes images that already have a framing, so a completed
+classification does not hide the crop action. Both surfaces retain their
+existing crop save rules described above.
 
 Progress reports crops, skips and failures. Dataset results refresh changed image
 previews. **Stop Framing** stops a Dataset pass between images and prevents a new

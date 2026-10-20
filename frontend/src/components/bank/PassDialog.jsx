@@ -2,12 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { attemptModalSubmit } from '../../utils/submitOutcome.js'
 import { lastPassNote, lastPassSentence } from './lastPassNote.js'
 import AutoCropOptions, { DEFAULT_CROP_CONFIDENCE_PERCENT, validCropConfidence } from '../dataset/AutoCropOptions.jsx'
+import PassScopeChoices from '../shared/PassScopeChoices.jsx'
 import {
   bankPass, passScopeRows, passSelectionAvailability, watermarkSettings,
 } from './bankPasses.js'
 import {
   DEFAULT_PASS_SCOPE, passBinWarning, passLaunchDisabledReason, passLaunchLabel,
-  passScopeCount, passScopeLineLabel, passScopeStatuses,
+  passScopeCount, passScopeStatuses,
 } from './bankPassScope.js'
 
 /** THE LAUNCH WINDOW every bank pass now opens instead of firing on click.
@@ -169,46 +170,13 @@ export default function PassDialog({
         <div ref={bodyRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 sm:p-4">
           <Block title="This run"
             subtitle="Where this pass applies, and how many images that is.">
-            {/* ① the selection, when there is one. */}
-            {selectionSize > 0 && (
-              <label className={`flex items-start gap-2 rounded-md border border-border p-2 text-sm ${selection.ok ? 'bg-surface-raised' : 'opacity-70'}`}>
-                <input type="radio" name={`scope-${passId}`} className="mt-1"
-                  checked={selection.ok && useSelection} disabled={!selection.ok}
-                  onChange={() => setUseSelection(true)} />
-                <span className="min-w-0">
-                  <span className="font-medium text-content">
-                    Your selection — up to {selectionSize} image(s)
-                  </span>
-                  {selection.ok ? (
-                    <span className="block text-2xs leading-snug text-content-subtle">
-                      “Up to”, because the selection is narrowed by what this pass still
-                      has to do — never widened.
-                    </span>
-                  ) : <DisabledNote>{selection.reason}</DisabledNote>}
-                </span>
-              </label>
-            )}
-
             {/* ② the four piles + the default. A pass with a global result shows
                 ONE immutable line instead, and the objection under it. */}
-            {spec.scopes === true ? rows.map((r) => (
-              <label key={r.id || 'default'}
-                className={`flex items-start gap-2 rounded-md border border-border p-2 text-sm ${
-                  r.ok ? 'bg-surface-raised' : 'opacity-70'}`}>
-                <input type="radio" name={`scope-${passId}`} className="mt-1"
-                  checked={!(useSelection && canUseSelection) && scope === r.id}
-                  disabled={!r.ok}
-                  onChange={() => { setUseSelection(false); setScope(r.id) }} />
-                <span className="min-w-0">
-                  <span className="font-medium text-content">
-                    {passScopeLineLabel(payload, passId, r.id, effectiveRedo)}
-                  </span>
-                  {r.ok ? (
-                    <span className="block text-2xs leading-snug text-content-subtle">{r.hint}</span>
-                  ) : <DisabledNote>{r.reason}</DisabledNote>}
-                </span>
-              </label>
-            )) : (
+            <PassScopeChoices payload={payload} passId={passId} scope={scope} redo={effectiveRedo}
+              onScope={setScope} selectionSize={selectionSize} selection={selection}
+              useSelection={useSelection} onUseSelection={setUseSelection}
+              rows={spec.scopes === true ? rows : []} disabled={busy} />
+            {spec.scopes !== true && (
               <div className="lds-section py-2 text-sm">
                 <p className="m-0 font-medium text-content">
                   {spec.fixedScopeLine}
