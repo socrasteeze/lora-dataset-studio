@@ -151,22 +151,11 @@ test('the overview has an explicit unavailable state before bank data arrives', 
   assert.match(overview, /'Total unavailable'/)
 })
 
-/* The even-grid HALF of this test is gone, and deliberately.
- *
- * The fork's `72d297d9` and upstream's 2026-08-23 responsive pass both rewrote
- * this header for a phone, and they answer the same question two ways that
- * cannot share an element: even grid cells versus one horizontally-scrolling
- * line per row. Upstream's is the measured one — a real device probe, a header
- * that was 38 % of the fold at rest, eight counters wrapping to four rows — so
- * the layout half was adopted and `grid grid-cols-3`, `col-span-3` and the
- * `HEADER_BTN*` / `PATH_BTN` constants went with it (they sized a grid cell;
- * nothing sizes a grid cell here any more).
- *
- * What did NOT go is the copy rule, which was never about the grid: a control
+/* Portrait uses action columns; desktop and short landscape retain scrolling.
+ * The layout contract lives in bankProbeMarkers.test.js. The copy rule is
+ * independent: a control
  * that opens a window does not need to say so twice, and the ellipsis is the
  * second telling. That half is orthogonal to any layout and is still pinned.
- * Upstream's own contract for the adopted layout lives in bankProbeMarkers.test.js
- * ('the header gives the fold back on a phone') — this file does not duplicate it.
  */
 test('the header actions carry no idle ellipses', () => {
   const ws = readFileSync(new URL('./BankWorkspace.jsx', import.meta.url), 'utf8')

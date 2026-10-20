@@ -30,6 +30,20 @@ active in the live application. No live dataset or GPU workload was used as a fi
 
 ## Verification
 
+### Bank spacing follow-up, 2026-10-20
+
+Portrait Bank actions use three columns, with the delete action spanning the
+phone row. Large result counts span two toolbar columns above the selection
+actions. Progress text sits above an aligned progress bar and Stop button.
+Desktop and short-landscape header actions retain horizontal scrolling.
+The Dataset toolbar already wraps its separate status and sort controls.
+
+This follow-up has source inspection, lint and build evidence only. Tests,
+responsive probes and physical iPhone/PWA validation were not run. The earlier
+qualification below does not qualify this layout change.
+
+### Earlier mobile workflow qualification
+
 - Full integrated delivery gate passed: 10,343 backend/tooling tests, 106
   subtests, 244 isolated bundled Python tests and 6,283 frontend tests.
   The main backend suite skipped 22 tests; the bundled frontend skipped four.

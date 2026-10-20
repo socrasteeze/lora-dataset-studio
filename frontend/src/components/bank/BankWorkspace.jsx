@@ -159,14 +159,10 @@ const PAGE_SIZE = 120
 const CURATE_BTN = 'inline-flex w-full min-w-0 items-center justify-center '
   + 'rounded-md border px-3 py-1.5 text-center text-sm font-semibold '
   + `${FILTER_ACTIVE} ${FILTER_HOVER} ${CONTROL_DISABLED}`
-/* Shown / Review / selected / Select all / Auto-reject. One full-width row;
-   each cell is the same width. Labels wrap below lg instead of widening the page. */
+/* Portrait gives the results count two cells, then groups selection actions on
+   the next row. Desktop retains the five-cell toolbar. */
 const TOOLBAR_CELL = 'inline-flex h-full min-h-10 w-full min-w-0 items-center justify-center '
   + 'rounded-md px-1.5 text-center text-xs leading-tight lg:min-h-0 lg:h-7'
-/* The header's own buttons are inlined rather than shared through a constant:
-   they sit in two horizontally-scrolling rows now (upstream's measured layout),
-   not in even grid cells, so there is no shared box left for a constant to
-   describe. CURATE_BTN below still has one — those buttons DO share a grid. */
 /* How often the bank-wide counts refresh while a pass runs. The banner ticks
    every 2 s off /activity; the dashboard follows on this slower beat — plus
    immediately when the job lands, so the numbers you end on are exact. The
@@ -2061,12 +2057,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             </BankStatsStrip>
           </div>
         )}
-        {/* The decisive actions. ⚙ Passes opens the analysis panel; the other
-            three are the ones that change what leaves this bank. Each button is
-            shrink-0 + whitespace-nowrap: allowed to shrink, the scrolling line
-            squeezed them instead and "Delete rejected from disk" wrapped to five
-            lines, a 123-px row on a 360-px phone. */}
-        <div className="flex h-14 min-w-0 flex-nowrap items-center gap-2 overflow-x-auto overflow-y-hidden border-t border-border pt-2 lg:h-12 [scrollbar-width:thin] [@media(max-height:500px)]:ml-auto [@media(max-height:500px)]:h-12 lg:[@media(max-height:500px)]:h-10 [@media(max-height:500px)]:border-t-0 [@media(max-height:500px)]:pt-0">
+        {/* The decisive actions. Portrait uses equal columns and a full-width
+            delete action. Desktop and short landscape retain the compact
+            scrolling row. Wrapped labels can grow without clipping. */}
+        <div className="grid min-w-0 grid-cols-3 items-stretch gap-2 border-t border-border pt-2 [&>button]:h-auto [&>button]:min-w-0 [&>button]:whitespace-normal [&>button]:px-2 [&>button]:py-1.5 [&>button]:text-xs [&_svg]:shrink-0 lg:flex lg:h-12 lg:flex-nowrap lg:items-center lg:overflow-x-auto lg:overflow-y-hidden lg:[&>button]:h-8 lg:[&>button]:whitespace-nowrap lg:[&>button]:px-3 lg:[&>button]:py-0 lg:[&>button]:text-sm [scrollbar-width:thin] [@media(max-height:500px)]:ml-auto [@media(max-height:500px)]:flex [@media(max-height:500px)]:h-12 lg:[@media(max-height:500px)]:h-10 [@media(max-height:500px)]:items-center [@media(max-height:500px)]:overflow-x-auto [@media(max-height:500px)]:overflow-y-hidden [@media(max-height:500px)]:border-t-0 [@media(max-height:500px)]:pt-0 [@media(max-height:500px)]:[&>button]:h-10 lg:[@media(max-height:500px)]:[&>button]:h-8 [@media(max-height:500px)]:[&>button]:whitespace-nowrap">
           {/* The path row above is hidden on a phone and in a short landscape
               window. Exclude folder is curation, so it stays reachable there. */}
           {excludeFolderButton('sm:hidden [@media(max-height:500px)]:!inline-flex')}
@@ -2094,7 +2088,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             className="font-bold shadow">
             <Rocket aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Launch all
           </Button>
-          <span className="ml-auto" />
+          <span className="ml-auto hidden lg:block [@media(max-height:500px)]:block" />
           <Button type="button" size="md" noShrink disabled={bankBusy || !payload?.instance_id}
             onClick={() => setProfileMoveOpen(true)}>Move to Profile</Button>
           <Button type="button" size="md" noShrink variant="primary" onClick={() => setPromoteOpen(true)} disabled={bankBusy || !canPromote}
@@ -2114,7 +2108,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               : (counts?.reject > 0)
                 ? 'Delete the rejected images from your disk (OS trash when available). Irreversible — asks you to type DELETE first. Kept images are untouched.'
                 : 'No rejected images to delete'}
-            className="border-rose-500/50 text-rose-300 hover:bg-rose-500/10">
+            className="col-span-3 border-rose-500/50 text-rose-300 hover:bg-rose-500/10 sm:col-span-1 lg:col-auto">
             <Trash2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Delete rejected from disk{(counts?.reject > 0) ? ` (${counts.reject})` : ''}
           </Button>
         </div>
@@ -2262,13 +2256,14 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           </>}
           {comparisonLoading && <span role="status" className="text-xs text-content-muted">Loading comparison</span>}
         </div>
-        {/* Results readout + selection actions. Five equal cells across the row. */}
+        {/* Results stay together on portrait; the three selection cells share
+            their own row. Desktop keeps the existing five equal columns. */}
         <div className="space-y-1.5">
-        <div className="grid w-full grid-cols-5 items-stretch gap-1.5">
-          <span className={`${TOOLBAR_CELL} text-content-muted`}>
-            <span className="font-semibold tabular-nums text-content">{(page.total ?? 0).toLocaleString()}</span>&nbsp;shown
+        <div className="grid w-full grid-cols-3 items-stretch gap-1.5 lg:grid-cols-5">
+          <span className={`${TOOLBAR_CELL} col-span-2 flex-wrap gap-x-1 text-content-muted lg:col-span-1`}>
+            <span className="whitespace-nowrap"><span className="font-semibold tabular-nums text-content">{(page.total ?? 0).toLocaleString()}</span> shown</span>
             {isFiltered && (
-              <span className="text-content-subtle">&nbsp;of {(counts?.total ?? 0).toLocaleString()}</span>
+              <span className="whitespace-nowrap text-content-subtle">of {(counts?.total ?? 0).toLocaleString()}</span>
             )}
           </span>
           {/* The fast lane: full-size, one image at a time, Keep/Reject/Skip with
