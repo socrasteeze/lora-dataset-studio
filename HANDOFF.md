@@ -1,13 +1,19 @@
 # HANDOFF
 
-**Updated:** 2026-10-19 | **Branch:** main | **Base:** 873411c4b
+**Updated:** 2026-10-19 | **Branch:** perf/all-pass-hardware-tuning | **Base:** 26ca2c116
 
 ## State
+All Bank/Dataset pass families have been reviewed. Hardware-scaled worker budgets, adaptive CUDA Score batches, bounded ONNX sessions, unused face-head removal and rate-limited embedding checkpoints are implemented in this branch. Publication and activation are pending. Models used for scores/identity/pose, precision, thresholds, image validation and provenance stay intact. Tests and benchmarks remain off; no speedup is measured.
 Dataset Auto-Crop now shares Bank's status and grid-selection controls. The default is kept and undecided; a selection narrows that pool. Rejected images require an explicit bin/all scope. Empty selections cannot widen the run. Choices remain after a failed request. Source 66125fce8 and bundle 5b0f11dac are active after a controlled restart.
 Confidence-gated Auto-Crop is implemented in the image editor and as an opt-in Bank/Dataset Framing option. The shared server gate defaults to 90%; missing/invalid/lower confidence skips pixel writes. Confidence is an uncalibrated model estimate.
 Tests, rendered checks and inference remain off. A new healthy backend boot serves the matching built bundle. Dataset metadata and four saved configuration files are unchanged. Bank inventory and Forget Missing requests occurred during activation; the Bank image table changed while surviving rows stayed identical. Full qualification remains incomplete.
 
 ## Done this session
+- Added shared native thread budgets to inference worker environments, preserving stricter inherited limits and the parent environment. Quality scan and Score preparation use the same CPU-capacity policy.
+- Score batches CLIP and NSFW together, sizes batches from free CUDA memory, backs off on OOM and isolates other failures per image. Stop saves the current batch; runtime output reports its budget.
+- Face/angle and Dataset face sessions bound ONNX threads and disable idle spinning. Face/identity analysis keeps identity and 3D pose inputs while skipping unused heads; face masking uses detection only.
+- Face and SigLIP2 caches share Score's checkpoint interval. Normal Stop/completion flush all finished work; abrupt process termination can require more recomputation. Face cancellation also reaches the error path.
+- Wrote CPU-budget, ONNX-pool, batch-equivalence, OOM-backoff, isolated-head-failure, batch-Stop/resume, replaced-source and checkpoint-durability regressions without running them.
 - Extracted the shared Bank/Dataset status and selection controls without changing stored scope IDs. Dataset shows eligible counts, blocks empty scopes and clears stale grid selections on navigation. Framing waits for bulk curation to finish.
 - Dataset validates status/ID options before reserving the GPU, intersects them with dataset ownership, excludes rejected images by default and rechecks status after inference before saving.
 - Added scope, selection, foreign-ID, invalid-input and status-change regressions without running them. Updated Guide, help keywords and What's New.
@@ -20,6 +26,7 @@ Tests, rendered checks and inference remain off. A new healthy backend boot serv
 - Activated source 46926f85b and bundle d1ca52fd0 after an idle-work check and local metadata/settings backup. Served entry and JavaScript bytes match the built bundle; no jobs or inference were started.
 
 ## Open
+0. Publish and activate the completed performance wave when idle with CI skipped. Pass performance, model equivalence and full qualification remain unverified; run only an explicitly requested scope.
 1. Auto-Crop confidence calibration, crop accuracy, rendered behavior and live providers remain unverified. Run only an explicitly requested scope. Fixture speedup qualification against aeb09dae9 also remains unrun.
 2. The operator chose a local identity accuracy set. Await its location/labels and explicit evaluation authorization; keep images local. Report wrong names, misses, abstentions and provenance. Similarity thresholds remain unmeasured heuristics.
 3. Physical phone/PWA acceptance, installed-source trainer compatibility and real GPU/training comparisons remain operator gates. Opt-in live encoder/Ollama checks were not run.
@@ -44,7 +51,27 @@ Tests, rendered checks and inference remain off. A new healthy backend boot serv
 - Do not move Auto-Crop inference into passive requests/effects. Keep old route/help/What's New identifiers. Failed-save exceptions must reach CropModal.
 - Do not merge upstream branches. The upstream review below is carried forward unchanged.
 
+## Pass review
+| Pass family | Result |
+| --- | --- |
+| Quality | Existing single decode supplies metrics/provenance/hash/thumbnail. Preparation workers now use the shared CPU policy. |
+| Score | Bounded preparation/native threads; adaptive CLIP and NSFW batches; per-image failure isolation and batch Stop. |
+| Semantic index | CLIP inherits Score changes. SigLIP2 keeps its existing model/processor and limits full-cache rewrites. |
+| Faces/person groups | Bounded ONNX pools without idle spinning; identity/pose heads retained; unused heads skipped; checkpoint I/O limited. |
+| Angles | Shares the face worker and keeps its 3D pose estimator and yaw gates. |
+| Watermark detection | Shared worker budget; existing streaming detector chunks and memory-bounded tile sweep retained. Vision concurrency stays configured. |
+| Text scan | Existing vision/OCR route and persistence retained; native worker budget applies where an inference worker is used. |
+| Watermark crop | Existing lossless image-edit and mutation guards retained. |
+| Watermark inpaint | Native worker budget; LaMa keeps one model for bulk work. External Klein/ComfyUI scheduling stays unchanged. |
+| Improve/upscale | Native helper budget; external ComfyUI workflows and GPU ownership stay unchanged. |
+| Framing/Auto-Crop | Existing vision concurrency, confidence gate, source fence and serial crop publication retained. |
+| Medium | Existing cached Score embeddings and prototype classifier retained. |
+| Semantic dedup | Existing cached embeddings, bounded comparisons and threshold semantics retained. |
+| Caption | Native worker budget; WD14 adds ONNX limits and retains eight-image batches. Existing VLM concurrency and bulk caption workers retained. |
+| Identity/masking | Identity retains detection/recognition/3D pose. Face masking skips unused face heads. |
+
 ## Verify
+Pass tuning: Ruff and ESLint passed; ESLint has zero errors and 32 existing warnings. AST parsing covered 20 changed Python files without imports or execution. Production build passed in 6.74s. Privacy inspection covered 3084 text files with zero findings; added-source attribution inspection and whitespace review had zero findings. The pure-text outbound inventory has zero differences. Tests, fixtures, inference, benchmarks and rendered checks were not run. No workflow, dependency or saved-setting changes were made. Full qualification and throughput/equivalence measurement remain incomplete.
 Dataset scope source inspection: Ruff passed; ESLint reported zero errors and 32 existing warnings. Three changed Python files parsed without imports or execution. Production build passed in 6.76s. Privacy inspection covered 3079 text files with zero findings; whitespace review passed. No tests, fixtures, browser checks, model inference or rendered probes ran. New regression cases remain unrun. Full qualification is incomplete.
 Dataset scope activation: new healthy boot, same profile, matching served entry and bundle bytes, idle work state and unchanged hashes for four configuration files. Of 46 metadata tables, 45 were identical. The Bank image delta was 3427 added pending rows and 1267 removed pending rows, with zero field changes in surviving rows. Timestamped logs show successful Bank create/inventory and Forget Missing requests during that interval. No live data was restored or overwritten. Backup and filtered metadata/request receipts remain under ignored Git storage, lds-auto-crop-activation-20261019-899e4e9e.
 Auto-Crop source inspection: Ruff passed; ESLint passed with zero errors and 32 existing warnings. AST parsing covered nine Python files without imports or test collection. Final production build passed in 7.04s. Privacy inspection covered 3075 text files with zero findings; new attribution scan had zero findings. The pure-text outbound inventory has zero differences. No tests, fixtures, model inference or rendered probes ran. Bank and Dataset confidence policy uses the same server helper; options are validated before queued admission or the Dataset GPU window. Bank framing is rebound to the saved crop's fingerprint. No workflow or dependency changes were made. Accuracy and full qualification remain unverified.

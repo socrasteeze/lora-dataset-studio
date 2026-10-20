@@ -364,6 +364,37 @@ def test_image_worker_cancel_flushes_an_atomic_resumable_cache(
     assert not list(cache.parent.glob('*.tmp.npz'))
 
 
+@pytest.mark.parametrize('interval,expected_writes', [(3600, [6]), (0, [2, 4, 6, 6])])
+def test_semantic_cache_rewrites_are_rate_limited_and_completion_flushes(
+        isolated_semantic, tmp_path, monkeypatch, interval, expected_writes):
+    worker = _load_script('bank_semantic_infer')
+    contract = semantic.semantic_contract()
+    cache = isolated_semantic / '12' / semantic.SIGLIP2_CACHE_FILENAME
+    images = []
+    for index in range(6):
+        path = tmp_path / f'example-{index}.bmp'
+        Image.new('RGB', (16, 16), (index, 20, 40)).save(path, 'BMP')
+        images.append(str(path))
+    _install_ml_stubs(monkeypatch, contract['dimension'])
+    monkeypatch.setattr(worker, 'time', SimpleNamespace(monotonic=lambda: 0))
+    monkeypatch.setattr(worker, 'CACHE_EVERY', 2)
+    monkeypatch.setattr(worker, 'CACHE_SAVE_SECONDS', interval)
+    writes = []
+    flush = worker._flush_cache
+
+    def tracked(path, entries, metadata):
+        writes.append(len(entries))
+        return flush(path, entries, metadata)
+
+    monkeypatch.setattr(worker, '_flush_cache', tracked)
+    code, result = _run_image_worker(worker, monkeypatch, {
+        **contract, 'images': images, 'cache': str(cache), 'device': 'cpu',
+    })
+    assert code == 0 and result['computed'] == 6
+    assert writes == expected_writes
+    assert set(worker._load_cache(str(cache), contract)) == set(images)
+
+
 def test_image_worker_retries_a_cached_error(
         isolated_semantic, tmp_path, monkeypatch):
     worker = _load_script('bank_semantic_infer')

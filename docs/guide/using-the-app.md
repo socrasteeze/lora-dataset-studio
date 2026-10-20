@@ -3297,6 +3297,35 @@ happily runs alongside your generation. So a fast pass costs you the card while
 it runs; a slow one costs you time but nothing else. The dialog states this on
 every CUDA row before you pick that interpreter.
 
+**Pass resource budgets.** Local inference workers share a CPU thread budget,
+scaled to the detected CPU count and capped at four native threads per operation.
+Stricter inherited limits stay in force. These limits affect the workers that
+LDS starts, including scoring, face analysis, tagging, captioning, detection and
+masking. They do not change a separately running Ollama, LM Studio or ComfyUI.
+Face/angle analysis keeps detection, identity embeddings and 3D pose estimation;
+it skips unused age/gender and 2D landmark inference. Face masking uses detection
+only. Face and WD14 ONNX sessions limit their pools and disable idle spinning.
+
+Score sizes its preparation pool from the CPU count. CUDA inference uses one Torch CPU thread per
+operation. CPU inference keeps one preparation worker and a bounded Torch thread
+pool. Stricter inherited thread limits remain in force.
+
+CUDA batches start at up to eight images, based on free GPU memory after the
+models load. Memory pressure reduces the batch and retries the same images.
+Other batch inference errors retry images individually. CLIP and NSFW both use
+the batch; models, precision, validation and image transforms stay the same.
+Runtime progress reports the chosen device, batch and preparation worker count.
+Hardware budgets are automatic; there is no batch setting to adjust. CPU-heavy
+decoding can still limit throughput. No measured speedup is claimed.
+
+Score, face embeddings and SigLIP2 embeddings limit full-cache rewrites: a
+periodic checkpoint requires at least 50 processed images and 60 elapsed seconds
+since the previous write. Stop and normal completion still flush the cache.
+A forced process kill can require recomputing work since the last successful
+checkpoint. The normal resume and source-fingerprint checks stay intact.
+WD14 retains its existing eight-image batches. Vision passes retain their
+configured concurrency, and LaMa keeps its existing single-model bulk worker.
+
 **If you borrow ComfyUI's own Python**, one extra thing to know: Score frees
 ComfyUI's VRAM, but it does not close ComfyUI, and CUDA start-up in the borrowed
 interpreter can stall against a process still holding the card. If a first pass
@@ -4544,7 +4573,10 @@ that cache and pays only for the rest. On a bank that is fully scored, the pass
 does not even load the model: it goes straight to the grouping.
 
 So **Stop is safe**, and it is now safe in the database too. When you stop a run,
-the scores it had already computed are written to your images before the pass
+Score finishes its current scoring batch before saving. On CUDA this is at most
+eight images; CPU inference handles one image at a time.
+
+The scores it had already computed are written to your images before the pass
 ends — that work was paid for, and it used to reach the cache and never reach a
 single row. The line at the end of the pass says exactly what happened: how many
 images were scored, how many remain, and how many were reused instead of

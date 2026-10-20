@@ -114,6 +114,7 @@ def test_face_embed_marks_rejected_snapshot_error_without_cv2_decode(
     cv2.imdecode = imdecode
     onnxruntime = types.ModuleType('onnxruntime')
     onnxruntime.get_available_providers = lambda: []
+    onnxruntime.SessionOptions = lambda: types.SimpleNamespace(add_session_config_entry=lambda *_: None)
     insightface = types.ModuleType('insightface')
     insightface.__path__ = []
     insightface_app = types.ModuleType('insightface.app')
@@ -153,6 +154,7 @@ def test_face_embed_does_not_commit_result_when_file_changes_during_model_call(
     cv2.imdecode = lambda *_args, **_kwargs: np.zeros((12, 16, 3), dtype='uint8')
     onnxruntime = types.ModuleType('onnxruntime')
     onnxruntime.get_available_providers = lambda: []
+    onnxruntime.SessionOptions = lambda: types.SimpleNamespace(add_session_config_entry=lambda *_: None)
     insightface = types.ModuleType('insightface')
     insightface.__path__ = []
     insightface_app = types.ModuleType('insightface.app')
@@ -202,6 +204,8 @@ def test_bank_score_does_not_commit_embedding_when_file_changes_during_clip(
 
     torch = types.ModuleType('torch')
     torch.cuda = types.SimpleNamespace(is_available=lambda: False)
+    torch.set_num_threads = lambda count: None
+    torch.set_num_interop_threads = lambda count: None
 
     class NoGrad:
         def __enter__(self):
@@ -303,6 +307,8 @@ def test_bank_score_marks_rejected_snapshot_error_without_second_pillow_open(
 
     torch = types.ModuleType('torch')
     torch.cuda = types.SimpleNamespace(is_available=lambda: False)
+    torch.set_num_threads = lambda count: None
+    torch.set_num_interop_threads = lambda count: None
 
     class NoGrad:
         def __enter__(self):

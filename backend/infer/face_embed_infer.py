@@ -18,9 +18,10 @@ Protocol (same family as face_score_infer.py):
             drive the UI progress bar).
 
 Embeddings are CACHED in the .npz (parallel arrays paths/embs/states/dets/
-bfracs/yaws/bpx/sigs/hashes) and written incrementally every CACHE_EVERY images — killing the
-pass mid-way loses at most that slice, and re-clustering at another threshold is
-then near-instant.
+bfracs/yaws/bpx/sigs/hashes). Periodic full-cache writes require CACHE_EVERY new
+images and the shared checkpoint interval. Stop and completion always flush;
+an abrupt process kill can lose work since the last successful checkpoint.
+Re-clustering at another threshold reuses the saved embeddings.
 
 ``yaws`` and ``bpx`` were added after the fact and every cache written before
 each of them lacks it. Those entries load with NaN — for the yaw, reported as
@@ -65,6 +66,7 @@ import hashlib
 import json
 import os
 import sys
+import time
 # A ._pth-pinned interpreter (ComfyUI portable's python_embeded) does not put
 # this script's directory on sys.path — restore it or the import below dies
 # there. See _harness.py for the whole story.
@@ -72,6 +74,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 from _harness import _cancel_requested, _log, _write_count
+from pass_resources import CACHE_SAVE_SECONDS, FACE_SCORING_MODULES, onnx_session_options
 
 CACHE_EVERY = 50
 # Detection confidence and head-turn gates — the same values face_score_infer
@@ -411,7 +414,9 @@ def main() -> int:
                      if used_gpu else ['CPUExecutionProvider'])
         _log(f'[embed] providers={avail} device={device} used_gpu={used_gpu}')
         try:
-            kwargs = {'name': 'antelopev2', 'providers': providers}
+            kwargs = {'name': 'antelopev2', 'providers': providers,
+                      'allowed_modules': list(FACE_SCORING_MODULES),
+                      'sess_options': onnx_session_options(ort)}
             if models_root:
                 kwargs['root'] = models_root
             app = FaceAnalysis(**kwargs)
@@ -444,6 +449,7 @@ def main() -> int:
         import numpy as _np
         zero = _np.zeros(512, dtype='float32')
         done_since_save = 0
+        last_save = time.monotonic()
         uncached_changed = 0
         if _cancel_requested(cancel_file):   # cancelled during the model load
             cached = len(images) - len(todo)
@@ -567,15 +573,16 @@ def main() -> int:
                     cache[p] = ('error', 0.0, 0.0, zero, float('nan'), signature,
                                 payload_hash, float('nan'))
                 _log(f'[embed] {i}/{len(todo)} ERROR {e}')
-                continue
             finally:
                 done_since_save += 1
-                if cache_path and done_since_save >= CACHE_EVERY:
+                if (cache_path and done_since_save >= CACHE_EVERY
+                        and time.monotonic() - last_save >= CACHE_SAVE_SECONDS):
                     _flush_cache(cache_path, cache)
                     _write_count(
                         cache_path,
                         len(images) - len(todo) + i - uncached_changed)
                     done_since_save = 0
+                    last_save = time.monotonic()
             _log(f'[embed] {i}/{len(todo)} '
                  f'{cache[p][0] if p in cache else "changed; retry next run"}')
             if _cancel_requested(cancel_file):   # clean stop between images

@@ -4739,7 +4739,7 @@ def _scan_job(bank_id, rescan, regroup=False, statuses=None, ids=None):
         if items and not os.path.isdir(src_root or ''):
             bank_jobs.fail(job, MOVED_FOLDER_MSG)
             return
-        workers = min(8, os.cpu_count() or 4)
+        workers = infer_env.prepare_workers()
         done = 0
         missing = 0
         folder_ok = False   # set once the folder is shown to hold scanned images
@@ -9180,7 +9180,7 @@ def _score_job(bank_id, device_id=None, rescore=False):
             cost='Every image already scored is saved when you stop. The style '
                  'grouping is computed over the whole bank at once, so it is '
                  'the one thing a stop loses.',
-            wait='Stopping — waiting for the image being analyzed, then saving '
+            wait='Stopping — finishing the current scoring batch, then saving '
                  'what was scored.')
         if not paths:
             # Never leave the label of a pass that did not run: the one-click

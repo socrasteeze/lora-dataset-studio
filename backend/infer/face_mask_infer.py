@@ -179,7 +179,8 @@ def main() -> int:
     # user already read as "stuck".
     _phase('downloading' if not _models_present(models_root) else 'loading')
     try:
-        kwargs = {'name': 'antelopev2', 'providers': ['CPUExecutionProvider']}
+        kwargs = {'name': 'antelopev2', 'providers': ['CPUExecutionProvider'],
+                  'allowed_modules': ['detection']}
         if models_root:
             kwargs['root'] = models_root
         app = FaceAnalysis(**kwargs)

@@ -232,3 +232,21 @@ Dataset requests use the live local-engine registry and still reject legacy
 and registered API engines before dispatch. Keep plugin enablement and
 preparation checks in that path. H3 weight discovery must retain explicit
 relative-path matching while searching basename requests through model subfolders.
+
+## Divergence 13: bounded image-pass resources
+
+`backend/infer/pass_resources.py` owns native CPU thread budgets for inference
+workers. `infer_env.worker_env` applies them before numerical libraries load;
+stricter inherited limits remain in force. Face/angle sessions keep detection,
+recognition and 3D pose heads, bound ONNX pools and disable idle spinning. Face
+masking keeps detection only. Preserve pose estimation and source-byte guards.
+
+Score uses small CUDA batches chosen from free memory after model loading,
+halves them on OOM and isolates other batch failures per image. CPU inference
+stays single-image. Stop finishes and saves the current batch. Keep models,
+precision, thresholds, per-image errors and cache provenance unchanged.
+
+Score, face and semantic caches rate-limit full periodic rewrites using the
+shared interval; Stop and normal completion always flush. A forced process kill
+can require recomputation since the last successful checkpoint. No speedup is
+qualified until the operator requests measurement.

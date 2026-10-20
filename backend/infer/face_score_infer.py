@@ -22,6 +22,7 @@ if _HERE not in sys.path:
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from infer_io import claim_result_stream  # noqa: E402
 from _harness import _log  # noqa: E402
+from pass_resources import FACE_SCORING_MODULES, onnx_session_options  # noqa: E402
 _OUT = claim_result_stream(__name__)
 
 DET_MIN, YAW_MAX = 0.50, 40.0
@@ -186,7 +187,9 @@ def main() -> int:
     providers = (['CUDAExecutionProvider', 'CPUExecutionProvider'] if use_cuda
                  else ['CPUExecutionProvider'])
     try:
-        kwargs = {'name': 'antelopev2', 'providers': providers}
+        kwargs = {'name': 'antelopev2', 'providers': providers,
+                  'allowed_modules': list(FACE_SCORING_MODULES),
+                  'sess_options': onnx_session_options(_ort)}
         if models_root:
             kwargs['root'] = models_root
         app = FaceAnalysis(**kwargs)

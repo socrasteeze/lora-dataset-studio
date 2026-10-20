@@ -9,6 +9,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 from infer_io import claim_result_stream
+from pass_resources import FACE_SCORING_MODULES
 
 _OUT = claim_result_stream(__name__)
 
@@ -33,7 +34,8 @@ def main():
                 'glintr100.onnx', 'scrfd_10g_bnkps.onnx')):
             raise ValueError('missing prepared weights')
         analyzer = FaceAnalysis(name='antelopev2', root=root,
-                                providers=['CPUExecutionProvider'])
+                                providers=['CPUExecutionProvider'],
+                                allowed_modules=list(FACE_SCORING_MODULES))
         analyzer.prepare(ctx_id=-1, det_size=(640, 640))
     except Exception:
         json.dump({'ok': False, 'error': 'Face recognition is unavailable.'}, _OUT)
