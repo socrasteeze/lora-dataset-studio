@@ -9,6 +9,7 @@ import { animeFamilyNote } from './animeFamilyNote.js';
 import { dualCaptionsSupport } from './dualCaptions.js';
 import { maskedCarryOverAction, clearLegacyMasked } from './maskedMigration.js';
 import ConceptFaceMaskField from './ConceptFaceMaskField';
+import AtkRecipeDialog from './AtkRecipeDialog';
 import PluginSlot from '../../plugins/PluginSlot.jsx';
 import { contributions } from '../../plugins/registry.js';
 import {
@@ -802,9 +803,12 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   const advFamilyLabel = adv?.family_label ?? 'this model';
   const advSampleDefault = adv?.sample_prompts_default ?? [];
   const advMaxPrompts = adv?.max_sample_prompts ?? 8;
+  const [atkRecipeOpen, setAtkRecipeOpen] = useState(false);
+  useEffect(() => { setAtkRecipeOpen(false); }, [ds.currentId, trainType]);
   const saveAdv = async (patch) => {
     const eff = await ds.setTrainSettings?.(patch);
     if (eff) setAdv(eff);
+    return eff;
   };
   // Seed / re-sync the preview-prompts textarea from the stored value whenever
   // base-info (re)loads. Save is on blur, so the user is never mid-typing here.
@@ -2533,6 +2537,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 <select value={String(advSave)} onChange={(e) => saveAdv({ save_every: Number(e.target.value) })}
                   aria-label="Checkpoint frequency"
                   className={fieldClass({ size: 'sm' })}>
+                  <option value="100">every 100 steps</option>
                   <option value="250">every 250 steps</option>
                   <option value="500">every 500 steps</option>
                   <option value="1000">every 1000 steps</option>
@@ -2900,6 +2905,17 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   Larger batches and disabling checkpointing use more VRAM. Quantisation saves memory; convrot8 needs an Ampere GPU or newer. If a run fails at its first step, disable Compile.
                 </span>
               </div>
+              {!fullMode && <div className="flex min-w-0 flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-content">ATK Recipe<HelpBadge topic="training.atk_recipe" /></span>
+                  <button type="button" disabled={!adv?.atk_recipe} onClick={() => setAtkRecipeOpen(true)}
+                    className={btnClass({ size: 'sm' })}>Edit Recipe</button>
+                </div>
+                <span className="text-2xs text-content-muted">LR limits, layer exclusions, caption dropout, caches and preview settings.</span>
+                {atkRecipeOpen && <AtkRecipeDialog key={`${ds.currentId}:${trainType}`}
+                  settings={adv.atk_recipe} optimizer={advOptimizer} instanceId={ds.data?.instance_id}
+                  onSave={saveAdv} onClose={() => setAtkRecipeOpen(false)} />}
+              </div>}
               {/* Decoupled alpha */}
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2 flex-wrap">

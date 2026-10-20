@@ -568,6 +568,11 @@ def _safe_trigger(ds) -> str:
     return ''.join(c if (c.isalnum() or c in '_-') else '_' for c in t) or f'dataset{ds.id}'
 
 
+def _training_trigger(ds) -> str:
+    """Preserve conditioning text; _safe_trigger remains the filesystem identifier."""
+    return (ds.trigger_word or f'dataset{ds.id}').strip()
+
+
 def _train_type(ds, family=None) -> str:
     """Resolve the training family, defaulting to zimage.
 
@@ -1299,7 +1304,7 @@ _RES_CHOICES = {
     '1024': [1024],
     '768': [768],
 }
-_SAVE_CHOICES = (250, 500, 1000)
+_SAVE_CHOICES = (100, 250, 500, 1000)
 # Expert settings preserve current behavior when absent.
 _DROPOUT_CHOICES = (0.05, 0.1, 0.15, 0.2, 0.3)          # network dropout; absent means off
 _ALPHA_CHOICES = (1, 2, 4, 8, 16, 24, 32, 48, 64)       # independent alpha; absent means derived
@@ -1760,6 +1765,8 @@ def _network_block(ds, rank, family) -> dict:
     d = _train_settings(ds).get('dropout')
     if isinstance(d, (int, float)) and d in _DROPOUT_CHOICES:
         net['dropout'] = d
+    if s.get('ignore_if_contains'):
+        net['network_kwargs'] = {'ignore_if_contains': list(s['ignore_if_contains'])}
     return net
 
 
@@ -1800,9 +1807,40 @@ def _train_serializer_fields(ds) -> dict:
     if (isinstance(decay, (int, float)) and not isinstance(decay, bool)
             and 0 <= float(decay) <= 1):
         out['optimizer_params'] = {'weight_decay': float(decay)}
+    if _optimizer_eff(ds) == 'automagic3':
+        for key in ('min_lr', 'max_lr'):
+            if key in s:
+                out.setdefault('optimizer_params', {})[key] = s[key]
+    for key in ('skip_first_sample', 'loss_sync_every', 'unload_text_encoder',
+                'bypass_guidance_embedding'):
+        if key in s:
+            out[key] = s[key]
     if s.get('loss_type') in _LOSS_TYPE_CHOICES:
         out['loss_type'] = s['loss_type']
     return out
+
+
+_ATK_RECIPE_KEYS = (
+    'min_lr', 'max_lr', 'ignore_if_contains', 'caption_dropout_rate',
+    'cache_latents', 'skip_first_sample', 'loss_sync_every',
+    'unload_text_encoder', 'bypass_guidance_embedding',
+    'sample_width', 'sample_height', 'sample_seed', 'sample_walk_seed',
+    'sample_negative_prompt',
+)
+
+
+def _dataset_recipe_fields(ds) -> dict:
+    s = _train_settings(ds)
+    return {key: s[key] for key in ('caption_dropout_rate', 'cache_latents') if key in s}
+
+
+def _sample_recipe_fields(ds) -> dict:
+    s = _train_settings(ds)
+    return {target: s[source] for source, target in (
+        ('sample_width', 'width'), ('sample_height', 'height'),
+        ('sample_seed', 'seed'), ('sample_walk_seed', 'walk_seed'),
+        ('sample_negative_prompt', 'neg'),
+    ) if source in s}
 
 
 def _timestep_type_eff(ds, default: str) -> str:
@@ -2446,11 +2484,12 @@ def launch_settings_snapshot(ds, family=None, masked=None) -> dict:
             'sample_every': FULL_TRANSFORMER_SAMPLE_EVERY,
             'guidance_scale': 4,
             'sample_steps': 25,
-            'trigger': _safe_trigger(dense_ds),
+            'trigger': _training_trigger(dense_ds),
             'masked': (bool(masked) if isinstance(masked, bool)
                        else person_masking_enabled(dense_ds)),
         }
     rank = _lora_rank(ds, fam)
+    s = _train_settings(ds)
     zrecipe = (zimage_training_recipe(getattr(ds, 'train_variant', None),
                                       getattr(ds, 'train_base_model', None))
                if fam == 'zimage' else None)
@@ -2468,6 +2507,7 @@ def launch_settings_snapshot(ds, family=None, masked=None) -> dict:
         'lr': _lr_eff(ds),
     }
     network = _network_block(ds, rank, fam)
+    snap['ignore_if_contains'] = list(s.get('ignore_if_contains') or [])
     if network['type'] == 'lora':
         # ``None`` is an explicit topology fact for new records: linear-only.
         # Older records lacking these keys remain unknown and permissive.
@@ -2493,10 +2533,11 @@ def launch_settings_snapshot(ds, family=None, masked=None) -> dict:
         # Style LoRA. It is deliberately absent from provenance/share snapshots
         # so nobody mistakes it for an activation token.
         snap['style_mode'] = 'always_on'
-        snap['effective_caption_dropout'] = _effective_style_caption_dropout(fam)
+        snap['effective_caption_dropout'] = s.get(
+            'caption_dropout_rate', _effective_style_caption_dropout(fam))
     else:
         # Character/concept LoRAs do require this token to reproduce inference.
-        snap['trigger'] = _safe_trigger(ds)
+        snap['trigger'] = _training_trigger(ds)
     if fam != 'sdxl':
         timestep_default = (zrecipe['timestep_type'] if zrecipe
                             else _DEFAULT_TIMESTEP.get(fam, 'sigmoid'))
@@ -2518,7 +2559,6 @@ def launch_settings_snapshot(ds, family=None, masked=None) -> dict:
             snap['vae_path'] = ds.train_vae_path
         if getattr(ds, 'train_te_path', None):
             snap['te_name_or_path'] = ds.train_te_path
-    s = _train_settings(ds)
     for k in ('dropout', 'sample_every'):
         if s.get(k):
             snap[k] = s[k]
@@ -2587,7 +2627,7 @@ def launch_settings_snapshot(ds, family=None, masked=None) -> dict:
         'weight_decay', 'loss_type', 'qtype', 'qtype_te',
         'layer_offloading', 'layer_offloading_transformer_percent',
         'layer_offloading_text_encoder_percent', 'cache_text_embeddings',
-        'save_dtype', 'preset_steps_per_image', 'preset_steps_min',
+        'save_dtype', *_ATK_RECIPE_KEYS, 'preset_steps_per_image', 'preset_steps_min',
         'preset_steps_max', 'preset_steps_fixed',
     ):
         if _k in s:
@@ -2600,7 +2640,7 @@ def launch_settings_snapshot(ds, family=None, masked=None) -> dict:
             'extras_name_or_path': QWENIMAGE21_EXTRAS,
             'qtype': memory.get('qtype'), 'qtype_te': memory.get('qtype_te'),
             'cache_text_embeddings': _cache_text_embeddings_eff(ds, fam),
-            'unload_text_encoder': False,
+            'unload_text_encoder': s.get('unload_text_encoder', False),
         })
     return snap
 
@@ -2615,7 +2655,7 @@ def effective_train_settings(ds, family=None) -> dict:
     stored_rank = s.get('rank') if s.get('rank') in _RANK_CHOICES else None
     eff_rank = stored_rank if stored_rank else _default_rank_for(ds, fam)
     res = s.get('resolution')
-    trig = _safe_trigger(ds)
+    trig = _training_trigger(ds)
     stored_prompts = s.get('sample_prompts')
     network = _network_block(ds, eff_rank, fam)
     return {'rank': stored_rank,                       # None means family-aware Auto
@@ -2636,9 +2676,11 @@ def effective_train_settings(ds, family=None) -> dict:
             'optimizer_choices': list(_OPTIMIZER_CHOICES),
             'automagic3_supported': _aitoolkit_supports_automagic3(),
             # Effective LR (absolute) this run trains at — the ▶ Continue dialog's LR
-            # factor shows the resulting rate and hides the knob when it's adaptive
-            # (Prodigy). Not an editable Advanced-options control; read-only here.
+            # factor shows the resulting rate and hides the knob for Prodigy.
             'learning_rate': _lr_eff(ds),
+            'atk_recipe': {key: s.get(key) for key in (
+                'learning_rate', 'weight_decay', 'conv', 'conv_alpha',
+                'cache_text_embeddings', *_ATK_RECIPE_KEYS)},
             'lr_scheduler': s.get('lr_scheduler') if s.get('lr_scheduler') in _LR_SCHEDULER_CHOICES else None,  # None → constant
             'lr_scheduler_choices': list(_LR_SCHEDULER_CHOICES),
             'warmup': s.get('warmup') if s.get('warmup') in _WARMUP_CHOICES else None,
@@ -3182,13 +3224,12 @@ def _ts_apply_quality_and_precision(patch, cur):
     """Learning-rate/decay/loss quality levers plus quantisation, offloading,
     save dtype and preset-step keys. Moved verbatim; mutates cur in place."""
     if 'learning_rate' in patch:
-        # Not a general Advanced-options control: the family-fixed 1e-4 (or the
-        # Prodigy lr=1 convention) is the default, and only the ▶ Continue dialog's
-        # LR factor writes an explicit absolute rate here (see resolve_resume_lr).
+        # The ATK Recipe editor and Continue LR factor share this absolute rate.
         v = patch['learning_rate']
         if v in (None, 'auto', ''):
             cur.pop('learning_rate', None)                 # back to the family-fixed default
-        elif isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0:
+        elif (isinstance(v, (int, float)) and not isinstance(v, bool)
+              and math.isfinite(v) and v > 0):
             cur['learning_rate'] = float(v)
         else:
             raise ValueError('learning_rate must be a positive number (or auto)')
@@ -3263,11 +3304,80 @@ def _ts_apply_quality_and_precision(patch, cur):
             raise ValueError(f'{key} must be a positive integer (or auto)')
 
 
+def _ts_apply_atk_recipe(patch, cur):
+    """Validate recipe overrides before either settings or presets can persist."""
+    for key, lo, hi in (
+        ('min_lr', 0, 1e3), ('max_lr', 0, 1e3),
+        ('caption_dropout_rate', 0, 1),
+    ):
+        if key not in patch:
+            continue
+        v = patch[key]
+        if v in (None, '', 'auto'):
+            cur.pop(key, None)
+        elif (isinstance(v, (int, float)) and not isinstance(v, bool)
+              and math.isfinite(v) and lo <= v <= hi
+              and (key == 'caption_dropout_rate' or v > 0)):
+            cur[key] = float(v)
+        else:
+            lower = 'at least 0' if key == 'caption_dropout_rate' else 'greater than 0'
+            raise ValueError(f'{key} must be finite, {lower}, and at most {hi:g}')
+    if cur.get('min_lr', 1e-8) > cur.get('max_lr', 1e3):
+        raise ValueError('Minimum LR must not exceed Maximum LR.')
+    for key in ('cache_latents', 'skip_first_sample', 'sample_walk_seed',
+                'unload_text_encoder', 'bypass_guidance_embedding'):
+        if key not in patch:
+            continue
+        v = patch[key]
+        if isinstance(v, bool):
+            cur[key] = v
+        elif v in (None, '', 'auto'):
+            cur.pop(key, None)
+        else:
+            raise ValueError(f'{key} must be true, false or auto')
+    for key, lo, hi in (
+        ('loss_sync_every', 1, 1000), ('sample_width', 64, 4096),
+        ('sample_height', 64, 4096), ('sample_seed', 0, 2**32 - 1),
+    ):
+        if key not in patch:
+            continue
+        v = patch[key]
+        if v in (None, '', 'auto'):
+            cur.pop(key, None)
+        elif (isinstance(v, int) and not isinstance(v, bool) and lo <= v <= hi
+              and (key not in ('sample_width', 'sample_height') or v % 8 == 0)):
+            cur[key] = v
+        else:
+            suffix = '; dimensions must be multiples of 8' if key.startswith('sample_') and key != 'sample_seed' else ''
+            raise ValueError(f'{key} must be an integer between {lo} and {hi}{suffix}')
+    if 'ignore_if_contains' in patch:
+        v = patch['ignore_if_contains']
+        if v is None or v == '' or v == 'auto':
+            cur.pop('ignore_if_contains', None)
+        else:
+            if isinstance(v, str):
+                v = v.splitlines()
+            if (not isinstance(v, list) or len(v) > 64
+                    or any(not isinstance(item, str) or len(item) > 256
+                           or any(ord(c) < 32 for c in item) for item in v)):
+                raise ValueError('Layer exclusions must contain at most 64 single-line patterns of up to 256 characters.')
+            cur['ignore_if_contains'] = list(dict.fromkeys(item.strip() for item in v if item.strip()))
+    if 'sample_negative_prompt' in patch:
+        v = patch['sample_negative_prompt']
+        if v is None:
+            cur.pop('sample_negative_prompt', None)
+        elif isinstance(v, str) and len(v) <= 4000 and '\x00' not in v:
+            cur['sample_negative_prompt'] = v.strip()
+        else:
+            raise ValueError('Sample negative prompt must be text of up to 4000 characters.')
+
+
 def _ts_apply_levers_memory_quality(patch, cur):
     """Boolean/tri-state levers, memory-saver keys, quality knobs and the
     preset step bounds. Moved verbatim; mutates cur in place."""
     _ts_apply_data_and_memory(patch, cur)
     _ts_apply_quality_and_precision(patch, cur)
+    _ts_apply_atk_recipe(patch, cur)
 
 
 
@@ -3303,6 +3413,10 @@ def update_train_settings(user_id, dataset_id, patch: dict, *, _settings=None) -
     _ts_apply_sampling_and_saves(patch, cur)
     _ts_apply_network_and_optim(patch, cur)
     _ts_apply_levers_memory_quality(patch, cur)
+    if (cur.get('unload_text_encoder') is True
+            and not cur.get('cache_text_embeddings',
+                            _train_type(ds) in DUAL_CAPTION_UNSUPPORTED_FAMILIES)):
+        raise ValueError('Enable text embedding caching before unloading the encoder. Otherwise image captions would be lost.')
     if _settings is not None:
         return cur
     if selection and selection['family_changed']:
@@ -3350,7 +3464,7 @@ TRAIN_SETTING_KEYS = ('rank', 'resolution', 'save_every', 'max_step_saves',
                       'loss_type', 'qtype', 'qtype_te', 'layer_offloading',
                       'layer_offloading_transformer_percent',
                       'layer_offloading_text_encoder_percent',
-                      'cache_text_embeddings', 'save_dtype',
+                      'cache_text_embeddings', 'save_dtype', *_ATK_RECIPE_KEYS,
                       # Speed levers: what a run costs per step, as opposed to
                       # what it costs in memory. Defaults unchanged.
                       'batch_size', 'gradient_checkpointing', 'compile',
@@ -4168,8 +4282,10 @@ def apply_train_settings_dict(user_id, dataset_id, settings: dict, *,
         if k not in settings:
             continue
         try:
+            trial = dict(candidate)
             update_train_settings(user_id, dataset_id, {k: settings[k]},
-                                  _settings=candidate)
+                                  _settings=trial)
+            candidate = trial
         except ValueError as e:
             rejected.append({'key': k, 'reason': str(e)})
     if isinstance(preset_scope, dict):
@@ -4596,7 +4712,7 @@ def export_dataset_to_aitoolkit(user_id, dataset_id, masked: bool = True, dest_d
             shutil.copyfile(src, dst)
         exported.append(dst)
         cap = fds.style_content_caption(ds, img.caption)
-        body = cap if fds.is_style(ds) else (f'{trigger}, {cap}' if cap else trigger)
+        body = cap if fds.is_style(ds) else _inject_trigger(cap, _training_trigger(ds))
         with open(os.path.join(out, f'{stem}.txt'), 'w', encoding='utf-8') as fh:
             fh.write(body)
         if dual:
@@ -4606,7 +4722,7 @@ def export_dataset_to_aitoolkit(user_id, dataset_id, masked: bool = True, dest_d
             # key = the image path ai-toolkit will open (forward-slashed).
             short_src = (img.caption_short or '').strip() or img.caption
             scap = fds.style_content_caption(ds, short_src)
-            sbody = scap if fds.is_style(ds) else (f'{trigger}, {scap}' if scap else trigger)
+            sbody = scap if fds.is_style(ds) else _inject_trigger(scap, _training_trigger(ds))
             dual_entries[dst.replace('\\', '/')] = {'caption': body, 'caption_short': sbody}
         n += 1
     if n == 0:
@@ -4753,6 +4869,8 @@ def _apply_style_overrides(ds, process: dict, family: str | None = None) -> dict
     # model or leak into sidecars/sample prompts.
     process.pop('trigger_word', None)
     dropout = _effective_style_caption_dropout(fam, process)
+    if not _is_full_transformer(ds):
+        dropout = _train_settings(ds).get('caption_dropout_rate', dropout)
     for d in process.get('datasets', ()):
         d['caption_dropout_rate'] = dropout
     # Timestep choice is family/variant-specific. Never erase a resolved safe
@@ -4956,7 +5074,7 @@ def build_job_config(ds, dataset_folder: str, steps: int = 3000, training_folder
         _apply_slider_overrides(ds, cfg_['config']['process'][0], 'qwenimage21')
         _apply_dual_captions(ds, cfg_['config']['process'][0], dataset_folder)
         return cfg_
-    trigger = _safe_trigger(ds)
+    trigger = _training_trigger(ds)
     base_model = getattr(ds, 'train_base_model', None)
     recipe = zimage_training_recipe(getattr(ds, 'train_variant', None), base_model)
 
@@ -4976,7 +5094,7 @@ def build_job_config(ds, dataset_folder: str, steps: int = 3000, training_folder
     cfg_ = {
         'job': 'extension',
         'config': {
-            'name': f'lora_{trigger}',
+            'name': f'lora_{_safe_trigger(ds)}',
             'process': [{
                 'type': 'sd_trainer',
                 'training_folder': (training_folder if training_folder
@@ -4992,6 +5110,7 @@ def build_job_config(ds, dataset_folder: str, steps: int = 3000, training_folder
                     # Caption dropout sometimes exposes the trigger alone, reinforcing
                     # subject identity in the trigger rather than descriptive words.
                     'caption_dropout_rate': 0.05,
+                    **_dataset_recipe_fields(ds),
                     'cache_latents_to_disk': True,
                     **_dataset_cache_text_embeddings(ds),
                     'resolution': _train_res(ds),
@@ -5023,6 +5142,7 @@ def build_job_config(ds, dataset_folder: str, steps: int = 3000, training_folder
                     'guidance_scale': _sample_guidance(ds, 'zimage'),
                     'sample_steps': _sample_steps(ds, 'zimage'),
                     'prompts': _sample_prompts(ds, trigger),
+                    **_sample_recipe_fields(ds),
                 },
             }],
         },
@@ -5045,7 +5165,7 @@ def _build_job_config_krea(ds, dataset_folder: str, steps: int, training_folder=
     Require the installed krea2 extension through _aitoolkit_supports_krea.
     Use the canonical LoRA network and KREA_TRAIN_RESOLUTION with cached/unloaded
     text encoder; 768 is the measured lower-memory fallback."""
-    trigger = _safe_trigger(ds)
+    trigger = _training_trigger(ds)
     if _is_full_transformer(ds):
         _assert_full_transformer_recipe(ds)
         return {
@@ -5053,7 +5173,7 @@ def _build_job_config_krea(ds, dataset_folder: str, steps: int, training_folder=
             'config': {
                 # Krea 2 Community License requires derivative model names to
                 # begin with "Krea"; the job/save root inherits this value.
-                'name': f'Krea_full_{trigger}',
+                'name': f'Krea_full_{_safe_trigger(ds)}',
                 'process': [{
                     'type': 'sd_trainer',
                     'training_folder': (training_folder if training_folder
@@ -5136,7 +5256,7 @@ def _build_job_config_krea(ds, dataset_folder: str, steps: int, training_folder=
     return {
         'job': 'extension',
         'config': {
-            'name': f'lora_{trigger}',
+            'name': f'lora_{_safe_trigger(ds)}',
             'process': [{
                 'type': 'sd_trainer',
                 'training_folder': (training_folder if training_folder
@@ -5150,6 +5270,7 @@ def _build_job_config_krea(ds, dataset_folder: str, steps: int, training_folder=
                     'folder_path': dataset_folder,
                     'caption_ext': 'txt',
                     'caption_dropout_rate': 0.05,
+                    **_dataset_recipe_fields(ds),
                     'cache_latents_to_disk': True,
                     # Cache Qwen3-VL embeddings and unload the frozen text encoder during
                     # training, freeing roughly 4-8 GB so 1024 fits without offloading.
@@ -5187,6 +5308,7 @@ def _build_job_config_krea(ds, dataset_folder: str, steps: int, training_folder=
                     'guidance_scale': _sample_guidance(ds, 'krea'),
                     'sample_steps': _sample_steps(ds, 'krea'),
                     'prompts': _sample_prompts(ds, trigger),
+                    **_sample_recipe_fields(ds),
                 },
             }],
         },
@@ -5203,7 +5325,7 @@ def _build_job_config_flux(ds, dataset_folder: str, steps: int, training_folder=
     its initial roughly 24 GB download.
     Like Krea, this 12B transformer uses low_vram/qfloat8 defaults for 24 GB cards;
     selecting 768 resolution is the lower-memory fallback."""
-    trigger = _safe_trigger(ds)
+    trigger = _training_trigger(ds)
     _frank = _lora_rank(ds, 'flux')   # official default 16; editable through train_settings
     # Custom local flux weights replace name_or_path; ai-toolkit resolves the
     # text encoder and VAE from the official repository.
@@ -5217,7 +5339,7 @@ def _build_job_config_flux(ds, dataset_folder: str, steps: int, training_folder=
     return {
         'job': 'extension',
         'config': {
-            'name': f'lora_{trigger}',
+            'name': f'lora_{_safe_trigger(ds)}',
             'process': [{
                 'type': 'sd_trainer',
                 'training_folder': (training_folder if training_folder
@@ -5231,6 +5353,7 @@ def _build_job_config_flux(ds, dataset_folder: str, steps: int, training_folder=
                     'folder_path': dataset_folder,
                     'caption_ext': 'txt',
                     'caption_dropout_rate': 0.05,
+                    **_dataset_recipe_fields(ds),
                     'cache_latents_to_disk': True,
                     **_dataset_cache_text_embeddings(ds),
                     'resolution': _train_res(ds),
@@ -5262,6 +5385,7 @@ def _build_job_config_flux(ds, dataset_folder: str, steps: int, training_folder=
                     'guidance_scale': _sample_guidance(ds, 'flux'),
                     'sample_steps': _sample_steps(ds, 'flux'),
                     'prompts': _sample_prompts(ds, trigger),
+                    **_sample_recipe_fields(ds),
                 },
             }],
         },
@@ -5279,7 +5403,7 @@ def _build_job_config_flux2klein(ds, dataset_folder: str, steps: int, training_f
     flux, Klein architectures are extensions, so _aitoolkit_supports_flux2klein
     must prevent silent legacy-SD fallback. Retain the shared memory controls;
     768 resolution is the lower-VRAM setting."""
-    trigger = _safe_trigger(ds)
+    trigger = _training_trigger(ds)
     is_9b = _flux2klein_is_9b(ds)
     _fkrank = _lora_rank(ds, 'flux2klein')   # default 16; editable through train_settings
     # Custom local Klein weights replace name_or_path. The official Mistral text
@@ -5296,7 +5420,7 @@ def _build_job_config_flux2klein(ds, dataset_folder: str, steps: int, training_f
     return {
         'job': 'extension',
         'config': {
-            'name': f'lora_{trigger}',
+            'name': f'lora_{_safe_trigger(ds)}',
             'process': [{
                 'type': 'sd_trainer',
                 'training_folder': (training_folder if training_folder
@@ -5310,6 +5434,7 @@ def _build_job_config_flux2klein(ds, dataset_folder: str, steps: int, training_f
                     'folder_path': dataset_folder,
                     'caption_ext': 'txt',
                     'caption_dropout_rate': 0.05,
+                    **_dataset_recipe_fields(ds),
                     'cache_latents_to_disk': True,
                     **_dataset_cache_text_embeddings(ds),
                     'resolution': _train_res(ds),
@@ -5341,6 +5466,7 @@ def _build_job_config_flux2klein(ds, dataset_folder: str, steps: int, training_f
                     'guidance_scale': _sample_guidance(ds, 'flux2klein'),
                     'sample_steps': _sample_steps(ds, 'flux2klein'),
                     'prompts': _sample_prompts(ds, trigger),
+                    **_sample_recipe_fields(ds),
                 },
             }],
         },
@@ -5358,7 +5484,7 @@ def _build_job_config_anima(ds, dataset_folder: str, steps: int, training_folder
     Cache latents and frozen text embeddings, then unload the encoder for smaller
     cards. Guidance 4/25-step previews are extrapolated from undistilled Krea Raw
     because no Anima-specific value was published."""
-    trigger = _safe_trigger(ds)
+    trigger = _training_trigger(ds)
     _arank = _lora_rank(ds, 'anima')   # options.ts default 32; editable through train_settings
     # Custom local Anima weights replace name_or_path. The loader still resolves
     # Qwen3, the T5 conditioner and VAE from the official pipeline.
@@ -5371,7 +5497,7 @@ def _build_job_config_anima(ds, dataset_folder: str, steps: int, training_folder
     return {
         'job': 'extension',
         'config': {
-            'name': f'lora_{trigger}',
+            'name': f'lora_{_safe_trigger(ds)}',
             'process': [{
                 'type': 'sd_trainer',
                 'training_folder': (training_folder if training_folder
@@ -5385,6 +5511,7 @@ def _build_job_config_anima(ds, dataset_folder: str, steps: int, training_folder
                     'folder_path': dataset_folder,
                     'caption_ext': 'txt',
                     'caption_dropout_rate': 0.05,
+                    **_dataset_recipe_fields(ds),
                     'cache_latents_to_disk': True,
                     # Cache Qwen3 embeddings and unload its frozen text encoder during
                     # training to free VRAM. This is lossless with train_text_encoder=False.
@@ -5420,6 +5547,7 @@ def _build_job_config_anima(ds, dataset_folder: str, steps: int, training_folder
                     'guidance_scale': _sample_guidance(ds, 'anima'),
                     'sample_steps': _sample_steps(ds, 'anima'),
                     'prompts': _sample_prompts(ds, trigger),
+                    **_sample_recipe_fields(ds),
                 },
             }],
         },
@@ -5434,10 +5562,10 @@ def _build_job_config_qwenimage21(ds, dataset_folder, steps, training_folder=Non
     caption pairs; reference-image editing and RGBA datasets are not exposed here.
     """
     family = 'qwenimage21'
-    trigger = _safe_trigger(ds)
+    trigger = _training_trigger(ds)
     base = getattr(ds, 'train_base_model', None)
     return {'job': 'extension', 'config': {
-        'name': f'lora_{trigger}',
+        'name': f'lora_{_safe_trigger(ds)}',
         'process': [{
             'type': 'sd_trainer',
             'training_folder': training_folder if training_folder else str(_run_root(ds)),
@@ -5448,7 +5576,8 @@ def _build_job_config_qwenimage21(ds, dataset_folder, steps, training_folder=Non
                      'max_step_saves_to_keep': _max_step_saves(ds)},
             'datasets': [{
                 'folder_path': dataset_folder, 'caption_ext': 'txt',
-                'caption_dropout_rate': 0.05, 'cache_latents_to_disk': True,
+                'caption_dropout_rate': 0.05,
+                **_dataset_recipe_fields(ds), 'cache_latents_to_disk': True,
                 **_dataset_cache_text_embeddings(ds, default=False),
                 'resolution': _train_res(ds), **_mask_fields(dataset_folder),
             }],
@@ -5476,6 +5605,7 @@ def _build_job_config_qwenimage21(ds, dataset_folder, steps, training_folder=Non
                 'guidance_scale': _sample_guidance(ds, family),
                 'sample_steps': _sample_steps(ds, family),
                 'prompts': _sample_prompts(ds, trigger),
+                **_sample_recipe_fields(ds),
             },
         }],
     }}
@@ -5485,7 +5615,7 @@ def _build_job_config_sdxl(ds, dataset_folder: str, steps: int, training_folder=
     """Build arch='sdxl' from verified ai-toolkit options.ts defaults:
     no quantization, DDPM scheduler/sampler, no timestep weighting, guidance 6.
     Use a local single-file ComfyUI checkpoint without conversion."""
-    trigger = _safe_trigger(ds)
+    trigger = _training_trigger(ds)
     base_model = getattr(ds, 'train_base_model', None)
     if not base_model:
         raise ValueError('SDXL: a base checkpoint is required')
@@ -5508,7 +5638,7 @@ def _build_job_config_sdxl(ds, dataset_folder: str, steps: int, training_folder=
     return {
         'job': 'extension',
         'config': {
-            'name': f'lora_{trigger}',
+            'name': f'lora_{_safe_trigger(ds)}',
             'process': [{
                 'type': 'sd_trainer',
                 'training_folder': (training_folder if training_folder
@@ -5522,6 +5652,7 @@ def _build_job_config_sdxl(ds, dataset_folder: str, steps: int, training_folder=
                     'folder_path': dataset_folder,
                     'caption_ext': 'txt',
                     'caption_dropout_rate': 0.05,
+                    **_dataset_recipe_fields(ds),
                     'cache_latents_to_disk': True,
                     **_dataset_cache_text_embeddings(ds),
                     'resolution': _train_res(ds),
@@ -5554,6 +5685,7 @@ def _build_job_config_sdxl(ds, dataset_folder: str, steps: int, training_folder=
                     'guidance_scale': _sample_guidance(ds, 'sdxl'),
                     'sample_steps': _sample_steps(ds, 'sdxl'),
                     'prompts': _sample_prompts(ds, trigger),
+                    **_sample_recipe_fields(ds),
                 },
             }],
         },
@@ -5827,7 +5959,7 @@ def legacy_lokr_resume_error(parent_geometry, fallback_settings=None):
 
 def describe_geometry_conflict(parent_geometry, rank, alpha, *, network_type=None,
                                lokr_factor=None, lokr_full_rank=None,
-                               conv=None, conv_alpha=None):
+                               conv=None, conv_alpha=None, ignore_if_contains=None):
     """Explain a known checkpoint/topology mismatch, or return ``None``.
 
     Adapter type, rank/alpha, and LoKr's decomposition parameters all determine
@@ -5836,6 +5968,10 @@ def describe_geometry_conflict(parent_geometry, rank, alpha, *, network_type=Non
     so only facts explicitly recorded for the checkpoint are enforced.
     """
     geo = parent_geometry or {}
+    if ('ignore_if_contains' in geo
+            and set(geo['ignore_if_contains']) != set(ignore_if_contains or [])):
+        return ('Layer exclusions differ from this checkpoint. Restore the original '
+                'exclusions in ATK Recipe, or start a fresh run.')
     parent_type = geo.get('network_type')
     if (parent_type in _NETWORK_TYPE_CHOICES
             and network_type in _NETWORK_TYPE_CHOICES
@@ -8986,7 +9122,8 @@ def continue_training(user_id, dataset_id, extra_steps: int = 1000,
         lokr_factor=_live_geometry.get('lokr_factor'),
         lokr_full_rank=_live_geometry.get('lokr_full_rank'),
         conv=_live_geometry.get('conv'),
-        conv_alpha=_live_geometry.get('conv_alpha'))
+        conv_alpha=_live_geometry.get('conv_alpha'),
+        ignore_if_contains=_live_geometry.get('ignore_if_contains'))
     if _conflict:
         raise ValueError(_conflict)
     try:

@@ -1169,6 +1169,52 @@ to compare in Test Studio, not as proof that a specific step will be best.
 
 - **Dual captions (long + short)** — off by default. When on, the run uses ai-toolkit's native `short_and_long_captions`: every image trains with **both** its full caption and a short one (text-side augmentation, so the LoRA leans less on any single wording). The short variant is **derived from the long caption** the next time you (re-)caption — text-only, via the local vision model, honouring the same kind rules (no trigger; the identity/concept/aesthetic stays omitted) — and you can edit it per image in the **⛶** caption editor. **Local training only for now:** the cloud pod's dataset upload doesn't carry the JSON caption file the short is read from, so cloud runs train on the long caption alone. **Not available on Krea 2 or Anima:** those families pre-cache their text embeddings and unload the text encoder, so no second caption can be encoded — the toggle is reported as ignored on the training panel and in the pre-launch check, and the run trains on the long caption alone (issue #22, reported by 1Tomber).
 
+## ATK recipe
+
+Open **Training > Advanced > ATK Recipe > Edit Recipe** to match an existing
+ai-toolkit recipe. Save Recipe validates all edited fields together. A failed
+save keeps the dialog and text. Local drafts stay in this browser tab and require
+an explicit Restore Draft action; they are not accepted server settings.
+
+| Control | Stored setting | Behavior |
+| --- | --- | --- |
+| Learning Rate | `learning_rate` | Positive starting LR. Blank uses the existing default; Prodigy keeps its fixed convention. |
+| Minimum LR / Maximum LR | `min_lr`, `max_lr` | Positive Automagic3 limits. Minimum must not exceed maximum. Blank uses ATK defaults, not the starting LR. These limits stay stored but do not apply to other optimizers. |
+| Weight Decay | `weight_decay` | Fraction from 0 to 1. Zero explicitly disables decay. |
+| Conv Rank / Conv Alpha | `conv`, `conv_alpha` | Optional convolutional LoRA geometry. Blank preserves existing defaults. |
+| Layer Exclusions | `ignore_if_contains` | One literal layer-name substring per line. Matching layers receive no LoRA. Saved checkpoints retain this topology choice. |
+| Caption Dropout | `caption_dropout_rate` | Fraction from 0 to 1. Zero keeps every caption. Blank preserves the family/kind recipe. |
+| RAM Latent Cache | `cache_latents` | Retain cached latents in system RAM as well as the existing disk cache. Uses additional RAM. |
+| Text Embedding Cache | `cache_text_embeddings` | Cache frozen text embeddings. Anima enables this by default. |
+| Unload Text Encoder | `unload_text_encoder` | Explicit ATK flag. LDS requires cached captions when enabled. ATK also unloads cached encoders when this flag is off. |
+| Bypass Guidance Embedding | `bypass_guidance_embedding` | Forward the source recipe's guidance-embedding choice. Its effect depends on the model. |
+| Loss Sync Interval | `loss_sync_every` | Positive interval for ATK loss synchronization. |
+| Skip First Preview | `skip_first_sample` | Skip the initial preview; keep the normal preview interval. |
+| Preview Width / Height | `sample_width`, `sample_height` | Dimensions from 64 to 4096, in multiples of eight. |
+| Preview Seed / Walk Preview Seed | `sample_seed`, `sample_walk_seed` | Fixed seed and ATK's seed-walking choice. |
+| Override Preview Negative | `sample_negative_prompt` | When enabled, an empty field means no negative prompt. Disabled uses the family default. |
+
+These controls apply to image LoRA recipes. The fixed full-transformer recipe
+keeps its existing controls. Presets and launch snapshots retain the new fields.
+Checkpoint frequency also supports 100 steps. Continue refuses a changed layer
+exclusion list when the parent checkpoint records that list. Historical records
+without exclusions remain unknown; this does not certify an external checkpoint.
+
+Character and Concept training preserve trigger text, including `@`, in captions,
+job conditioning and previews. File and folder identifiers remain sanitized.
+Ordinary character tokens need no `@` prefix. Style training stays always-on and
+does not acquire a trigger.
+
+The repository includes an importable example at
+`docs/examples/training-presets/anima-character-automagic3.json`. It sets rank/alpha
+32, Conv rank/alpha 16, batch 4, accumulation 1, 1000 steps, sigmoid timesteps,
+checkpointing on, LR `2e-5`, limits `1e-6` to `2e-5`, decay `1e-4`, zero caption
+dropout, both latent caches and text caching, and unmasked training. It contains
+no dataset path, trigger, model path or private prompts. Select the same base
+weights and image/caption set yourself. Enter the original preview prompts in
+the existing preview editor. Per-prompt size overrides are not part of this
+preset. Matching settings alone does not guarantee identical trained weights.
+
 ## Storage
 
 One local disk page answers where the app writes files and how much space they use.
