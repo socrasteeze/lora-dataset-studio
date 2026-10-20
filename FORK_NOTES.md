@@ -245,6 +245,8 @@ Score uses small CUDA batches chosen from free memory after model loading,
 halves them on OOM and isolates other batch failures per image. CPU inference
 stays single-image. Stop finishes and saves the current batch. Keep models,
 precision, thresholds, per-image errors and cache provenance unchanged.
+At batch size one, a failed optional head, including OOM, keeps the CLIP
+embedding and other completed scores. A CLIP failure still fails that image.
 
 Score, face and semantic caches rate-limit full periodic rewrites using the
 shared interval; Stop and normal completion always flush. A forced process kill
