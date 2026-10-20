@@ -5,6 +5,7 @@ base check, used in reverse — and the fact that it never touches the source.
 """
 
 from public_dense_test_io import no_dense_provider_io  # noqa: F401
+from functools import lru_cache
 import os
 from pathlib import Path
 import sys
@@ -57,14 +58,20 @@ def selected_cpu_runtime(app, monkeypatch, isolated_cpu_python):
         yield isolated_cpu_python
 
 
-def _model(tmp_path, name='BigModel.safetensors'):
-    torch.manual_seed(3)
-    path = tmp_path / name
-    safetensors_torch.save_file({
-        'blocks.0.attn.wq.weight': torch.randn(1024, 1024).bfloat16(),
-        'blocks.0.mlp.up.weight': torch.randn(1024, 2048).bfloat16(),
+@lru_cache(maxsize=1)
+def _model_bytes():
+    """Reuse only immutable input bytes, never a test's mutable model file."""
+    generator = torch.Generator().manual_seed(3)
+    return safetensors_torch.save({
+        'blocks.0.attn.wq.weight': torch.randn(1024, 1024, generator=generator).bfloat16(),
+        'blocks.0.mlp.up.weight': torch.randn(1024, 2048, generator=generator).bfloat16(),
         'blocks.0.prenorm.scale': torch.ones(1024),
-    }, str(path))
+    })
+
+
+def _model(tmp_path, name='BigModel.safetensors'):
+    path = tmp_path / name
+    path.write_bytes(_model_bytes())
     return path
 
 

@@ -104,11 +104,13 @@ class _Handler(BaseHTTPRequestHandler):
 @pytest.fixture
 def health_server():
     server = HTTPServer(('127.0.0.1', 0), _Handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread = threading.Thread(target=server.serve_forever,
+                              kwargs={'poll_interval': 0.01}, daemon=True)
     thread.start()
     yield server
     server.shutdown()
     server.server_close()
+    thread.join()
 
 
 def test_health_answers_on_a_real_ok_server(health_server):

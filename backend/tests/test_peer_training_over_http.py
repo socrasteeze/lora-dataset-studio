@@ -376,6 +376,7 @@ class FakePeer:
         self._server.peer = self
         self.port = self._server.server_address[1]
         self._thread = threading.Thread(target=self._server.serve_forever,
+                                        kwargs={'poll_interval': 0.01},
                                         name='fake-aitoolkit', daemon=True)
         self._thread.start()
         return self
