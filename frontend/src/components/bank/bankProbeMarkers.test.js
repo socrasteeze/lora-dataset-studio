@@ -106,20 +106,31 @@ test('an anchor that exists but cannot be clicked STOPS the run — it never ski
   assert.match(probe, /await browser\.close\(\);\s*\n\s*\}[^]{0,240}if \(unreachable\) cannotRun\(/);
 });
 
-test('the header gives the fold back on a phone', () => {
+test('the header keeps portrait actions visible and short windows compact', () => {
   // the source-path row is a desktop gesture; the counters fold into ⚙ Passes
-  // below sm; the action row scrolls on one line and its buttons never shrink
-  // into wrapped labels; a phone held sideways gets a one-row header
+  // below sm; portrait actions use three columns and can grow with labels;
+  // desktop and a phone held sideways keep the scrolling row.
   assert.match(workspace, /className="hidden min-w-0 grow items-center gap-2 sm:flex \[@media\(max-height:500px\)\]:!hidden"/);
   assert.match(workspace, /className="hidden min-w-0 border-t border-border pt-2 sm:block \[@media\(max-height:500px\)\]:!hidden"/);
   assert.match(workspace, /data-probe-reading>\s*\{\(\s*<div className="mb-2 sm:hidden">\s*<BankStatsStrip/);
   const strip = read('./BankStatsStrip.jsx');
   assert.match(strip, /flex h-10 min-w-0 shrink-0.*overflow-x-auto overflow-y-hidden whitespace-nowrap/);
   assert.equal((workspace.match(/<BankStatsStrip/g) || []).length, 2);
-  assert.match(workspace, /flex h-14 min-w-0 flex-nowrap items-center gap-2 overflow-x-auto overflow-y-hidden border-t border-border pt-2/);
+  assert.match(workspace, /grid min-w-0 grid-cols-3 items-stretch gap-2 border-t border-border pt-2/);
   const actions = workspace.slice(workspace.indexOf('{/* The decisive actions.'), workspace.indexOf('</header>'));
+  assert.match(actions, /\[&>button\]:h-auto/);
+  assert.match(actions, /\[&>button\]:whitespace-normal/);
+  assert.match(actions, /lg:overflow-x-auto lg:overflow-y-hidden/);
+  assert.match(actions, /\[@media\(max-height:500px\)\]:overflow-x-auto/);
+  assert.match(actions, /col-span-3[^\"]*sm:col-span-1 lg:col-auto/);
   assert.equal((actions.match(/<Button type="button" size="md" noShrink/g) || []).length, 6);
   assert.match(workspace, /\[@media\(max-height:500px\)\]:flex \[@media\(max-height:500px\)\]:flex-nowrap/);
+});
+
+test('large result counts have room above the portrait selection actions', () => {
+  assert.match(workspace, /grid w-full grid-cols-3 items-stretch gap-1\.5 lg:grid-cols-5/);
+  assert.match(workspace, /TOOLBAR_CELL\} col-span-2 flex-wrap gap-x-1[^\n]*lg:col-span-1/);
+  assert.match(workspace, /className="whitespace-nowrap text-content-subtle">of /);
 });
 
 test('the probe knows what a layer is, and charges it to no budget', () => {

@@ -104,10 +104,9 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
   return (
     <div className="space-y-2">
     <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm">
-      {/* flex-wrap: at 400 px the label, the bar and Stop cannot share one row —
-          they used to squash the label to a sliver. */}
-      <div className="flex min-h-28 flex-wrap items-center gap-x-3 gap-y-1.5 sm:min-h-24 lg:min-h-10">
-        <span className={`min-w-0 max-w-full break-words text-content ${stale ? 'opacity-60' : ''}`}>
+      {/* Portrait keeps the label above one aligned progress/Stop row. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 lg:flex lg:min-h-10">
+        <span className={`col-span-2 min-w-0 max-w-full break-words text-content lg:flex-1 ${stale ? 'opacity-60' : ''}`}>
           <span aria-hidden>⏳</span>{' '}
           {pipe
             ? `Launch all — step ${(pipe.index ?? 0) + 1}/${pipe.total_steps} · ${plainStepLabel(pipe.current) || pipe.current}`
@@ -131,7 +130,7 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
           {activity.detail ? `${(done || total || eta) ? ' · ' : ' — '}${activity.detail}` : ''}
         </span>
         {pct != null && (
-          <div className="h-1.5 w-40 overflow-hidden rounded bg-surface-raised" role="progressbar"
+          <div className="h-1.5 min-w-0 w-full overflow-hidden rounded bg-surface-raised lg:w-40 lg:shrink-0" role="progressbar"
             aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
             <div className="h-full bg-amber-400" style={{ width: `${pct}%` }} />
           </div>
@@ -139,7 +138,7 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
         {/* No counter (loading a model, grouping styles): an indeterminate bar,
             so a phase that is working never looks like a pass that stopped. */}
         {pct == null && !stale && (
-          <div className="h-1.5 w-40 overflow-hidden rounded bg-surface-raised" role="progressbar"
+          <div className="h-1.5 min-w-0 w-full overflow-hidden rounded bg-surface-raised lg:w-40 lg:shrink-0" role="progressbar"
             aria-valuetext={activity.detail || undefined} title={activity.detail || undefined}>
             <div className="h-full w-full animate-pulse bg-amber-400/70 motion-reduce:animate-none" />
           </div>
@@ -150,7 +149,7 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
             presses; the line below carries it for everyone else. */}
         <button type="button" disabled={asked} title={note || undefined}
           onClick={() => { setStopAskedFor(jobKey(activity)); onCancel?.() }}
-          className="ml-auto min-h-10 min-w-20 rounded-md border border-border px-2 py-0.5 text-xs text-content hover:bg-surface-raised disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent lg:min-h-0">
+          className="col-start-2 min-h-10 min-w-20 rounded-md border border-border px-2 py-0.5 text-xs text-content hover:bg-surface-raised disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent lg:min-h-0">
           {stopLabel(asked)}
         </button>
       </div>

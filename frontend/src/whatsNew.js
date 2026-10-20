@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-20-bank-mobile-spacing', date: '2026-10-20', title: 'Align Bank Controls',
+    blurb: 'Portrait Bank actions fit into columns. Large counts stay together, and the progress bar aligns with Stop.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-19-zzzzzzzz-native-cpu-models', date: '2026-10-19', title: 'Restore CPU Capacity',
     blurb: 'LaMa inpainting and watermark localization use their native CPU thread defaults again. Score keeps its CUDA batches. Existing CPU thread limits still apply.',
     to: '/guide/using-the-app#make-score-use-a-gpu-python-you-already-have',
