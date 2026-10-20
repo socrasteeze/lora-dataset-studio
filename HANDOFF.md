@@ -1,10 +1,10 @@
 # HANDOFF
 
-**Updated:** 2026-10-19 | **Branch:** feat/one-click-auto-crop | **Base:** bbb58a4d3
+**Updated:** 2026-10-19 | **Branch:** main | **Base:** bbb58a4d3
 
 ## State
 Confidence-gated Auto-Crop is implemented in the image editor and as an opt-in Bank/Dataset Framing option. The shared server gate defaults to 90%; missing/invalid/lower confidence skips pixel writes. Confidence is an uncalibrated model estimate.
-Tests, rendered checks and inference remain off. Lint/source inspection and production build passed; delivery and controlled backend activation are pending. The running checkout is unchanged.
+Tests, rendered checks and inference remain off. Source 46926f85b and bundle d1ca52fd0 are active in a new healthy backend boot. All 46 metadata tables and four saved configuration files match the pre-activation checkpoint; full qualification remains incomplete.
 
 ## Done this session
 - Added shared confidence validation, full-subject crop geometry and source-byte checks in auto_crop.py. Framing requests crop evidence in the same model call, including on compute peers.
@@ -12,14 +12,13 @@ Tests, rendered checks and inference remain off. Lint/source inspection and prod
 - Dataset Auto-Crop includes already-classified image files, uses an exclusive activity reservation and atomic crop publication, and provides Stop Framing. Changed previews receive fresh versions.
 - The image editor's Auto-Crop saves after a qualifying detection. Manual crop remains available. Failed saves retain the detected box; aspect ratios cannot cut the detected subject.
 - Updated Guide, help anchors, README and What's New. Wrote confidence/bounds/source-change, stop-isolation and Bank/Dataset regression cases without running them.
-- Prior fixture optimization remains delivered at 80e7536a0/bbb58a4d3 with tests skipped; its runtime improvement remains unmeasured.
+- Activated source 46926f85b and bundle d1ca52fd0 after an idle-work check and local metadata/settings backup. Served entry and JavaScript bytes match the built bundle; no jobs or inference were started.
 
 ## Open
-1. Finish the source review/scrub, commit source and the rebuilt frontend/dist separately, and deliver with [skip ci]. Backend activation needs an idle job state, metadata backup and controlled restart. Do not run tests or inference.
-2. Auto-Crop confidence calibration, crop accuracy, rendered behavior, live providers and Auto-Center remain unverified. Run only an explicitly requested scope. Fixture speedup qualification against aeb09dae9 also remains unrun.
-3. The operator chose a local identity accuracy set. Await its location/labels and explicit evaluation authorization; keep images local. Report wrong names, misses, abstentions and provenance. Similarity thresholds remain unmeasured heuristics.
-4. Physical phone/PWA acceptance, installed-source trainer compatibility and real GPU/training comparisons remain operator gates. Opt-in live encoder/Ollama checks were not run.
-5. If the Bank tab error recurs, collect the first browser ErrorBoundary line. The original live tab error and earlier desktop tag timeout have unconfirmed causes.
+1. Auto-Crop confidence calibration, crop accuracy, rendered behavior and live providers remain unverified. Run only an explicitly requested scope. Fixture speedup qualification against aeb09dae9 also remains unrun.
+2. The operator chose a local identity accuracy set. Await its location/labels and explicit evaluation authorization; keep images local. Report wrong names, misses, abstentions and provenance. Similarity thresholds remain unmeasured heuristics.
+3. Physical phone/PWA acceptance, installed-source trainer compatibility and real GPU/training comparisons remain operator gates. Opt-in live encoder/Ollama checks were not run.
+4. If the Bank tab error recurs, collect the first browser ErrorBoundary line. The original live tab error and earlier desktop tag timeout have unconfirmed causes.
 
 ## Decisions
 - Image Sources uses manual Scan, Load Previews, Download and Import Images actions. Opening a panel does not start network work.
@@ -32,7 +31,7 @@ Tests, rendered checks and inference remain off. Lint/source inspection and prod
 - Keep worker counts, loadfile scheduling, request budgets and test parameter sets. Optimize setup and teardown instead of reducing coverage.
 
 ## Traps
-- Build away from the running checkout. Backend activation needs a metadata backup and a controlled restart; do not import create_app against production as a check.
+- Build away from the running checkout. Backend activation needs a metadata backup and a controlled restart with the normal CSRF session; do not import create_app against production as a check.
 - Tests, responsive probes, fixtures and model inference remain off. Static lint/build/privacy inspection is permitted.
 - Keep frontend source and generated dist in separate commits. Preserve unrelated worktrees and the original scraper branch.
 - Keep real data names, images, settings and credentials private. Checkpoint metadata under ignored Git storage only.
@@ -41,6 +40,7 @@ Tests, rendered checks and inference remain off. Lint/source inspection and prod
 
 ## Verify
 Auto-Crop source inspection: Ruff passed; ESLint passed with zero errors and 32 existing warnings. AST parsing covered nine Python files without imports or test collection. Final production build passed in 7.04s. Privacy inspection covered 3075 text files with zero findings; new attribution scan had zero findings. The pure-text outbound inventory has zero differences. No tests, fixtures, model inference or rendered probes ran. Bank and Dataset confidence policy uses the same server helper; options are validated before queued admission or the Dataset GPU window. Bank framing is rebound to the saved crop's fingerprint. No workflow or dependency changes were made. Accuracy and full qualification remain unverified.
+Operational activation readback confirmed an idle app, a new healthy boot on the same profile, matching served entry/bundle, identical fingerprints for all 46 metadata tables and unchanged hashes for all four saved configuration files. Checkpoint and receipts remain under ignored Git storage, lds-auto-crop-activation-20261019-8d5cbaf4. No real image crop or model call was used for verification.
 Historical fixture optimization: source comparison against aeb09dae9 retained all 75 existing test function bodies/decorators in its five changed files, with one new isolation regression. Both linters/privacy inspection passed. Tests and benchmarks did not run.
 Prior application baseline aeb09dae9 records the merged scraper/Auto-Center activation and its metadata checkpoint. Those operational results are historical and do not qualify this wave.
 Prior identity/upstream qualification: 2673a79faf05a5d01d1c85585585620be51a2bbf, Fork Gates 39183822421 and post-push CI 39185814233. Queue run 39189043465 was cancelled before full Gates finished; no further tests were authorized.
