@@ -96,7 +96,7 @@ def _run_lama_payload(payload, timeout: int = 300) -> tuple[bool, dict | None]:
                               input=payload_json,
                               capture_output=True, text=True, encoding='utf-8',
                               errors='replace', timeout=processing_timeout(timeout),
-                              env=infer_env.worker_env(_lama_python()),
+                              env=infer_env.worker_env(_lama_python(), limit_native_threads=False),
                               creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     except (subprocess.TimeoutExpired, OSError) as e:
         logger.warning('watermark_lama: subprocess failed: %s', e)
@@ -176,7 +176,7 @@ def inpaint_batch(jobs, *, device: str, timeout: int = 900,
                                   input=payload_json,
                                   capture_output=True, text=True, encoding='utf-8',
                                   errors='replace', timeout=processing_timeout(timeout),
-                                  env=infer_env.worker_env(lama_python()),
+                                  env=infer_env.worker_env(lama_python(), limit_native_threads=False),
                                   creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         else:
             from .infer_stream import run_infer_script
@@ -187,7 +187,8 @@ def inpaint_batch(jobs, *, device: str, timeout: int = 900,
                     on_progress(int(match.group(1)), int(match.group(2)))
 
             stdout, stderr_lines, rc, timed_out = run_infer_script(
-                lama_python(), _SCRIPT, payload_json, timeout, on_line=_on_line)
+                lama_python(), _SCRIPT, payload_json, timeout, on_line=_on_line,
+                limit_native_threads=False)
             if timed_out:
                 raise subprocess.TimeoutExpired(_SCRIPT, processing_timeout(timeout))
             proc = subprocess.CompletedProcess(

@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-19-zzzzzzzz-native-cpu-models', date: '2026-10-19', title: 'Restore CPU Capacity',
+    blurb: 'LaMa inpainting and watermark localization use their native CPU thread defaults again. Score keeps its CUDA batches. Existing CPU thread limits still apply.',
+    to: '/guide/using-the-app#make-score-use-a-gpu-python-you-already-have',
+  },
+  {
     id: '2026-10-19-zzzzzzz-quiet-probes', date: '2026-10-19', title: 'Keep Checks Quiet',
     blurb: 'Background capability checks now hide their helper consoles on Windows, preventing a console window from opening for each import probe.',
     to: '/settings?section=local-tools',
@@ -103,7 +108,7 @@ export const WHATS_NEW = [
     id: '2026-10-19-zzzz-score-hardware-tuning',
     date: '2026-10-19',
     title: 'Reduce Pass Overhead',
-    blurb: 'Pass workers limit CPU threading; Score batches CUDA inference, face passes skip unused heads, and embedding caches limit full rewrites. Scoring models and thresholds stay intact; speedups remain unmeasured.',
+    blurb: 'Most pass workers limit CPU threading; Score batches CUDA inference, face passes skip unused heads, and embedding caches limit full rewrites. Scoring models and thresholds stay intact.',
     to: '/guide/using-the-app#make-score-use-a-gpu-python-you-already-have',
   },
   {

@@ -87,7 +87,7 @@ def parse_result_json(stdout) -> dict | None:
 def run_infer_script(python, script, payload, timeout, on_line=None,
                      env=None, cwd=None,
                      should_stop=None, on_stop=None, stop_grace=_STOP_GRACE_S,
-                     poll_s=_STOP_POLL_S):
+                     poll_s=_STOP_POLL_S, *, limit_native_threads=True):
     """Run ``python script``, feed it ``payload`` on stdin, stream its stderr
     lines to ``on_line`` as they arrive.
 
@@ -97,6 +97,9 @@ def run_infer_script(python, script, payload, timeout, on_line=None,
     had the model — the same failure that made a peer re-fetch 352 MB when its
     models_root was dropped. None keeps the inherited environment, which is what
     every existing caller wants.
+
+    ``limit_native_threads=False`` lets LaMa retain native library defaults and
+    inherited user limits. It does not disable worker isolation or offline mode.
 
     Returns ``(stdout, stderr_lines, returncode, timed_out)``. ``timed_out`` says
     the BUDGET elapsed, not that nothing came back: the watchdog asks before it
@@ -127,7 +130,8 @@ def run_infer_script(python, script, payload, timeout, on_line=None,
         # of the caller's environment rather than replacing it — `base=env` falls
         # back to os.environ when the caller passed none, so JoyCaption's HF_HOME
         # (and the peer worker's models_root) still reach the child.
-        env=infer_env.worker_env(python, base=env), cwd=cwd,
+        env=infer_env.worker_env(python, base=env,
+                                limit_native_threads=limit_native_threads), cwd=cwd,
         creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     lines: deque = deque(maxlen=_TAIL_LINES)
 
