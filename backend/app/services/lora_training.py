@@ -2255,7 +2255,8 @@ def _inject_trigger(prompt: str, trigger: str) -> str:
         return p
     if not p:
         return trigger
-    return p if trigger.lower() in p.lower() else f'{trigger}, {p}'
+    present = re.search(rf'(?<!\w){re.escape(trigger)}(?!\w)', p, flags=re.IGNORECASE)
+    return p if present else f'{trigger}, {p}'
 
 
 def _strip_style_trigger(prompt: str, trigger: str) -> str:

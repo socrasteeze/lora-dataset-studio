@@ -95,7 +95,21 @@ language* as equally supported, which its LLM text encoder is what makes possibl
 this is the family where the "match the style" rule below does **not** apply: caption
 in prose, caption in booru tags, or keep an existing dataset as it is — the app will
 not flag either as a mismatch, and you never have to force the launch. Prose is only
-the preselected default. It trains on the open `Anima-Base-v1.0-Diffusers` (no gated
+the preselected default. JoyCaption prose does not need conversion to tags. Prose
+describes concepts directly; LDS does not convert sentences into a hidden tag list.
+For Character datasets, batch captioning and Caption Lab ask for visible outfit,
+pose, expression, framing and background details without invented names, quality
+ratings or filler. Existing Appearance and body-fidelity omission controls still
+apply. Anima tag mode requests lowercase tags with spaces instead of underscores.
+These instructions guide the captioner; review its output for errors.
+
+Stored captions remain content-only. LDS adds the saved character trigger when
+preparing training files and exports. Write TXT also permits an explicit prefix;
+ZIP export avoids repeated leading copies of the saved trigger. Changing the
+trigger does not require regenerating content-only captions. Bank captions remain
+descriptive and receive the dataset's trigger after promotion at training/export.
+
+It trains on the open `Anima-Base-v1.0-Diffusers` (no gated
 download) and is **local-only** for training. Its LoRAs can generate images and
 compare checkpoints in Test Studio. Prepare Anima's base, Qwen3 0.6B encoder and
 VAE under **Settings → Image engines → Trained image models**.
