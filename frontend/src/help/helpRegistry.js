@@ -2403,6 +2403,12 @@ const TOPICS = [
     app: { route: '/datasets?section=training' },
     tip: { trigger: 'training-speed-advanced',
       text: 'New: Advanced options → Speed. Batch size, the quantisation backend, gradient checkpointing and compile were fixed at the values that fit 24 GB — on a bigger card you can trade that memory back for time.' } },
+  { id: 'training.atk_recipe', kind: 'setting', title: 'ATK Recipe',
+    keywords: ['automagic3', 'minimum lr', 'maximum lr', 'learning rate', 'weight decay',
+      'layer exclusions', 'caption dropout', 'ram cache', 'text encoder', 'unload',
+      'conv rank', 'preview seed', 'negative prompt', 'trigger', 'anima'],
+    guide: { chapter: 'settings-reference', anchor: 'atk-recipe' },
+    app: { route: '/datasets?section=training' } },
   // server
   setting('server.port', 'server', 'server-port', 'Server port',
     ['server', 'port', 'bind', 'network', '5050']),

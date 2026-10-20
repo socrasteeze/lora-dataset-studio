@@ -315,6 +315,9 @@ def network_geometry(rec):
         return out
     if not isinstance(cfg, dict):
         return out
+    exclusions = cfg.get('ignore_if_contains')
+    if isinstance(exclusions, list) and all(isinstance(item, str) for item in exclusions):
+        out['ignore_if_contains'] = exclusions
     for key in ('rank', 'alpha'):
         val = cfg.get(key)
         if isinstance(val, bool):

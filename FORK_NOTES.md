@@ -77,6 +77,11 @@ Rental routes refuse before a provider call. Local run history, checkpoints
 and the gallery still read local files in `cloud_training.py`. That module
 does not call Hugging Face or a rental host.
 
+ATK Recipe preserves per-dataset optimizer limits, literal layer exclusions,
+caption dropout, RAM latent caching and preview controls through presets and
+launch snapshots. Keep conditioning triggers separate from safe file identifiers.
+The fixed full-transformer recipe and always-on Style contract stay intact.
+
 ## Divergence 5: tests
 
 These tests are the fork's. Upstream parity is not a goal.

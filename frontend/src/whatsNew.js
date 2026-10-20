@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-20-z-atk-recipe', date: '2026-10-20', title: 'Match ATK Recipes',
+    blurb: 'Set Automagic3 LR limits, layer exclusions, caption dropout and RAM caching. Preserve trigger punctuation and save these choices in training presets.',
+    to: '/datasets?section=training',
+  },
+  {
     id: '2026-10-20-bank-mobile-spacing', date: '2026-10-20', title: 'Align Bank Controls',
     blurb: 'Portrait Bank actions fit into columns. Large counts stay together, and the progress bar aligns with Stop.',
     to: '/bank',
