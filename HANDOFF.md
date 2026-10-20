@@ -1,9 +1,9 @@
 # HANDOFF
 
-**Updated:** 2026-10-19 | **Branch:** perf/test-suite-overhead | **Base:** aeb09dae9
+**Updated:** 2026-10-19 | **Branch:** main | **Base:** aeb09dae9
 
 ## State
-Suite fixture overhead changes are implemented on perf/test-suite-overhead. Source comparison preserves all 75 existing test function bodies and decorators in the five affected Python files; one fixture-isolation regression was added.
+Suite fixture overhead changes are applied on main from 80e7536a0. Source comparison preserves all 75 existing test function bodies and decorators in the five affected Python files; one fixture-isolation regression was added.
 Tests and CI remain off. Static checks passed; runtime improvement and full qualification are unmeasured. Application runtime, frontend assets and workflow definitions are unchanged.
 
 ## Done this session
@@ -11,6 +11,7 @@ Tests and CI remain off. Static checks passed; runtime improvement and full qual
 - FP8 tests cache only immutable serialized input bytes. Tensor shapes/dtypes, separate writable model files, real interpreter probes and CPU conversion workers remain.
 - Real HTTP fixture servers use a short shutdown poll; segmented transfers connect to their bound IPv4 address directly. Request timeouts, retry limits, barriers and existing assertions remain unchanged.
 - Updated CONTRIBUTING.md and FORK_NOTES.md with the fixture isolation rules. Ruff, ESLint, syntax/source comparison, whitespace and privacy inspection passed; no tests ran.
+- Fast-forwarded the primary checkout with tests/docs only. No application restart was needed; delivery commits use [skip ci].
 
 ## Open
 1. Only if explicitly requested, qualify the exact new source and compare full-suite timing/coverage with aeb09dae9 on equivalent cloud runners. No speedup percentage is claimed for this wave.
