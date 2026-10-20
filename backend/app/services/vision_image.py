@@ -58,13 +58,13 @@ def ensure_vision_safe_jpeg(image_bytes: bytes, *, provider: str = 'vision') -> 
             im = bg
         elif im.mode != 'RGB':
             im = im.convert('RGB')
-        # A fresh image has no inherited `info`; Pillow otherwise may carry
-        # source metadata in surprising format-specific save paths.
+        if max(im.size) > VISION_MAX_SIDE:
+            im.thumbnail((VISION_MAX_SIDE, VISION_MAX_SIDE), Image.LANCZOS)
+        # Copy only the bounded image, rather than allocating another full-size
+        # raster before resizing it. The fresh image still strips all metadata.
         clean = Image.new('RGB', im.size)
         clean.paste(im)
         im = clean
-        if max(im.size) > VISION_MAX_SIDE:
-            im.thumbnail((VISION_MAX_SIDE, VISION_MAX_SIDE), Image.LANCZOS)
         out = io.BytesIO()
         im.save(out, 'JPEG', quality=90)
         return out.getvalue()

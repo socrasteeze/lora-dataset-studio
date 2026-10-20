@@ -33,6 +33,22 @@ def _no_real_subprocess(monkeypatch):
 
 # --- brief tests, verbatim ---------------------------------------------
 
+
+def test_import_probe_hides_its_windows_console(app, monkeypatch, _no_real_subprocess):
+    from types import SimpleNamespace
+    from app import capabilities
+    calls = []
+
+    def run(command, **options):
+        calls.append((command, options))
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(capabilities.subprocess, 'run', run)
+    monkeypatch.setattr(capabilities.subprocess, 'CREATE_NO_WINDOW', 0x08000000, raising=False)
+    assert _no_real_subprocess('python', 'import os') is True
+    assert calls[0][1]['creationflags'] == 0x08000000
+    assert calls[0][1]['capture_output'] is True
+
 def test_probe_all_off_when_unconfigured(app):
     with app.app_context():
         from app import capabilities

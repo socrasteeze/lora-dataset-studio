@@ -7219,6 +7219,7 @@ def classify_images(user_id, dataset_id, force=False, report=None, *,
     """
     _guard_not_bank_export(dataset_id)
     from . import auto_crop as crop_service
+    from .vision_pool import map_vision
     auto_crop, minimum = crop_service.options(auto_crop, min_crop_confidence)
     statuses = normalize_pass_statuses(statuses)
     if auto_crop and statuses is None:
@@ -7238,7 +7239,7 @@ def classify_images(user_id, dataset_id, force=False, report=None, *,
     # meanwhile used to kill the whole classification.
     row_ids = [img.id for img in rows]
     n = 0
-    vanished = unanswered = missing = 0
+    vanished = unanswered = missing = stale = completed = 0
     scope_skipped = 0
     cropped = crop_skipped = crop_failed = 0
     cropped_ids = []
@@ -7252,63 +7253,100 @@ def classify_images(user_id, dataset_id, force=False, report=None, *,
     else:
         token = dataset_activity.begin(dataset_id, 'classify', total=len(row_ids))
     stopped = False
-    try:
-        for i, image_id in enumerate(row_ids):
-            if dataset_activity.cancel_requested(dataset_id, dataset_activity.FRAMING_KINDS):
-                stopped = True
-                break
-            dataset_activity.progress(token, done=i + 1)
+
+    def cancelled():
+        return dataset_activity.cancel_requested(dataset_id, dataset_activity.FRAMING_KINDS)
+
+    def advance():
+        nonlocal completed
+        completed += 1
+        dataset_activity.progress(token, done=completed)
+
+    def prepared():
+        nonlocal vanished, missing, scope_skipped
+        for image_id in row_ids:
+            if cancelled():
+                return
             img = _live_image_row(image_id)
-            if img is None:      # deleted while the pass ran
+            if img is None or img.dataset_id != dataset_id:
                 vanished += 1
-                continue
-            if img.dataset_id != dataset_id:
-                vanished += 1
+                advance()
                 continue
             if statuses is not None and img.status not in statuses:
                 scope_skipped += 1
+                advance()
                 continue
             path = _img_path(img) if img.filename else ''
             if not os.path.exists(path):
                 missing += 1
+                advance()
                 continue
+            # The pool receives plain values. All ORM work stays on this thread.
+            yield image_id, path
+
+    def ask(item, *, auto_start_local=False):
+        _image_id, path = item
+        try:
             with open(path, 'rb') as fh:
                 payload = fh.read()
-                # fmt='json' is the Bank framing call, and the head-crop call:
-                # without the grammar a reasoning/abliterated checkpoint rambles
-                # a <think> trace past num_predict and `response` comes back
-                # empty — the toast then blames Ollama for a silent no-answer.
-                raw = describe_image_ollama(
-                    payload, prompt, num_predict=650 if auto_crop else 400,
-                    prefer_json=True, fmt='json',
-                    keep_alive=_VISION_BATCH_KEEPALIVE,
-                    auto_start_local=(i == 0))
+        except OSError:
+            return None
+        raw = describe_image_ollama(
+            payload, prompt, num_predict=650 if auto_crop else 400,
+            prefer_json=True, fmt='json', keep_alive=_VISION_BATCH_KEEPALIVE,
+            auto_start_local=auto_start_local)
+        return raw, bank_transfer_metadata.content_fingerprint_bytes(payload), payload if auto_crop else None
+
+    def answers():
+        items = iter(prepared())
+        first = next(items, None)
+        if first is None:
+            return
+        # Warm/start the provider once before allowing concurrent requests.
+        yield first, ask(first, auto_start_local=True), None
+        yield from map_vision(items, ask, should_cancel=cancelled)
+
+    source = answers()
+    try:
+        for (image_id, path), answer, error in source:
+            advance()
+            if cancelled():
+                stopped = True
+                break
+            if error is not None:
+                unanswered += 1
+                logger.warning('dataset framing: a vision request failed (%s)', type(error).__name__)
+                continue
+            if answer is None:
+                missing += 1
+                continue
+            raw, fingerprint, payload = answer
             if not (raw or '').strip():
                 # Ollama vision failure differs from indeterminate framing: leave None
                 # so retry remains possible, rather than storing permanent unknown.
                 unanswered += 1
                 continue
             framing, label = _parse_classify(raw)
-            if dataset_activity.cancel_requested(dataset_id, dataset_activity.FRAMING_KINDS):
+            if cancelled():
                 stopped = True
                 break
-            if auto_crop or statuses is not None or image_ids is not None:
-                current = _live_image_row(image_id)
-                if (current is None or current.dataset_id != dataset_id
-                        or not current.filename or _img_path(current) != path):
-                    vanished += 1
-                    continue
-                if statuses is not None and current.status not in statuses:
-                    scope_skipped += 1
-                    continue
-                img = current
-            if auto_crop:
-                try:
-                    fingerprint = bank_transfer_metadata.content_fingerprint_bytes(payload)
-                    crop_service.require_unchanged(path, fingerprint)
-                except (OSError, crop_service.CropSkipped):
+            img = _live_image_row(image_id)
+            if (img is None or img.dataset_id != dataset_id
+                    or not img.filename or _img_path(img) != path):
+                vanished += 1
+                continue
+            if ((statuses is not None and img.status not in statuses)
+                    or (not force and not auto_crop and img.framing is not None)):
+                scope_skipped += 1
+                continue
+            try:
+                crop_service.require_unchanged(path, fingerprint)
+            except (OSError, crop_service.CropSkipped):
+                stale += 1
+                if auto_crop:
                     crop_skipped += 1
-                    continue
+                continue
+            if auto_crop:
                 try:
                     proposal = crop_service.plan(raw, payload, minimum)
                     if not crop_image(user_id, image_id,
@@ -7337,9 +7375,13 @@ def classify_images(user_id, dataset_id, force=False, report=None, *,
             n += 1
     finally:
         try:
-            unload_vision_model()  # Release VRAM to ComfyUI at batch end.
+            source.close()  # Join every submitted call before releasing the model.
         finally:
-            dataset_activity.end(token)
+            try:
+                unload_vision_model()  # Release VRAM to ComfyUI at batch end.
+            finally:
+                stopped = stopped or cancelled()
+                dataset_activity.end(token)
     if vanished:
         logger.info('classify: %s image(s) were deleted while the pass ran, skipped',
                     vanished)
@@ -7348,7 +7390,9 @@ def classify_images(user_id, dataset_id, force=False, report=None, *,
         report['unanswered'] = unanswered
         report['missing'] = missing
         report['vanished'] = vanished
-        if statuses is not None or image_ids is not None:
+        if stale:
+            report['stale'] = stale
+        if statuses is not None or image_ids is not None or scope_skipped:
             report['scope_skipped'] = scope_skipped
         if stopped:
             report['stopped'] = True

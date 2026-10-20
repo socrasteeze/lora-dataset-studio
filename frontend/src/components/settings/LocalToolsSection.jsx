@@ -516,18 +516,16 @@ export default function LocalToolsSection(props) {
             onChange={(e) => setField('ollama', 'vision_concurrency', Number(e.target.value))}
             className={INPUT_CLASS}
           >
-            <option value="1">1 — one at a time (slowest, gentlest)</option>
+            <option value="1">1 (Sequential)</option>
             <option value="2">2</option>
-            <option value="4">4 — recommended (about twice as fast)</option>
+            <option value="4">4 (Default)</option>
             <option value="6">6</option>
-            <option value="8">8 — only if Ollama is set up for it</option>
+            <option value="8">8</option>
           </select>
           <p className="mt-1 text-xs text-content-muted">
-            Bank passes that read every image — watermark scan, framing, captions — send
-            this many requests to Ollama at the same time. Most of each request is
-            waiting, not computing, so overlapping them roughly halves a long pass.
-            Raising it past 4 gains little unless your Ollama is configured for more
-            parallel requests, and it makes Stop take a few seconds longer.
+            Bank vision passes and Dataset Framing keep this many requests in flight.
+            Ollama can limit Qwen3-VL to one model slot. More requests can increase
+            queueing and Stop time.
           </p>
           <ResetToDefault label="Images analysed at once" section="ollama" field="vision_concurrency"
             config={config} configDefaults={configDefaults} setField={setField} />
@@ -616,16 +614,16 @@ export default function LocalToolsSection(props) {
             onChange={(e) => setField('lmstudio', 'vision_concurrency', Number(e.target.value))}
             className={INPUT_CLASS}
           >
-            <option value="1">1 — one at a time (slowest, gentlest)</option>
+            <option value="1">1 (Sequential)</option>
             <option value="2">2</option>
-            <option value="4">4 — recommended</option>
+            <option value="4">4 (Default)</option>
             <option value="6">6</option>
             <option value="8">8</option>
           </select>
           <p className="mt-1 text-xs text-content-muted">
-            The same dial as Ollama's, kept separate because the two servers do not take the
-            same load: LM Studio serves as many parallel requests as its own Parallel setting
-            allows, and going wider here than that gains nothing.
+            Bank vision passes and Dataset Framing keep this many requests in flight.
+            LM Studio controls how many requests its model executes at once.
+            More queued requests can increase Stop time.
           </p>
           <ResetToDefault label="Images analysed at once" section="lmstudio" field="vision_concurrency"
             config={config} configDefaults={configDefaults} setField={setField} />

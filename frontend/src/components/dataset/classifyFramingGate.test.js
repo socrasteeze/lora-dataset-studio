@@ -125,3 +125,13 @@ test('0 classified while there was work is reported as a failure, not a success'
   assert.equal(disk.tone, 'error');
   assert.match(disk.text, /not found on disk/i);
 });
+
+test('changed or removed images do not blame the vision model or missing files', () => {
+  for (const field of ['stale', 'scope_skipped', 'vanished']) {
+    const result = classifyResultMessage(0, 1, { attempted: 1, unanswered: 0, [field]: 1 });
+    assert.equal(result.tone, 'info');
+    assert.match(result.text, /0\/1 classified/);
+    assert.match(result.text, /skipped 1 images after changes or removal/);
+    assert.doesNotMatch(result.text, /Ollama|not found on disk/);
+  }
+});

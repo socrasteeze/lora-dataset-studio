@@ -1118,7 +1118,7 @@ def dataset_classify(dataset_id):
 
 @bp.post('/dataset/<int:dataset_id>/classify/cancel')
 def dataset_cancel_classify(dataset_id):
-    """Stop Framing between images without applying another automatic crop."""
+    """Stop submitting Framing images; join requests without applying another crop."""
     if not svc.get_dataset(LOCAL_USER, dataset_id):
         return jsonify({'error': 'not found'}), 404
     from ..services import dataset_activity

@@ -659,6 +659,7 @@ export function useDataset() {
       }
       const msg = classifyResultMessage(d.classified, want, {
         attempted: d.attempted, unanswered: d.unanswered,
+        stale: d.stale, scope_skipped: d.scope_skipped, vanished: d.vanished,
       });
       const cropSummary = d.cropped == null ? ''
         : ` · ${d.cropped} cropped · ${d.crop_skipped} crop skipped · ${d.crop_failed} crop failed`;
