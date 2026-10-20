@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-20-zz-anima-character-captions', date: '2026-10-20', title: 'Refine Anima Captions',
+    blurb: 'Anima character captions request visible scene details without invented names or filler. Prose stays supported. Training adds the character trigger, and ZIP export avoids repeated trigger prefixes.',
+    to: '/guide/dataset-guide',
+  },
+  {
     id: '2026-10-20-z-atk-recipe', date: '2026-10-20', title: 'Match ATK Recipes',
     blurb: 'Set Automagic3 LR limits, layer exclusions, caption dropout and RAM caching. Preserve trigger punctuation and save these choices in training presets.',
     to: '/datasets?section=training',

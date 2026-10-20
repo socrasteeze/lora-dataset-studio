@@ -6,6 +6,12 @@ Image LoRA settings retain Automagic3 LR limits, layer exclusions, caption dropo
 The ATK Recipe editor saves related fields together and keeps failed/local drafts. The importable Character example is `docs/examples/training-presets/anima-character-automagic3.json`; it contains no dataset identity, private paths or prompts.
 Ruff, ESLint and the production build passed during implementation. Tests, responsive probes and training were not run. Exact-run parity remains unverified. Keep source and the delivery bundle in separate commits, with CI skipped under the current test hold.
 The local activation was separately authorized and verified. Publication does not restart the app or change dataset settings. Match the original base, images, captions and sample prompts before using the preset.
+## Anima character captions (2026-10-20)
+
+Task branch: `fix/anima-character-captions`, based on recipe commit `f815689f3`. The operator authorized clean publication and activation without tests. Preserve the separate uncommitted storage work in the primary checkout. Activation must retain its source and controls.
+Anima Character batch and Caption Lab share visible-detail guidance for JoyCaption/local vision, retain prose as default, and preserve existing appearance/body omission controls. Tag mode requests lowercase words with spaces. Stored captions remain content-only; training/TXT/ZIP add the saved trigger. ZIP export normalizes repeated leading prefixes, and previews match whole triggers instead of substrings.
+Ruff and diff checks passed. ESLint passed with zero errors and 32 existing warnings. After integration with the recipe commit, the isolated production build passed in 7.09 seconds. No tests, responsive probes, inference, caption jobs or training ran. Prompt instructions do not establish caption accuracy.
+Delivery is in progress. Keep source and bundle commits separate and use [skip ci]. Existing captions and data were not changed. Record the activation receipt after the controlled restart. The earlier open items below remain pending.
 
 **Updated:** 2026-10-20 | **Branch:** fix/pwa-bank-toolbar-spacing | **Base:** 8af39502f
 

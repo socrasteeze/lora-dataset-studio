@@ -59,7 +59,7 @@ from .face_variations import (DESCRIPTIVE_CAPTION_PROMPT,
                               CAPTION_REFINE_CONCEPT_PROMPT, CAPTION_LEAK_FIX_PROMPT,
                               EXPAND_CONCEPT_TERMS_PROMPT,
                               CLASSIFY_PROMPT, HEAD_BBOX_PROMPT, WATERMARK_BBOX_PROMPT,
-                              aspect_for_label, caption_prompt_for,
+                              aspect_for_label, caption_prompt_for, caption_prompt_for_anima,
                               caption_prompt_for_style, caption_prompt_for_concept,
                               caption_has_identity_leak, caption_has_concept_leak,
                               appearance_describe_phrases, appearance_omit_shorten_clause,
@@ -7998,7 +7998,8 @@ def _dataset_caption_recipe(ds, opts, mode=None):
     body = is_body_fidelity(ds)
     appearance = opts.get('appearance') or None
     base_cleaner = drop_identity_tags if mode == 'booru' else drop_identity_sentences
-    return (caption_prompt_for(mode, body=body, appearance=appearance),
+    prompt_for = caption_prompt_for_anima if train_type == 'anima' else caption_prompt_for
+    return (prompt_for(mode, body=body, appearance=appearance),
             lambda text: base_cleaner(text, body=body, appearance=appearance))
 
 
@@ -12792,7 +12793,7 @@ def _export_caption(ds, caption) -> str:
     cap = style_content_caption(ds, caption)
     if is_style(ds):
         return cap
-    return f"{ds.trigger_word}, {cap}" if cap else ds.trigger_word
+    return _caption_file_text(ds, cap, ds.trigger_word) if cap else ds.trigger_word
 
 
 def write_export_zip(user_id: int, dataset_id: int, output: BinaryIO) -> None:

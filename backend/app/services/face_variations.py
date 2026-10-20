@@ -2765,6 +2765,28 @@ def caption_prompt_for(mode, body=False, appearance=None) -> str:
     return base + (BODY_FIDELITY_BOORU_SUFFIX if mode == 'booru' else BODY_FIDELITY_PROSE_SUFFIX)
 
 
+def caption_prompt_for_anima(mode, body=False, appearance=None) -> str:
+    """Anima accepts prose or tags; retain the selected identity omission policy."""
+    base = caption_prompt_for(mode, body=body, appearance=appearance)
+    guidance = (
+        "\n\nThis caption is for an Anima CHARACTER LoRA. Describe only details that "
+        "are visible in this image. Describe the outfit, pose, expression, framing "
+        "and background accurately, subject to the omission rules above. Use "
+        "consistent, concrete names for the same visible features. Do not invent "
+        "hidden details, character names, series names or artist names. Do not add "
+        "quality ratings or generic praise. Do not write a character trigger; LDS "
+        "adds the saved trigger when preparing training captions and exports. ")
+    if mode == 'booru':
+        guidance += (
+            "For Anima, write lowercase comma-separated tags with spaces instead "
+            "of underscores. Do not add prose.")
+    else:
+        guidance += (
+            "Write a compact factual paragraph. Natural language is supported "
+            "directly; do not add a duplicate tag list or repetitive filler.")
+    return base + guidance
+
+
 # Advisory detector of actual identity traits: hair/skin/eye color/face
 # shape/features. Do not flag face lighting or eyes-open/looking expressions.
 # Calibrated empirically on 31 real captions.
