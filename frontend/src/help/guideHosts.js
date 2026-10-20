@@ -73,6 +73,7 @@ export const CORE_GUIDE_ANCHORS = {
     "what-editing-an-image-costs-it",
     "a-crop-is-never-enlarged",
     "auto-center-a-crop",
+    "auto-crop-during-framing",
     "why-a-re-run-button-is-greyed-out",
     "rotate-a-sideways-image",
     "crop-and-upscale-inside-a-bank",

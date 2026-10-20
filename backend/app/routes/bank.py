@@ -1175,6 +1175,7 @@ def bank_framing(bank_id):
     data = request.get_json(silent=True) or {}
     return _queued_start('framing', _app(), LOCAL_USER, bank_id,
                   rescan=bool(data.get('rescan')),
+                  **{key: data[key] for key in ('auto_crop', 'min_crop_confidence') if key in data},
                   device_id=data.get('device_id'), **_scope(data))
 
 

@@ -1097,12 +1097,29 @@ def dataset_classify(dataset_id):
     force = bool(data.get('force'))
     outcome = {}
     try:
+        from ..services.auto_crop import request_options
+        crop_arguments = request_options(data)
+        if crop_arguments.get('auto_crop'):
+            from ..services import dataset_activity
+            if dataset_activity.get(dataset_id):
+                return jsonify({'error': 'The dataset is busy. Wait for its current work before Auto-Crop.'}), 409
         with gpu_exclusive_vision_window(flag_ttl=1800):
             n = svc.classify_images(LOCAL_USER, dataset_id, force=force,
-                                    report=outcome)
+                                    report=outcome, **crop_arguments)
     except Exception as e:
         return _map_error(e)
     return jsonify({'ok': True, 'classified': n, **outcome})
+
+
+@bp.post('/dataset/<int:dataset_id>/classify/cancel')
+def dataset_cancel_classify(dataset_id):
+    """Stop Framing between images without applying another automatic crop."""
+    if not svc.get_dataset(LOCAL_USER, dataset_id):
+        return jsonify({'error': 'not found'}), 404
+    from ..services import dataset_activity
+    if not dataset_activity.request_cancel(dataset_id, dataset_activity.FRAMING_KINDS):
+        return jsonify({'error': 'No Framing pass is running.'}), 409
+    return jsonify({'ok': True})
 
 
 @bp.post('/dataset/<int:dataset_id>/caption')
@@ -2253,7 +2270,10 @@ def image_auto_center():
         return jsonify({'error': 'An image preview is required.'}), 400
     raw = upload.stream.read(auto_center.MAX_UPLOAD_BYTES + 1)
     try:
-        result = auto_center.suggest_subject_box(raw, request.form.get('framing', 'subject'))
+        minimum = request.form.get('min_crop_confidence')
+        minimum = float(minimum) if minimum is not None else None
+        result = auto_center.suggest_subject_box(
+            raw, request.form.get('framing', 'subject'), minimum_confidence=minimum)
     except auto_center.VisionUnavailable as exc:
         return jsonify({'error': str(exc), 'setup_required': True}), 409
     except auto_center.SubjectNotFound as exc:

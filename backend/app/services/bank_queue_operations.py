@@ -74,6 +74,9 @@ def prepare(operation, user_id, bank_id, options):
         banks.normalize_inpaint_options(options.get('method'), options.get('target'))
     if operation == 'semantic_dedup':
         banks._semantic_dup_threshold(banks._selected_semantic_engine(bank), options.get('threshold'))
+    if operation == 'framing':
+        from .auto_crop import options as crop_options
+        crop_options(options.get('auto_crop', False), options.get('min_crop_confidence'))
     if options.get('limit') is not None and int(options['limit']) < 1:
         raise ValueError('limit must be at least 1')
     ids = options.get('ids') or []

@@ -644,7 +644,7 @@ export function useDataset() {
   // silent outcome into a diagnosis: the server answers ok/classified=0 when the
   // vision backend never replied (Ollama down), and 0 on its own reads as success.
   // Errors carry their `detail` too — "GPU busy" alone doesn't say training is running.
-  const classify = useCallback((expected = 0) => wrap(async () => {
+  const classify = useCallback((expected = 0, options) => wrap(async () => {
     const want = Number.isFinite(Number(expected)) ? Number(expected) : 0;
     // The route answers only when the whole pass is done, so nothing would refetch
     // the payload while it runs and its server-side `activity` (done/total) would
@@ -652,7 +652,7 @@ export function useDataset() {
     // the generic 3.5 s activity poll then drives the live progress from there.
     const seed = setTimeout(() => { refresh(currentId); }, 1200);
     try {
-      const d = await postJson(`/api/dataset/${currentId}/classify`);
+      const d = await postJson(`/api/dataset/${currentId}/classify`, options);
       if (!d.ok) {
         toast.error([d.error, d.detail].filter(Boolean).join(' — ') || 'Unexpected error');
         return;
@@ -660,12 +660,30 @@ export function useDataset() {
       const msg = classifyResultMessage(d.classified, want, {
         attempted: d.attempted, unanswered: d.unanswered,
       });
-      (toast[msg.tone] || toast.success)(msg.text);
+      const cropSummary = d.cropped == null ? ''
+        : ` · ${d.cropped} cropped · ${d.crop_skipped} crop skipped · ${d.crop_failed} crop failed`;
+      const tone = d.crop_failed > 0 ? 'warning' : d.stopped ? 'info' : msg.tone;
+      const text = d.stopped ? `Stopped. ${d.classified} classified` : msg.text;
+      (toast[tone] || toast.success)(text + cropSummary);
+      if (d.cropped_ids?.length) setNonces((previous) => {
+        const next = { ...previous };
+        for (const id of d.cropped_ids) next[id] = (next[id] || 0) + 1;
+        return next;
+      });
       await refresh();
     } finally {
       clearTimeout(seed);
     }
   }), [wrap, currentId, refresh, toast]);
+
+  const stopClassify = useCallback(async () => {
+    try {
+      await postJson(`/api/dataset/${currentId}/classify/cancel`, {});
+      await refresh(currentId);
+    } catch (failure) {
+      toast.error(failure.message || 'Could not stop Framing.');
+    }
+  }, [currentId, refresh, toast]);
 
   const caption = useCallback((mode) => wrap(async () => {
     const run = beginCaptioningRun(currentId);
@@ -1818,7 +1836,7 @@ export function useDataset() {
            textScanning: textScanningLive, activity,
            nonces, mirroringIds, refNonce, scoringFaceIds, recaptioningIds, create, open,
            deleteDataset, renameDataset, updateSettings, setCurrentId, setRef, addExtraRef, removeExtraRef,
-           generate, importFiles, scrapeImport, resolveSmallImageRescue, improveImage, reimproveImage, improveBatch, classify, caption, recaption, recaptionImages,
+           generate, importFiles, scrapeImport, resolveSmallImageRescue, improveImage, reimproveImage, improveBatch, classify, stopClassify, caption, recaption, recaptionImages,
            setStatus, setCaption, mirrorImage, rotateImage, crop, cropRef, cropExtraRef, recropRefAuto, editReference, retryReferenceEdit, canRetryReferenceEdit, keepEditedReference, discardEditedReference, setDatasetTrainType, setDatasetFidelity, deleteImage, batchImages, replaceCaptions, writeCaptionFiles, openDatasetFolder, cancelPending, cancelCaption, regenerate, analyzeFaces, scoreFace,
            findWatermarks, cancelWatermarkScan, findText, cancelTextScan, cleanWatermarks, cleanWatermarkImages, restoreWatermarkImage, repairImageRegion, undoImageRepair, dismissWatermarks, saveWatermarkRegions,
            purgeUnused, exportZip, exportBackup, exportZipFor, exportBackupFor, importBackup, importDatasetZip, importDatasetFolder,

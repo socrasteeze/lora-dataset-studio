@@ -1172,7 +1172,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
 
      It answers {ok,error} rather than toasting: the window owns its own refusal
      surface and stays open with the choices intact (utils/submitOutcome.js). */
-  const passBody = (passId, { statuses, imageIds, redo } = {}, extra = {}) => {
+  const passBody = (passId, { statuses, imageIds, redo, autoCrop, minCropConfidence } = {}, extra = {}) => {
     const spec = BANK_PASSES[passId]
     return {
       // Which machine — on() first, so a pass that genuinely needs to say more
@@ -1186,6 +1186,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         : (spec?.redo && redo ? { [spec.redo.key]: true } : {})),
       ...(statuses ? { statuses } : {}),
       ...(imageIds === 'selection' && selected.size ? { image_ids: [...selected] } : {}),
+      ...(passId === 'framing' && autoCrop
+        ? { auto_crop: true, min_crop_confidence: minCropConfidence } : {}),
       ...extra,
     }
   }

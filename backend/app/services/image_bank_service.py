@@ -11931,13 +11931,16 @@ def _framing_pool(bank_id, rescan, statuses=None, ids=None):
 
 
 def start_framing(app, user_id, bank_id, rescan=False, device_id=None,
-                  statuses=None, ids=None):
+                  statuses=None, ids=None, auto_crop=False, min_crop_confidence=None):
     """Classify every non-rejected image by SHOT TYPE (face / bust / body / back),
     reusing the SAME Qwen3-VL classifier the datasets use (CLASSIFY_PROMPT). Feeds
     the 📐 Framing filter chips and the coverage advice. Needs the vision model
     pulled; serialized against training/vision like the watermark pass (503 when
     the GPU is held). ``rescan`` re-classifies rows that already have a framing."""
     from .vision_llm import probe_model as probe_ollama_model
+    from .auto_crop import options as crop_options
+    auto_crop, minimum = crop_options(auto_crop, min_crop_confidence)
+    rescan = rescan or auto_crop
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
@@ -11970,8 +11973,10 @@ def start_framing(app, user_id, bank_id, rescan=False, device_id=None,
             raise RuntimeError(reason)
     device_id = device_id if remote else None
     q = _framing_pool(bank_id, rescan, statuses, ids)
+    crop_arguments = ({'auto_crop': True, 'min_crop_confidence': minimum}
+                      if auto_crop else {})
     return bank_jobs.start(app, bank_id, 'framing',
-                           _framing_job(bank_id, rescan, device_id, statuses, ids),
+                           _framing_job(bank_id, rescan, device_id, statuses, ids, **crop_arguments),
                            total=q.count(), device_label=_device_label(device_id), device_id=device_id)
 
 
@@ -11982,9 +11987,12 @@ def start_framing(app, user_id, bank_id, rescan=False, device_id=None,
 _FENCE_STREAK_WARN = 5
 
 
-def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None):
+def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None, *,
+                 auto_crop=False, min_crop_confidence=None):
     def run(job):
         import contextlib
+        from . import auto_crop as crop_service
+        _, minimum = crop_service.options(auto_crop, min_crop_confidence)
         from .face_dataset_service import CLASSIFY_PROMPT, _parse_classify
         from .vision_llm import describe_image as describe_image_ollama, unload_vision_model
         from .vision_ollama import LocalOllamaFenceError
@@ -12017,6 +12025,8 @@ def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None):
                 + _scope_note(bank_id, todo_clause, statuses, ids)))
             return
         classified = errors = missing = seen = vanished = 0
+        cropped = crop_skipped = crop_failed = 0
+        prompt = crop_service.framing_prompt(CLASSIFY_PROMPT) if auto_crop else CLASSIFY_PROMPT
         stale = fenced = unanswered = 0
         fence_streak = 0
         pending = {}
@@ -12060,7 +12070,7 @@ def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None):
             fingerprint = bank_transfer_metadata.content_fingerprint_bytes(payload)
             try:
                 raw = describe_image_ollama(
-                    payload, CLASSIFY_PROMPT, num_predict=400,
+                    payload, prompt, num_predict=650 if auto_crop else 400,
                     prefer_json=True, fmt='json', keep_alive='5m')
                 return {'raw': raw, 'fingerprint': fingerprint, 'error': None,
                         'fenced': False}
@@ -12082,7 +12092,7 @@ def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None):
         if device_id:
             window = contextlib.nullcontext()
             source = bank_remote.run_remote_vision(
-                job, device_id, items=list(prepared()), prompt=CLASSIFY_PROMPT,
+                job, device_id, items=list(prepared()), prompt=prompt,
                 detail_label='framing pass', bank_id=bank_id)
         else:
             window = gpu_exclusive_vision_window(flag_ttl=1800)
@@ -12172,9 +12182,45 @@ def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None):
                         unanswered += 1
                     else:
                         framing, _label = _parse_classify(raw)
+                        framing_update = {'framing': framing}
+                        if auto_crop and not bank_jobs.cancelled(job):
+                            try:
+                                if not fingerprint:
+                                    raise crop_service.CropSkipped('missing image fingerprint')
+                                payload = _read_safe_bank_source_bytes(_path, label='framing crop')
+                                if (fingerprint and bank_transfer_metadata.content_fingerprint_bytes(payload)
+                                        != fingerprint):
+                                    stale += 1
+                                    bank_jobs.bump(job)
+                                    db.session.commit()
+                                    continue
+                                proposal = crop_service.plan(raw, payload, minimum)
+                                saved = crop_image(bank.user_id, bank_id, row_id,
+                                                   *(proposal[key] for key in ('x', 'y', 'w', 'h')),
+                                                   _bank_lease=_job_bank_capability(job))
+                                if saved is None:
+                                    raise crop_service.CropSkipped('image no longer exists')
+                                cropped += 1
+                                cropped_row = _live_image(row_id)
+                                if cropped_row is not None:
+                                    cropped_path = analysis_image_path(bank, cropped_row, refresh_rotation=True)
+                                    cropped_fingerprint = bank_transfer_metadata.content_fingerprint_path(cropped_path)
+                                    if _valid_analysis_fingerprint(cropped_fingerprint):
+                                        framing_update['analysis_fingerprint'] = cropped_fingerprint
+                            except crop_service.CropSkipped:
+                                crop_skipped += 1
+                            except Exception as exc:
+                                db.session.rollback()
+                                crop_failed += 1
+                                logger.warning('bank framing: automatic crop failed for image %s (%s)',
+                                               row_id, type(exc).__name__)
                         # face|bust|body|back|unknown
-                        pending[row_id] = {'framing': framing}
+                        pending[row_id] = framing_update
                         classified += 1
+                        if auto_crop:
+                            bank_jobs.progress(job, detail=(
+                                f'framing · {cropped} cropped · {crop_skipped} crop skipped'
+                                f' · {crop_failed} crop failed'))
                     # Bounded by IMAGES SEEN, not by successes: the old gate
                     # counted only classified rows, so an unreachable Ollama
                     # never reached a commit at all.
@@ -12207,6 +12253,9 @@ def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None):
                                 unanswered=unanswered, fenced=fenced,
                                 fence_reason=fence_reason,
                                 stale=stale, unreadable=errors)
+        if auto_crop:
+            skipped += (f' · {cropped} cropped · {crop_skipped} crop skipped'
+                        f' · {crop_failed} crop failed · minimum confidence {minimum * 100:g}%')
         if bank_jobs.cancelled(job):
             bank_jobs.progress(
                 job, detail=f'cancelled — {classified} classified so far' + skipped)

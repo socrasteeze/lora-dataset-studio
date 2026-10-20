@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { attemptModalSubmit } from '../../utils/submitOutcome.js'
 import { lastPassNote, lastPassSentence } from './lastPassNote.js'
+import AutoCropOptions, { DEFAULT_CROP_CONFIDENCE_PERCENT, validCropConfidence } from '../dataset/AutoCropOptions.jsx'
 import {
   bankPass, passScopeRows, passSelectionAvailability, watermarkSettings,
 } from './bankPasses.js'
@@ -83,6 +84,10 @@ export default function PassDialog({
   const setRedo = (v) => onRedo?.(v)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  const [autoCrop, setAutoCrop] = useState(false)
+  const [cropConfidence, setCropConfidence] = useState(DEFAULT_CROP_CONFIDENCE_PERCENT)
+  const cropActive = passId === 'framing' && autoCrop
+  const effectiveRedo = redo || cropActive
   /* A pass whose window shows its own results (🔤 Find text renders the flagged
      pages with their zones in place) stays OPEN on a successful launch: closing
      it would hide exactly what the run was started to show. `launched` only
@@ -110,11 +115,12 @@ export default function PassDialog({
   const effectiveSelection = useSelection && canUseSelection ? selectionSize : 0
   const countable = spec.countable !== false
   const runLabel = passLaunchLabel({
-    verb: spec.verb, payload, passId, scopeId: scope, redo,
+    verb: cropActive ? 'Classify & Crop' : spec.verb, payload, passId, scopeId: scope, redo: effectiveRedo,
     selectionSize: effectiveSelection, countable,
   })
-  const blocked = passLaunchDisabledReason({
-    payload, passId, scopeId: scope, redo, selectionSize: effectiveSelection,
+  const blocked = cropActive && !validCropConfidence(cropConfidence)
+    ? 'Set a minimum confidence greater than 0 and at most 100%.' : passLaunchDisabledReason({
+    payload, passId, scopeId: scope, redo: effectiveRedo, selectionSize: effectiveSelection,
     countable, live,
   })
   const binWarning = effectiveSelection ? '' : passBinWarning(scope, {
@@ -133,7 +139,8 @@ export default function PassDialog({
         scope,
         statuses: effectiveSelection ? null : passScopeStatuses(scope),
         imageIds: effectiveSelection ? 'selection' : null,
-        redo,
+        redo: effectiveRedo,
+        ...(cropActive ? { autoCrop: true, minCropConfidence: Number(cropConfidence) / 100 } : {}),
       }), { fallback: `Could not start ${spec.label}` })
     } finally { setBusy(false) }
     if (outcome.close) {
@@ -194,7 +201,7 @@ export default function PassDialog({
                   onChange={() => { setUseSelection(false); setScope(r.id) }} />
                 <span className="min-w-0">
                   <span className="font-medium text-content">
-                    {passScopeLineLabel(payload, passId, r.id, redo)}
+                    {passScopeLineLabel(payload, passId, r.id, effectiveRedo)}
                   </span>
                   {r.ok ? (
                     <span className="block text-2xs leading-snug text-content-subtle">{r.hint}</span>
@@ -217,7 +224,7 @@ export default function PassDialog({
             {/* ③ the "do it again" line — where “Rescan all” went. */}
             {spec.redo && (
               <label className="flex items-start gap-2 rounded-md border border-border bg-surface-raised p-2 text-sm">
-                <input type="checkbox" className="mt-1" checked={redo}
+                <input type="checkbox" className="mt-1" checked={effectiveRedo} disabled={cropActive}
                   onChange={(e) => setRedo(e.target.checked)} />
                 <span className="min-w-0">
                   <span className="font-medium text-content">{spec.redo.label}</span>
@@ -236,6 +243,10 @@ export default function PassDialog({
                 ⚠ {binWarning}
               </p>
             )}
+
+            {passId === 'framing' && <AutoCropOptions enabled={autoCrop} onEnabledChange={setAutoCrop}
+              confidence={cropConfidence} onConfidenceChange={setCropConfidence} disabled={busy}
+              note="Saves full-subject crops in this scope. Includes already-classified images." />}
 
             {/* Per-pass options that belong to THIS RUN — the caption engine,
                 model, register and length live here now, not spread under the

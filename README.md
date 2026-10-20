@@ -61,7 +61,7 @@ Four ways to fill a dataset, and one choice at creation that rewires everything 
 
 | Capability | What it provides |
 |---|---|
-| **Curation grid** | Keep/reject, crop, Auto-Center the full subject with a local vision model, mirror, rotate, zoom, resize, multi-select and non-destructive upscale candidates from either engine — Klein re-renders detail (sharper, but skin and colour can shift), SeedVR2 resolves detail and leaves the original look alone |
+| **Curation grid** | Keep/reject, manual crop or confidence-gated Auto-Crop with a local vision model, mirror, rotate, zoom, resize, multi-select and non-destructive upscale candidates from either engine — Klein re-renders detail (sharper, but skin and colour can shift), SeedVR2 resolves detail and leaves the original look alone |
 | **Identity and composition checks** | InsightFace similarity, score-based auto-triage, framing badges and a live Character composition meter |
 | **Model-matched captions** | Prose or booru form selected by target family, with kind-aware Concept leak checks and content-only Style rules |
 | **Local booru tagger** | Optional PixAI Tagger writes booru dataset captions from prepared local weights. Setup preparation requires an explicit action. Auto, prose, Concept and Bank captioning keep the existing engines. See [Captioning settings](docs/guide/settings-reference.md#pixai-device). |

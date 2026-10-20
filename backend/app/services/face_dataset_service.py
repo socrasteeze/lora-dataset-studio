@@ -417,6 +417,8 @@ def _guard_not_bank_export(dataset_id, activity_token=None):
     if (exclusive and dataset_activity.owns_exclusive(
             dataset_id, activity_token, exclusive)):
         return
+    if exclusive == 'classify':
+        raise RuntimeError('Auto-Crop is running on this dataset. Stop Framing before editing its images.')
     if exclusive == 'bank_export':
         raise RuntimeError(
             'This dataset is being copied to a Bank. Wait for that copy to '
@@ -456,11 +458,12 @@ def _serialize_dataset_ingest(fn):
 def _serialize_dataset_image_ingest(fn):
     @wraps(fn)
     def wrapped(user_id, image_id, *args, **kwargs):
+        activity_token = kwargs.pop('_dataset_activity_token', None)
         image = db.session.get(FaceDatasetImage, image_id)
         if image is None:
             return fn(user_id, image_id, *args, **kwargs)
         with _dataset_ingest_lock(user_id, image.dataset_id):
-            _guard_not_bank_export(image.dataset_id)
+            _guard_not_bank_export(image.dataset_id, activity_token)
             return fn(user_id, image_id, *args, **kwargs)
     return wrapped
 
@@ -2470,13 +2473,26 @@ def _crop_resize_file(path, x, y, w, h, size=1024, dst=None):
 
 
 @_serialize_dataset_image_ingest
-def crop_image(user_id, image_id, x, y, w, h):
+def crop_image(user_id, image_id, x, y, w, h, *, _expected_fingerprint=None):
     """Crop a dataset image to (x,y,w,h), long side capped at 1024, no pad (a box
     smaller than that keeps its own size). Returns bool."""
     img = _owned_image(user_id, image_id)
     if not img or not img.filename:
         return False
-    ok, scale = _crop_resize_file(_img_path(img), x, y, w, h)
+    path = _img_path(img)
+    if _expected_fingerprint is None:
+        ok, scale = _crop_resize_file(path, x, y, w, h)
+    else:
+        from .auto_crop import require_unchanged
+        temporary = str(Path(path).with_name(f'.auto-crop-{uuid.uuid4().hex}{Path(path).suffix}'))
+        try:
+            require_unchanged(path, _expected_fingerprint)
+            ok, scale = _crop_resize_file(path, x, y, w, h, dst=temporary)
+            if ok:
+                require_unchanged(path, _expected_fingerprint)
+                os.replace(temporary, path)
+        finally:
+            Path(temporary).unlink(missing_ok=True)
     if ok:
         _clear_watermark_metadata(img)
         img.upscale_ratio = scale
@@ -7180,7 +7196,8 @@ def _classify_pool(dataset_id, force=False):
     return q
 
 
-def classify_images(user_id, dataset_id, force=False, report=None):
+def classify_images(user_id, dataset_id, force=False, report=None, *,
+                    auto_crop=False, min_crop_confidence=None):
     """Classify images via Qwen3-VL. Returns how many rows were written.
 
     Default fills images that still have no shot type (any source — a crop
@@ -7194,6 +7211,8 @@ def classify_images(user_id, dataset_id, force=False, report=None):
     nothing" from "the pool was empty" — both used to arrive as classified=0.
     """
     _guard_not_bank_export(dataset_id)
+    from . import auto_crop as crop_service
+    auto_crop, minimum = crop_service.options(auto_crop, min_crop_confidence)
     try:
         from .vision_llm import describe_image as describe_image_ollama, unload_vision_model
     except ImportError:
@@ -7201,21 +7220,36 @@ def classify_images(user_id, dataset_id, force=False, report=None):
     ds = get_dataset(user_id, dataset_id)
     if not ds:
         return 0
-    rows = _classify_pool(dataset_id, force).all()
+    rows = _classify_pool(dataset_id, force or auto_crop).all()
     # Ids, not ORM objects: see _live_image_row. The commit at the bottom of this
     # loop expires every row it has not reached, and a tile deleted from the grid
     # meanwhile used to kill the whole classification.
     row_ids = [img.id for img in rows]
     n = 0
     vanished = unanswered = missing = 0
+    cropped = crop_skipped = crop_failed = 0
+    cropped_ids = []
+    prompt = crop_service.framing_prompt(CLASSIFY_PROMPT) if auto_crop else CLASSIFY_PROMPT
     # Persistent progress indicator (survives a page reload): try/finally guarantees
     # end() runs even if the batch raises → no phantom "Classifying…" spinner.
-    token = dataset_activity.begin(dataset_id, 'classify', total=len(row_ids))
+    if auto_crop:
+        token = dataset_activity.begin_exclusive(dataset_id, 'classify', total=len(row_ids))
+        if token is None:
+            raise RuntimeError('The dataset is busy. Wait for its current work before Auto-Crop.')
+    else:
+        token = dataset_activity.begin(dataset_id, 'classify', total=len(row_ids))
+    stopped = False
     try:
         for i, image_id in enumerate(row_ids):
+            if dataset_activity.cancel_requested(dataset_id, dataset_activity.FRAMING_KINDS):
+                stopped = True
+                break
             dataset_activity.progress(token, done=i + 1)
             img = _live_image_row(image_id)
             if img is None:      # deleted while the pass ran
+                vanished += 1
+                continue
+            if auto_crop and img.dataset_id != dataset_id:
                 vanished += 1
                 continue
             path = _img_path(img) if img.filename else ''
@@ -7223,12 +7257,13 @@ def classify_images(user_id, dataset_id, force=False, report=None):
                 missing += 1
                 continue
             with open(path, 'rb') as fh:
+                payload = fh.read()
                 # fmt='json' is the Bank framing call, and the head-crop call:
                 # without the grammar a reasoning/abliterated checkpoint rambles
                 # a <think> trace past num_predict and `response` comes back
                 # empty — the toast then blames Ollama for a silent no-answer.
                 raw = describe_image_ollama(
-                    fh.read(), CLASSIFY_PROMPT, num_predict=400,
+                    payload, prompt, num_predict=650 if auto_crop else 400,
                     prefer_json=True, fmt='json',
                     keep_alive=_VISION_BATCH_KEEPALIVE,
                     auto_start_local=(i == 0))
@@ -7238,13 +7273,52 @@ def classify_images(user_id, dataset_id, force=False, report=None):
                 unanswered += 1
                 continue
             framing, label = _parse_classify(raw)
+            if dataset_activity.cancel_requested(dataset_id, dataset_activity.FRAMING_KINDS):
+                stopped = True
+                break
+            if auto_crop:
+                current = _live_image_row(image_id)
+                if (current is None or current.dataset_id != dataset_id
+                        or not current.filename or _img_path(current) != path):
+                    vanished += 1
+                    continue
+                try:
+                    fingerprint = bank_transfer_metadata.content_fingerprint_bytes(payload)
+                    crop_service.require_unchanged(path, fingerprint)
+                except (OSError, crop_service.CropSkipped):
+                    crop_skipped += 1
+                    continue
+                try:
+                    proposal = crop_service.plan(raw, payload, minimum)
+                    if not crop_image(user_id, image_id,
+                                      *(proposal[key] for key in ('x', 'y', 'w', 'h')),
+                                      _expected_fingerprint=proposal['fingerprint'], _dataset_activity_token=token):
+                        raise ValueError('The crop could not be saved.')
+                    cropped += 1
+                    cropped_ids.append(image_id)
+                except crop_service.SourceChanged:
+                    crop_skipped += 1
+                    continue
+                except crop_service.CropSkipped:
+                    crop_skipped += 1
+                except Exception as exc:
+                    db.session.rollback()
+                    crop_failed += 1
+                    logger.warning('dataset framing: automatic crop failed for image %s (%s)',
+                                   image_id, type(exc).__name__)
+                img = _live_image_row(image_id)
+                if img is None:
+                    vanished += 1
+                    continue
             img.framing = framing
             img.variation_label = label
             db.session.commit()
             n += 1
     finally:
-        unload_vision_model()  # Release VRAM to ComfyUI at batch end.
-        dataset_activity.end(token)
+        try:
+            unload_vision_model()  # Release VRAM to ComfyUI at batch end.
+        finally:
+            dataset_activity.end(token)
     if vanished:
         logger.info('classify: %s image(s) were deleted while the pass ran, skipped',
                     vanished)
@@ -7253,6 +7327,12 @@ def classify_images(user_id, dataset_id, force=False, report=None):
         report['unanswered'] = unanswered
         report['missing'] = missing
         report['vanished'] = vanished
+        if stopped:
+            report['stopped'] = True
+        if auto_crop:
+            report.update(cropped=cropped, crop_skipped=crop_skipped,
+                          crop_failed=crop_failed, cropped_ids=cropped_ids,
+                          min_crop_confidence=minimum)
     return n
 
 
