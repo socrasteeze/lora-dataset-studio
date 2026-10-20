@@ -42,7 +42,7 @@ def predict_batch(entries, torch, clip_model, aes_head, nsfw_bundle, device, rea
                 for offset, index in enumerate(valid):
                     predictions[index]['aesthetic'] = round(float(scores[offset]), 3)
             except Exception as exc:
-                if isinstance(exc, torch.cuda.OutOfMemoryError) or len(valid) > 1:
+                if len(valid) > 1:
                     raise
                 predictions[valid[0]]['heads']['aesthetic'] = reason(exc)
         if nsfw_bundle is not None:
@@ -64,7 +64,8 @@ def predict_batch(entries, torch, clip_model, aes_head, nsfw_bundle, device, rea
                     for offset, index in enumerate(nsfw_valid):
                         predictions[index]['nsfw'] = round(float(scores[offset]), 4)
                 except Exception as exc:
-                    if isinstance(exc, torch.cuda.OutOfMemoryError) or len(nsfw_valid) > 1:
+                    if (len(nsfw_valid) > 1
+                            or (len(valid) > 1 and isinstance(exc, torch.cuda.OutOfMemoryError))):
                         raise
                     predictions[nsfw_valid[0]]['heads']['nsfw'] = reason(exc)
     return predictions

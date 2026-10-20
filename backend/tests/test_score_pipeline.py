@@ -137,3 +137,61 @@ def test_one_failed_head_does_not_remove_good_images_or_other_scores(pipeline):
     assert results[0]['aesthetic'] is not None and results[2]['aesthetic'] is not None
     assert results[1]['aesthetic'] is None
     assert 'aesthetic' in results[1]['heads']
+
+
+@pytest.mark.parametrize('failed_head', ['aesthetic', 'nsfw'])
+def test_head_oom_at_minimum_batch_keeps_the_embedding_and_other_head(pipeline, failed_head):
+    torch = pytest.importorskip('torch')
+    entries = _entries(torch, [1, -2, 3])
+    aesthetic, nsfw = _heads(torch)
+
+    def constrained_aesthetic(inputs):
+        if failed_head == 'aesthetic' and (inputs[:, 0] < 0).any():
+            raise torch.cuda.OutOfMemoryError('synthetic head OOM')
+        return aesthetic(inputs)
+
+    def constrained_nsfw(pixel_values):
+        if failed_head == 'nsfw' and (pixel_values[:, 0] < 0).any():
+            raise torch.cuda.OutOfMemoryError('synthetic head OOM')
+        return nsfw[0](pixel_values=pixel_values)
+
+    plan = {**pipeline.score_plan(24, True, 24 * 1024 ** 3), 'device': 'cpu'}
+    results = pipeline.predict_adaptive(entries, plan, torch, _Clip(), constrained_aesthetic,
+                                        (constrained_nsfw, None, 1), str, lambda _: None)
+    assert plan['batch_size'] == 1
+    assert all(item['error'] is None and item['embedding'] is not None for item in results)
+    assert results[1][failed_head] is None
+    assert results[1]['heads'] == {failed_head: 'synthetic head OOM'}
+    good_head = 'nsfw' if failed_head == 'aesthetic' else 'aesthetic'
+    assert all(item[good_head] is not None for item in results)
+    assert all(results[index][failed_head] is not None for index in (0, 2))
+
+
+def test_single_nsfw_input_can_back_off_memory_held_by_a_larger_clip_batch(pipeline):
+    torch = pytest.importorskip('torch')
+    entries = _entries(torch, [1, 2, 3])
+    for _, prep in entries[1:]:
+        prep['nsfw_error'] = ValueError('synthetic invalid head input')
+    aesthetic, nsfw = _heads(torch)
+
+    class Clip(_Clip):
+        batch_size = 0
+
+        def encode_image(self, inputs):
+            self.batch_size = len(inputs)
+            return super().encode_image(inputs)
+
+    clip = Clip()
+
+    def constrained_nsfw(pixel_values):
+        if clip.batch_size > 1:
+            raise torch.cuda.OutOfMemoryError('synthetic shared GPU pressure')
+        return nsfw[0](pixel_values=pixel_values)
+
+    plan = {**pipeline.score_plan(24, True, 24 * 1024 ** 3), 'device': 'cpu'}
+    results = pipeline.predict_adaptive(entries, plan, torch, clip, aesthetic,
+                                        (constrained_nsfw, None, 1), str, lambda _: None)
+    assert plan['batch_size'] == 1 and len(results) == 3
+    assert all(item['error'] is None and item['embedding'] is not None for item in results)
+    assert results[0]['nsfw'] is not None and not results[0]['heads']
+    assert all('nsfw' in results[index]['heads'] for index in (1, 2))
