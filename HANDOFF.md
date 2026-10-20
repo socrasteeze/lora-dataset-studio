@@ -1,12 +1,16 @@
 # HANDOFF
 
-**Updated:** 2026-10-19 | **Branch:** main | **Base:** bbb58a4d3
+**Updated:** 2026-10-19 | **Branch:** feat/dataset-crop-scope | **Base:** 873411c4b
 
 ## State
+Dataset Auto-Crop now shares Bank's status and grid-selection controls. The default is kept and undecided; a selection narrows that pool. Rejected images require an explicit bin/all scope. Empty selections cannot widen the run. Choices remain after a failed request. This scope wave is built and awaiting publication/activation; the prior confidence-gated wave remains active until then.
 Confidence-gated Auto-Crop is implemented in the image editor and as an opt-in Bank/Dataset Framing option. The shared server gate defaults to 90%; missing/invalid/lower confidence skips pixel writes. Confidence is an uncalibrated model estimate.
 Tests, rendered checks and inference remain off. Source 46926f85b and bundle d1ca52fd0 are active in a new healthy backend boot. All 46 metadata tables and four saved configuration files match the pre-activation checkpoint; full qualification remains incomplete.
 
 ## Done this session
+- Extracted the shared Bank/Dataset status and selection controls without changing stored scope IDs. Dataset shows eligible counts, blocks empty scopes and clears stale grid selections on navigation. Framing waits for bulk curation to finish.
+- Dataset validates status/ID options before reserving the GPU, intersects them with dataset ownership, excludes rejected images by default and rechecks status after inference before saving.
+- Added scope, selection, foreign-ID, invalid-input and status-change regressions without running them. Updated Guide, help keywords and What's New.
 - Added shared confidence validation, full-subject crop geometry and source-byte checks in auto_crop.py. Framing requests crop evidence in the same model call, including on compute peers.
 - Bank preserves pass status/selection scope, queue options, existing edit history and its active mutation reservation. Reports crops/skips/failures; no source file is overwritten.
 - Dataset Auto-Crop includes already-classified image files, uses an exclusive activity reservation and atomic crop publication, and provides Stop Framing. Changed previews receive fresh versions.
@@ -21,6 +25,7 @@ Tests, rendered checks and inference remain off. Source 46926f85b and bundle d1c
 4. If the Bank tab error recurs, collect the first browser ErrorBoundary line. The original live tab error and earlier desktop tag timeout have unconfirmed causes.
 
 ## Decisions
+- Dataset Auto-Crop uses Bank's kept/undecided default, explicit kept/undecided/bin/all choices and selection priority. A selection excludes rejected images; choosing a status scope replaces the selection. Legacy classification without Auto-Crop keeps its existing pool.
 - Image Sources uses manual Scan, Load Previews, Download and Import Images actions. Opening a panel does not start network work.
 - Keep two aligned columns of text/controls above the full-width normal Bank thumbnail grid. Stack controls on mobile.
 - Auto-Crop uses full subjects with roughly 10% padding and a 90% default minimum. The editor saves in one click; Framing cropping is opt-in. Model confidence is not measured accuracy.
@@ -39,6 +44,7 @@ Tests, rendered checks and inference remain off. Source 46926f85b and bundle d1c
 - Do not merge upstream branches. The upstream review below is carried forward unchanged.
 
 ## Verify
+Dataset scope source inspection: Ruff passed; ESLint reported zero errors and 32 existing warnings. Three changed Python files parsed without imports or execution. Production build passed in 6.76s. Privacy inspection covered 3079 text files with zero findings; whitespace review passed. No tests, fixtures, browser checks, model inference or rendered probes ran. New regression cases remain unrun. Full qualification is incomplete.
 Auto-Crop source inspection: Ruff passed; ESLint passed with zero errors and 32 existing warnings. AST parsing covered nine Python files without imports or test collection. Final production build passed in 7.04s. Privacy inspection covered 3075 text files with zero findings; new attribution scan had zero findings. The pure-text outbound inventory has zero differences. No tests, fixtures, model inference or rendered probes ran. Bank and Dataset confidence policy uses the same server helper; options are validated before queued admission or the Dataset GPU window. Bank framing is rebound to the saved crop's fingerprint. No workflow or dependency changes were made. Accuracy and full qualification remain unverified.
 Operational activation readback confirmed an idle app, a new healthy boot on the same profile, matching served entry/bundle, identical fingerprints for all 46 metadata tables and unchanged hashes for all four saved configuration files. Checkpoint and receipts remain under ignored Git storage, lds-auto-crop-activation-20261019-8d5cbaf4. No real image crop or model call was used for verification.
 Historical fixture optimization: source comparison against aeb09dae9 retained all 75 existing test function bodies/decorators in its five changed files, with one new isolation regression. Both linters/privacy inspection passed. Tests and benchmarks did not run.

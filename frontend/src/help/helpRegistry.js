@@ -89,7 +89,7 @@ const TOPICS = [
     guide: { chapter: 'using-the-app', anchor: 'auto-center-a-crop' },
     app: { route: '/bank' } },
   { id: 'auto-crop-framing', kind: 'action', title: 'Framing Auto-Crop',
-    keywords: ['framing', 'auto crop', 'confidence', 'threshold', 'minimum', 'crop', '90%'],
+    keywords: ['framing', 'auto crop', 'confidence', 'threshold', 'minimum', 'crop', '90%', 'scope', 'selection', 'rejected'],
     guide: { chapter: 'using-the-app', anchor: 'auto-crop-during-framing' },
     app: { route: '/bank' } },
   { id: 'image-sources', kind: 'action', title: 'Image Sources',

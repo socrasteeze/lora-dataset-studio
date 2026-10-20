@@ -1099,13 +1099,18 @@ def dataset_classify(dataset_id):
     try:
         from ..services.auto_crop import request_options
         crop_arguments = request_options(data)
+        scope_arguments = {}
+        if 'statuses' in data:
+            scope_arguments['statuses'] = svc.normalize_pass_statuses(data['statuses'])
+        if 'image_ids' in data:
+            scope_arguments['image_ids'] = svc.normalize_batch_image_ids(data['image_ids'])
         if crop_arguments.get('auto_crop'):
             from ..services import dataset_activity
             if dataset_activity.get(dataset_id):
                 return jsonify({'error': 'The dataset is busy. Wait for its current work before Auto-Crop.'}), 409
         with gpu_exclusive_vision_window(flag_ttl=1800):
             n = svc.classify_images(LOCAL_USER, dataset_id, force=force,
-                                    report=outcome, **crop_arguments)
+                                    report=outcome, **crop_arguments, **scope_arguments)
     except Exception as e:
         return _map_error(e)
     return jsonify({'ok': True, 'classified': n, **outcome})

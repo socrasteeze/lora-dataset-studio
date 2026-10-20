@@ -332,6 +332,12 @@ export default function DatasetWorkspace({ ds, onBack }) {
   const [extraRefCrop, setExtraRefCrop] = useState(null);
   const [viewImg, setViewImg] = useState(null);
   const [gridBulkBusy, setGridBulkBusy] = useState(false);
+  const [gridSelection, setGridSelection] = useState({ datasetId: null, ids: [] });
+  const onGridSelectionChange = useCallback((datasetId, ids) => {
+    setGridSelection((previous) => previous.datasetId === datasetId
+      && previous.ids.length === ids.length && previous.ids.every((id, index) => id === ids[index])
+      ? previous : { datasetId, ids });
+  }, []);
   useEffect(() => {
     if (gridBulkBusy) setViewImg(null);
   }, [gridBulkBusy]);
@@ -1403,6 +1409,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   onBatch={ds.batchImages} busy={ds.busy}
                   improveBusy={ds.improveBusy} generateBusy={ds.generationBusy} curationBusy={ds.curationBusy}
                   onBulkBusyChange={setGridBulkBusy}
+                  onSelectionChange={onGridSelectionChange}
                   onIdentityChanged={() => setIdentityVersion((value) => value + 1)}
                   onImproveBatch={ds.improveBatch} activity={act}
                           subjectType={d.subject_type || 'human'}
@@ -1463,8 +1470,10 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       stored shot type for the same reason — those pixels changed. The
                       vision pass that fills them in lives right here, under the bar
                       that shows the gap. */}
-                  <ClassifyFramingButton images={images} ollama={activeLocalLlm(caps)} capsLoading={capsLoading}
-                    busy={ds.busy} activity={act} onClassify={(n, options) => ds.classify(n, options)}
+                  <ClassifyFramingButton key={d.id} images={images}
+                    selectedIds={gridSelection.datasetId === d.id ? gridSelection.ids : []}
+                    ollama={activeLocalLlm(caps)} capsLoading={capsLoading}
+                    busy={ds.busy || gridBulkBusy} activity={act} onClassify={(n, options) => ds.classify(n, options)}
                     onStop={ds.stopClassify} />
                   <div id="ds-add-generate" tabIndex={-1} className="scroll-mt-20">
                     <Suspense fallback={null}>
