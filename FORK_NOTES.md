@@ -250,3 +250,10 @@ Score, face and semantic caches rate-limit full periodic rewrites using the
 shared interval; Stop and normal completion always flush. A forced process kill
 can require recomputation since the last successful checkpoint. No speedup is
 qualified until the operator requests measurement.
+
+Dataset Framing uses the shared bounded vision pool after warming its provider
+once. Keep ORM work on the owning thread, recheck scope and source bytes before
+saving, and join submitted requests before releasing the model. The shared
+vision image gate copies pixels after resizing; preserve the exact JPEG pixels,
+orientation handling and metadata removal. Request overlap does not override
+Ollama's architecture-specific model-slot limits.

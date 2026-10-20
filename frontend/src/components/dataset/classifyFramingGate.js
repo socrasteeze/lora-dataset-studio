@@ -95,10 +95,14 @@ export function classifyFramingState({
  * `attempted` is how many rows the server actually queued. Prefer it over
  * `expected` when present. */
 export function classifyResultMessage(classified, expected, {
-  attempted, unanswered,
+  attempted, unanswered, stale, scope_skipped, vanished,
 } = {}) {
   const n = Number(classified) || 0;
   const want = Number.isFinite(Number(attempted)) ? Number(attempted) : (Number(expected) || 0);
+  const changed = (Number(stale) || 0) + (Number(scope_skipped) || 0) + (Number(vanished) || 0);
+  if (changed > 0) {
+    return { tone: 'info', text: `${n}/${want} classified. LDS skipped ${changed} images after changes or removal. Review the remaining images before retrying.` };
+  }
   if (n === 0 && want > 0) {
     if (Number(unanswered) === 0) {
       return {

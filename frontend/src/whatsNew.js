@@ -85,6 +85,16 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-19-zzzzzzz-quiet-probes', date: '2026-10-19', title: 'Keep Checks Quiet',
+    blurb: 'Background capability checks now hide their helper consoles on Windows, preventing a console window from opening for each import probe.',
+    to: '/settings?section=local-tools',
+  },
+  {
+    id: '2026-10-19-zzzzzz-framing-overlap', date: '2026-10-19', title: 'Overlap Framing Requests',
+    blurb: 'Dataset Framing overlaps bounded vision requests using the existing concurrency setting. Image preparation copies pixels after resizing. Stop waits for submitted calls, and changed images are skipped before saving.',
+    to: '/guide/using-the-app#auto-crop-during-framing',
+  },
+  {
     id: '2026-10-19-zzzzz-source-readiness', date: '2026-10-19', title: 'Steady Source Controls',
     blurb: 'Image Sources keeps its action buttons in place when a job starts. Setup checks that the source ffmpeg binary runs before reporting success.',
     to: '/guide/using-the-app#image-sources',

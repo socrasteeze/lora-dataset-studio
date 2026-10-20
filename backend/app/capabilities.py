@@ -196,7 +196,8 @@ def _import_ok(python, module_expr: str, timeout=_IMPORT_TIMEOUT):
         isolated = infer_env.NO_USER_SITE_FLAG in prefix[1:]
         result = subprocess.run(
             [*prefix, '-c', module_expr], capture_output=True, timeout=processing_timeout(timeout),
-            env=infer_env.worker_env(prefix[0]) if isolated else None)
+            env=infer_env.worker_env(prefix[0]) if isolated else None,
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         return result.returncode == 0
     except subprocess.TimeoutExpired:
         return None

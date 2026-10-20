@@ -2614,10 +2614,15 @@ Auto-Crop includes images that already have a framing, so a completed
 classification does not hide the crop action. Both surfaces retain their
 existing crop save rules described above.
 
+Dataset Framing warms the provider once, then overlaps a bounded number of requests.
+It uses the active provider's **Images analysed at once** setting, just like Bank.
+Database access stays on the pass thread. Each result is checked against the
+current image, status and source bytes before saving.
+
 Progress reports crops, skips and failures. Dataset results refresh changed image
-previews. **Stop Framing** stops a Dataset pass between images and prevents a new
-crop after the in-flight model call returns. Bank uses its existing **Stop**
-control. An automatic Dataset pass reserves the dataset against competing edits;
+previews. **Stop Framing** stops new submissions and waits for requests already
+sent. It saves no further crops or classifications after Stop. Bank uses its
+existing **Stop** control. An automatic Dataset pass reserves the dataset against competing edits;
 changed source bytes are skipped, and a failed crop preparation keeps the input.
 
 ### Manual crop and edit history
