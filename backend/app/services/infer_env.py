@@ -112,7 +112,7 @@ def worker_argv(python, *args) -> list:
     return [str(python), NO_USER_SITE_FLAG, *rest]
 
 
-def worker_env(python=None, base=None, **extra) -> dict:
+def worker_env(python=None, base=None, *, limit_native_threads=True, **extra) -> dict:
     """The environment for an infer worker: `base` (``os.environ`` by default),
     the no-user-site instruction when `python` is borrowed, and the caller's own
     keys on top.
@@ -123,8 +123,10 @@ def worker_env(python=None, base=None, **extra) -> dict:
 
     A fresh dict every time — callers mutate what they get back, and handing out
     a view of ``os.environ`` would let one pass rewrite the whole process.
-    Numerical-library thread counts are bounded by the shared hardware budget;
-    stricter caller limits remain in force."""
+    Numerical-library thread counts are bounded by the shared hardware budget
+    by default. LaMa and watermark localization pass ``limit_native_threads=False``
+    to retain the pre-tuning library defaults and inherited user limits.
+    Isolation and offline enforcement apply with either policy."""
     env = dict(os.environ if base is None else base)
     if python is None or is_borrowed(python):
         env[NO_USER_SITE_ENV] = '1'
@@ -135,7 +137,8 @@ def worker_env(python=None, base=None, **extra) -> dict:
             env.pop(key, None)
         else:
             env[key] = str(value)
-    env = bounded_native_environment(env)
+    if limit_native_threads:
+        env = bounded_native_environment(env)
     # Runtime workers use files already installed on this machine. Setup's
     # explicit download jobs do not run through this inference environment.
     env['HF_HUB_OFFLINE'] = '1'

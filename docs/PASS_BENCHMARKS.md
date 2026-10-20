@@ -4,6 +4,20 @@ Measured on 2026-10-19 with synthetic fixtures only. Score has a clear throughpu
 gain. Face-mask startup is shorter. CPU inpainting and localization regress.
 The other completed comparisons do not establish a throughput gain.
 
+## Correction after these measurements
+
+LaMa and watermark localization now retain native library thread defaults and
+inherited user limits, as they did before pass tuning. The common worker
+environment no longer imposes the four-thread cap on these launches. LaMa's
+single-image, bulk and progress-streamed paths all use the same policy.
+Ranking-only watermark detection and the default policy for other workers retain
+the cap. Score's batches, preparation pool, Torch limits and OOM recovery stay
+unchanged. Worker isolation and offline enforcement also stay intact.
+
+This is an implementation correction based on the measurements below. No new
+benchmark, model inference or test suite ran after the correction. The table
+describes the earlier revisions, not measured post-correction performance.
+
 ## Comparison
 
 - Before: `26ca2c1162e5f7e5eff80073db91d0b7cca49827`, immediately before pass tuning.
@@ -92,8 +106,8 @@ the first result. These fixtures do not establish mask-generation throughput.
 
 LaMa processed eight 768x768 PNG copies with the same normalized rectangle in
 each image. All output pixels matched. The four-thread environment reduces CPU
-use but makes this CPU workload slower. A pass-specific CPU budget needs further
-measurement before changing the implementation.
+use but made this CPU workload slower. The correction above restores native
+defaults; its resulting throughput has not been measured.
 
 The Quality core used the actual scan worker with eight threads, new thumbnail
 files and all existing metrics and byte checks. Outputs and encoded thumbnails

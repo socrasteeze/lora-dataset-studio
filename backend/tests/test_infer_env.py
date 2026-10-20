@@ -69,6 +69,19 @@ def test_every_infer_worker_uses_bounded_native_threads_and_keeps_stricter_limit
     assert original == {'OMP_NUM_THREADS': '1', 'MKL_NUM_THREADS': '32', 'EXAMPLE': 'preserved'}
 
 
+@pytest.mark.parametrize('limits', [{}, {'OMP_NUM_THREADS': '1', 'MKL_NUM_THREADS': '16'}])
+def test_native_model_policy_preserves_defaults_and_user_limits(limits):
+    original = {**limits, 'EXAMPLE': 'preserved'}
+    env = infer_env.worker_env(base=original, limit_native_threads=False)
+    for key in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'NUMEXPR_NUM_THREADS'):
+        assert env.get(key) == limits.get(key)
+    assert original == {**limits, 'EXAMPLE': 'preserved'}
+    assert env['EXAMPLE'] == 'preserved'
+    assert env['PYTHONNOUSERSITE'] == '1'
+    assert env['HF_HUB_OFFLINE'] == env['TRANSFORMERS_OFFLINE'] == '1'
+    assert env['LDS_INFER_OFFLINE_HELPER'].endswith('offline_network.py')
+
+
 # --- the one interpreter this must NEVER be done to -------------------------------
 
 def test_our_own_interpreter_keeps_its_user_site_because_that_may_be_where_we_live():
@@ -128,6 +141,63 @@ def _borrow(keys):
         section, _, leaf = key.partition('.')
         out.setdefault(section, {})[leaf] = BORROWED
     config.save_config(out)
+
+
+@pytest.mark.parametrize('mode', ['single', 'batch', 'stream'])
+@pytest.mark.parametrize('limits', [{}, {'OMP_NUM_THREADS': '1', 'MKL_NUM_THREADS': '16'}])
+def test_all_lama_launch_paths_preserve_native_defaults(app, monkeypatch, tmp_path, mode, limits):
+    from app.services import infer_stream, watermark_lama
+
+    for key in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'NUMEXPR_NUM_THREADS'):
+        monkeypatch.delenv(key, raising=False)
+    for key, value in limits.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setattr(watermark_lama, 'is_available', lambda: True)
+    if mode == 'stream':
+        seen = _spy(monkeypatch, infer_stream)
+    else:
+        seen = _spy(monkeypatch, watermark_lama, attr='run')
+    image = tmp_path / 'image.webp'
+    image.write_bytes(b'synthetic input')
+    boxes = [[0.1, 0.1, 0.2, 0.2]]
+    with app.app_context():
+        _borrow(['watermark.python'])
+        if mode == 'single':
+            watermark_lama.inpaint_watermarks(image, boxes)
+        else:
+            watermark_lama.inpaint_batch(
+                [{'image_path': str(image), 'bboxes': boxes}], device='cpu',
+                on_progress=(lambda done, total: None) if mode == 'stream' else None)
+    for key in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'NUMEXPR_NUM_THREADS'):
+        assert seen['env'].get(key) == limits.get(key)
+    assert seen['argv'][1] == '-s'
+    assert seen['env']['PYTHONNOUSERSITE'] == '1'
+    assert seen['env']['HF_HUB_OFFLINE'] == '1'
+
+
+@pytest.mark.parametrize('locate', [False, True])
+def test_only_watermark_localization_uses_native_defaults(app, monkeypatch, locate):
+    from app.services import watermark_detector
+
+    for key in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'NUMEXPR_NUM_THREADS'):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(os, 'cpu_count', lambda: 24)
+    monkeypatch.setenv('OMP_NUM_THREADS', '1')
+    monkeypatch.setenv('MKL_NUM_THREADS', '16')
+    seen = _spy(monkeypatch, watermark_detector)
+    with app.app_context():
+        _borrow(['watermark_detect.python'])
+        with pytest.raises(watermark_detector.DetectorUnavailable):
+            list(watermark_detector._run_chunk(
+                ['image.jpg'], device='auto', locate=locate,
+                should_cancel=None, cancel_file=None))
+    assert seen['env']['OMP_NUM_THREADS'] == '1'
+    assert seen['env']['MKL_NUM_THREADS'] == ('16' if locate else '4')
+    for key in ('OPENBLAS_NUM_THREADS', 'NUMEXPR_NUM_THREADS'):
+        assert seen['env'].get(key) == (None if locate else '4')
+    assert seen['argv'][1] == '-s'
+    assert seen['env']['PYTHONNOUSERSITE'] == '1'
+    assert seen['env']['HF_HUB_OFFLINE'] == '1'
 
 
 def test_the_frame_encoder_runs_without_the_user_site(app, monkeypatch):

@@ -252,8 +252,8 @@ def _run_chunk(chunk, *, device, locate, should_cancel, cancel_file, info=None):
     # as HF_HOME. The two do NOT agree — HF_HOME appends a `hub/` level and
     # cache_dir does not — so setting both is how an app ends up downloading the
     # same 840 MB twice into two folders it never mentions to the user.
-    env = infer_env.worker_env(python, PYTHONUTF8='1',
-                           PYTHONIOENCODING='utf-8')
+    env = infer_env.worker_env(python, limit_native_threads=not locate,
+                              PYTHONUTF8='1', PYTHONIOENCODING='utf-8')
     try:
         proc = subprocess.Popen(
             infer_env.worker_argv(python, _SCRIPT),
