@@ -6,6 +6,10 @@ source of repository guidance for all coding agents.
 The scoped files under `.claude/rules/` remain applicable. AGENTS.md links them
 so agents that do not auto-load those files receive the same instructions.
 
+This is a divergent fork, not a mirror. Never merge, pull or rebase from
+`upstream`; review and cherry-pick only, per "Delivery and fork boundaries" in
+AGENTS.md and the divergences in [FORK_NOTES.md](FORK_NOTES.md).
+
 <!-- ghost:start -->
 ## Ghost data-handling policy
 Treat every data file in this repo (images, video, audio, documents, exports,

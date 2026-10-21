@@ -201,7 +201,16 @@ manifests and `scripts/gates.ps1`. Historical test counts are not a current base
   sensitive data before committing or pushing. Run repository gates only when
   requested. Delivery without tests must use `[skip ci]` and state that full
   qualification was not completed.
-- `upstream` stays a read-only remote for an occasional cherry-pick.
+- This fork diverges from perfectgf/lora-dataset-studio on purpose. Whole areas
+  were removed: cloud generation and training, the plugin catalog, online
+  services, and every plugin outside `fork-plugins.json` (Distribution and
+  Divergences 1, 4 and 12 in [FORK_NOTES.md](FORK_NOTES.md)).
+- Never `git merge`, `git pull` or rebase onto any `upstream/*` ref, and never
+  run a generic fork-sync that does. A merge brings removed code back without
+  a conflict.
+- `upstream` stays a read-only remote. Review new upstream commits one at a
+  time against FORK_NOTES, cherry-pick (`-x`) only what the divergences allow,
+  and record each review in HANDOFF.md under "Carried-forward upstream review".
 - Rebuild `frontend/dist` after frontend changes. The app serves it directly.
   When committing, keep source and the consolidated `build(frontend):` bundle
   in separate commits within the same delivery.
