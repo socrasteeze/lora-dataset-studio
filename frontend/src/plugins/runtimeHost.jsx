@@ -9,6 +9,7 @@ import { controlHeight } from '../components/common/controls.js'
 import Pagination from '../components/common/Pagination.jsx'
 import { paginate } from '../utils/datasetLibrary.js'
 import { HelpBadge } from '../help/HelpMode.jsx'
+import FolderCategoryFields from '../components/dataset/FolderCategoryFields.jsx'
 import { requestHelpTip } from '../help/helpTips.js'
 import GlobalModelPicker from '../components/shared/GlobalModelPicker.jsx'
 import { installActionLabel } from './hostCatalog.js'
@@ -64,7 +65,7 @@ import { clampPopoverToViewport, popoverHeight } from './hostPopover.js'
 import { isAbort, saveUrlAsFile } from '../utils/fileSave.js'
 
 export function configureHostRuntime() {
-  configureRuntimeServices({ canvas: canvasServices, useToast, HelpBadge, requestHelpTip, GlobalModelPicker, installActionLabel,
+  configureRuntimeServices({ canvas: canvasServices, useToast, HelpBadge, FolderCategoryFields, requestHelpTip, GlobalModelPicker, installActionLabel,
     useFocusTrap, useCapabilities, localEngineUnavailableReason, postJsonResult, hasContributions, useSliderLock, controlHeight, paginate,
     ui: { H3LoraPicker, Card, SecretField, TextField, StatusBadge, ResetToDefault, EngineCard, SettingsLink,
       PexelsAttribution, InstallRunner, KleinModelSetting, PromptOverrideField, PluginSlot, LocationEditor,

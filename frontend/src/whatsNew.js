@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-21-dataset-folder-categories', date: '2026-10-21', title: 'Organize Dataset Folders',
+    blurb: 'Choose Character, Style or Miscellaneous for new Dataset folders. A configured destination keeps them under LDS with an abbreviated name and stable number. Existing folders stay in place.',
+    to: '/guide/settings-reference#new-media-destinations',
+  },
+  {
     id: '2026-10-20-zz-anima-character-captions', date: '2026-10-20', title: 'Refine Anima Captions',
     blurb: 'Anima character captions request visible scene details without invented names or filler. Prose stays supported. Training adds the character trigger, and ZIP export avoids repeated trigger prefixes.',
     to: '/guide/dataset-guide',

@@ -379,7 +379,7 @@ export default function StorageSection({
       <SettingsGroup {...groupProps(locationsGroup)}>
       <LocationEditor id="dataset-images-root" storageKey="datasets"
         label="Dataset images root" section="paths" field="dataset_images_root"
-        help="Stores manual datasets and Bank promotions. New folders use five-digit IDs, such as 00001. Move existing files when changing this root to keep current datasets available."
+        help="The installation policy places new Datasets under its LDS subfolder, with category, abbreviated name and number. Existing datasets keep their locations."
         {...shared('datasets')} />
 
       </SettingsGroup>

@@ -93,7 +93,8 @@ def video_dataset_create():
     try:
         out = intake.create(LOCAL_USER, name=data.get('name'),
             target_profile=data.get('target_profile'), frames=data.get('frames'),
-            size=data.get('size'), trigger_word=data.get('trigger_word'))
+            size=data.get('size'), trigger_word=data.get('trigger_word'),
+            folder_category=data.get('folder_category'))
     except (TypeError, ValueError) as exc:
         return jsonify({'error': str(exc)}), 400
     return jsonify({'ok': True, **out}), 201

@@ -34,5 +34,5 @@ test('Storage renders a labeled path with Browse and explicit validation', () =>
   assert.match(html, /id="dataset-images-root"/);
   assert.match(html, />Browse<|>\s*Browse\s*</);
   assert.match(html, /Check Folder/);
-  assert.match(html, /five-digit IDs/);
+    assert.match(html, /category, abbreviated name and number/);
 });

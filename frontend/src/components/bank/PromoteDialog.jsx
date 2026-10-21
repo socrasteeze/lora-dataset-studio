@@ -6,6 +6,8 @@ import {
   weightNotice,
 } from './bankPromote.js'
 import { triggerWarning } from '../dataset/newDataset.js'
+import FolderCategoryFields from '../dataset/FolderCategoryFields.jsx'
+import { categoryForKind } from '../common/folderNaming.js'
 import { settingsLinkHref } from '../common/settingsLinkHref'
 
 /** ⬆ Promote: copy the selection somewhere it can be worked on. THREE
@@ -39,6 +41,10 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
   // existing dataset's trigger only surfaces much later, at training-queue time.
   const [newDsName, setNewDsName] = useState(sourceBankName || '')
   const [newDsTrigger, setNewDsTrigger] = useState('')
+  const [newDsKind, setNewDsKind] = useState('character')
+  const [conceptDesc, setConceptDesc] = useState('')
+  const [folderCategory, setFolderCategory] = useState(null)
+  const [destinationReady, setDestinationReady] = useState(false)
   const [promotable, setPromotable] = useState(null)
   const [size, setSize] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -80,6 +86,7 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
     if (!canStartPromote({
       destination, datasetId, bankName, busy,
       datasetName: newDsName, datasetTrigger: newDsTrigger,
+      datasetKind: newDsKind, conceptDesc, destinationReady,
     })) return
     setBusy(true)
     try {
@@ -97,7 +104,9 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
       } else if (destination === 'new-dataset') {
         await postJson(`/api/bank/${bankId}/promote-to-new-dataset`, {
           name: newDsName.trim(),
-          trigger_word: newDsTrigger.trim(),
+          trigger_word: newDsKind === 'style' ? '' : newDsTrigger.trim(),
+          kind: newDsKind, concept_desc: conceptDesc.trim(),
+          folder_category: folderCategory || categoryForKind(newDsKind),
           image_ids: useSelection ? selectedIds : [],
           ...(collectionId != null ? { collection_id: collectionId } : {}),
         })
@@ -177,7 +186,19 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
                 placeholder="Emma"
                 className="mt-1 w-full rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content" />
             </div>
-            <div>
+            <label className="flex flex-col gap-1 text-sm">Dataset Type
+              <select value={newDsKind} onChange={(event) => setNewDsKind(event.target.value)} disabled={busy}
+                className="min-h-10 rounded border border-border bg-surface-raised px-2 text-content">
+                <option value="character">Character</option><option value="concept">Concept</option><option value="style">Style</option>
+              </select>
+            </label>
+            {newDsKind === 'concept' && <label className="flex flex-col gap-1 text-sm">Concept Description
+              <textarea value={conceptDesc} maxLength={500} onChange={(event) => setConceptDesc(event.target.value)}
+                className="min-h-10 rounded border border-border bg-surface-raised p-2 text-content" />
+            </label>}
+            <FolderCategoryFields name={newDsName} category={folderCategory || categoryForKind(newDsKind)}
+              onChange={setFolderCategory} onReady={setDestinationReady} disabled={busy} />
+            {newDsKind !== 'style' && <div>
               <label htmlFor="promote-new-dataset-trigger" className="block text-sm font-medium text-content">
                 Trigger word
               </label>
@@ -194,12 +215,8 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
                   ⚠ {triggerWarning(newDsTrigger, datasets)}
                 </p>
               )}
-            </div>
-            <p className="text-xs text-content-subtle">
-              A character dataset with the usual defaults. Concept or style, the target
-              model and the fidelity all live in the dataset's own settings afterwards —
-              nothing here is locked in.
-            </p>
+            </div>}
+            <p className="text-xs text-content-subtle">Dataset type controls captions and import. Folder category only labels the folder.</p>
           </div>
         ) : toBank ? (
           <div>
@@ -242,7 +259,7 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
 
         {!toBank && (
           <p className="text-xs text-content-subtle">
-            Dataset folders use the shared Storage location.{' '}
+            New Datasets follow the installation destination when configured. Existing Datasets keep their location.{' '}
             <a href={settingsLinkHref('storage', 'dataset-images-root')}
               target="_blank" rel="noreferrer"
               className="inline-flex min-h-10 items-center underline lg:min-h-0">
@@ -260,6 +277,7 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
             disabled={!canStartPromote({
               destination, datasetId, bankName, busy,
               datasetName: newDsName, datasetTrigger: newDsTrigger,
+                datasetKind: newDsKind, conceptDesc, destinationReady,
             })}
             className="rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-50">
             {promoteButtonLabel({ destination, busy })}

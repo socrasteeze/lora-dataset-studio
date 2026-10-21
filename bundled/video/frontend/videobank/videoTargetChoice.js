@@ -198,7 +198,7 @@ export function promoteProblem({ name, target, frames }) {
  * as a resize and anything else as "keep the source's size", so sending a lone
  * width would silently be ignored. */
 export function promotePayload({ name, targetKey, frames, size, ids, edgeInsetS,
-                                 maxPerSource, triggerWord, sliceLong }) {
+                                 maxPerSource, triggerWord, sliceLong, folderCategory }) {
   const body = {
     name: (name || '').trim(),
     target_profile: targetKey,
@@ -223,6 +223,7 @@ export function promotePayload({ name, targetKey, frames, size, ids, edgeInsetS,
   // the server treats absence and empty the same on purpose.
   const trig = (triggerWord || '').trim()
   if (trig) body.trigger_word = trig
+  if (folderCategory) body.folder_category = folderCategory
   // Omitted unless asked for: the default has always been "one clip per shot",
   // and a key that is always present invites a later default flip.
   if (sliceLong) body.slice_long = true

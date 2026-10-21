@@ -77,17 +77,41 @@ def dataset_folder_conflict(folder, *, datasets_root=None) -> dict | None:
     """The refusal payload for a folder that would make a bank share a dataset's
     files, or None when the folder is the user's own and shares nothing.
 
-    Every dataset stores its images at ``dataset_images_root()/<dataset id>``
-    (see ``services.dataset_storage``), so ONE comparison against that root
-    settles every dataset at once — no per-dataset walk, and datasets created
-    after this check still land on the right side of it.
+    Check the legacy root, new creation destinations and recorded dataset
+    locations. No media tree is walked; a changed creation policy must not
+    permit a Bank to share an older dataset's files.
 
     Returns {'relation', 'scope', 'dataset_id', 'path', 'message'} where scope is
     'dataset' (this folder is one dataset's storage, or sits inside it) or 'root'
     (it is the datasets root itself, or a folder containing it)."""
-    try:
-        root = str(datasets_root) if datasets_root else str(cfg.dataset_images_root())
-    except OSError:
+    if datasets_root is None:
+        from flask import has_app_context
+        from ..models import FaceDataset, VideoDataset
+
+        try:
+            roots = [cfg.dataset_images_root()]
+        except OSError:
+            roots = []
+        for kind in ('datasets', 'video_datasets'):
+            try:
+                root = cfg.creation_root(kind)
+            except ValueError:
+                continue  # A broken new-media policy cannot hide existing items.
+            if root is not None:
+                roots.append(root)
+        if has_app_context():
+            roots.extend(row.storage_root for row in FaceDataset.query.filter(
+                FaceDataset.storage_root.isnot(None)).all() if row.storage_root)
+            # Video rows already own full output paths, not just roots.
+            roots.extend(row.output_dir for row in VideoDataset.query.all() if row.output_dir)
+        for root in dict.fromkeys(str(root) for root in roots):
+            conflict = dataset_folder_conflict(folder, datasets_root=root)
+            if conflict:
+                return conflict
+        return None
+    root = str(datasets_root)
+    from ..creation_destinations import is_flat_root, dataset_namespace_conflict
+    if is_flat_root(root) and not dataset_namespace_conflict(folder, root):
         return None
     rel = relation(folder, root)
     if rel is None:

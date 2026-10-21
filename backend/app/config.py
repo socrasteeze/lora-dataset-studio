@@ -1634,6 +1634,15 @@ def aitoolkit_path(kind: str):
         return root / 'config' / 'generated'
     raise KeyError(kind)
 
+def creation_root(kind: str) -> Path | None:
+    from .creation_destinations import destination
+    return destination(kind)
+
+
+def new_dataset_images_root() -> Path:
+    return creation_root('datasets') or dataset_images_root()
+
+
 def dataset_images_root() -> Path:
     p = get('paths.dataset_images_root') or ''
     root = Path(p) if p else _data_dir() / 'datasets'

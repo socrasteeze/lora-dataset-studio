@@ -134,3 +134,26 @@ def test_short_or_broken_upload_leaves_no_training_files(client, clip):
     assert 'too short' in data['import_activity']['detail']
     assert 'not video' in data['import_activity']['detail']
     assert list(Path(data['output_dir']).iterdir()) == []
+
+
+def test_direct_video_creation_uses_category_destination_and_keeps_existing_output(client, app, tmp_path, monkeypatch):
+    import json
+    from app import creation_destinations
+    from lds_video.models import db, VideoDataset
+    policy = tmp_path / 'policy.json'
+    root = tmp_path / 'sets'
+    policy.write_text(json.dumps({'root': str(root)}), encoding='utf-8')
+    monkeypatch.setattr(creation_destinations, 'POLICY_PATH', policy)
+    result = _create(client, name='Amber art', folder_category='style')
+    assert result.status_code == 201, result.get_json()
+    data = result.get_json()
+    expected = root / 'LDS' / f"STYL-AMBE-ART_LDS{data['id']:04d}"
+    assert Path(data['output_dir']) == expected and expected.is_dir()
+    assert data['folder_category'] == 'style'
+    policy.write_text('{', encoding='utf-8')
+    with app.app_context():
+        row = db.session.get(VideoDataset, data['id'])
+        row.name = 'Changed display name'
+        db.session.commit()
+        assert svc.dataset_dir(row.id) == expected
+    assert _create(client).status_code == 400

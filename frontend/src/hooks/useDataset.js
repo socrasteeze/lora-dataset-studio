@@ -359,9 +359,9 @@ export function useDataset() {
 
   const open = useCallback(async (id) => { setCurrentId(id); await refresh(id); }, [refresh, setCurrentId]);
 
-  const create = useCallback(async (name, trigger, kind, conceptDesc, trainType, fidelity) => {
+  const create = useCallback(async (name, trigger, kind, conceptDesc, trainType, fidelity, folderCategory) => {
     const d = await postJson('/api/dataset/create',
-      { name, trigger_word: trigger, ...(kind ? { kind } : {}),
+      { name, trigger_word: trigger, folder_category: folderCategory, ...(kind ? { kind } : {}),
         ...(trainType ? { train_type: trainType } : {}),
         ...(fidelity ? { fidelity } : {}),
         ...(kind === 'concept' && conceptDesc ? { concept_desc: conceptDesc } : {}) });

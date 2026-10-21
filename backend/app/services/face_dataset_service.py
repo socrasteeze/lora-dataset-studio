@@ -1476,7 +1476,7 @@ def face_scoring_block_reason(ds):
 
 def create_dataset(user_id, name, trigger_word, kind=None, concept_desc=None, train_type=None,
                    fidelity=None, prompt_suffix=None, prompt_suffixes=None, subject_type=None,
-                   *, commit=True):
+                   *, folder_category=None, commit=True):
     """Create a dataset and return its row.
 
     ``commit=False`` is reserved for callers that need to coordinate the row with
@@ -1490,7 +1490,21 @@ def create_dataset(user_id, name, trigger_word, kind=None, concept_desc=None, tr
         # The concept description is what the captioner OMITS; without it the
         # inverted-caption logic has nothing to bind the trigger to. Required.
         raise ValueError('concept_desc required for a concept dataset')
-    ds = FaceDataset(user_id=str(user_id), name=(name or '').strip()[:100],
+    from ..creation_destinations import normalize_category
+    category = normalize_category(folder_category, default=('character' if k is None else
+                                                          'style' if k == 'style' else 'miscellaneous'))
+    creation_root = cfg.creation_root('datasets')
+    dataset_id = None
+    basename = None
+    if creation_root is not None:
+        from ..creation_destinations import reserve_folder
+        latest = FaceDataset.query.order_by(FaceDataset.id.desc()).first()
+        dataset_id, folder = reserve_folder(creation_root, 'LDS', name=name, category=category,
+                                            minimum=(latest.id + 1 if latest else 1))
+        basename = folder.name
+    ds = FaceDataset(id=dataset_id, user_id=str(user_id), name=(name or '').strip()[:100],
+                     storage_root=str(creation_root) if creation_root else None,
+                     storage_basename=basename, folder_category=category,
                      trigger_word=(trigger_word or '').strip()[:60] or 'zchar',
                      # concept_desc applies only to concepts. Styles have no named concept to
                      # omit: their caption prompt describes content rather than rendering.
@@ -3604,6 +3618,7 @@ def _write_backup_zip_locked(user_id: int, dataset_id: int,
         'format': BACKUP_FORMAT, 'version': BACKUP_VERSION,
         'name': ds.name, 'trigger_word': ds.trigger_word,
         'kind': ds.kind, 'fidelity': ds.fidelity,
+        'folder_category': ds.folder_category,
         'concept_desc': ds.concept_desc, 'concept_terms': ds.concept_terms,
         'train_type': ds.train_type,
         # Optional in backup v1: old archives omit it and restore as LoRA.
@@ -4186,7 +4201,8 @@ def _bkp_restore_validated(user_id: int, z: zipfile.ZipFile, manifest,
     # Extract first into a sibling directory: it is on the same volume as the final
     # dataset folder, so promotion is a single rename.  The database transaction is
     # only opened after extraction succeeds; no empty dataset can become visible.
-    root = str(cfg.dataset_images_root())
+    root = str(cfg.new_dataset_images_root())
+    os.makedirs(root, exist_ok=True)
     staging_dir = os.path.join(root, f'.restore-{uuid.uuid4().hex}.tmp')
     os.mkdir(staging_dir)
     final_dir = None
@@ -4232,7 +4248,8 @@ def _bkp_restore_validated(user_id: int, z: zipfile.ZipFile, manifest,
         db_started = True
         ds = create_dataset(user_id, name, trigger, kind=manifest.get('kind'),
                             concept_desc=manifest.get('concept_desc'),
-                            train_type=manifest.get('train_type'), commit=False)
+                            train_type=manifest.get('train_type'),
+                            folder_category=manifest.get('folder_category'), commit=False)
         for field in ('concept_terms', 'train_variant', 'train_settings',
                       'best_settings', 'fidelity'):
             setattr(ds, field, manifest.get(field))
@@ -4242,6 +4259,9 @@ def _bkp_restore_validated(user_id: int, z: zipfile.ZipFile, manifest,
         ds.ref_original_filename = _backup_basename(
             manifest.get('ref_original_filename'))
         final_dir = _dataset_path(ds.id)
+        if ds.storage_root:
+            # Remove only the empty folder this restore just reserved.
+            os.rmdir(final_dir)
         if os.path.exists(final_dir):
             # Never merge with or delete a pre-existing orphan directory.
             raise RuntimeError(f'dataset folder already exists for id {ds.id}')
@@ -5361,6 +5381,8 @@ def dataset_payload(user_id, dataset_id):
         'train_base_model': ds.train_base_model or '',
         'train_variant': ds.train_variant,
         'kind': (ds.kind or 'character'),
+        'folder_category': ds.folder_category,
+        'storage_basename': ds.storage_basename,
         # WHAT the subject is (NULL/legacy -> 'human'); drives the generation
         # catalog + identity lock. Orthogonal to `kind`.
         'subject_type': subject_type_of(ds),

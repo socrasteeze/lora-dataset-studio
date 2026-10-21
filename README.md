@@ -15,6 +15,9 @@ The current instance stays **Default**. One profile runs at a time. The in-app
 Profiles popup switches with a controlled restart. Move a Bank between profiles
 with its metadata and cached analysis preserved while source images stay in place.
 
+New Dataset creation can use a private [installation destination](docs/guide/settings-reference.md#new-media-destinations),
+with category/name folders under `LDS`. Existing datasets and Banks keep their locations.
+
 The core and the ten bundled plugins are free under the [PolyForm Noncommercial license](LICENSE). The core needs no account. This fork does not send usage statistics, rent a GPU, or install extra plugins.
 
 <table>

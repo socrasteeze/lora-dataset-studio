@@ -215,3 +215,11 @@ products using the API1.8 model-download or native Cloud contracts must declare
 API 1.9: `improve.engine` / `improve.editor` provide complete optional image improvement. The shared inference module exposes active choices and historical labels; `/lora` contains shared LoRA normalization, and `ui.PromptOverrideField` edits global prompts.
 
 API 1.10 adds `ui.H3LoraPicker` with an explicit product `apiBase`, and `/h3` for shared LoRA grouping and frame rules. Live and Video use these primitives while owning separate screens, installation and history.
+
+### Dataset creation category
+
+`FolderCategoryFields` from `@lds/plugin-sdk` renders the host category selector
+and read-only destination preview. Pass `name`, canonical `category`, `onChange`,
+`onReady`, and optional `disabled`. Block creation while `onReady(false)` applies.
+The host validates the final category and allocates the number during creation.
+Categories are `character`, `style`, and `miscellaneous`, independent of training kind.

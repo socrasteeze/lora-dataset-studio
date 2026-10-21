@@ -1,3 +1,4 @@
+import { FolderCategoryFields } from '@lds/plugin-sdk'
 import { useEffect, useMemo, useState } from 'react'
 import { apiFetch, postJson } from '@lds/plugin-sdk';
 import { useToast } from '@lds/plugin-sdk';
@@ -40,6 +41,8 @@ export default function PromoteVideoDialog({
   const [targets, setTargets] = useState(null)
   const [targetKey, setTargetKey] = useState('')
   const [name, setName] = useState('')
+  const [folderCategory, setFolderCategory] = useState('miscellaneous')
+  const [destinationReady, setDestinationReady] = useState(false)
   const [triggerWord, setTriggerWord] = useState('')
   const [frames, setFrames] = useState(null)
   const [sizeKey, setSizeKey] = useState('source')
@@ -117,13 +120,13 @@ export default function PromoteVideoDialog({
 
   const submit = async (e) => {
     e.preventDefault()
-    if (busy || problem) return
+    if (busy || problem || !destinationReady) return
     setBusy(true)
     setError(null)
     try {
       const d = await postJson(`/api/video-bank/${bankId}/promote`,
         promotePayload({ name, targetKey, frames, size, ids: selectedIds, sliceLong,
-          edgeInsetS: edgeInset, maxPerSource, triggerWord }))
+          edgeInsetS: edgeInset, maxPerSource, triggerWord, folderCategory }))
       toast.success(`Building “${d.name}” — ${d.clips} clip(s) being encoded.`)
       // Said out loud rather than left in the job line: these clips were removed
       // by the user's OWN setting, and it is the only limit here they can undo.
@@ -195,6 +198,7 @@ export default function PromoteVideoDialog({
         </div>
 
         <div>
+          <FolderCategoryFields name={name} category={folderCategory} onChange={setFolderCategory} onReady={setDestinationReady} disabled={busy} />
           <label htmlFor="video-ds-trigger" className="block text-sm font-medium text-content">
             Trigger word <span className="font-normal text-content-subtle">(optional)</span>
           </label>
@@ -343,7 +347,7 @@ export default function PromoteVideoDialog({
             className="rounded-md border border-border px-3 py-1.5 text-sm text-content hover:bg-surface-raised">
             Cancel
           </button>
-          <button type="submit" disabled={busy || !!problem} title={problem || undefined}
+          <button type="submit" disabled={busy || !destinationReady || !!problem} title={problem || undefined}
             className="rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-40">
             {busy ? 'Starting' : `🎬 Encode ${promoteScopeLabel((selectedIds || []).length, keepCount)}`}
           </button>

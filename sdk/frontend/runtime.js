@@ -49,3 +49,8 @@ export function registerPlugin(descriptor) {
   if (!accepted) throw new Error(`LDS refused the descriptor for ${descriptor?.id || 'this plugin'}.`)
   return descriptor
 }
+
+export function FolderCategoryFields(props) {
+  const host = runtime()
+  return host.React.createElement(host.FolderCategoryFields, props)
+}

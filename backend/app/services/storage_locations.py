@@ -64,7 +64,7 @@ _DEFS = (
     {'key': 'datasets', 'label': 'Dataset images',
      'section': 'paths', 'field': 'dataset_images_root',
      'resolve': cfg.dataset_images_root,
-     'holds': 'Every image of every dataset, plus its captions and masks.'},
+     'holds': 'Legacy dataset images, captions and masks. New media uses the installation policy when configured.'},
     {'key': 'banks', 'label': 'Image banks (working data)',
      'section': None, 'field': None,
      'resolve': cfg.banks_root,
@@ -161,6 +161,22 @@ def locations() -> list:
             'configured': configured,
             'relocatable': bool(d['section'] and d['field']),
         })
+    for kind, label in (('datasets', 'New Datasets'),
+                        ('video_datasets', 'New Video Datasets')):
+        try:
+            path = cfg.creation_root(kind)
+        except ValueError as exc:
+            out.append({'key': f'creation_{kind}', 'label': label,
+                        'holds': str(exc), 'path': '', 'exists': False,
+                        'section': None, 'field': None, 'configured': '',
+                        'relocatable': False})
+            continue
+        if path is not None:
+            out.append({'key': f'creation_{kind}', 'label': label,
+                        'holds': 'New media only. Existing files keep their locations.',
+                        'path': str(path), 'exists': path.is_dir(),
+                        'section': None, 'field': None, 'configured': '',
+                        'relocatable': False})
     return out
 
 

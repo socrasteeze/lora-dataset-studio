@@ -1,5 +1,19 @@
 # HANDOFF
 
+## Pending Dataset folder categories (2026-10-21)
+
+Task branch: `fix/dataset-folder-categories-20261021`. New creation uses a private
+installation root plus the app subfolder and category/description/app-ID name.
+The category and final location persist independently of display-name changes.
+Legacy paths, append targets, Bank sources, and unrelated exports remain unchanged.
+No production data, schema, allocation ledger, or service was changed by this work.
+
+Regression cases are prepared but unrun. The owner has not authorized cloud tests;
+local tests, builds, installs, and restarts remain prohibited. Static source checks
+are the available validation, not qualification. Finish the required delivery gates
+before merging. Preserve the earlier state below and other active worktrees.
+
+
 ## ATK recipe controls (2026-10-20)
 
 Image LoRA settings retain Automagic3 LR limits, layer exclusions, caption dropout, RAM latent caching, encoder/guidance flags and preview overrides through validated presets and run snapshots. Training trigger punctuation is preserved separately from safe filesystem identifiers.
