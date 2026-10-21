@@ -147,14 +147,13 @@ npm run lint
 ```
 
 ### Carried-forward upstream review
-On 2026-10-19, upstream's default branch remained v2 at 1a150ab4c6eb50ccd887d8e6b2675430fb2dca5c. v1 remained 3fe3d4f0e29e28de583a6e22bce886c35e5ecd3f. The review started at fork acf4ee146, with merge base d13337cc3. The previous reviewed SHA d566904e4 matched Overwatch and is an ancestor of the new head. The review window contains 7 commits; raw ancestry counts are not missing features.
+On 2026-10-21, upstream's default branch remained v2 at 2e2cbb4c2a0961ee47c6680a4a3792263091cdb9. v1 remained 3fe3d4f0e29e28de583a6e22bce886c35e5ecd3f. The review started at fork 6df8491fa, with merge base d13337cc3. The previous reviewed SHA 1a150ab4c matched Overwatch and is an ancestor of the new head. The review window contains 4 commits; raw ancestry counts are not missing features.
 
 | Upstream commits | Class and evidence |
 | --- | --- |
-| ceda138f1, b6a59b17d | REJECT. Patreon membership features on plugin catalog cards conflict with Distribution and Divergence 12. The catalog was removed in 6c056974f; `patreon_core.py` never existed in the fork. The What's New entry drops with the feature, per the 2026-10-18 Patreon precedent. |
-| ba60ca167, 87d4d8984 | SKIP-BUILD. Rebuild the fork bundle from its own source. |
-| bd5e42e6f | REJECT. Retain the fork version (`+fork`) and `APP_RELEASE_CHANNEL`. |
-| d0fbe41c7 | REJECT. Docker Ollama test timeout; the test was deleted with the packaged-image path in ad0439ff9 (Distribution, Divergence 5). |
-| 1a150ab4c | REJECT. Test fixture binds `lds_cloud_training.public_api_v1`; the cloud_training plugin is excluded in `fork-plugins.json` and removed in d9e94fc21 (Divergence 4). No fork test enables it, so the race cannot occur. |
+| 64ae2ce57 | PORT, deferred. Full-backup and dataset-archive restores lose the 2 GiB ceiling, stage uploads on the data drive with a free-space check (JSON 507), and add `GET /api/backup/full/restore/space`. No divergence blocks it and the new route is local, so the outbound gate is unaffected. It conflicts with main in `backend/app/__init__.py`, `frontend/src/hooks/useDataset.js` and `frontend/src/whatsNew.js`, and overlaps the uncommitted destination-policy work in `__init__.py`, `full_backup.py` and `whatsNew.js`. `test_full_backup.py` carries a small fork patch (Divergence 5); keep it when resolving. Port on a task branch after the destination-policy work lands. |
+| 80db925ed | REJECT. Retain the fork version (`+fork`) and `APP_RELEASE_CHANNEL`. |
+| e2d714b98 | SKIP-BUILD. Rebuild the fork bundle from its own source. |
+| 2e2cbb4c2 | REJECT. Checkpoint-resume changes live only in `bundled/cloud_training` and its tests; that plugin is absent from the fork (Divergence 4). |
 
-Decision: nothing ported. A later review starts after `1a150ab4c`. Do not merge upstream/v1 or upstream/v2.
+Decision: nothing ported; 64ae2ce57 stays an open port. A later review starts after `2e2cbb4c2`. Do not merge upstream/v1 or upstream/v2.
