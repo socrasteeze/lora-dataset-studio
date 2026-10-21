@@ -1224,7 +1224,8 @@ on that drive.
 
 - **Dataset images root** → `paths.dataset_images_root`. Leave it blank for
   `<data dir>/datasets`. This shared location stores manually created datasets and
-  Bank promotions. New dataset folders use a minimum of five digits, such as
+  Bank promotions when no installation destination policy exists. A policy takes priority for new media only.
+  Without a policy, dataset folders use a minimum of five digits, such as
   `00001` and `00042`; larger IDs are not truncated. Existing unpadded folders
   remain in use and are not renamed. Bank promotion links to this setting.
   To change it, use **Browse** to select a folder on the host, or type an absolute
@@ -1609,10 +1610,10 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `console.level` | What the start.bat / run.py terminal narrates from the activity log: `off` (silent), `events` (default — one line per state change), `heartbeat` (plus a line per running job every `console.heartbeat_seconds`), `all` (plus progress ticks, throttled to at most one per job per second). Same events the 📋 Activity panel shows. Overridable by `LDS_CONSOLE`. Config.json only — no Settings UI. |
 | `console.heartbeat_seconds` | Interval for heartbeat lines when `console.level` is `heartbeat` or `all` (default `30`, clamped 5–600). |
 | `diagnostics.db_trace_seconds` | Seconds a database write may be held before the log reports which thread is holding it and what opened it. `0` (default) = off. The database allows one writer at a time, so a background pass that holds it too long makes everything else — a ✓ on an image, a second machine's check-in — fail with "the database is busy". This is how you find out which pass. Turn it on only while investigating; it costs nothing when off but adds a log line per slow write when on. Overridable by `LDS_DB_TRACE`. Config.json only — no Settings UI. |
-| `paths.dataset_images_root` | Where dataset images are stored. Empty string defaults to `<data dir>/datasets`. |
+| `paths.dataset_images_root` | Legacy dataset images and the fallback for new creation without an installation destination. Empty string defaults to `<data dir>/datasets`. |
 | `paths.cloud_runs_dir` | Working area of cloud training runs (dataset copy, samples, logs). Empty string defaults to `<data dir>/cloud_runs`. |
 | `paths.checkpoints_dir` | Durable store for the checkpoints cloud runs produce. Empty string defaults to `<data dir>/checkpoints`. No cleanup ever removes a file from it. |
-| `paths.video_datasets_dir` | Where promoted video datasets are written — a flat folder of `.mp4` clips with homonym `.txt` captions per dataset. Empty string defaults to `<data dir>/video_datasets`. |
+| `paths.video_datasets_dir` | Legacy video datasets and the fallback without an installation destination. Each contains `.mp4` clips with homonym `.txt` captions. Empty string defaults to `<data dir>/video_datasets`. |
 | `dataset_import.max_side` | Longest side for opt-in WebP normalization (default `1024`; `0` = original size). It is ignored by the default `preserve` mode; ratio is always preserved, never enlarged, and normalized paths clamp at 8192 px. Every source must still fit `image_input.*` below; a larger one is rejected and must be resized before import (or the budget raised). Not retroactive. Editable in Settings → Captioning & quality. |
 | `dataset_import.encoding` | How an un-cropped imported image is written: `preserve` (default; original JPG/JPEG, PNG, WebP or BMP bytes with the matching extension), or the opt-in WebP modes `standard` (q92), `high` (q100), and `lossless`. Auto head-crop is always a derived WebP. The `image_input.*` budget applies to every mode. Editable in Settings → Captioning & quality. |
 | `image_input.max_pixels` | Largest source image any lane may decode, in pixels (default `67108864` = 64 Mi-pixels; `0` = no limit). A memory budget: ~3 bytes per decoded RGB pixel, and an edit or analysis pass can hold a second copy. Read by dataset import, ZIP/scrape ingest, Bank scan and thumbnails, edits, ComfyUI staging and Ollama vision. Bank *inference workers* keep their own fixed 16 Mi-pixel guard. Editable in Settings → Captioning & quality. |
@@ -1709,3 +1710,50 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `updates.repo` | Legacy updater configuration retained for compatibility. Online update APIs are disabled in this fork. |
 
 Additional config-file-only keys (ComfyUI folder overrides, cloud internals, quality-tool interpreters, Klein consistency LoRA) are documented in [Config-file-only settings](#config-file-only-settings) above.
+
+
+## New media destinations
+
+The installation can keep a private, gitignored `dataset-destinations.json`
+beside its launcher. Its `root` field selects an absolute parent for newly
+created Datasets. The app adds its own `LDS` or `DSM` subfolder. This policy
+overrides saved defaults and environment paths only for creation. A missing
+policy preserves portable defaults; an invalid policy stops creation.
+
+Choose **Character (CHAR)**, **Style (STYL)**, or **Miscellaneous (MISC)** before
+creation. Category is independent of training kind, concepts, and captions.
+The display name stays separate from the folder name. A synthetic example is
+`STYL-AMBE-ART_LDS0001` or `STYL-AMBE-ART_DSM0001` for the name `Amber-art`.
+Spaces, hyphens, underscores, and other punctuation split words. Each ASCII
+word contributes up to four uppercase letters or digits. Compatible accented
+letters normalize to ASCII; unsupported characters are removed. A name with
+no remaining words uses `DATA`. Basenames are capped at 64 characters by
+trimming the description, preserving the category and app/number suffix.
+
+The preview uses `####` until allocation. Numbers have at least four digits,
+are shared across profiles and categories within each app, and are not reused
+after deletion. LDS images and Video Datasets share its sequence. The allocator
+also skips existing folder numbers and IDs already used by the current catalog;
+gaps or a first number above one are expected. `.dataset-folders.json` and its
+short-lived exclusive lock live in each app subfolder. Keep the allocation
+record. A lock left by an interrupted process needs review before creation.
+
+The app stores the category and final location at creation. Later name or
+category metadata edits never recompute the folder name. Existing records keep
+their paths and may remain uncategorized. Appending inherits the target's
+location and category. No setting change renames or moves existing files.
+Copied subfolders, captions, manifest members, and explicit relocation flows
+retain their existing behavior.
+
+These are separate app-owned Datasets. Shared images do not make database IDs,
+manifests, caches, revisions, or deletion ownership interchangeable. Neither app
+can safely edit the other app's Dataset as its own. Training, model, cache, and
+unrelated export destinations keep their existing behavior.
+
+Image creation suggests Character for Character kind, Style for Style kind,
+and Miscellaneous for Concept kind. The suggestion is overridable without
+changing training behavior. Bank promotion offers the same choices. New Video
+Datasets default to Miscellaneous; image-to-stills conversion inherits the
+image Dataset category, falling back to the same training-kind mapping for legacy records.
+Banks remain source folders with their existing storage and naming behavior.
+Opening an existing Bank is unchanged.

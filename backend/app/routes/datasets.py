@@ -87,6 +87,15 @@ def _zip_download(write_zip, filename):
         raise
 
 
+@bp.get('/dataset/creation-options')
+def dataset_creation_options():
+    try:
+        root = cfg.creation_root('datasets')
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify({'root': str(root) if root is not None else None})
+
+
 @bp.post('/dataset/create')
 def dataset_create():
     data = request.get_json(silent=True) or {}
@@ -107,7 +116,8 @@ def dataset_create():
                                 fidelity=data.get('fidelity'),
                                 prompt_suffix=data.get('prompt_suffix'),
                                 prompt_suffixes=data.get('prompt_suffixes'),
-                                subject_type=data.get('subject_type'))
+                                subject_type=data.get('subject_type'),
+                                folder_category=data.get('folder_category'))
     except ValueError as e:
         # concept dataset without a concept description -> 400 (not a 500)
         return jsonify({'error': str(e)}), 400

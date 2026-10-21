@@ -9,6 +9,8 @@ import { Button, Chip, Input, btnClass, btnShape, fieldClass } from '../common/C
 import Pagination from '../common/Pagination.jsx';
 import { HelpBadge } from '../../help/HelpMode';
 import { canCreateDataset } from './newDataset';
+import FolderCategoryFields from './FolderCategoryFields.jsx';
+import { categoryForKind } from '../common/folderNaming.js';
 import { useUnsavedWork } from '../../hooks/useUnsavedWork';
 import { settingsLinkHref } from '../common/settingsLinkHref';
 import { requestHelpTip } from '../../help/helpTips';
@@ -217,6 +219,8 @@ function NewDatasetForm({ onCreate, onClose }) {
   // Dataset kind: character (identity bound to the trigger) or concept (recurring action/effect
   // bound to the trigger, with raw import, inverse captions and no reference/face tools).
   const [kind, setKind] = useState('character');
+  const [folderCategory, setFolderCategory] = useState(null);
+  const [destinationReady, setDestinationReady] = useState(false);
   // The target model selected at creation sets the caption format immediately (SDXL = booru,
   // otherwise prose) and the menu group. It remains editable in the training panel. Default:
   // Z-Image, the app's default type.
@@ -224,7 +228,7 @@ function NewDatasetForm({ onCreate, onClose }) {
   // Concept only: what the captioner must OMIT from every caption so the concept binds to the
   // trigger, the inverse of a character LoRA. Required for concepts.
   const [conceptDesc, setConceptDesc] = useState('');
-  useUnsavedWork(!!(name.trim() || trigger.trim() || conceptDesc.trim()));
+  useUnsavedWork(!!(name.trim() || trigger.trim() || conceptDesc.trim() || folderCategory));
   // Character only: face fidelity (default) or face + body. Body mode excludes body markings from
   // captions and targets more body shots.
   const [fidelity, setFidelity] = useState('face');
@@ -236,7 +240,7 @@ function NewDatasetForm({ onCreate, onClose }) {
   // newDataset.js the moment ⬆ Promote gained a "🆕 A new dataset" door: two
   // copies of a rule that mirrors the server is two chances to stop mirroring
   // it. Same behaviour, now tested.
-  const canCreate = canCreateDataset({ name, trigger, kind, conceptDesc });
+  const canCreate = destinationReady && canCreateDataset({ name, trigger, kind, conceptDesc });
   return (
     <div id="new-dataset-form" className="mx-auto flex w-full max-w-4xl flex-col gap-2 rounded-xl border border-border bg-surface p-3">
       <div className="flex items-center justify-between gap-2">
@@ -267,13 +271,15 @@ function NewDatasetForm({ onCreate, onClose }) {
         <PluginPanel panelKey={`datasets.create:${media}`} importer={creator.panel} onClose={onClose} />
       ) : (<>
       <p className="text-xs text-content-subtle">
-        Dataset folders use the shared Storage location.{' '}
+        New Datasets follow the installation destination when configured. Existing Datasets keep their location.{' '}
         <a href={settingsLinkHref('storage', 'dataset-images-root')}
           target="_blank" rel="noreferrer"
           className="inline-flex min-h-10 items-center underline lg:min-h-0">
           Dataset Location
         </a>
       </p>
+      <FolderCategoryFields name={name} category={folderCategory || categoryForKind(kind)}
+        onChange={setFolderCategory} onReady={setDestinationReady} />
       {/*
        * Kind: character (default) or concept. Concept adapts the rest: raw import preserves aspect
        * ratio, captions retain identity, and reference photos and the variation generator are
@@ -380,7 +386,7 @@ function NewDatasetForm({ onCreate, onClose }) {
         </p>
         <button type="button"
           onClick={() => canCreate && onCreate(name.trim(), trigger.trim(), kind, conceptDesc.trim(), trainType,
-            (concept || style) ? undefined : fidelity)}
+            (concept || style) ? undefined : fidelity, folderCategory || categoryForKind(kind))}
           disabled={!canCreate}
           className={`ml-auto ${btnClass({ variant: 'primary' })}`}>
           Create

@@ -209,8 +209,15 @@ def _tree_bytes(root) -> int:
 def check_disk_space() -> dict:
     """Raise DiskSpaceError when the data volume can't hold the archive.
     Returns {'needed_bytes', 'free_bytes'} on success."""
-    root = cfg.dataset_images_root()
-    needed = int(_tree_bytes(root) * _DISK_HEADROOM_FACTOR) + _DISK_SAFETY_BYTES
+    from flask import has_app_context
+    from ..models import FaceDataset
+
+    roots = {str(cfg.dataset_images_root())}
+    if has_app_context():
+        from .dataset_storage import dataset_path
+        roots.update(dataset_path(row.id) for row in FaceDataset.query.filter(
+            FaceDataset.storage_root.isnot(None)).all() if row.storage_root)
+    needed = int(sum(_tree_bytes(root) for root in roots) * _DISK_HEADROOM_FACTOR) + _DISK_SAFETY_BYTES
     try:
         free = shutil.disk_usage(str(cfg.backups_dir())).free
     except OSError:

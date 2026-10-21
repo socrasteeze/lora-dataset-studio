@@ -302,3 +302,49 @@ def test_the_route_409s_a_busy_bank(app, client, source):
     assert r.get_json()['busy_kind'] == 'scan'
     with app.app_context():
         assert _dataset_count() == before
+
+
+def test_promotion_uses_installation_destination_despite_stale_settings(app, source, tmp_path, monkeypatch):
+    """Before the fix promotion followed paths.dataset_images_root. Cloud red/green pending."""
+    import json
+    from app import creation_destinations, config as cfg
+    from app.models import FaceDatasetImage
+    from app.services import image_bank_service as banks
+
+    policy = tmp_path / 'policy.json'
+    root = tmp_path / 'media'
+    policy.write_text(json.dumps({'root': str(root)}), encoding='utf-8')
+    monkeypatch.setattr(creation_destinations, 'POLICY_PATH', policy)
+    monkeypatch.delenv('LDS_PROFILE_ID', raising=False)
+    bank_id, _folder, ids = source
+    with app.app_context():
+        stale = tmp_path / 'stale'
+        cfg.save_config({'paths': {'dataset_images_root': str(stale)}})
+        new_id = banks.start_new_dataset_promote(app, 'local', bank_id, ids, 'Example', 'example')
+        expected = root / 'LDS' / f'CHAR-EXAM_LDS{new_id:04d}'
+        landed = FaceDatasetImage.query.filter_by(dataset_id=new_id).all()
+        assert len(landed) == len(ids)
+        assert all((expected / row.filename).is_file() for row in landed)
+        assert not (stale / f'{new_id:05d}').exists()
+
+
+def test_style_promotion_overrides_folder_category_without_changing_kind(app, client, source, tmp_path, monkeypatch):
+    import json
+    from app import creation_destinations
+    from app.extensions import db
+    from app.models import FaceDataset
+    from app.services.dataset_storage import dataset_path
+    from pathlib import Path
+    bank_id, _folder, ids = source
+    policy = tmp_path / 'policy.json'
+    root = tmp_path / 'sets'
+    policy.write_text(json.dumps({'root': str(root)}), encoding='utf-8')
+    monkeypatch.setattr(creation_destinations, 'POLICY_PATH', policy)
+    response = client.post(f'/api/bank/{bank_id}/promote-to-new-dataset', json={
+        'name': 'Amber art', 'kind': 'style', 'folder_category': 'miscellaneous', 'image_ids': ids,
+    })
+    assert response.status_code == 202, response.get_json()
+    with app.app_context():
+        row = db.session.get(FaceDataset, response.get_json()['id'])
+        assert row.kind == 'style' and row.folder_category == 'miscellaneous'
+        assert Path(dataset_path(row.id)) == root / 'LDS' / f'MISC-AMBE-ART_LDS{row.id:04d}'

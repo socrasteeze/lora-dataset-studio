@@ -704,6 +704,7 @@ def video_bank_promote(bank_id):
                                 max_per_source=data.get('max_per_source'),
                                 edge_inset_s=data.get('edge_inset_s'),
                                 trigger_word=data.get('trigger_word'),
+                                folder_category=data.get('folder_category'),
                                 slice_long=bool(data.get('slice_long')))
     except bank_jobs.BankJobBusy as e:
         return _busy(e)

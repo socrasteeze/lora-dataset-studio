@@ -84,6 +84,10 @@ const action = (id, title, keywords, route, chapter, anchor, tip) => ({
 });
 
 const TOPICS = [
+  { id: 'dataset-folder-category', kind: 'setting', title: 'Folder Category',
+    keywords: ['dataset', 'folder', 'category', 'CHAR', 'STYL', 'MISC', 'destination'],
+    guide: { chapter: 'settings-reference', anchor: 'new-media-destinations' },
+    app: { route: '/datasets' } },
   { id: 'auto-center-crop', kind: 'action', title: 'Auto-Crop',
     keywords: ['crop', 'center', 'subject', 'full body', 'blank space', 'framing', 'face', 'head'],
     guide: { chapter: 'using-the-app', anchor: 'auto-center-a-crop' },

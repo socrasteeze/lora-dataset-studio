@@ -8,6 +8,7 @@ import tempfile
 import uuid
 
 from lds_sdk.video_host import bank_jobs
+from lds_sdk.dataset_creation import normalize_category
 from lds_video import video_bank_service as svc, video_clip_export, video_probe, video_targets
 from lds_video.models import db, VideoDataset, VideoDatasetClip
 
@@ -16,7 +17,7 @@ def job_key(dataset_id):
     return f'video-dataset-import:{int(dataset_id)}'
 
 
-def create(user_id, *, name, target_profile, frames=None, size=None, trigger_word=None):
+def create(user_id, *, name, target_profile, frames=None, size=None, trigger_word=None, folder_category=None):
     name = str(name or '').strip()
     if not name or len(name) > 100:
         raise ValueError('Name must contain 1 to 100 characters.')
@@ -31,14 +32,17 @@ def create(user_id, *, name, target_profile, frames=None, size=None, trigger_wor
     ds = VideoDataset(user_id=user_id, name=name, target_profile=target_profile,
                       fps=profile['fps'], frames=frames, width=size[0] if size else None,
                       height=size[1] if size else None, trigger_word=trigger or None,
-                      output_dir='')
+                      output_dir='', folder_category=normalize_category(folder_category))
+    svc._reserve_dataset_folder(ds)
+    reserved = bool(ds.output_dir)
     db.session.add(ds)
     db.session.flush()
     folder = svc.dataset_dir(ds.id)
-    created_folder = False
+    created_folder = reserved
     try:
-        folder.mkdir(parents=True, exist_ok=False)
-        created_folder = True
+        if not reserved:
+            folder.mkdir(parents=True, exist_ok=False)
+            created_folder = True
         ds.output_dir = str(folder)
         db.session.commit()
     except Exception:

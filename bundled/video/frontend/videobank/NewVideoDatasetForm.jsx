@@ -1,3 +1,4 @@
+import { FolderCategoryFields } from '@lds/plugin-sdk'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { apiFetch, postJson, HelpBadge } from '@lds/plugin-sdk'
@@ -10,6 +11,8 @@ export default function NewVideoDatasetForm() {
   const [frames, setFrames] = useState('')
   const [sizeKey, setSizeKey] = useState('source')
   const [name, setName] = useState('')
+  const [folderCategory, setFolderCategory] = useState('miscellaneous')
+  const [destinationReady, setDestinationReady] = useState(false)
   const [trigger, setTrigger] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -28,12 +31,12 @@ export default function NewVideoDatasetForm() {
   const sizes = sizeOptions(target)
   const create = async (event) => {
     event.preventDefault()
-    if (busy || !name.trim() || !target) return
+    if (busy || !destinationReady || !name.trim() || !target) return
     setBusy(true); setError('')
     try {
       const size = sizes.find((s) => s.key === sizeKey)
       const result = await postJson('/api/video-datasets', { name: name.trim(),
-        trigger_word: trigger.trim(), target_profile: targetKey, frames: Number(frames),
+        trigger_word: trigger.trim(), folder_category: folderCategory, target_profile: targetKey, frames: Number(frames),
         size: size?.width ? [size.width, size.height] : null })
       navigate(`/video-dataset/${result.id}?section=import`)
     } catch (e) { setError(e.message) }
@@ -51,6 +54,7 @@ export default function NewVideoDatasetForm() {
           <input maxLength={100} value={trigger} onChange={(e) => setTrigger(e.target.value)} className={field} />
         </label>
       </div>
+      <FolderCategoryFields name={name} category={folderCategory} onChange={setFolderCategory} onReady={setDestinationReady} disabled={busy} />
       <label className="flex flex-col gap-1 text-xs text-content-muted">Target model
         <select aria-label="Target model" value={targetKey} disabled={busy} className={field} onChange={(e) => {
           setTargetKey(e.target.value); setFrames(defaultFrames(targets.find((t) => t.key === e.target.value))); setSizeKey('source')
@@ -74,7 +78,7 @@ export default function NewVideoDatasetForm() {
       {sizeKey === 'source' && <p className="text-xs text-content-subtle">The first imported video sets the size for this dataset. Later videos are resized to match.</p>}
       {targetWarnings(target).map((w) => <p key={w.key} className="text-xs text-content-muted">{w.text}</p>)}
       {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}
-      <button type="submit" disabled={busy || !name.trim() || !target}
+      <button type="submit" disabled={busy || !destinationReady || !name.trim() || !target}
         className="min-h-10 self-end rounded-lg bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-40">
         {busy ? 'Creating' : 'Create video dataset'}
       </button>

@@ -100,3 +100,6 @@ docs/superpowers/
 # found the server on). Not ours, machine-local, never shipped.
 /.lds-dashboard-port
 grok.md
+
+# Installation-only destinations; never publish host paths.
+/dataset-destinations.json

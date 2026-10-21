@@ -117,11 +117,11 @@ export function promoteSummary({ destination, useSelection, selectedCount,
  *  rule: a second copy of a rule that mirrors the server is a second chance to
  *  stop mirroring it, which is exactly why that helper was extracted. */
 export function canStartPromote({ destination, datasetId, bankName, busy,
-  datasetName, datasetTrigger }) {
+  datasetName, datasetTrigger, datasetKind, conceptDesc, destinationReady = true }) {
   if (busy) return false
   if (destination === 'bank') return String(bankName || '').trim().length > 0
   if (destination === 'new-dataset') {
-    return canCreateDataset({ name: datasetName, trigger: datasetTrigger })
+    return destinationReady && canCreateDataset({ name: datasetName, trigger: datasetTrigger, kind: datasetKind, conceptDesc })
   }
   return !!datasetId
 }

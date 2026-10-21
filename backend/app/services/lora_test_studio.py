@@ -3158,7 +3158,7 @@ def _base_model_dataset(user_id, family):
     if dataset is None:
         dataset = fds.create_dataset(
             user_id, f"Test Studio · {_MODE_LABEL_BY_FAMILY.get(family, family)} (base model)",
-            trigger, train_type=family)
+            trigger, train_type=family, folder_category='miscellaneous')
     return dataset
 
 

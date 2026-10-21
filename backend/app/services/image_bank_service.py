@@ -15799,14 +15799,13 @@ def start_promote(app, user_id, bank_id, ids, dataset_id):
 # LoRAs, run folders, exports and job configs). But asking for a second field is
 # not the same as having no door.
 
-def start_new_dataset_promote(app, user_id, bank_id, ids, name, trigger_word):
+def start_new_dataset_promote(app, user_id, bank_id, ids, name, trigger_word, *,
+                              kind=None, concept_desc=None, folder_category=None):
     """Create a dataset and promote a selection into it, in one click.
 
-    Name + trigger only: `kind=None` IS the character kind (normalize_kind), and
-    train_type/fidelity default to exactly what the Datasets-page form defaults
-    them to. So this is not a reduced dataset — it is the same one, with the
-    pickers left for its own settings page rather than duplicated into a dialog
-    that is already doing something else.
+    Dataset kind controls caption/training semantics. Folder category defaults
+    from that kind but can be overridden independently. Existing callers that
+    omit both keep the Character defaults.
 
     Ordering follows start_bank_promote: everything that can refuse refuses
     BEFORE the dataset row exists, because bank_jobs.start would raise the same
@@ -15824,14 +15823,17 @@ def start_new_dataset_promote(app, user_id, bank_id, ids, name, trigger_word):
     # at all and silently turns a blank trigger into 'zchar' (the rule lives only
     # in POST /api/dataset/create). Trusting it would answer 202 and hand back a
     # nameless dataset that collides with the next one created the same way.
-    if not name or not trigger:
-        raise ValueError('name and trigger_word are required')
+    if kind is not None and kind not in ('character', 'concept', 'style'):
+        raise ValueError('Choose Character, Concept or Style for the dataset type')
+    if not name or (not trigger and kind != 'style'):
+        raise ValueError('name and trigger_word are required except for a Style trigger')
     rows = _promote_source_rows(bank_id, ids)
     if not rows:
         raise ValueError('nothing to promote — keep or select some images first')
     if bank_jobs.running(bank_id):
         raise bank_jobs.BankJobBusy(bank_jobs.get(bank_id)['kind'])
-    ds = create_dataset(user_id, name, trigger)
+    ds = create_dataset(user_id, name, trigger, kind=kind, concept_desc=concept_desc,
+                        folder_category=folder_category)
     try:
         # The promotion itself is the EXISTING path, untouched: same job kind,
         # same _promote_job, same _promote_rows. A second job body is where the
@@ -15859,9 +15861,9 @@ def _discard_new_dataset(user_id, dataset_id):
     destroy a REAL dataset's artifacts, on a path the user never sees.
 
     Nothing needs it. At this point the row has no images, no runs and nothing on
-    disk: ensure_dataset_dir is lazy and only import_images reaches it, inside a
-    job body that never launched. So a bare row delete is both sufficient and the
-    only safe option — and the emptiness is re-checked rather than assumed.
+    disk except an optional empty flat-folder reservation. Remove only that
+    empty directory, then the row. Never call the training-artifact cleanup.
+    Both row membership and directory emptiness are checked before discarding.
 
     NOTE the asymmetry with the bank door, which also discards when it copied
     ZERO files: not mirrored here on purpose. This promotion runs through the
@@ -15882,6 +15884,14 @@ def _discard_new_dataset(user_id, dataset_id):
             logger.warning('new-dataset promote: dataset %s already holds images — kept',
                            dataset_id)
             return
+        if ds.storage_root:
+            from .dataset_storage import dataset_path
+            try:
+                os.rmdir(dataset_path(ds.id))
+            except FileNotFoundError:
+                pass
+            except OSError:
+                return  # Never discard a reservation that already contains files.
         db.session.delete(ds)
         db.session.commit()
     except Exception:      # noqa: BLE001

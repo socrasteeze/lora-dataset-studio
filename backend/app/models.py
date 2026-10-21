@@ -140,6 +140,10 @@ class ImageSourceAsset(db.Model):
 
 class FaceDataset(db.Model):
     """A named face-dataset for LoRA character training (one per character)."""
+    # New media keeps its root; NULL retains the legacy configured location.
+    storage_root = db.Column(Text, nullable=True)
+    storage_basename = db.Column(String(64), nullable=True)
+    folder_category = db.Column(String(16), nullable=True)
     __tablename__ = 'face_dataset'
     id = db.Column(Integer, primary_key=True)
     instance_id = db.Column(String(32), nullable=False, unique=True,
@@ -2151,6 +2155,7 @@ class VideoDataset(db.Model):
     width = db.Column(Integer, nullable=True)
     height = db.Column(Integer, nullable=True)
     output_dir = db.Column(Text, nullable=False)
+    folder_category = db.Column(String(16), nullable=True)
     # One trigger, one place. It is PREPENDED to every sidecar at promote time —
     # the captions road, deliberately, because that is the only path every
     # trainer provably reads; a config-level trigger on top of it would be the

@@ -48,6 +48,7 @@ import uuid
 from pathlib import Path
 
 from lds_sdk.video_host import config as cfg
+from lds_sdk.dataset_creation import destination, normalize_category, reserve_folder
 from lds_video.models import db
 from lds_video.models import VideoBank, VideoClip, VideoDataset, VideoDatasetClip, VideoSource
 from lds_video import video_metrics, video_camera_motion, video_clip_export, video_targets, video_training
@@ -146,7 +147,23 @@ def thumb_path(bank_id, clip_id) -> Path:
 def dataset_dir(dataset_id) -> Path:
     """A video dataset's folder. FLAT — see ``_promote_job`` for why a subfolder
     here is a defect rather than a matter of taste."""
+    from flask import has_app_context
+
+    dataset = db.session.get(VideoDataset, int(dataset_id)) if has_app_context() else None
+    if dataset and dataset.output_dir:
+        return Path(dataset.output_dir)
+    # Older rows can omit output_dir; their original storage setting still owns them.
     return cfg.video_datasets_root() / str(int(dataset_id))
+
+
+def _reserve_dataset_folder(dataset):
+    root = destination('video_datasets')
+    if root is not None:
+        latest = VideoDataset.query.order_by(VideoDataset.id.desc()).first()
+        number, folder = reserve_folder(root, 'LDS', name=dataset.name, category=dataset.folder_category,
+                                        minimum=(latest.id + 1 if latest else 1))
+        dataset.id = number
+        dataset.output_dir = str(folder)
 
 
 def _contained_path(base_dir: str, relpath: str) -> str | None:
@@ -2581,7 +2598,7 @@ def _resolve_edge_inset(value):
 
 def start_promote(app, user_id, bank_id, *, ids=None, name, target_profile,
                   frames=None, size=None, max_per_source=None,
-                  edge_inset_s=None, trigger_word=None, slice_long=False):
+                  edge_inset_s=None, trigger_word=None, slice_long=False, folder_category=None):
     """Encode the KEPT clips into a new video dataset.
 
     Everything that can be refused is refused HERE, synchronously, before a single
@@ -2736,11 +2753,13 @@ def start_promote(app, user_id, bank_id, *, ids=None, name, target_profile,
 
     trigger = (trigger_word or '').strip() or None
     dataset = VideoDataset(user_id=user_id, name=name,
+                           folder_category=normalize_category(folder_category),
                            target_profile=target_profile, fps=profile['fps'],
                            frames=frames, trigger_word=trigger,
                            width=size[0] if size else None,
                            height=size[1] if size else None,
                            output_dir='')
+    _reserve_dataset_folder(dataset)
     db.session.add(dataset)
     db.session.flush()                      # need the id to name its folder
     out_dir = dataset_dir(dataset.id)
@@ -3138,6 +3157,7 @@ def _dataset_row(ds: VideoDataset) -> dict:
         # they come back to it, not once at creation.
         'licence_note': profile.get('licence_note'),
         'trigger_word': ds.trigger_word,
+        'folder_category': ds.folder_category,
         'best_settings': read_best(ds),
         'best_settings_loras': best_settings_loras(ds),
         'references': len(reference_dirs(ds)),
@@ -3228,10 +3248,13 @@ def create_stills_dataset_from_face_dataset(user_id, face_dataset_id,
     dataset = VideoDataset(
         user_id=user_id,
         name=(name or '').strip() or f'{face.name} — stills',
+        folder_category=face.folder_category or ('style' if face.kind == 'style' else
+                                                 'miscellaneous' if face.kind == 'concept' else 'character'),
         target_profile=profile_key, fps=video_targets.get(profile_key)['fps'],
         frames=1, width=768, height=768,
         trigger_word=(getattr(face, 'trigger_word', None) or '').strip() or None,
         output_dir='')
+    _reserve_dataset_folder(dataset)
     db.session.add(dataset)
     db.session.flush()
     out_dir = dataset_dir(dataset.id)
