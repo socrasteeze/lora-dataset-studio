@@ -1,6 +1,6 @@
 # HANDOFF
 
-## Pending Dataset folder categories (2026-10-21)
+## Dataset folder categories (2026-10-21)
 
 Task branch: `fix/dataset-folder-categories-20261021`. New creation uses a private
 installation root plus the app subfolder and category/description/app-ID name.
@@ -8,10 +8,18 @@ The category and final location persist independently of display-name changes.
 Legacy paths, append targets, Bank sources, and unrelated exports remain unchanged.
 No production data, schema, allocation ledger, or service was changed by this work.
 
-Regression cases are prepared but unrun. The owner has not authorized cloud tests;
-local tests, builds, installs, and restarts remain prohibited. Static source checks
-are the available validation, not qualification. Finish the required delivery gates
-before merging. Preserve the earlier state below and other active worktrees.
+Source `9334de22137d394a8639375b34b290598d03f0bf` passed full Ruff 0.16.4 and
+frontend ESLint in the cloud (zero errors, 32 existing warnings). The fork frontend
+build passed with Node 24.19.0, npm 11.9.0 and Vite 6.4.3: 2,735 modules in 12.55s.
+The transferred bundle has 157 verified files and the expected ten-plugin marker;
+its dist tree is `cfc39df0745135d7ee18d12c29355792a97d56af`. Package and lockfile
+hashes match the source. Keep the bundle in its own `build(frontend):` commit.
+
+Regression cases are prepared but unrun. No tests or rendered validation ran;
+full qualification is incomplete. Delivery is authorized with `[skip ci]`.
+Runtime activation remains pending separate authorization. Local tests, builds,
+installs and restarts remain prohibited. Existing Bank folder behavior and
+cross-app editing ownership are unchanged. Preserve earlier state and other worktrees.
 
 
 ## ATK recipe controls (2026-10-20)
