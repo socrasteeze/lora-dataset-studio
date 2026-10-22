@@ -74,6 +74,13 @@ export const CAPTION_ORIGINS = [
     short: 'Written by PixAI Tagger',
     title: 'Booru dataset caption written by PixAI Tagger from local weights.',
   },
+  {
+    key: 'pixai_hybrid',
+    chip: 'PixAI + VLM',
+    short: 'Written by PixAI Tagger and the local LLM',
+    title: 'Booru tags from PixAI Tagger, then a short description from the local '
+      + 'vision model. The trigger word is not stored in the caption.',
+  },
 ];
 
 /* The absence, spelled out. Its `known` flag is false so a caller can choose

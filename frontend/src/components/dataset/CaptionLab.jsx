@@ -25,7 +25,10 @@ const CANDIDATE_ENGINES = ENGINE_OPTIONS.filter((o) => o.id !== 'none');
 const MAX_CANDIDATES = 4;
 
 // Short labels for a candidate card header (the long option labels are for the picker).
-const ENGINE_SHORT = { '': 'Default engine', auto: 'Auto', joycaption: 'JoyCaption', ollama: 'Ollama' };
+const ENGINE_SHORT = {
+  '': 'Default engine', auto: 'Auto', joycaption: 'JoyCaption', ollama: 'Ollama',
+  pixai: 'PixAI', pixai_hybrid: 'PixAI + VLM',
+};
 const VOCAB_SHORT = { '': '', explicit: 'Explicit', clinical: 'Clinical', safe: 'Safe' };
 const LENGTH_SHORT = { '': '', concise: 'Concise', detailed: 'Detailed' };
 

@@ -20,6 +20,14 @@ test('every other family keeps dual captions, with no scary note', () => {
   }
 });
 
+test('turning the text cache off makes Anima dual captions available', () => {
+  const on = dualCaptionsSupport('anima', { cacheTextEmbeddings: true });
+  const off = dualCaptionsSupport('anima', { cacheTextEmbeddings: false });
+  assert.equal(on.supported, false);
+  assert.equal(off.supported, true);
+  assert.equal(off.note, '');
+});
+
 test('an unknown family is assumed to support them (no false alarm)', () => {
   assert.equal(dualCaptionsSupport('brand_new').supported, true);
   assert.equal(dualCaptionsSupport(undefined).supported, true);

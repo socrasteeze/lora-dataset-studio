@@ -139,6 +139,7 @@ export const CORE_GUIDE_ANCHORS = {
     "borrow-a-prompt-from-civitai-s-top-images",
     "continue-a-run-instead-of-starting-over",
     "7-dual-captions-long-short",
+    "text-embedding-cache",
     "8-concept-loras-keeping-faces-out",
     "9-coverage-what-your-set-never-showed",
     "what-it-can-and-cannot-see",

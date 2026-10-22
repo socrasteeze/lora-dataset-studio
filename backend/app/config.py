@@ -210,7 +210,12 @@ DEFAULTS = {
     'engines': {'default': 'klein',
                 'enabled': ['klein', 'krea'],
                 'known': []},
-    'captioning': {'backend': 'auto'},                         # auto|joycaption|ollama|pixai|none
+    'captioning': {
+        'backend': 'auto',  # auto|joycaption|ollama|pixai|pixai_hybrid|none
+        # Anima Auto skips JoyCaption and calls this Ollama tag. Blank uses
+        # ollama.vision_model. Other families keep JoyCaption, then the local LLM.
+        'anima_auto_model': 'huihui_ai/qwen3-vl-abliterated:8b-instruct',
+    },
     # PixAI Tagger v1.0. Blank python -> data/envs/pixai. Blank models_root ->
     # data/models (folder pixai-tagger-v1.0). device: auto|cuda|cpu.
     # Not part of Auto, and not the WD14 bank-tag column.

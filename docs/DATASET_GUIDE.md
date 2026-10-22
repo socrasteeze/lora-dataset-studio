@@ -596,15 +596,28 @@ How the short caption is produced:
 JSON file the short caption is read from trains on the long caption alone; on this
 fork every run is local, so the toggle applies to all of them.
 
-**Not on Krea 2 or Anima.** Those two families pre-cache their text embeddings and
-unload the text encoder to fit their DiT in VRAM. ai-toolkit caches exactly one
-embedding per image — the long caption — and once the encoder is gone the training
-loop reads those cached embeddings instead of the caption text, so a second caption
-has nowhere to be encoded. Asking for both used to crash the run at the first step,
-*after* the weights download and the whole caching pass (reported by **1Tomber**,
-GitHub #22). The app now refuses the combination when it builds the training config:
-the toggle says so, the pre-launch check warns, and the run trains on the long
-caption alone — trigger word included, exactly like a normal run.
+**Not while the text embedding cache is on.** Krea 2 and Anima turn that cache on
+by default and unload the text encoder to fit their DiT in VRAM. ai-toolkit caches
+exactly one embedding per image — the long caption — and once the encoder is gone
+the training loop reads those cached embeddings instead of the caption text, so a
+second caption has nowhere to be encoded. Asking for both used to crash the run at
+the first step, *after* the weights download and the whole caching pass (reported
+by **1Tomber**, GitHub #22). The app refuses the combination when it builds the
+training config: the toggle says so, the pre-launch check warns, and the run trains
+on the long caption alone — trigger word included, exactly like a normal run. Turn
+**Text Embedding Cache** off on that dataset to train both captions.
+
+## Text embedding cache
+
+**Training → Advanced → Text Embedding Cache** writes `train.cache_text_embeddings`
+in the ai-toolkit job. Anima and Krea 2 default **on**, matching their ai-toolkit
+presets, which also unload the text encoder. Other image families default **off**.
+Qwen-Image 2.1 stays off. This app does not train the older Qwen-Image or Wan
+families whose example presets turn the cache on.
+
+The same switch lives in **ATK Recipe**. The panel shows the value the next run
+will use. Turning it off on Anima or Krea 2 is what makes dual captions trainable
+again.
 
 ---
 

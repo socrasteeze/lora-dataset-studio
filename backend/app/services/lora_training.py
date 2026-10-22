@@ -2776,9 +2776,9 @@ def effective_train_settings(ds, family=None) -> dict:
                 s.get('layer_offloading_transformer_percent'),
             'layer_offloading_text_encoder_percent':
                 s.get('layer_offloading_text_encoder_percent'),
-            'cache_text_embeddings': (s.get('cache_text_embeddings')
-                                      if isinstance(s.get('cache_text_embeddings'), bool)
-                                      else None),
+            # Effective value. Anima and Krea default on when the key is unset.
+            # atk_recipe keeps the stored tri-state for the recipe dialog.
+            'cache_text_embeddings': _cache_text_embeddings_eff(ds, fam),
             'save_dtype': _save_dtype_eff(ds),
             'preset_steps_policy': _preset_steps_policy(ds),
             # Family label, so the panel can name the family in that sentence
@@ -5022,6 +5022,20 @@ def _assert_full_transformer_recipe(ds) -> None:
         raise ValueError('full_transformer training is incompatible with Slider LoRA mode')
 
 
+def _with_train_cache_flag(cfg_) -> dict:
+    """Copy the dataset cache flag onto ``train.cache_text_embeddings``.
+
+    ai-toolkit reads the train key and then forces it onto every dataset. The
+    dataset key is already set, including the Z-Image slider workaround that
+    turns the cache off, so the train key follows that final dataset value.
+    """
+    process = cfg_['config']['process'][0]
+    cached = any(bool(d.get('cache_text_embeddings'))
+                 for d in (process.get('datasets') or ()))
+    process.setdefault('train', {})['cache_text_embeddings'] = cached
+    return cfg_
+
+
 def build_job_config(ds, dataset_folder: str, steps: int = 3000, training_folder=None) -> dict:
     """Build the validated ai-toolkit Z-Image Turbo/Base/De-Turbo job configuration.
 
@@ -5040,41 +5054,41 @@ def build_job_config(ds, dataset_folder: str, steps: int = 3000, training_folder
         _apply_style_overrides(ds, cfg_['config']['process'][0], 'sdxl')
         _apply_slider_overrides(ds, cfg_['config']['process'][0], 'sdxl')
         _apply_dual_captions(ds, cfg_['config']['process'][0], dataset_folder)
-        return cfg_
+        return _with_train_cache_flag(cfg_)
     if _train_type(ds) == 'krea':
         cfg_ = _build_job_config_krea(ds, dataset_folder, steps, training_folder=training_folder)
         # Dense training must stay free of every LoRA-specific post-processor.
         # The dedicated builder already emits the complete conservative recipe.
         if mode == 'full_transformer':
-            return cfg_
+            return _with_train_cache_flag(cfg_)
         _apply_style_overrides(ds, cfg_['config']['process'][0], 'krea')
         _apply_slider_overrides(ds, cfg_['config']['process'][0], 'krea')
         _apply_dual_captions(ds, cfg_['config']['process'][0], dataset_folder)
-        return cfg_
+        return _with_train_cache_flag(cfg_)
     if _train_type(ds) == 'flux':
         cfg_ = _build_job_config_flux(ds, dataset_folder, steps, training_folder=training_folder)
         _apply_style_overrides(ds, cfg_['config']['process'][0], 'flux')
         _apply_slider_overrides(ds, cfg_['config']['process'][0], 'flux')
         _apply_dual_captions(ds, cfg_['config']['process'][0], dataset_folder)
-        return cfg_
+        return _with_train_cache_flag(cfg_)
     if _train_type(ds) == 'flux2klein':
         cfg_ = _build_job_config_flux2klein(ds, dataset_folder, steps, training_folder=training_folder)
         _apply_style_overrides(ds, cfg_['config']['process'][0], 'flux2klein')
         _apply_slider_overrides(ds, cfg_['config']['process'][0], 'flux2klein')
         _apply_dual_captions(ds, cfg_['config']['process'][0], dataset_folder)
-        return cfg_
+        return _with_train_cache_flag(cfg_)
     if _train_type(ds) == 'anima':
         cfg_ = _build_job_config_anima(ds, dataset_folder, steps, training_folder=training_folder)
         _apply_style_overrides(ds, cfg_['config']['process'][0], 'anima')
         _apply_slider_overrides(ds, cfg_['config']['process'][0], 'anima')
         _apply_dual_captions(ds, cfg_['config']['process'][0], dataset_folder)
-        return cfg_
+        return _with_train_cache_flag(cfg_)
     if _train_type(ds) == 'qwenimage21':
         cfg_ = _build_job_config_qwenimage21(ds, dataset_folder, steps, training_folder)
         _apply_style_overrides(ds, cfg_['config']['process'][0], 'qwenimage21')
         _apply_slider_overrides(ds, cfg_['config']['process'][0], 'qwenimage21')
         _apply_dual_captions(ds, cfg_['config']['process'][0], dataset_folder)
-        return cfg_
+        return _with_train_cache_flag(cfg_)
     trigger = _training_trigger(ds)
     base_model = getattr(ds, 'train_base_model', None)
     recipe = zimage_training_recipe(getattr(ds, 'train_variant', None), base_model)
@@ -5151,7 +5165,7 @@ def build_job_config(ds, dataset_folder: str, steps: int = 3000, training_folder
     _apply_style_overrides(ds, cfg_['config']['process'][0], 'zimage')
     _apply_slider_overrides(ds, cfg_['config']['process'][0], 'zimage')
     _apply_dual_captions(ds, cfg_['config']['process'][0], dataset_folder)
-    return cfg_
+    return _with_train_cache_flag(cfg_)
 
 
 def _build_job_config_krea(ds, dataset_folder: str, steps: int, training_folder=None) -> dict:

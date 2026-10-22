@@ -35,6 +35,7 @@ const captioningOptions = (llm) => [
   { id: 'auto', label: 'Auto (best available)' },
   { id: 'joycaption', label: 'JoyCaption' },
   { id: 'pixai', label: 'PixAI Tagger' },
+  { id: 'pixai_hybrid', label: 'PixAI tags + VLM' },
   { id: 'ollama', label: `${llm} vision` },
   { id: 'none', label: 'None' },
 ]
@@ -212,7 +213,7 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
       <SettingsGroup {...groupProps(captionGroup)}>
       <Card
         title="Captioning"
-        help={`Who writes the captions. Auto prefers JoyCaption (via ai-toolkit) and falls back to the ${llmName} vision model.`}
+        help={`Who writes the captions. Auto prefers JoyCaption (via ai-toolkit) and falls back to the ${llmName} vision model. An Anima dataset skips JoyCaption and uses the configured Qwen3-VL model.`}
       >
         <div>
           <label htmlFor="captioning-backend" className="block text-sm font-medium text-content">Captioning Backend</label>

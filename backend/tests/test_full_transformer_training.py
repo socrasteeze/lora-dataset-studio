@@ -293,6 +293,7 @@ def test_full_transformer_krea_config_is_dense_and_conservative(app, tmp_path):
         'train_unet': True,
         'train_text_encoder': False,
         'unload_text_encoder': True,
+        'cache_text_embeddings': True,
         'gradient_checkpointing': True,
         'noise_scheduler': 'flowmatch',
         'timestep_type': 'linear',

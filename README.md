@@ -67,7 +67,7 @@ Four ways to fill a dataset, and one choice at creation that rewires everything 
 | **Curation grid** | Keep/reject, manual crop or confidence-gated Auto-Crop with a local vision model, mirror, rotate, zoom, resize, multi-select and non-destructive upscale candidates from either engine — Klein re-renders detail (sharper, but skin and colour can shift), SeedVR2 resolves detail and leaves the original look alone |
 | **Identity and composition checks** | InsightFace similarity, score-based auto-triage, framing badges and a live Character composition meter |
 | **Model-matched captions** | Prose or booru form selected by target family, with kind-aware Concept leak checks and content-only Style rules |
-| **Local booru tagger** | Optional PixAI Tagger writes booru dataset captions from prepared local weights. Setup preparation requires an explicit action. Auto, prose, Concept and Bank captioning keep the existing engines. See [Captioning settings](docs/guide/settings-reference.md#pixai-device). |
+| **Local booru tagger** | Optional PixAI Tagger writes booru dataset captions from prepared local weights. **PixAI tags + VLM** adds a short vision sentence on the same line. Missing weights fail with an install message. Anima Auto uses the configured Qwen3-VL model and skips JoyCaption. Concept and Bank captioning stay on the other engines. See [Captioning settings](docs/guide/settings-reference.md#captioning). |
 | **Caption tools and recovery** | Find/replace, tag frequencies, expanded editing, targeted re-captioning, stoppable batches and reload-proof recovery |
 | **🧪 Caption Lab** | Bench up to four caption configurations — engine, vision model, vocabulary register, length — on **one** image and read them side by side against the caption already stored, before spending a pass on thousands. Nothing is written until you keep a result. On **both surfaces**: a dataset's Captions section (and any image's caption editor), and an image bank's 🏷️ Caption window |
 | **External caption round trip** | Export ordinary image/`.txt` pairs, caption them in any tool, then re-import without duplicating images or overwriting non-empty LDS captions |
@@ -280,7 +280,7 @@ Captions are what training actually reads — written for you in the shape your 
 | Sub-feature | What it gets you |
 | :-- | :-- |
 | **Model-matched form** | Prose for Z-Image / Krea 2 / FLUX.1 / FLUX.2 Klein, booru tags for SDXL, EITHER for Anima (hybrid-prompting — both are native, neither is flagged) — chosen from the target model |
-| **Engines** | JoyCaption (via ai-toolkit) or an Ollama vision model, picked per dataset |
+| **Engines** | JoyCaption (via ai-toolkit), a local vision model, or PixAI Tagger. Anima Auto uses Qwen3-VL. PixAI tags + VLM joins tags and a short description |
 | **⚙️ Options** | Choose or **pull** the exact Ollama vision model and remember it on the dataset |
 | **Vocabulary preset** | Explicit / Clinical / Safe naming of nudity, plus your own free-text wording instructions |
 | **Kind-aware rules** | Concept captions invert and are leak-checked; Style requires a content-only caption per kept image |
@@ -660,7 +660,7 @@ A big pile of images isn't a dataset. This is where you cut it down to the shots
 Captions are what training actually reads — and the right *form* depends on the base model. LDS writes them for you, in the shape the model wants, and gives you the tools to sweep the whole set.
 
 - **Model-matched form** — **prose** sentences for Z-Image / Krea 2 / FLUX.1 / FLUX.2 Klein, **booru-style tags** for SDXL, selected automatically from the dataset's target model. **Anima takes either**: it is a hybrid-prompting model, so a booru-tagged Anima set is never refused as a mismatch.
-- **Engines** — written by **JoyCaption** (via ai-toolkit) or an **Ollama** vision model. The **⚙️ Options** button picks the engine (Auto / JoyCaption / Ollama vision), lets you choose or **pull** the exact Ollama vision model, and remembers it on the dataset.
+- **Engines** — written by **JoyCaption** (via ai-toolkit), a **local vision model**, or **PixAI Tagger**. The **⚙️ Options** button picks the engine (Auto / JoyCaption / PixAI Tagger / PixAI tags + VLM / local vision), lets you choose or **pull** the vision model, and remembers it on the dataset. **Anima Auto** uses the configured Qwen3-VL model and does not try JoyCaption.
 - **Vocabulary preset** — set how nudity is named — **Explicit / Clinical / Safe** — plus your own free-text wording instructions, all layered on top of the built-in guardrails.
 - **Kind-aware rules** — **Concept datasets invert** the caption: it names everything *but* the concept and flags captions that accidentally name the concept itself. **Style datasets** require a distinct content-only caption for every kept image and strip the internal dataset identifier from training ZIPs and sample prompts. **Write TXT** can add a chosen prefix to the caption files on disk.
 - **Sweep the set** — a **find/replace + frequency** panel, tag hide/isolate controls, an expanded editor and bulk caption clearing let you fix the whole set at once.

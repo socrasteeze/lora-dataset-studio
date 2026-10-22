@@ -142,6 +142,18 @@ def get_vision_model() -> str:
     return cfg.get('ollama.vision_model') or 'huihui_ai/qwen3-vl-abliterated:8b-instruct'
 
 
+def anima_auto_vision_model() -> str:
+    """Vision model for an Anima dataset on the Auto caption backend.
+
+    ``captioning.anima_auto_model`` when it is set, otherwise
+    :func:`get_vision_model`. Callers use this instead of copying the tag.
+    """
+    chosen = cfg.get('captioning.anima_auto_model')
+    if isinstance(chosen, str) and chosen.strip():
+        return chosen.strip()
+    return get_vision_model()
+
+
 class LocalOllamaFenceError(RuntimeError):
     """A local inference lost its verified Vision GPU ownership."""
 

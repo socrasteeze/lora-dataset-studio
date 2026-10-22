@@ -416,7 +416,7 @@ def test_the_vocabulary_is_frozen_and_borrowed_from_columns_that_exist(app):
     from app.services import caption_origin
 
     assert caption_origin.ASSERTED == 'asserted'
-    assert caption_origin.ENGINES == ('joycaption', 'ollama', 'pixai')
+    assert caption_origin.ENGINES == ('joycaption', 'ollama', 'pixai', 'pixai_hybrid')
     assert caption_origin.engine_origin('pixai') == 'pixai'
     assert caption_origin.engine_origin('pixai-tagger-v1.0') is None
     # 'auto' is a CHAIN, not an engine: recording it would name a policy and

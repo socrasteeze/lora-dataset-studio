@@ -747,6 +747,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   const advEma = adv?.ema ?? 0;
   const advEmaChoices = adv?.ema_choices ?? [0.99, 0.999];
   const advDualCaptions = Boolean(adv?.dual_captions);
+  const advCacheText = adv?.cache_text_embeddings
+    ?? (trainType === 'krea' || trainType === 'anima');
   // Concept face masking (issue #15). `supported` is the SERVER's answer (concept
   // only) rather than a second `kind === 'concept'` in JSX that could drift from it.
   const advMaskFaces = Boolean(adv?.mask_faces);
@@ -2755,6 +2757,23 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   EMA can smooth checkpoints. It is off by default; test it as a separate variable from the Krea starter.
                 </span>
               </div>
+              {/* Text embedding cache — visible here, not only inside ATK Recipe. */}
+              <div className="flex flex-col gap-0.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="training-toggle-chip">
+                    <input type="checkbox" checked={Boolean(advCacheText)}
+                      onChange={(e) => saveAdv({ cache_text_embeddings: e.target.checked })}
+                      aria-label="Text Embedding Cache"
+                      className="h-4 w-4 rounded border-border bg-surface accent-indigo-500" />
+                    <span>Text Embedding Cache</span>
+                  </label>
+                  <HelpBadge topic="training.cache_text_embeddings" />
+                </div>
+                <span className="text-content-subtle text-2xs leading-relaxed">
+                  Caches captions and unloads the text encoder on families whose preset does this.
+                  Anima and Krea 2 default on. Turn it off to train dual captions on those families.
+                </span>
+              </div>
               {/* Dual captions — train each image with a long AND a short caption */}
               <div className="flex flex-col gap-0.5">
                 <div className="flex flex-wrap items-center gap-2">
@@ -2771,9 +2790,9 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 {/* Issue #22 (1Tomber): Krea 2 / Anima cache their text embeddings, so the
                     short caption can never be encoded. Say it here rather than let the user
                     believe two wordings are training. Wraps at 400 px — no fixed width. */}
-                {advDualCaptions && !dualCaptionsSupport(trainType).supported && (
+                {advDualCaptions && !dualCaptionsSupport(trainType, { cacheTextEmbeddings: Boolean(advCacheText) }).supported && (
                   <span className="text-amber-400 text-2xs leading-relaxed">
-                    Ignored here: {dualCaptionsSupport(trainType).note}
+                    Ignored here: {dualCaptionsSupport(trainType, { cacheTextEmbeddings: Boolean(advCacheText) }).note}
                   </span>
                 )}
                 <span className="text-content-subtle text-2xs leading-relaxed">
