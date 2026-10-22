@@ -26,15 +26,17 @@ def profiles_app(tmp_path, monkeypatch):
         dispose_test_app(app)
 
 
-def test_creating_a_profile_preserves_access_without_copying_settings(profiles_app):
+@pytest.mark.parametrize('bound_host', ['0.0.0.0', '127.0.0.1', '::1', '192.0.2.9'])
+def test_creating_a_profile_defaults_to_lan_without_copying_settings(profiles_app, bound_host):
     app, store = profiles_app
-    app.config['LDS_BOUND_HOST'] = '0.0.0.0'
+    app.config['LDS_BOUND_HOST'] = bound_host
     result = app.test_client().post('/api/profiles', json={'name': 'Example'}).get_json()
     assert result['ok']
     row = store.get(result['profile']['id'])
     settings = json.loads(Path(row['paths']['LDS_CONFIG']).read_text())
     assert set(settings) == {'server'}
-    assert settings['server']['host'] == '0.0.0.0'
+    assert settings['server']['host'] == (bound_host if bound_host == '192.0.2.9' else '0.0.0.0')
+    assert settings['server']['require_token'] is True
     assert len(settings['server']['access_token']) >= 24
     assert Path(row['paths']['LDS_ENV']).read_bytes() == b''
     assert store.selected() == 'default'
@@ -94,6 +96,102 @@ def test_busy_profile_does_not_write_a_switch_request(profiles_app, monkeypatch)
     monkeypatch.setattr(profiles, 'freeze_profile_work', busy)
     response = app.test_client().post('/api/profiles/switch', json={'profile_id': target['id']})
     assert response.status_code == 409
+    assert not (store.home / 'switch.json').exists()
+
+
+@pytest.mark.parametrize('token', [None, 'example-target-token'])
+@pytest.mark.parametrize('outcome', ['scheduled', 'refused', 'failed', 'busy', 'target_busy'])
+@pytest.mark.parametrize('remote,bound_host', [('198.51.100.9', '0.0.0.0'), ('127.0.0.1', '127.0.0.1')])
+def test_profile_switch_defaults_legacy_lan_and_rolls_back(profiles_app, monkeypatch, token, outcome, remote, bound_host):
+    from urllib.parse import parse_qs, urlsplit
+    from instance_profiles import ProfileError
+    from app import config as cfg
+    from app.plugins.restart import RestartBlocked
+    from app.routes import profiles
+    from app.services import updater
+    app, store = profiles_app
+    cfg.save_config({'server': {'access_token': 'example-source-token'}})
+    settings = {'server': {'host': '127.0.0.1', 'require_token': False},
+                'example': {'keep': 'target-setting'}}
+    if token:
+        settings['server']['access_token'] = token
+    target = store.create('Example', config=settings)
+    # Emulate an older profile with its original local-only settings.
+    Path(target['paths']['LDS_CONFIG']).write_text(json.dumps(settings), encoding='utf-8')
+    source_path = Path(store.get('default')['paths']['LDS_CONFIG'])
+    source_bytes = source_path.read_bytes()
+    app.config['LDS_BOUND_HOST'] = bound_host
+    monkeypatch.delenv('LDS_HOST', raising=False)
+    monkeypatch.setenv('LDS_RESTART_MODE', 'supervisor')
+    monkeypatch.setenv('LDS_PROFILE_SWITCH_SUPPORTED', '1')
+    finished = threading.Event()
+    finished.set()
+    released = []
+    gate = SimpleNamespace(finished=finished, release=lambda: released.append(True))
+
+    def freeze():
+        if outcome == 'busy':
+            raise RestartBlocked('Example work is running.')
+        return gate
+
+    def check_target(_ident):
+        if outcome == 'target_busy':
+            raise ProfileError('Example target work is running.')
+
+    seen = []
+
+    def schedule(**_options):
+        seen.append(json.loads((store.home / 'switch.json').read_text()))
+        if outcome == 'failed':
+            raise OSError('Example restart failure')
+        return outcome == 'scheduled'
+
+    monkeypatch.setattr(profiles, 'freeze_profile_work', freeze)
+    monkeypatch.setattr(store, 'check_other_work', check_target)
+    monkeypatch.setattr(updater, 'schedule_restart', schedule)
+    response = app.test_client().post('/api/profiles/switch',
+        json={'profile_id': target['id']},
+        environ_overrides={'REMOTE_ADDR': remote})
+    saved = json.loads(Path(target['paths']['LDS_CONFIG']).read_text())
+    assert source_path.read_bytes() == source_bytes
+    assert store.selected() == 'default'
+    if outcome == 'scheduled':
+        assert response.status_code == 200
+        assert saved['server']['host'] == '0.0.0.0'
+        assert saved['server']['require_token'] is True
+        access_token = saved['server']['access_token']
+        assert access_token != 'example-source-token'
+        if token:
+            assert access_token == token
+        else:
+            assert len(access_token) >= 24
+        assert saved['example'] == settings['example']
+        assert parse_qs(urlsplit(response.get_json()['destination']).query)['token'] == [access_token]
+        assert not released
+    else:
+        assert response.status_code == 409
+        assert saved == settings
+        assert not (store.home / 'switch.json').exists()
+        assert released == ([] if outcome == 'busy' else [True])
+    assert len(seen) == (0 if outcome in ('busy', 'target_busy') else 1)
+    response.close()
+
+
+def test_profile_switch_does_not_override_a_local_host_environment(profiles_app, monkeypatch):
+    app, store = profiles_app
+    target = store.create('Example')
+    path = Path(target['paths']['LDS_CONFIG'])
+    original = path.read_bytes()
+    app.config['LDS_BOUND_HOST'] = '0.0.0.0'
+    monkeypatch.setenv('LDS_HOST', '127.0.0.1')
+    monkeypatch.setenv('LDS_RESTART_MODE', 'supervisor')
+    monkeypatch.setenv('LDS_PROFILE_SWITCH_SUPPORTED', '1')
+    response = app.test_client().post('/api/profiles/switch',
+        json={'profile_id': target['id']},
+        environ_overrides={'REMOTE_ADDR': '198.51.100.9'})
+    assert response.status_code == 409
+    assert 'code' not in response.get_json()
+    assert path.read_bytes() == original
     assert not (store.home / 'switch.json').exists()
 
 

@@ -101,18 +101,25 @@ lets you create another profile without leaving the app. Enter its name and
 choose **Create Profile**, then **Switch Profile** to open it.
 
 New profiles have separate databases, settings, credentials, plugin data,
-datasets, caches and training storage. Creating a profile from the popup copies
-only the server bind host and token requirement, then generates an independent
-access token. Complete Setup for each new profile. Tool installations and model
+datasets, caches and training storage. LAN access defaults to on for new profiles,
+with a required independent access token. The popup preserves an existing network
+bind address; a local-only bind becomes `0.0.0.0` for the new profile.
+Complete Setup for each new profile. Tool installations and model
 weights may be shared. The active profile name appears below the Studio title.
 
 Only one profile can run per installation. Save or discard open edits and finish
 or clear work queues before switching. The popup refuses a switch while work
 still needs the server. It then restarts Studio and opens the selected profile
 in the same browser tab after that profile answers at its own port. Switching
-does not stop jobs or cancel queues. A remote phone cannot switch into a profile
-that is configured for local access only; enable its LAN access from the host
-first.
+does not stop jobs or cancel queues. Switching to an older local-only profile
+enables LAN access automatically. No extra checkbox or retry is required.
+Studio uses the running server's network bind address, or `0.0.0.0` when the
+current bind is local-only. It requires the target profile's own access token,
+preserves an existing target token or creates an independent one. No other
+settings or credentials are copied. Busy work blocks the change before any
+settings change. If restart scheduling fails, Studio restores the target's
+previous settings.
+An explicit local-only `LDS_HOST` override still requires a host-side change.
 
 A live server, surviving training fence, unresolved generation or queued Bank
 work blocks another profile. Reopen the original profile to recover or clear

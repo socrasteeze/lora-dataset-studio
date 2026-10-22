@@ -63,6 +63,7 @@ def test_new_profiles_start_empty_and_do_not_inherit_secrets(store):
     two = store.create('Example Two')
     assert one['id'] != two['id']
     assert one['port'] != two['port'] != store.get('default')['port']
+    tokens = set()
     for row in (one, two):
         environment = store.child_environment(row['id'])
         assert all(key not in environment for key in profiles.SECRET_KEYS)
@@ -70,10 +71,18 @@ def test_new_profiles_start_empty_and_do_not_inherit_secrets(store):
         assert environment['LDS_AUTO_PORT'] == '0'
         assert environment['LDS_PROFILE_PORT'] == str(row['port'])
         assert 'LDS_BIND_MANAGED' not in environment
-        assert json.loads(Path(environment['LDS_CONFIG']).read_text(encoding='utf-8')) == {}
+        settings = json.loads(Path(environment['LDS_CONFIG']).read_text(encoding='utf-8'))
+        assert set(settings) == {'server'}
+        assert settings['server']['host'] == '0.0.0.0'
+        assert settings['server']['require_token'] is True
+        token = settings['server']['access_token']
+        assert len(token) >= 24
+        assert token != 'synthetic-secret'
+        tokens.add(token)
         assert Path(environment['LDS_ENV']).read_bytes() == b''
         assert all(Path(environment[key]).is_dir() for key in (
             'LDS_DATA_DIR', 'LDS_PLUGINS_DIR', 'LDS_EXTENSIONS_DIR'))
+    assert len(tokens) == 2
 
 
 def test_selection_defaults_to_the_current_install_and_survives_store_reopen(store):

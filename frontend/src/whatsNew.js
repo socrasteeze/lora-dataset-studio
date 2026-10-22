@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-21-profile-lan-switch', date: '2026-10-21', title: 'Switch Profiles Remotely',
+    blurb: 'LAN access defaults to on for new profiles. Older local-only profiles enable LAN access on switch. Each profile keeps its own access token.',
+    to: '/guide/settings-reference?h=instance-profiles',
+  },
+  {
     id: '2026-10-21-dataset-folder-categories', date: '2026-10-21', title: 'Organize Dataset Folders',
     blurb: 'Choose Character, Style or Miscellaneous for new Dataset folders. A configured destination keeps them under LDS with an abbreviated name and stable number. Existing folders stay in place.',
     to: '/guide/settings-reference#new-media-destinations',

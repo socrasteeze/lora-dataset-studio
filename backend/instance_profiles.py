@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import json
-from contextlib import closing
+from contextlib import closing, contextmanager
 import os
 from pathlib import Path
 import re
+import secrets
 import sqlite3
 import sys
 import uuid
@@ -199,7 +200,12 @@ class ProfileStore:
             base.mkdir(parents=True)
             for key in ('LDS_DATA_DIR', 'LDS_PLUGINS_DIR', 'LDS_EXTENSIONS_DIR'):
                 Path(paths[key]).mkdir()
-            Path(paths['LDS_CONFIG']).write_text(json.dumps(config or {}) + '\n', encoding='utf-8')
+            server = {'host': '0.0.0.0', 'require_token': True,
+                      **(config or {}).get('server', {})}
+            if not server.get('access_token'):
+                server['access_token'] = secrets.token_urlsafe(24)
+            settings = {**(config or {}), 'server': server}
+            Path(paths['LDS_CONFIG']).write_text(json.dumps(settings) + '\n', encoding='utf-8')
             Path(paths['LDS_ENV']).write_text('', encoding='utf-8')
             row = {'id': ident, 'name': name, 'port': port, 'paths': paths}
             _write_json(self.registry, {'version': 1, 'profiles': [*rows, row]})
@@ -220,6 +226,21 @@ class ProfileStore:
         environment.pop('LDS_SUPERVISOR', None)
         environment.pop('LDS_RESTART_MODE', None)
         return environment
+
+    @contextmanager
+    def enable_lan(self, ident, host):
+        """Keep default LAN access only when the switch is scheduled."""
+        path = Path(self.get(ident)['paths']['LDS_CONFIG'])
+        original = json.loads(path.read_text(encoding='utf-8'))
+        server = dict(original.get('server', {}))
+        server.update(host=host, require_token=True,
+                      access_token=server.get('access_token') or secrets.token_urlsafe(24))
+        _write_json(path, {**original, 'server': server})
+        try:
+            yield
+        except BaseException:
+            _write_json(path, original)
+            raise
 
     def browser_url(self, ident):
         from single_instance import _probe_host, read_lock
