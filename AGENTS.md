@@ -97,6 +97,25 @@ than creating a second policy for another agent.
 - Use the pinned `.venv` interpreter directly. Activation can select the wrong
   Python after a checkout or virtual environment has moved.
 
+## Worktree cleanup safety
+
+- Give each disposable worktree independent dependencies. Never junction or
+  symlink the live `.venv`, `node_modules`, data or model directories into it.
+- Before any worktree archive, run `scripts/worktree_cleanup_guard.py --worktree
+  <absolute-worktree-root>` with system Python outside the live and target
+  environments and require exit code zero. The preflight
+  is read-only. It rejects the primary checkout, links and reparse points,
+  mounted directories, unreadable paths and incomplete inspections.
+- Use the managed archive tool only after that preflight. Do not use raw
+  recursive deletion, `git worktree remove` or `git worktree prune` as a fallback.
+  Do not use force flags to bypass a refused inspection.
+- A blocked inspection means retain the worktree. Link removal needs a separate
+  reviewed operation that removes only the link, never its target or children.
+- The user-level Codex cleanup hook must be trusted before relying on automatic
+  blocking. Hooks do not cover manual UI or OS cleanup. Keep disposable worktrees
+  link-free even when a hook is installed. Do not run cleanup fixtures unless
+  the operator explicitly requests tests.
+
 ## Mobile is a supported workflow
 
 - Treat a remote phone as a full dataset client. Host installation is a separate prerequisite.

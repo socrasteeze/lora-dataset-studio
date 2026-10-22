@@ -1,5 +1,40 @@
 # HANDOFF
 
+## Worktree cleanup guard (2026-10-21)
+
+`scripts/worktree_cleanup_guard.py` provides read-only preflight and Codex
+PreToolUse handling. It rejects a primary checkout, filesystem links/reparse
+points in the root, ancestors or tree, mounted directories, unknown Git metadata,
+unreadable paths and incomplete inspections. It scans ignored directories too.
+Shell worktree removal/pruning, raw deletion inside worktrees and common link
+creation commands are blocked. The program performs no filesystem writes.
+
+An identical installed copy, a PowerShell launcher and a system-Python reference
+are under the user Codex hooks directory. The launcher converts missing files,
+process errors and its own 12-second watchdog expiry into a blocking exit code.
+The hook definition is in the user `hooks.json`, outside disposable worktrees and
+the live environment. Repo and global AGENTS guidance require independent
+dependencies and successful preflight immediately before managed archival.
+
+Trust confirmed through the Codex CLI `/hooks` screen on operator order.
+PreToolUse shows one installed and one active hook. The selected worktree cleanup
+entry is enabled (`[x]`) and reports `Trust: Trusted`. Its displayed matcher,
+launcher command, synchronous mode and 20-second timeout match the reviewed
+definition. A matching trust record already existed, so no trust setting needed
+changing. No hook-trust bypass was used. Hooks do not cover manual UI or OS
+cleanup; keep disposable worktrees link-free regardless.
+
+Ruff and Python/PowerShell syntax and JSON checks passed. The installed source
+hash matches the repository copy. The one remaining linked worktree passed an
+actual read-only inspection of 3,420 entries with zero file changes. The
+implementation left Studio healthy. No worktree cleanup, restart, test or fixture
+probe was part of implementation. Publication is authorized with tests off.
+The deny branches remain untested under the operator's no-tests instruction.
+The host UI confirms enabled/trusted registration; no worktree cleanup or test
+probe was used to exercise blocking. This source-and-documentation delivery uses
+`[skip ci]`. No frontend changes or bundle rebuild are required. Machine-specific
+hook settings stay in user config.
+
 ## Profile LAN defaults (2026-10-21)
 
 Prepared for `origin/main` from `c4a03f4d8` on `noble/profile-lan-publish`.
@@ -17,8 +52,11 @@ Ruff passed. ESLint passed with zero errors and 32 existing warnings. The
 delivery build passed in 7.55 seconds on current main, including the newer caption
 and Dataset-folder work. Attribution and privacy scans have no unresolved findings.
 
-Activation remains pending separate authorization. The primary checkout, its
-pending work, saved configuration, served bundle and running process remain unchanged.
+The profile fix was activated on separate operator authorization. Its matching
+activation build retained existing local storage behavior rather than loading the
+newer Dataset-folder wave. The separate Dataset-folder activation below is still
+pending. Recovery and data-preservation evidence are in AAR.md. Studio was already
+offline at the cleanup-guard delivery precheck; this delivery does not restart it.
 
 ## Dataset folder categories (2026-10-21)
 
