@@ -77,18 +77,29 @@ def test_unlock_restores_explicit_delete_behavior(client, tmp_path, monkeypatch)
     assert not image.exists()
 
 
-def test_read_only_blocks_import_before_download(client, app, tmp_path, monkeypatch):
-    from app.services import image_bank_service as banks
+def test_read_only_blocks_image_source_import_before_reading_assets(client, app, tmp_path):
+    # Fork: the scraper import is retired (Divergence 12); Image Sources is the
+    # web import that writes into a Bank's source folder.
+    import json
+    import threading
+    from app.extensions import db
+    from app.models import ImageSourceAsset, ImageSourceJob
+    from app.services.image_source_import import import_job
 
     bank_id, _, image = _create(client, tmp_path / 'nas', True)
     before = _fingerprint(image.parent)
-    monkeypatch.setattr(banks, '_download_scrape_item', lambda *_: pytest.fail('download'))
-    response = client.post('/api/bank/scrape-import', json={
-        'bank_id': bank_id, 'items': [{'url': 'https://example.org/photo.png'}],
-    })
-    assert response.status_code == 403, response.get_json()
-    with app.app_context(), pytest.raises(banks.BankSourceReadOnly):
-        banks.scrape_import_to_bank('local', [{'url': 'https://example.org/photo.png'}], bank_id)
+    with app.app_context():
+        job = ImageSourceJob(user_id='local', provider='danbooru',
+                             url='https://danbooru.donmai.us/posts?tags=synthetic',
+                             destination='bank', target_id=bank_id, name='Demo')
+        db.session.add(job)
+        db.session.commit()
+        db.session.add(ImageSourceAsset(job_id=job.id, source_key='synthetic-1', kind='image',
+                                        url='https://cdn.example.test/1.png',
+                                        metadata_json=json.dumps({})))
+        db.session.commit()
+        with pytest.raises(ValueError, match='read-only'):
+            import_job(job, threading.Event())
     assert _fingerprint(image.parent) == before
 
 
@@ -104,12 +115,22 @@ def test_removing_protected_imported_bank_preserves_source_folder(client, app):
     assert client.get(f'/api/bank/{bank_id}').status_code == 404
 
 
-@pytest.mark.parametrize('relation', ['same', 'parent', 'child'])
+def test_readding_a_folder_read_only_protects_the_existing_bank(client, tmp_path):
+    # Fork: one folder is one bank, so a re-add reuses it instead of adding a twin.
+    bank_id, _, image = _create(client, tmp_path / 'nas')
+    body = {'name': 'Original photos', 'folder': str(image.parent)}
+    again = client.post('/api/bank/create', json={**body, 'read_only': True}).get_json()
+    assert again['id'] == bank_id and again['reused'] is True and again['read_only'] is True
+    plain = client.post('/api/bank/create', json=body).get_json()
+    assert plain['id'] == bank_id and plain['read_only'] is True
+
+
+@pytest.mark.parametrize('relation', ['parent', 'child'])
 def test_other_banks_cannot_write_into_a_protected_tree(client, tmp_path, relation):
     parent = tmp_path / 'nas'
     child = parent / 'album'
     writable, image_id, image = _create(client, child if relation == 'parent' else parent)
-    protected = parent if relation in ('same', 'parent') else child
+    protected = parent if relation == 'parent' else child
     _create(client, protected, True)
     before = _fingerprint(parent)
     client.post(f'/api/bank/{writable}/images/status', json={'ids': [image_id], 'status': 'reject'})
@@ -123,7 +144,7 @@ def test_protection_waits_for_own_and_overlapping_writers(client, tmp_path):
     from app.services import bank_jobs
 
     bank_id, _, image = _create(client, tmp_path / 'nas')
-    other, _, _ = _create(client, image.parent)
+    other, _, _ = _create(client, image.parent / 'album')
     for busy_id in (bank_id, other):
         with bank_jobs.mutation_lease(busy_id, 'delete_rejected'):
             assert _protect(client, bank_id).status_code == 409
@@ -135,9 +156,13 @@ def test_read_only_creation_refuses_a_busy_overlapping_bank(client, tmp_path):
     from app.services import bank_jobs
 
     bank_id, _, image = _create(client, tmp_path / 'nas')
+    # Fork: a child folder, because the same folder would reuse the busy bank.
+    child = image.parent / 'album'
+    child.mkdir()
+    Image.new('RGB', (64, 64), (20, 50, 80)).save(child / 'copy.png')
     with bank_jobs.mutation_lease(bank_id, 'delete_rejected'):
         response = client.post('/api/bank/create', json={
-            'name': 'Protected', 'folder': str(image.parent), 'read_only': True,
+            'name': 'Protected', 'folder': str(child), 'read_only': True,
         })
         assert response.status_code == 409
     assert len(client.get('/api/banks').get_json()['banks']) == 1
