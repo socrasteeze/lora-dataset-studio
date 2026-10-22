@@ -77,6 +77,7 @@ For scripted setups, a handful of environment variables override paths and binds
 | `LDS_DATA_DIR` | Runtime data directory (where `config.json`, datasets and trash live). |
 | `LDS_CONFIG` | Path to `config.json`. |
 | `LDS_ENV` | Path to the `.env` secrets file. |
+| `LDS_DATASET_DESTINATIONS` | Path to `dataset-destinations.json`. Unset, the app reads the file beside the launcher. See [New media destinations](#new-media-destinations). |
 | `LDS_HOST` | Bind host — takes priority over `server.host`. |
 | `LDS_PORT` | Bind port — takes priority over `server.port`. |
 | `LDS_NO_BROWSER` | `1` disables the browser auto-open at startup regardless of `server.auto_open_browser` — for a one-off or automated launch that never touched Settings. |
@@ -1728,7 +1729,9 @@ Additional config-file-only keys (ComfyUI folder overrides, cloud internals, qua
 ## New media destinations
 
 The installation can keep a private, gitignored `dataset-destinations.json`
-beside its launcher. Its `root` field selects an absolute parent for newly
+beside its launcher. `LDS_DATASET_DESTINATIONS` selects a different file and
+is read when a Dataset is created. Unset, the app reads the file beside the
+launcher. Its `root` field selects an absolute parent for newly
 created Datasets. The app adds its own `LDS` or `DSM` subfolder. This policy
 overrides saved defaults and environment paths only for creation. A missing
 policy preserves portable defaults; an invalid policy stops creation.

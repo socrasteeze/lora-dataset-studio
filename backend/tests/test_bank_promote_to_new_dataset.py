@@ -307,14 +307,14 @@ def test_the_route_409s_a_busy_bank(app, client, source):
 def test_promotion_uses_installation_destination_despite_stale_settings(app, source, tmp_path, monkeypatch):
     """Before the fix promotion followed paths.dataset_images_root. Cloud red/green pending."""
     import json
-    from app import creation_destinations, config as cfg
+    from app import config as cfg
     from app.models import FaceDatasetImage
     from app.services import image_bank_service as banks
 
     policy = tmp_path / 'policy.json'
     root = tmp_path / 'media'
     policy.write_text(json.dumps({'root': str(root)}), encoding='utf-8')
-    monkeypatch.setattr(creation_destinations, 'POLICY_PATH', policy)
+    monkeypatch.setenv('LDS_DATASET_DESTINATIONS', str(policy))
     monkeypatch.delenv('LDS_PROFILE_ID', raising=False)
     bank_id, _folder, ids = source
     with app.app_context():
@@ -330,7 +330,6 @@ def test_promotion_uses_installation_destination_despite_stale_settings(app, sou
 
 def test_style_promotion_overrides_folder_category_without_changing_kind(app, client, source, tmp_path, monkeypatch):
     import json
-    from app import creation_destinations
     from app.extensions import db
     from app.models import FaceDataset
     from app.services.dataset_storage import dataset_path
@@ -339,7 +338,7 @@ def test_style_promotion_overrides_folder_category_without_changing_kind(app, cl
     policy = tmp_path / 'policy.json'
     root = tmp_path / 'sets'
     policy.write_text(json.dumps({'root': str(root)}), encoding='utf-8')
-    monkeypatch.setattr(creation_destinations, 'POLICY_PATH', policy)
+    monkeypatch.setenv('LDS_DATASET_DESTINATIONS', str(policy))
     response = client.post(f'/api/bank/{bank_id}/promote-to-new-dataset', json={
         'name': 'Amber art', 'kind': 'style', 'folder_category': 'miscellaneous', 'image_ids': ids,
     })

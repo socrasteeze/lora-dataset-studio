@@ -138,6 +138,7 @@ try {
     if ($env:LDS_PLUGINS_DIR -or $env:LDS_PLUGIN_DISTRIBUTION) { throw 'Inherited plugin state leaked' }
     if ($env:LDS_CONFIG -ne (Scratch 'config.json')) { throw 'Config is not isolated' }
     if ($env:LDS_ENV -ne (Scratch '.env')) { throw 'Secrets are not isolated' }
+    if ($env:LDS_DATASET_DESTINATIONS -ne (Scratch 'dataset-destinations.json')) { throw 'Dataset destinations are not isolated' }
     if ($env:LDS_GATES_SCRATCH -ne $script:Scratch) { throw 'Smoke boundary missing' }
     if ($env:OMP_NUM_THREADS -ne '1' -or $env:MKL_NUM_THREADS -ne '1' -or
         $env:OPENBLAS_NUM_THREADS -ne '1') { throw 'Nested thread pools were not bounded' }

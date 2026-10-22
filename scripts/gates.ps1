@@ -63,7 +63,7 @@ function Remove-Scratch {
 # Do not impose one shared plugin directory on all xdist workers.
 function Invoke-IsolatedValidation([scriptblock]$Body) {
   $names = @('LDS_DATA_DIR', 'LDS_CONFIG', 'LDS_ENV', 'LDS_PLUGINS_DIR',
-             'LDS_EXTENSIONS_DIR', 'LDS_BUNDLED_DIR', 'LDS_PLUGIN_DISTRIBUTION',
+             'LDS_EXTENSIONS_DIR', 'LDS_DATASET_DESTINATIONS', 'LDS_BUNDLED_DIR', 'LDS_PLUGIN_DISTRIBUTION',
              'LDS_PLUGIN_BUILD_MODE', 'LDS_PLUGINS', 'LDS_EXTENSIONS', 'LDS_GATES_SCRATCH')
   $names += @('LDS_PROFILE_ID', 'LDS_PROFILE_NAME', 'LDS_PROFILE_PORT', 'LDS_PROFILES_HOME')
   $threadLimits = @('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS')
@@ -75,6 +75,7 @@ function Invoke-IsolatedValidation([scriptblock]$Body) {
     $env:LDS_DATA_DIR = Scratch 'data'
     $env:LDS_CONFIG = Scratch 'config.json'
     $env:LDS_ENV = Scratch '.env'
+    $env:LDS_DATASET_DESTINATIONS = Scratch 'dataset-destinations.json'
     $env:LDS_PROFILES_HOME = Scratch 'profiles'
     $env:LDS_GATES_SCRATCH = $script:Scratch
     foreach ($name in $threadLimits) { [Environment]::SetEnvironmentVariable($name, '1', 'Process') }
