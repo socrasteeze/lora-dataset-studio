@@ -146,6 +146,11 @@ def import_job(job, cancel):
             job.target_id = bank.id
             db.session.commit()
         with bank_jobs.mutation_lease(bank.id, 'source_import', total=len(assets)):
+            try:
+                banks._require_writable_source(bank)
+            except banks.BankSourceReadOnly as exc:
+                # The job runner reports ValueError text; keep the refusal visible.
+                raise ValueError(str(exc)) from None
             known = _bank_hashes(bank, cancel)
             _import_items(job, assets, cancel,
                           lambda asset, raw, ext: _bank_item(job, asset, bank, raw, ext, known))

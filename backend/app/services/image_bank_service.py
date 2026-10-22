@@ -952,8 +952,12 @@ def _register_bank(user_id, name, source_path, rels, root_only=False, *, exclude
     # fenced. Its flush only assigns bank.id for that lookup; the commit follows.
     if read_only:
         db.session.flush()
-    with _source_protection_change(bank) if read_only else ExitStack():
-        db.session.commit()
+    try:
+        with _source_protection_change(bank) if read_only else ExitStack():
+            db.session.commit()
+    except bank_jobs.BankJobBusy:
+        db.session.rollback()   # a busy overlapping bank leaves no half-made row
+        raise
     # Not cosmetic. The commit above EXPIRED `bank`, so bank.id is re-SELECTed
     # here — once, deliberately, before any DML. Reading it after the inserts
     # instead would let autoflush turn that read into a flush.
