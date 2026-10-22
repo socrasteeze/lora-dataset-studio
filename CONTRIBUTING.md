@@ -52,6 +52,24 @@ npm run build    # writes frontend/dist/
 
 **If you change anything under `frontend/src`, run `npm run build` and commit the regenerated `frontend/dist/` in the same PR** — otherwise people running from source won't see your change. There's no TypeScript step; a clean `npm run build` plus `npm run lint` (ESLint, correctness rules only — unused variables, undefined names, hook rules; config in `frontend/eslint.config.mjs`) is the bar. CI runs both.
 
+### Worktree cleanup
+
+Use independent dependencies in disposable worktrees. A junction to the live
+environment can expose that environment to recursive cleanup.
+Before archiving a worktree, run the read-only preflight from this checkout:
+
+```powershell
+py -3.12 -I scripts/worktree_cleanup_guard.py --worktree "<absolute-worktree-root>"
+```
+
+Use a system interpreter outside the live environment. Archive only after exit
+code zero. A refused or incomplete inspection means
+retain the worktree. Do not fall back to raw deletion or force flags. The guard
+also supports a Codex `PreToolUse` hook via `--hook`; its installed copy and
+interpreter must live outside disposable worktrees and the live environment.
+New hooks require review and trust through `/hooks` before they run. See the
+[official hook documentation](https://learn.chatgpt.com/docs/hooks).
+
 ### Lint
 
 Both halves have a small, correctness-only lint gate that CI runs on every push and PR (the `lint` job). It does not police style — only things that cannot be intended: unused imports and variables, undefined names, a hook called under a condition, a dict literal that writes the same key twice, a bare `except:`.
