@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-22-bank-read-only-source', date: '2026-10-22',
+    title: 'Protect your image bank originals with read-only mode',
+    blurb: 'Enable Read-only source when adding a bank or in an existing bank to block source file deletion and new imports. Triage, captions, edits to working copies and copying into datasets still work. Protection also covers other banks pointing at the same folder tree. Thanks to kennhardy for the suggestion (GitHub #72).',
+    to: '/bank',
+  },
+  {
     id: '2026-10-21-zz3-anima-hybrid-captions', date: '2026-10-21',
     title: 'Caption Anima with tags and a sentence',
     blurb: 'PixAI tags + VLM writes normalized booru tags, then a short description on the same line. The trigger stays out. If PixAI Tagger v1.0 is not installed, the pass stops and tells you to install it.',

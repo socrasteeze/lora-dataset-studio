@@ -47,7 +47,7 @@ import uuid
 import warnings
 from collections import Counter, OrderedDict, deque
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from functools import wraps
 from pathlib import Path
 from types import SimpleNamespace
@@ -795,7 +795,59 @@ def bank_for_source(user_id, folder, *, root_only=False) -> ImageBank | None:
     return None
 
 
-def create_bank(user_id, name, folder, *, excluded_folders=None):
+class BankSourceReadOnly(PermissionError):
+    """A Bank's source files are protected from writes and removal."""
+
+
+def source_write_block(bank) -> str | None:
+    """Protect the source even when another Bank references the same tree."""
+    if bank.read_only:
+        return 'This bank is read-only. Source files cannot be added or deleted.'
+    protected_ids = {b.id for b in ImageBank.query.filter_by(
+        user_id=bank.user_id, read_only=True).all()}
+    if protected_ids and any(o['id'] in protected_ids
+                             for o in overlapping_banks(bank.user_id, bank.id)):
+        return ('This source folder overlaps a read-only bank. '
+                'Source files cannot be added or deleted.')
+    return None
+
+
+def _require_writable_source(bank):
+    # A preflight may have loaded this object before the mutation acquired its
+    # lease. Re-read the persisted choice at the actual write boundary.
+    db.session.refresh(bank, ['read_only'])
+    if reason := source_write_block(bank):
+        raise BankSourceReadOnly(reason)
+
+
+@contextmanager
+def _source_protection_change(bank):
+    """A successful protection change cannot race a writer in an overlapping Bank.
+
+    The caller owns this Bank (or has not committed its new row yet). Acquire
+    the other Banks' existing mutation leases until the setting is committed.
+    These leases refuse immediately when busy; they never wait on another job.
+    """
+    with ExitStack() as leases:
+        for other in overlapping_banks(bank.user_id, bank.id):
+            leases.enter_context(bank_jobs.mutation_lease(other['id'], 'source_protection'))
+        yield
+
+
+@_serialized_bank_mutation('source_protection')
+def set_read_only(user_id, bank_id, read_only, *, _bank_lease=None):
+    if not isinstance(read_only, bool):
+        raise ValueError('read_only must be a boolean')
+    bank = get_bank(user_id, bank_id)
+    if bank is None:
+        return None
+    with _source_protection_change(bank):
+        bank.read_only = read_only
+        db.session.commit()
+    return {'read_only': bool(bank.read_only), 'source_write_block': source_write_block(bank)}
+
+
+def create_bank(user_id, name, folder, *, excluded_folders=None, read_only=False):
     """Register a folder as a bank: walk it recursively and create one row per
     image file. Instant (no decode) — scoring is the separate scan pass.
     Returns (bank, added). ValueError on a missing folder / too many files.
@@ -809,7 +861,13 @@ def create_bank(user_id, name, folder, *, excluded_folders=None):
     something). The refresh is strictly additive, so re-adding a folder is a
     safe way to pick up new files and can never reset a triage. The caller can
     tell the two apart by asking bank_for_source BEFORE this — the return shape
-    is deliberately unchanged, because dozens of callers unpack the pair."""
+    is deliberately unchanged, because dozens of callers unpack the pair.
+
+    ``read_only=True`` on such a re-add turns protection on for the existing
+    bank; ``read_only=False`` never turns it off (that stays an explicit,
+    confirmed change)."""
+    if not isinstance(read_only, bool):
+        raise ValueError('read_only must be a boolean')
     name = (name or '').strip()
     if excluded_folders is not None and not isinstance(excluded_folders, list):
         raise ValueError('excluded_folders must be a list of folders')
@@ -842,6 +900,8 @@ def create_bank(user_id, name, folder, *, excluded_folders=None):
                 set_excluded_folders(user_id, existing.id, combined)
         else:
             res = refresh_bank(user_id, existing.id, force=True) or {}
+        if read_only and not existing.read_only:
+            set_read_only(user_id, existing.id, True)
         return existing, int(res.get('added') or 0)
     rels = []
     for rel in _walk_image_relpaths(folder):
@@ -857,11 +917,13 @@ def create_bank(user_id, name, folder, *, excluded_folders=None):
     if cleaned and not any(not _rel_under_excluded(rel, excluded_set) for rel in rels):
         raise ValueError('every image is excluded — select at least one folder')
     if cleaned:
-        return _register_bank(user_id, name, folder, rels, excluded_folders=cleaned)
-    return _register_bank(user_id, name, folder, rels)
+        return _register_bank(user_id, name, folder, rels, excluded_folders=cleaned,
+                              read_only=read_only)
+    return _register_bank(user_id, name, folder, rels, read_only=read_only)
 
 
-def _register_bank(user_id, name, source_path, rels, root_only=False, *, excluded_folders=None):
+def _register_bank(user_id, name, source_path, rels, root_only=False, *, excluded_folders=None,
+                   read_only=False):
     """Persist one ImageBank rooted at ``source_path`` with a BankImage per rel
     (each relative to ``source_path``). Shared by create_bank and the per-
     subfolder split. Assumes name/folder are validated and ``rels`` is within
@@ -874,7 +936,7 @@ def _register_bank(user_id, name, source_path, rels, root_only=False, *, exclude
     # Persist the scope before the first commit exposes this bank to other tabs.
     # Excluded rows remain recoverable through the existing folder controls.
     bank = ImageBank(user_id=user_id, name=name, source_path=source_path,
-                     root_only=bool(root_only),
+                     root_only=bool(root_only), read_only=read_only,
                      excluded_folders=_json.dumps(excluded_folders) if excluded_folders else None)
     db.session.add(bank)
     # COMMIT, not flush (upstream flushes here). A flush OPENS the write
@@ -886,7 +948,12 @@ def _register_bank(user_id, name, source_path, rels, root_only=False, *, exclude
     # commit is safe: refresh_bank is strictly additive and re-walks the folder
     # on open, so a bank left holding a subset of its files completes on the
     # next walk. root_only is persisted above, so that re-walk is scoped too.
-    db.session.commit()
+    # A protected bank publishes its row only while overlapping writers are
+    # fenced. Its flush only assigns bank.id for that lookup; the commit follows.
+    if read_only:
+        db.session.flush()
+    with _source_protection_change(bank) if read_only else ExitStack():
+        db.session.commit()
     # Not cosmetic. The commit above EXPIRED `bank`, so bank.id is re-SELECTed
     # here — once, deliberately, before any DML. Reading it after the inserts
     # instead would let autoflush turn that read into a flush.
@@ -1438,7 +1505,8 @@ def relocate_bank(user_id, bank_id, folder, confirm=False, *,
         return out
     bank = get_bank(user_id, bank_id)
     bank.source_path = out['folder']
-    db.session.commit()
+    with _source_protection_change(bank) if bank.read_only else ExitStack():
+        db.session.commit()
     _folder_sync.pop(bank_id, None)     # next walk must see the new folder
     out['applied'] = True
     out['overlaps'] = overlapping_banks(user_id, bank_id)
@@ -1622,7 +1690,9 @@ def delete_bank(user_id, bank_id, *, _allow_busy=False,
         raise BankInstanceMismatch('bank selection is stale')
     if refuse_queued and bank_queue.state_for(bank_id) is not None:
         raise BankQueued('bank is queued')
-    imported_source = bank.source_path if _is_imported_source(bank.source_path) else None
+    db.session.refresh(bank, ['read_only'])
+    imported_source = (bank.source_path if _is_imported_source(bank.source_path)
+                       and not source_write_block(bank) else None)
     from . import folder_person
     from . import bank_collections
     bank_collections.drop_for_bank(bank_id)
@@ -3061,6 +3131,7 @@ def _bank_workspace_fields(bank, th):
     return {
         'id': bank.id, 'instance_id': bank.instance_id, 'name': bank.name,
         'source_path': bank.source_path,
+        'read_only': bool(bank.read_only), 'source_write_block': source_write_block(bank),
         'excluded_folders': _excluded_prefixes(bank.id),
         'semantic_engine': _selected_semantic_engine(bank),
         'created_at': bank.created_at.isoformat() if bank.created_at else None,
@@ -3337,6 +3408,7 @@ def list_banks(user_id, dataset_id=None) -> list:
         row = {
             'id': bank.id, 'instance_id': bank.instance_id,
             'name': bank.name, 'source_path': bank.source_path,
+            'read_only': bool(bank.read_only),
             'created_at': bank.created_at.isoformat() if bank.created_at else None,
             **counters.get(bank.id, {'total': 0, 'keep': 0, 'reject': 0, 'scanned': 0}),
             'preview_ids': _preview_ids(bank.id),
@@ -7662,11 +7734,15 @@ def overlapping_banks(user_id, bank_id) -> list:
         return []
     out = []
     for other, theirs in _bank_folders(user_id, exclude_id=bank_id):
+        try:
+            common = os.path.commonpath([mine, theirs])
+        except ValueError:  # Different drives cannot share files.
+            continue
         if theirs == mine:
             relation = 'same'
-        elif mine.startswith(theirs + os.sep):
+        elif common == theirs:
             relation = 'parent'
-        elif theirs.startswith(mine + os.sep):
+        elif common == mine:
             relation = 'child'
         else:
             continue
@@ -7738,6 +7814,7 @@ def rejected_delete_preview(user_id, bank_id) -> dict | None:
             shared.append({'id': other['id'], 'name': other['name'],
                            'relation': other['relation'], 'files': n})
     return {'rejected': len(rows), 'mode': _delete_mode(), 'shared': shared,
+            'read_only': bool(bank.read_only), 'source_write_block': source_write_block(bank),
             # The hard stop, next to the soft warnings: another BANK losing files
             # is a warning the user may accept, a DATASET losing them is not.
             'dataset_conflict': bank_dataset_conflict(user_id, bank_id)}
@@ -7760,6 +7837,7 @@ def _delete_rejected_guard(user_id, bank_id, check_busy=True):
         raise ValueError('bank not found')
     if check_busy and bank_jobs.running(bank_id):
         raise RuntimeError('a job is running on this bank — stop it first')
+    _require_writable_source(bank)
     # An install that predates the create-time guard can still hold a bank whose
     # folder IS a dataset's. Here, and only here, that stops being cosmetic: these
     # "rejects" are the dataset's images. Refuse — never silently delete, never

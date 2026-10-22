@@ -523,6 +523,7 @@ _SCHEMA_ADDITIONS = (
     # must NOT recurse when its live folder is re-walked (see refresh_bank).
     ('image_bank', 'root_only', 'BOOLEAN'),
     ('image_bank', 'keep_separate', 'BOOLEAN'),
+    ('image_bank', 'read_only', 'BOOLEAN NOT NULL DEFAULT 0'),
     # When each pass last completed. A bank that predates it keeps NULL and
     # simply reports "never recorded" until its next pass writes a row.
     ('image_bank', 'last_passes', 'TEXT'),
