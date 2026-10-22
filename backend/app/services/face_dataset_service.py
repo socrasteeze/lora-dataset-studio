@@ -1006,7 +1006,7 @@ def dual_captions_enabled(ds) -> bool:
 # All three are OVERRIDES of the global captioning defaults: an empty value means
 # "follow the global default" (captioning.backend / ollama.vision_model), so a
 # dataset that never touched the popover behaves byte-for-byte as before.
-_CAPTION_BACKENDS = ('auto', 'joycaption', 'ollama', 'pixai', 'none')
+_CAPTION_BACKENDS = ('auto', 'joycaption', 'ollama', 'pixai', 'pixai_hybrid', 'none')
 # Extra instructions are APPENDED to the built caption prompt (never replace it),
 # so the kind rules (identity/concept/style omission) and the post-filter cleaners
 # stay in force — a bounded length keeps a runaway paste out of every prompt.
@@ -1220,6 +1220,7 @@ CAPTION_WRITER_JOYCAPTION = 'joycaption'          # JoyCaption's own words
 CAPTION_WRITER_OLLAMA = 'ollama'                  # written by the Ollama vision model
 CAPTION_WRITER_REFINED = 'joycaption_refined'     # a JoyCaption draft rewritten by Ollama
 CAPTION_WRITER_PIXAI = 'pixai'                      # PixAI Tagger booru tags
+CAPTION_WRITER_PIXAI_HYBRID = 'pixai_hybrid'        # PixAI tags plus a short VLM line
 # Stored nowhere and read by the UI as keys — treat them like catalog labels: adding
 # one is free, renaming one breaks the caller that reads it.
 
@@ -7865,9 +7866,14 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
       - 'joycaption' -> Joy drafts only + mechanical scrub (no Qwen calls);
       - 'ollama'     -> Joy skipped, every image direct-Qwen + enforcement;
       - 'auto'       -> Joy drafts refined by Qwen, no-Joy images direct-Qwen, all enforced."""
-    if (backend or '').strip().lower() == 'pixai':
+    if (backend or '').strip().lower() in ('pixai', 'pixai_hybrid'):
         from .pixai_tagger import CONCEPT_REFUSAL
         raise RuntimeError(CONCEPT_REFUSAL)
+    # Anima Auto is the local Qwen3-VL model, not the JoyCaption chain.
+    anima_auto = (_is_anima_dataset(ds) and (backend or '').strip().lower() == 'auto')
+    if anima_auto and not ollama_model:
+        from .vision_ollama import anima_auto_vision_model
+        ollama_model = anima_auto_vision_model()
     concept_desc = (ds.concept_desc or '').strip()
     # Dynamic omission clause: for a POSE concept the generic "describe their pose and
     # body position" line would instruct the VLM to describe the very concept - the
@@ -7906,7 +7912,7 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
     remaining = list(todo)
     refine_targets = []  # (image_id, p, joycap) -> Joy draft refined by Qwen
     # 1) JoyCaption batch (draft) when the backend allows it.
-    if backend in ('auto', 'joycaption'):
+    if backend in ('auto', 'joycaption') and not anima_auto:
         jc = {}
         jc_errors = {}
         try:
@@ -8008,6 +8014,10 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
     return n
 
 
+def _is_anima_dataset(ds) -> bool:
+    return (getattr(ds, 'train_type', None) or '').strip().lower() == 'anima'
+
+
 def _dataset_caption_recipe(ds, opts, mode=None):
     """Return the base prompt and cleaner shared by batch and preview paths."""
     if is_concept(ds):
@@ -8019,10 +8029,17 @@ def _dataset_caption_recipe(ds, opts, mode=None):
         return caption_prompt_for_style(mode), drop_style_lead_in
     body = is_body_fidelity(ds)
     appearance = opts.get('appearance') or None
-    base_cleaner = drop_identity_tags if mode == 'booru' else drop_identity_sentences
+    # Anima keeps count tags (1girl, solo). Other families still drop them.
+    keep_counts = train_type == 'anima' and mode == 'booru'
+    if mode == 'booru':
+        def _clean(text, body=body, appearance=appearance, keep_counts=keep_counts):
+            return drop_identity_tags(
+                text, body=body, appearance=appearance, keep_count_tags=keep_counts)
+    else:
+        def _clean(text, body=body, appearance=appearance):
+            return drop_identity_sentences(text, body=body, appearance=appearance)
     prompt_for = caption_prompt_for_anima if train_type == 'anima' else caption_prompt_for
-    return (prompt_for(mode, body=body, appearance=appearance),
-            lambda text: base_cleaner(text, body=body, appearance=appearance))
+    return (prompt_for(mode, body=body, appearance=appearance), _clean)
 
 
 
@@ -8057,8 +8074,13 @@ def _store_pixai_dataset_captions(ds, todo, *, token, dataset_id, force,
     for image_id, path in todo:
         if dataset_activity.cancel_requested(dataset_id):
             break
-        cap = pixai_tagger.booru_caption(
-            raw_results.get(path), include_character=include_character)
+        if _is_anima_dataset(ds):
+            from .anima_booru import format_anima_booru
+            cap = format_anima_booru(
+                raw_results.get(path), include_character=include_character)
+        else:
+            cap = pixai_tagger.booru_caption(
+                raw_results.get(path), include_character=include_character)
         if not cap:
             still.append((image_id, path))
             continue
@@ -8098,11 +8120,166 @@ def _preview_pixai_caption(ds, img, path, cleaner):
     if not batch.get('ok'):
         raise RuntimeError(batch.get('error') or 'PixAI Tagger failed')
     include_character = pixai_tagger.include_character_tags(getattr(ds, 'kind', None))
-    cap = pixai_tagger.booru_caption(
-        (batch.get('results') or {}).get(path), include_character=include_character)
+    raw = (batch.get('results') or {}).get(path)
+    if _is_anima_dataset(ds):
+        from .anima_booru import format_anima_booru
+        cap = format_anima_booru(raw, include_character=include_character)
+    else:
+        cap = pixai_tagger.booru_caption(raw, include_character=include_character)
     if cap:
         cap = cleaner(cap) or cap
         cap = _cap_caption(_with_camera_pose_phrase(img, cap))
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    return {'caption': cap or '', 'chars': len(cap or ''),
+            'duration_ms': duration_ms, 'cancelled': False,
+            'model': pixai_tagger.MODEL_ID}
+
+
+def _clean_hybrid_tags(ds, tags, opts) -> str:
+    """Drop identity tags from the PixAI half. Anima keeps its count tags."""
+    if is_style(ds) or not (tags or '').strip():
+        return tags or ''
+    return drop_identity_tags(
+        tags, body=is_body_fidelity(ds),
+        appearance=(opts or {}).get('appearance') or None,
+        keep_count_tags=_is_anima_dataset(ds)) or ''
+
+
+def _hybrid_vision_model(ds, ollama_model):
+    if (ollama_model or '').strip():
+        return ollama_model
+    if _is_anima_dataset(ds):
+        from .vision_ollama import anima_auto_vision_model
+        return anima_auto_vision_model()
+    return None
+
+
+def _store_pixai_hybrid_dataset_captions(ds, todo, *, token, dataset_id, force,
+                                         spare_asserted, opts, extra_instructions,
+                                         ollama_model, report, outcome):
+    """PixAI tags, then one short vision sentence. No other backend on failure."""
+    from . import pixai_tagger
+    from .anima_booru import compose_hybrid_caption, format_anima_booru, hybrid_grounding
+    if pixai_tagger.missing_snapshot():
+        raise RuntimeError(pixai_tagger.NOT_INSTALLED)
+    include_character = pixai_tagger.include_character_tags(getattr(ds, 'kind', None))
+
+    def _on_progress(rec):
+        if not rec:
+            return
+        kwargs = {}
+        if rec.get('done') is not None:
+            kwargs['done'] = rec['done']
+        phase = rec.get('phase')
+        if phase:
+            kwargs['detail'] = f'PixAI Tagger: {phase}'
+        dataset_activity.progress(token, **kwargs)
+
+    dataset_activity.progress(
+        token, detail=f'Loading PixAI Tagger and captioning {len(todo)} image(s)...')
+    batch = pixai_tagger.caption_images(
+        [path for _image_id, path in todo], on_progress=_on_progress)
+    if not batch.get('ok'):
+        if batch.get('error_kind') == 'unavailable' and pixai_tagger.missing_snapshot():
+            raise RuntimeError(pixai_tagger.NOT_INSTALLED)
+        raise RuntimeError(batch.get('error') or 'PixAI Tagger failed')
+    raw_results = batch.get('results') or {}
+    errors = batch.get('errors') or {}
+    base_prompt, prose_cleaner = _dataset_caption_recipe(ds, opts, mode='prose')
+    base_prompt = _with_caption_instructions(base_prompt, extra_instructions)
+    model = _hybrid_vision_model(ds, ollama_model)
+    from .vision_llm import describe_image, unload_vision_model
+    n = vanished = spared = 0
+    still = []
+    try:
+        for index, (image_id, path) in enumerate(todo, 1):
+            if dataset_activity.cancel_requested(dataset_id):
+                break
+            tags = _clean_hybrid_tags(
+                ds, format_anima_booru(
+                    raw_results.get(path), include_character=include_character),
+                opts)
+            if not tags and not raw_results.get(path):
+                still.append((image_id, path))
+                dataset_activity.bump(token)
+                continue
+            dataset_activity.progress(
+                token, detail=f'Captioning with the local LLM — image {index}/{len(todo)}…')
+            with open(path, 'rb') as fh:
+                prose = describe_image(
+                    fh.read(), base_prompt + '\n\n' + hybrid_grounding(tags),
+                    num_predict=400, model=model,
+                    keep_alive=_VISION_BATCH_KEEPALIVE,
+                    auto_start_local=(index == 1), timeout=(10, 300))
+            prose = (prose or '').strip().strip('"').strip()
+            if prose and not is_concept(ds):
+                prose = prose_cleaner(prose) or ''
+            line = compose_hybrid_caption(tags, prose)
+            img = _live_image_row(image_id)
+            if img is None:
+                vanished += 1
+                dataset_activity.bump(token)
+                continue
+            if _caption_write_blocked(img, force=force, spare_asserted=spare_asserted):
+                spared += 1
+                dataset_activity.bump(token)
+                continue
+            if not line:
+                still.append((image_id, path))
+                dataset_activity.bump(token)
+                continue
+            stored = ' '.join(_cap_caption(_with_camera_pose_phrase(img, line)).split())
+            caption_origin.stamp(img, stored, caption_origin.PIXAI_HYBRID)
+            db.session.commit()
+            n += 1
+            _writer(report, CAPTION_WRITER_PIXAI_HYBRID)
+            dataset_activity.bump(token)
+    finally:
+        unload_vision_model(model=model) if model else unload_vision_model()
+    if report is not None:
+        report['model'] = pixai_tagger.MODEL_ID
+    if still:
+        _record_caption_skips(outcome, still, errors)
+    return n
+
+
+def _preview_pixai_hybrid_caption(ds, img, path, opts, *, ollama_model, extra_instructions):
+    """One-image hybrid preview. Writes nothing. Missing weights fail clearly."""
+    from . import pixai_tagger
+    from .anima_booru import compose_hybrid_caption, format_anima_booru, hybrid_grounding
+    refusal = pixai_tagger.concept_refusal(getattr(ds, 'kind', None))
+    if refusal:
+        raise RuntimeError(refusal)
+    if pixai_tagger.missing_snapshot():
+        raise RuntimeError(pixai_tagger.NOT_INSTALLED)
+    started = time.perf_counter()
+    batch = pixai_tagger.caption_images([path])
+    if not batch.get('ok'):
+        if batch.get('error_kind') == 'unavailable' and pixai_tagger.missing_snapshot():
+            raise RuntimeError(pixai_tagger.NOT_INSTALLED)
+        raise RuntimeError(batch.get('error') or 'PixAI Tagger failed')
+    include_character = pixai_tagger.include_character_tags(getattr(ds, 'kind', None))
+    tags = _clean_hybrid_tags(
+        ds, format_anima_booru(
+            (batch.get('results') or {}).get(path), include_character=include_character),
+        opts)
+    base_prompt, prose_cleaner = _dataset_caption_recipe(ds, opts, mode='prose')
+    base_prompt = _with_caption_instructions(base_prompt, extra_instructions)
+    model = _hybrid_vision_model(ds, ollama_model)
+    from .vision_llm import describe_image, unload_vision_model
+    try:
+        with open(path, 'rb') as fh:
+            prose = describe_image(
+                fh.read(), base_prompt + '\n\n' + hybrid_grounding(tags),
+                num_predict=400, model=model, auto_start_local=True, timeout=(10, 300))
+    finally:
+        unload_vision_model(model=model) if model else unload_vision_model()
+    prose = (prose or '').strip().strip('"').strip()
+    if prose and not is_concept(ds):
+        prose = prose_cleaner(prose) or ''
+    cap = compose_hybrid_caption(tags, prose)
+    if cap:
+        cap = ' '.join(_cap_caption(_with_camera_pose_phrase(img, cap)).split())
     duration_ms = int((time.perf_counter() - started) * 1000)
     return {'caption': cap or '', 'chars': len(cap or ''),
             'duration_ms': duration_ms, 'cancelled': False,
@@ -8138,12 +8315,15 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None, 
     backend = (opts.get('backend') or cfg.get('captioning.backend') or 'auto').lower()
     if backend == 'none':
         raise RuntimeError('No captioning backend configured')
-    if backend == 'pixai':
+    if backend in ('pixai', 'pixai_hybrid'):
         from . import pixai_tagger
         refusal = pixai_tagger.concept_refusal(getattr(ds, 'kind', None))
         if refusal:
             raise RuntimeError(refusal)
-        if pixai_tagger.resolved_mode(getattr(ds, 'train_type', None), mode) != 'booru':
+        if backend == 'pixai_hybrid' and pixai_tagger.missing_snapshot():
+            raise RuntimeError(pixai_tagger.NOT_INSTALLED)
+        if (backend == 'pixai'
+                and pixai_tagger.resolved_mode(getattr(ds, 'train_type', None), mode) != 'booru'):
             raise RuntimeError(pixai_tagger.PROSE_REFUSAL)
     # Vocabulary preset (NSFW register) + free-text steer, combined into the one block that
     # rides at the end of every prompt this run builds.
@@ -8239,9 +8419,23 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None, 
             logger.info('captioning finished: dataset=%s backend=pixai captioned=%s '
                         'elapsed=%.1fs', dataset_id, n, time.monotonic() - started)
             return n
+        if backend == 'pixai_hybrid':
+            n = _store_pixai_hybrid_dataset_captions(
+                ds, todo, token=token, dataset_id=dataset_id, force=force,
+                spare_asserted=spare_asserted, opts=opts,
+                extra_instructions=extra_instructions, ollama_model=ollama_model,
+                report=report, outcome=outcome)
+            logger.info('captioning finished: dataset=%s backend=pixai_hybrid captioned=%s '
+                        'elapsed=%.1fs', dataset_id, n, time.monotonic() - started)
+            return n
+        # Anima Auto uses the configured Qwen3-VL model and does not try JoyCaption.
+        anima_auto = backend == 'auto' and _is_anima_dataset(ds)
+        if anima_auto and not ollama_model:
+            from .vision_ollama import anima_auto_vision_model
+            ollama_model = anima_auto_vision_model()
         # 1) Batch JoyCaption with one 8B NF4 model load in ai-toolkit's venv;
-        # skip entirely when backend forces Ollama.
-        if backend in ('auto', 'joycaption'):
+        # skip entirely when backend forces Ollama, and on an Anima Auto pass.
+        if backend in ('auto', 'joycaption') and not anima_auto:
             jc = {}
             # Why an image came back WITHOUT a caption, keyed by path. In 'auto' the
             # Ollama phase covers those images and the reason is noise; with
@@ -8445,9 +8639,9 @@ def caption_paths(paths, *, prompt=None, backend=None, ollama_model=None,
     backend = (backend or cfg.get('captioning.backend') or 'auto').lower()
     if backend == 'none':
         raise RuntimeError('No captioning backend configured')
-    if backend == 'pixai':
-        from .pixai_tagger import BANK_REFUSAL
-        raise RuntimeError(BANK_REFUSAL)
+    if backend in ('pixai', 'pixai_hybrid'):
+        from .pixai_tagger import BANK_REFUSAL, HYBRID_BANK_REFUSAL
+        raise RuntimeError(HYBRID_BANK_REFUSAL if backend == 'pixai_hybrid' else BANK_REFUSAL)
     cap_prompt = prompt or DESCRIPTIVE_CAPTION_PROMPT
     if extra_instructions:
         cap_prompt = _with_caption_instructions(cap_prompt, (extra_instructions or '').strip())
@@ -8692,9 +8886,25 @@ def preview_caption(user_id, dataset_id, image_id, *, backend=None,
     resolved_backend = str(resolved_backend).strip().lower()
     if resolved_backend == 'pixai':
         return _preview_pixai_caption(ds, img, path, cleaner)
+    if resolved_backend == 'pixai_hybrid':
+        return _preview_pixai_hybrid_caption(
+            ds, img, path, opts,
+            ollama_model=opts['ollama_model'] if ollama_model is _PREVIEW_UNSET else ollama_model,
+            extra_instructions=_compose_preview_instructions(
+                opts['vocabulary'] if vocabulary is None else vocabulary,
+                opts['instructions'] if instructions is None else instructions,
+                opts['length'] if length is None else length,
+                opts.get('appearance')))
+    preview_backend = resolved_backend
+    preview_model = opts['ollama_model'] if ollama_model is _PREVIEW_UNSET else ollama_model
+    if preview_backend == 'auto' and _is_anima_dataset(ds):
+        preview_backend = 'ollama'
+        if not (preview_model or '').strip():
+            from .vision_ollama import anima_auto_vision_model
+            preview_model = anima_auto_vision_model()
     result = preview_caption_path(
-        path, backend=opts['backend'] if backend is None else backend,
-        ollama_model=opts['ollama_model'] if ollama_model is _PREVIEW_UNSET else ollama_model,
+        path, backend=preview_backend,
+        ollama_model=preview_model,
         vocabulary=opts['vocabulary'] if vocabulary is None else vocabulary,
         length=opts['length'] if length is None else length,
         instructions=opts['instructions'] if instructions is None else instructions,

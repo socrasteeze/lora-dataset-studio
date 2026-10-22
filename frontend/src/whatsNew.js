@@ -85,6 +85,24 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-21-zz3-anima-hybrid-captions', date: '2026-10-21',
+    title: 'Caption Anima with tags and a sentence',
+    blurb: 'PixAI tags + VLM writes normalized booru tags, then a short description on the same line. The trigger stays out. If PixAI Tagger v1.0 is not installed, the pass stops and tells you to install it.',
+    to: '/settings/captioning',
+  },
+  {
+    id: '2026-10-21-zz2-anima-qwen-auto', date: '2026-10-21',
+    title: 'Anima captions use Qwen3-VL',
+    blurb: 'Auto on an Anima dataset calls the configured Qwen3-VL model in Ollama and skips JoyCaption. Other datasets keep JoyCaption, then the local vision model.',
+    to: '/settings/captioning',
+  },
+  {
+    id: '2026-10-21-zz1-text-embedding-cache', date: '2026-10-21',
+    title: 'Turn the text cache on from Training',
+    blurb: 'Text Embedding Cache sits on the training panel. Anima and Krea 2 start with it on, and the training job uses that choice. Turn it off when you want both the long and the short caption.',
+    to: '/datasets?section=training',
+  },
+  {
     id: '2026-10-21-profile-lan-switch', date: '2026-10-21', title: 'Switch Profiles Remotely',
     blurb: 'LAN access defaults to on for new profiles. Older local-only profiles enable LAN access on switch. Each profile keeps its own access token.',
     to: '/guide/settings-reference?h=instance-profiles',

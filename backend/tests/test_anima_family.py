@@ -117,12 +117,39 @@ def test_build_job_config_anima(app, tmp_path):
         assert p['train']['noise_scheduler'] == 'flowmatch'
         assert p['train']['unload_text_encoder'] is True
         assert p['datasets'][0]['cache_text_embeddings'] is True
+        assert p['train']['cache_text_embeddings'] is True
         assert p['datasets'][0]['caption_ext'] == 'txt'
         assert p['sample']['sampler'] == 'flowmatch'
         assert p['sample']['neg'] == lt.ANIMA_SAMPLE_NEG
         assert 'score_1' in p['sample']['neg']              # the anime default neg
         assert p['sample']['guidance_scale'] == 4 and p['sample']['sample_steps'] == 25
         assert p['network'] == {'type': 'lora', 'linear': 32, 'linear_alpha': 32}
+
+
+def test_anima_text_cache_defaults_on_and_off_unlocks_dual_captions(app, tmp_path):
+    """The ATK preset puts cache_text_embeddings on train. Turning it off is
+    what lets Anima train a second caption."""
+    from app.services import lora_training as lt
+    from app.services import face_dataset_service as svc
+    from app.config import LOCAL_USER
+    from app import config as cfg
+    with app.app_context():
+        cfg.save_config({'aitoolkit': {'dir': str(tmp_path / 'aitoolkit')}})
+        ds = svc.create_dataset(LOCAL_USER, 'Cache', 'zchar_cache', train_type='anima')
+        folder = str(tmp_path / 'ds')
+        on = lt.build_job_config(ds, folder, steps=100)['config']['process'][0]
+        assert on['train']['cache_text_embeddings'] is True
+        assert on['datasets'][0]['cache_text_embeddings'] is True
+        assert lt.effective_train_settings(ds)['cache_text_embeddings'] is True
+        lt.update_train_settings(LOCAL_USER, ds.id, {
+            'cache_text_embeddings': False, 'dual_captions': True})
+        ds = svc.get_dataset(LOCAL_USER, ds.id)
+        off = lt.build_job_config(ds, folder, steps=100)['config']['process'][0]
+        assert off['train']['cache_text_embeddings'] is False
+        assert off['datasets'][0]['cache_text_embeddings'] is False
+        assert off['train'].get('unload_text_encoder') is not True
+        assert off['train'].get('short_and_long_captions') is True
+        assert lt.effective_train_settings(ds)['cache_text_embeddings'] is False
 
 
 def test_official_base_repo_anima_is_public(app, tmp_path):

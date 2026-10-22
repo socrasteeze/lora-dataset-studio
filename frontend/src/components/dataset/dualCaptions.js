@@ -21,9 +21,12 @@ const FAMILY_LABEL = {
  * @param {string} family training family id (`train_type`)
  * @returns {{supported: boolean, note: string}} `note` is empty when supported.
  */
-export function dualCaptionsSupport(family) {
-  if (!DUAL_CAPTION_UNSUPPORTED_FAMILIES.includes(family)) return { supported: true, note: '' };
-  const label = FAMILY_LABEL[family] || family;
+export function dualCaptionsSupport(family, options) {
+  const caching = options && Object.prototype.hasOwnProperty.call(options, 'cacheTextEmbeddings')
+    ? Boolean(options.cacheTextEmbeddings)
+    : DUAL_CAPTION_UNSUPPORTED_FAMILIES.includes(family);
+  if (!caching) return { supported: true, note: '' };
+  const label = FAMILY_LABEL[family] || 'This model';
   return {
     supported: false,
     note: `${label} caches its text embeddings and unloads the text encoder, so the short `

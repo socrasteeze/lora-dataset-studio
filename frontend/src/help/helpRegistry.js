@@ -2129,7 +2129,8 @@ const TOPICS = [
      'panorama', 'wide', 'too large', 'rejects images', '8192', '16384', 'no limit',
      'unlimited', 'oversized', 'caption', 'captioning', 'joycaption']),
   setting('captioning.backend', 'captioning', 'captioning-backend', 'Captioning backend',
-    ['caption', 'captioning', 'backend', 'joycaption', 'ollama', 'auto', 'pixai', 'pixai tagger']),
+    ['caption', 'captioning', 'backend', 'joycaption', 'ollama', 'auto', 'pixai', 'pixai tagger',
+     'pixai tags', 'qwen', 'qwen3-vl', 'anima']),
   setting('pixai.device', 'captioning', 'pixai-device', 'PixAI Tagger device',
     ['pixai', 'pixai tagger', 'device', 'gpu', 'cuda', 'cpu', 'booru', 'anima']),
   setting('wd14.device', 'captioning', 'wd14-device', 'Tagging device',
@@ -2246,6 +2247,12 @@ const TOPICS = [
   // so it points at the dataset guide's dedicated section rather than
   // settings-reference, and its route is the training workspace section. Its tip
   // surfaces it when the Advanced options are first opened.
+  { id: 'training.cache_text_embeddings', kind: 'setting',
+    title: 'Text embedding cache',
+    keywords: ['cache', 'text embeddings', 'cache_text_embeddings', 'text encoder',
+      'vram', 'anima', 'krea', 'dual captions', 'training'],
+    guide: { chapter: 'dataset-guide', anchor: 'text-embedding-cache' },
+    app: { route: '/datasets?section=training' } },
   { id: 'training.dual_captions', kind: 'setting', title: 'Dual captions (long + short)',
     keywords: ['dual captions', 'long', 'short', 'short caption', 'caption', 'augmentation',
       'short_and_long', 'advanced', 'training', 'krea', 'anima', 'cache_text_embeddings'],

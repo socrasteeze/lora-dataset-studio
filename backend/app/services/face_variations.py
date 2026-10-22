@@ -3276,9 +3276,21 @@ def _is_hair_identity_tag(t) -> bool:
     return not any(m in t for m in _HAIR_ACCESSORY_MARKERS)
 
 
-def _is_identity_tag(tag, body=False, appearance=None) -> bool:
+# Count tags are identity on a character LoRA for every family except Anima,
+# which trains on them. Gender words (girl, woman, female) stay identity.
+_COUNT_TAG_EXACT = frozenset({
+    '1girl', '2girls', '3girls', '4girls', '5girls', '6girls',
+    '1boy', '2boys', '3boys', '4boys', '5boys', '6boys',
+    '1other', '2others', '3others',
+    'multiple_girls', 'multiple_boys', 'solo', 'solo_focus', 'no_humans',
+})
+
+
+def _is_identity_tag(tag, body=False, appearance=None, *, keep_count_tags=False) -> bool:
     t = (tag or '').strip().lower().replace(' ', '_')
     if not t:
+        return False
+    if keep_count_tags and t in _COUNT_TAG_EXACT:
         return False
     if appearance:
         if t in _CORE_TAG_EXACT:
@@ -3310,15 +3322,18 @@ def _is_identity_tag(tag, body=False, appearance=None) -> bool:
     return any(sub in t for sub in _IDENTITY_TAG_CONTAINS)
 
 
-def drop_identity_tags(caption, body=False, appearance=None) -> str:
+def drop_identity_tags(caption, body=False, appearance=None, *,
+                       keep_count_tags=False) -> str:
     """Remove identity tags from booru captions, mirroring prose
     drop_identity_sentences. body=True also removes permanent body marks.
     appearance=None retains the historical tag filter; policies remove
-    only Omit-family tags, preserving hair clips."""
+    only Omit-family tags, preserving hair clips. keep_count_tags leaves
+    Anima count tags (1girl, solo, no humans) in the caption."""
     if not caption:
         return ''
     kept = [t.strip() for t in caption.split(',')
-            if t.strip() and not _is_identity_tag(t, body=body, appearance=appearance)]
+            if t.strip() and not _is_identity_tag(
+                t, body=body, appearance=appearance, keep_count_tags=keep_count_tags)]
     return ', '.join(kept).strip()
 
 

@@ -32,6 +32,7 @@ def test_recipe_and_provenance_agree(app, tmp_path):
         assert p['train']['timestep_type'] == 'shift'
         assert p['train']['unload_text_encoder'] is False
         assert p['datasets'][0]['cache_text_embeddings'] is False
+        assert p['train']['cache_text_embeddings'] is False
         assert p['sample']['guidance_scale'] == 3
         assert p['sample']['sample_steps'] == 40
         snap = lt.launch_settings_snapshot(ds)

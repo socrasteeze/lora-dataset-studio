@@ -39,6 +39,9 @@ HF_REPO = 'pixai-labs/pixai-tagger-v1.0'
 FOLDER_NAME = 'pixai-tagger-v1.0'
 
 CONCEPT_REFUSAL = 'PixAI Tagger does not caption concept datasets.'
+NOT_INSTALLED = (
+    'PixAI Tagger v1.0 is not installed. Install it in Setup, then retry.'
+)
 PROSE_REFUSAL = (
     'PixAI Tagger only writes booru tag captions. '
     'SDXL uses booru by default; Anima can choose booru. '
@@ -47,6 +50,10 @@ PROSE_REFUSAL = (
 BANK_REFUSAL = (
     'PixAI Tagger writes booru dataset captions only. '
     'It does not describe bank images, and Auto does not switch to it.'
+)
+HYBRID_BANK_REFUSAL = (
+    'PixAI tags + VLM writes dataset captions only. '
+    'It does not describe bank images.'
 )
 
 DEVICES = ('auto', 'cuda', 'cpu')

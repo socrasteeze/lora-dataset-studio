@@ -12,7 +12,7 @@ import {
    alias would silently stop matching rows that already exist. */
 test('stored caption origins keep their keys, including PixAI', () => {
   assert.deepEqual(CAPTION_ORIGINS.map((o) => o.key),
-                   ['asserted', 'joycaption', 'ollama', 'pixai']);
+                   ['asserted', 'joycaption', 'ollama', 'pixai', 'pixai_hybrid']);
   for (const o of CAPTION_ORIGINS) {
     assert.equal(typeof o.chip, 'string');
     assert.ok(o.chip.length, o.key);

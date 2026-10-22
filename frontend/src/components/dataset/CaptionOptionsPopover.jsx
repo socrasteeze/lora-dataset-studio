@@ -27,12 +27,13 @@ export const ENGINE_OPTIONS = [
   { id: 'auto', label: 'Auto — JoyCaption, then the local LLM' },
   { id: 'joycaption', label: 'JoyCaption only' },
   { id: 'pixai', label: 'PixAI Tagger' },
+  { id: 'pixai_hybrid', label: 'PixAI tags + VLM' },
   { id: 'ollama', label: 'Local LLM only (Ollama / LM Studio)' },
   { id: 'none', label: 'None — captioning disabled' },
 ];
 
 // The Ollama model + pull only bite when the resolved engine can use Ollama.
-export const OLLAMA_RELEVANT = new Set(['', 'auto', 'ollama']);
+export const OLLAMA_RELEVANT = new Set(['', 'auto', 'ollama', 'pixai_hybrid']);
 
 // Optional Krea 2 companion preset. This is deliberately a per-dataset override:
 // the global 8B abliterated default remains the safer NSFW captioning choice.
@@ -291,10 +292,17 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
               <label htmlFor="cap-opt-engine" className="text-sm font-medium text-content">Caption engine</label>
               <select id="cap-opt-engine" value={backend} onChange={(e) => setBackend(e.target.value)}
                 className={inputCls}>
-                {ENGINE_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                {ENGINE_OPTIONS.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.id === 'auto' && trainType === 'anima'
+                      ? 'Auto — Qwen3-VL in Ollama'
+                      : o.label}
+                  </option>
+                ))}
               </select>
               <p className="text-xs text-content-subtle">
                 Overrides the global default only for this dataset. Leave on “default” to follow Settings.
+                {trainType === 'anima' ? ' Auto on an Anima dataset uses Qwen3-VL and skips JoyCaption.' : ''}
               </p>
             </div>
 
