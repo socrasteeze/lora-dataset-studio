@@ -33,6 +33,7 @@ import { useUnsavedWork } from '../hooks/useUnsavedWork'
 import ForgetMissingDialog from '../components/bank/ForgetMissingDialog'
 import PluginSlot from '../plugins/PluginSlot.jsx'
 import BankLaneTabs from '../components/bank/BankLaneTabs'
+import BankReadOnlyToggle from '../components/bank/BankReadOnlyToggle'
 import { bankListOverview, bankListSummaryLine } from '../components/bank/bankOverview.js'
 import BankBulkDialog from '../components/bank/BankBulkDialog.jsx'
 import BankBulkDeleteDialog from '../components/bank/BankBulkDeleteDialog.jsx'
@@ -210,6 +211,7 @@ export default function BankPage() {
   const [name, setName] = useState('')
   const [folder, setFolder] = useState('')
   useUnsavedWork(!!(name.trim() || folder.trim()));
+  const [readOnly, setReadOnly] = useState(false)
   const [creating, setCreating] = useState(false)
   // The list order is a display preference, so it lives client-side and sticks
   // (a library of twenty banks is unusable in creation order — see bankSort).
@@ -472,7 +474,7 @@ export default function BankPage() {
         refresh()
       } else {
         const d = await postJson('/api/bank/create', {
-          name, folder, excluded_folders: normalizeExcluded(excluded),
+          name, folder, excluded_folders: normalizeExcluded(excluded), read_only: readOnly,
         })
         // One folder is one bank. Re-adding it refreshes the bank that already
         // owns it — `added: 0` alone would read as a failed import.
@@ -486,7 +488,7 @@ export default function BankPage() {
         // triaging, destructive at Delete rejected — said once, up front.
         const overlap = overlapNotice(d.overlaps)
         if (overlap) toast.warning(overlap, 12000)
-        setName(''); setFolder('')
+        setName(''); setFolder(''); setReadOnly(false)
         open(d.id)
       }
     } catch (err) {
@@ -791,6 +793,13 @@ export default function BankPage() {
         </p>}
         {/* basis-full: its own row inside the wrapping flex form, so the sentence
             never squeezes the fields — including at 400 px. */}
+        {/* One bank per subfolder does not carry protection; set it per bank after the split. */}
+        {!splitMode && <div className="basis-full space-y-1">
+          <BankReadOnlyToggle checked={readOnly} onChange={setReadOnly} disabled={creating} />
+          <p className="text-xs text-content-subtle">
+            Protect a NAS or original photo folder from deletion and new imports. You can still triage and copy images into datasets.
+          </p>
+        </div>}
         {folderNotice && (
           <p role="alert"
             className="basis-full rounded-md border border-rose-500/70 bg-rose-500/15 p-3 text-sm text-rose-100">
@@ -960,6 +969,7 @@ export default function BankPage() {
                 {!selectingBanks && <button type="button" onClick={() => remove(b)} aria-label={`Remove bank ${b.name}`}
                   className="px-1.5 text-content-subtle hover:text-rose-300"><X aria-hidden="true" className="h-4 w-4" /></button>}
               </div>
+              {b.read_only && <p className="text-xs font-medium text-emerald-400">Read-only source</p>}
               <p className="truncate font-mono text-xs text-content-subtle" title={b.source_path}>
                 {b.source_path}
               </p>

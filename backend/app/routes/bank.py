@@ -112,6 +112,11 @@ def _busy_after_service_fence(e):
     return _busy(e)
 
 
+@bp.errorhandler(banks.BankSourceReadOnly)
+def _source_read_only(e):
+    return jsonify({'error': str(e), 'code': 'bank_source_read_only'}), 403
+
+
 _BUSY_WRITE_EXEMPT_ENDPOINTS = frozenset({
     # Admission records a future job. The queue waits for the live pass before
     # execution; the active pass must still fence all immediate Bank mutations.
@@ -198,6 +203,8 @@ def banks_list():
 @bp.post('/bank/create')
 def bank_create():
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({'error': 'request body must be an object'}), 400
     # Asked BEFORE the create, because create_bank reuses an existing bank on
     # the same folder and the two outcomes are indistinguishable afterwards.
     # The user has to be told which one happened: "added" reading 0 on a reuse
@@ -206,7 +213,8 @@ def bank_create():
     try:
         bank, added = banks.create_bank(LOCAL_USER, data.get('name'),
                                         data.get('folder'),
-                                        excluded_folders=data.get('excluded_folders'))
+                                        excluded_folders=data.get('excluded_folders'),
+                                        read_only=data.get('read_only', False))
     except bank_jobs.BankJobBusy as e:
         return _busy(e)
     except ValueError as e:
@@ -216,6 +224,7 @@ def bank_create():
     # Say it now, once, rather than at the destructive click only.
     return jsonify({'ok': True, 'id': bank.id, 'added': added, 'reused': reused,
                     'name': bank.name,
+                    'read_only': bool(bank.read_only),
                     'excluded_folders': banks._excluded_prefixes(bank.id),
                     'overlaps': banks.overlapping_banks(LOCAL_USER, bank.id)})
 
@@ -258,6 +267,17 @@ def bank_split():
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, 'banks': created})
+
+
+@bp.patch('/bank/<int:bank_id>/read-only')
+def bank_read_only(bank_id):
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get('read_only'), bool):
+        return jsonify({'error': 'read_only must be a boolean'}), 400
+    result = banks.set_read_only(LOCAL_USER, bank_id, data['read_only'])
+    if result is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify({'ok': True, **result})
 
 
 @bp.post('/bank/from-dataset')
