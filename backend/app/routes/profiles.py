@@ -2,16 +2,22 @@
 import os
 import json
 from pathlib import Path
-import secrets
+from contextlib import nullcontext
 from urllib.parse import urlsplit
 
 from flask import Blueprint, current_app, jsonify, request
 
 from instance_profiles import FileLease, ProfileError, ProfileStore, public_profile
 from .. import config as cfg
+from ..netguard import _is_loopback, _LOOPBACK_HOSTS
 from ..plugins.restart import RestartBlocked, freeze_profile_work
 
 bp = Blueprint('profiles', __name__, url_prefix='/api/profiles')
+
+
+def _profile_lan_host():
+    host = current_app.config.get('LDS_BOUND_HOST') or cfg.get('server.host')
+    return '0.0.0.0' if not host or host in _LOOPBACK_HOSTS else host
 
 
 def _clear_switch(store):
@@ -39,12 +45,10 @@ def create_profile():
     if not isinstance(data, dict):
         return jsonify(error='Send a JSON object.'), 400
     try:
-        # Preserve reachability, with an independent credential. No source
-        # configuration, tool paths, account keys or data are copied.
-        server = {'host': current_app.config.get('LDS_BOUND_HOST') or cfg.get('server.host'),
-                  'require_token': bool(cfg.get('server.require_token')),
-                  'access_token': secrets.token_urlsafe(24)}
-        row = ProfileStore().create(data.get('name'), config={'server': server})
+        # LAN access defaults on with an independent credential. Preserve an
+        # existing network bind without copying source settings or secrets.
+        row = ProfileStore().create(data.get('name'), config={
+            'server': {'host': _profile_lan_host()}})
     except (ProfileError, ValueError) as exc:
         return jsonify(error=str(exc)), 409
     except OSError:
@@ -88,22 +92,22 @@ def switch_profile():
             return jsonify(error='This profile is already open.'), 409
         target_settings = json.loads(Path(target['paths']['LDS_CONFIG']).read_text(encoding='utf-8'))
         target_host = os.environ.get('LDS_HOST') or target_settings.get('server', {}).get('host', '127.0.0.1')
-        if request.remote_addr not in ('127.0.0.1', '::1') and target_host in ('127.0.0.1', 'localhost', '::1'):
-            return jsonify(error='This profile is local only. Enable its LAN access from the host before switching remotely.'), 409
+        needs_lan = target_host in _LOOPBACK_HOSTS
+        if needs_lan and os.environ.get('LDS_HOST'):
+            if not _is_loopback(request.remote_addr):
+                return jsonify(error='The host uses a local-only address. Enable LAN access on the host, then restart Studio.'), 409
+            needs_lan = False
         gate = freeze_profile_work()
         with FileLease(store.home / 'transition.lock'):
             store.check_other_work(target['id'])
-            # Existing target access credentials can be passed to the same
-            # operator for the first request at the target port.
-            destination = store.browser_url(target['id'])
-            store.request_switch(source, target['id'])
-            requested = True
-            if not updater.schedule_restart(block_during_update=True):
-                _clear_switch(store)
-                response = jsonify(error='A restart is already scheduled. Wait before switching again.')
-                response.status_code = 409
-                response.call_on_close(gate.finished.wait)
-                return response
+            with store.enable_lan(target['id'], _profile_lan_host()) if needs_lan else nullcontext():
+                # The target keeps its own credential for the first request
+                # at its port, including default LAN access for older profiles.
+                destination = store.browser_url(target['id'])
+                store.request_switch(source, target['id'])
+                requested = True
+                if not updater.schedule_restart(block_during_update=True):
+                    raise ProfileError('A restart is already scheduled. Wait before switching again.')
     except (ProfileError, RestartBlocked, updater.UpdateInProgressError) as exc:
         if gate is not None:
             gate.release()

@@ -1,5 +1,25 @@
 # HANDOFF
 
+## Profile LAN defaults (2026-10-21)
+
+Prepared for `origin/main` from `c4a03f4d8` on `noble/profile-lan-publish`.
+LAN access defaults on for new profiles from the popup or recovery launcher.
+Switching an older local-only profile enables LAN automatically, with its own
+required credential. Explicit local-only host environment overrides still win.
+Busy-source and target guards precede settings writes. Failed restart scheduling
+restores target settings and releases the admission gate. No extra checkbox is required.
+
+The Guide, help search and What's New describe the defaults. Regression cases
+cover defaults, isolation, local/remote legacy switches, rollback and host overrides.
+Tests, responsive probes and CI tests are not run by operator order. Full
+qualification is incomplete. Source and bundle delivery commits use `[skip ci]`.
+Ruff passed. ESLint passed with zero errors and 32 existing warnings. The
+delivery build passed in 7.55 seconds on current main, including the newer caption
+and Dataset-folder work. Attribution and privacy scans have no unresolved findings.
+
+Activation remains pending separate authorization. The primary checkout, its
+pending work, saved configuration, served bundle and running process remain unchanged.
+
 ## Dataset folder categories (2026-10-21)
 
 Task branch: `fix/dataset-folder-categories-20261021`. New creation uses a private
