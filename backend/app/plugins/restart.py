@@ -21,6 +21,17 @@ _EXTENSION = 'lds_plugin_restart_gate'
 _TOKEN = '_lds_plugin_mutation'
 _BUSY = 'Work is still running or being admitted. Let it finish before applying plugin changes.'
 _RESTARTING = 'LDS is restarting. Wait for it to reconnect before making changes.'
+# Long enough for the dashboard's in-flight polls to return, short enough that
+# a genuinely stuck read still reports back inside the click's own request.
+_READ_DRAIN_SECONDS = 5.0
+# Read-only probes of the machine (installed tooling, GPU, reachable services)
+# that answer in milliseconds warm but take ten seconds or more on a cold cache.
+# They hold no state a profile change has to wait for, and waiting for one made
+# the switch refuse for as long as the probe ran. Admitted, never counted.
+_UNBLOCKING_READS = frozenset((
+    '/api/capabilities',
+    '/api/capabilities/startup',
+))
 _ACTIVE_QUEUE = ('pending', 'processing', 'sent_to_comfy', 'cancel_requested', 'stalled')
 
 
@@ -30,22 +41,46 @@ class RestartBlocked(RuntimeError):
 
 class _Gate:
     def __init__(self):
-        self.lock = threading.Lock()
+        self.lock = threading.Condition()
         self.writers = set()
-        self.readers = set()
+        self.readers = {}  # token -> request path, so a timeout can name it
         self.frozen = False
+        self.draining = False
         self.held = []
         self.finished = threading.Event()
         self.message = _RESTARTING
 
-    def freeze(self, own_token=None, message=_RESTARTING):
+    def _other_reads(self, own_token):
+        """Reads in flight that are not this request's own."""
+        return {t: p for t, p in self.readers.items() if t is not own_token}
+
+    def freeze(self, own_token=None, message=_RESTARTING, drain_timeout=_READ_DRAIN_SECONDS):
         with self.lock:
             if self.frozen:
                 raise RestartBlocked(_RESTARTING)
+            if self.draining:  # another change is already waiting out the reads
+                raise RestartBlocked(_BUSY)
             if self.writers - {own_token}:
                 raise RestartBlocked(_BUSY)
-            if message != _RESTARTING and self.readers - {own_token}:
-                raise RestartBlocked('Another request is still running. Wait a moment, then retry the profile change.')
+            # The UI keeps many short GET polls in flight, so a read almost
+            # always overlaps the click. Refusing on contact made a profile
+            # change nearly impossible to land; wait for the reads already
+            # admitted to finish instead. `draining` turns away reads that
+            # arrive while we wait, so the set cannot be refilled under us.
+            if message != _RESTARTING and self._other_reads(own_token):
+                self.draining = True
+                try:
+                    drained = self.lock.wait_for(
+                        lambda: not self._other_reads(own_token), drain_timeout)
+                finally:
+                    self.draining = False
+                    self.lock.notify_all()
+                if not drained:
+                    # Name what is still open: without this the refusal is
+                    # indistinguishable from a slow route nobody suspects.
+                    log.warning('profile freeze timed out; reads still open: %s',
+                                sorted(set(self._other_reads(own_token).values())))
+                    raise RestartBlocked('Another request is still running. Wait a moment, then retry the profile change.')
             self.frozen = True
             self.message = message
             self.finished.clear()
@@ -78,8 +113,13 @@ def install_gate(app):
             if gate.frozen and gate.message != _RESTARTING:
                 return jsonify(error=gate.message, code='restarting'), 503
             if request.method in ('GET', 'HEAD', 'OPTIONS'):
+                # A freeze waiting for reads to drain must not be refilled.
+                if gate.draining:
+                    return jsonify(error=_RESTARTING, code='restarting'), 503
+                if request.path.rstrip('/') in _UNBLOCKING_READS:
+                    return None  # admitted, but never blocks a profile change
                 token = object()
-                gate.readers.add(token)
+                gate.readers[token] = request.path
                 setattr(g, _TOKEN, token)
                 return None
         if request.method == 'POST' and request.path.rstrip('/') == '/api/plugins/apply':
@@ -98,7 +138,8 @@ def install_gate(app):
         if token is not None:
             with gate.lock:
                 gate.writers.discard(token)
-                gate.readers.discard(token)
+                gate.readers.pop(token, None)
+                gate.lock.notify_all()  # a freeze may be draining these reads
 
 
 def freeze_profile_work():
