@@ -14,9 +14,28 @@ from pathlib import Path
 @pytest.fixture
 def policy(tmp_path, monkeypatch):
     path = tmp_path / 'destination-policy.json'
-    monkeypatch.setattr(destinations, 'POLICY_PATH', path)
+    monkeypatch.setenv('LDS_DATASET_DESTINATIONS', str(path))
     monkeypatch.delenv('LDS_PROFILE_ID', raising=False)
     return path
+
+
+def test_default_isolation_ignores_the_repo_policy():
+    """A dataset-destinations.json beside the launcher must not steer the suite."""
+    active = destinations.policy_path()
+    assert active != destinations.default_policy_path()
+    assert not active.exists()
+    assert destinations.destination('datasets') is None
+    assert destinations.destination('video_datasets') is None
+
+
+def test_policy_path_replacement_works_when_the_override_is_unset(tmp_path, monkeypatch):
+    path = tmp_path / 'patched-policy.json'
+    root = tmp_path / 'media'
+    path.write_text(json.dumps({'root': str(root)}), encoding='utf-8')
+    monkeypatch.delenv('LDS_DATASET_DESTINATIONS', raising=False)
+    monkeypatch.setattr(destinations, 'POLICY_PATH', path)
+    assert destinations.destination('datasets') == root / 'LDS'
+    assert not root.exists()
 
 
 def test_missing_policy_keeps_portable_resolution(policy):

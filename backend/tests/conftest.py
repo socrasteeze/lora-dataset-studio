@@ -284,7 +284,9 @@ def _isolate_user_state(tmp_path, monkeypatch):
     machine. Covers the three roots the app resolves from the environment:
     ``LDS_CONFIG`` (config.json), ``LDS_DATA_DIR`` (data/: studio.db, banks,
     thumbnails, logs, the provisioned envs), ``LDS_ENV`` (.env secrets),
-    ``LDS_PLUGINS_DIR`` and ``LDS_EXTENSIONS_DIR``. It does not set
+    ``LDS_PLUGINS_DIR``, ``LDS_EXTENSIONS_DIR`` and
+    ``LDS_DATASET_DESTINATIONS`` (a missing file, so creation keeps the
+    portable defaults instead of the installation policy). It does not set
     ``LDS_PLUGIN_DISTRIBUTION`` or ``LDS_BUNDLED_DIR``.
 
     The `app` fixture already did all this — but only for tests that take it. A
@@ -316,6 +318,7 @@ def _isolate_user_state(tmp_path, monkeypatch):
     monkeypatch.setenv('LDS_ENV', str(tmp_path / 'isolated.env'))
     monkeypatch.setenv('LDS_PLUGINS_DIR', str(tmp_path / 'isolated-plugins'))
     monkeypatch.setenv('LDS_EXTENSIONS_DIR', str(tmp_path / 'isolated-extensions'))
+    monkeypatch.setenv('LDS_DATASET_DESTINATIONS', str(tmp_path / 'no-dataset-destinations.json'))
     monkeypatch.setattr(_cfg, 'ENV_PATH', tmp_path / 'isolated.env')
     monkeypatch.setattr(_cfg, '_cache', None)
     yield

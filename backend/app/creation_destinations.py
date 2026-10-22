@@ -7,7 +7,20 @@ import re
 from pathlib import Path
 
 
-POLICY_PATH = Path(__file__).resolve().parents[2] / 'dataset-destinations.json'
+def default_policy_path() -> Path:
+    return Path(__file__).resolve().parents[2] / 'dataset-destinations.json'
+
+
+def policy_path() -> Path:
+    """Resolve on each call. ``LDS_DATASET_DESTINATIONS`` overrides the repo file."""
+    override = os.environ.get('LDS_DATASET_DESTINATIONS', '').strip()
+    if override:
+        return Path(override)
+    return POLICY_PATH
+
+
+# Tests may replace this when the environment override is unset.
+POLICY_PATH = default_policy_path()
 
 
 def destination(kind: str) -> Path | None:
@@ -15,7 +28,7 @@ def destination(kind: str) -> Path | None:
     if kind not in ('datasets', 'video_datasets'):
         raise ValueError('Unknown creation destination.')
     try:
-        raw = POLICY_PATH.read_text(encoding='utf-8')
+        raw = policy_path().read_text(encoding='utf-8')
     except FileNotFoundError:
         return None
     except OSError as exc:

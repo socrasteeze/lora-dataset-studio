@@ -138,12 +138,11 @@ def test_short_or_broken_upload_leaves_no_training_files(client, clip):
 
 def test_direct_video_creation_uses_category_destination_and_keeps_existing_output(client, app, tmp_path, monkeypatch):
     import json
-    from app import creation_destinations
     from lds_video.models import db, VideoDataset
     policy = tmp_path / 'policy.json'
     root = tmp_path / 'sets'
     policy.write_text(json.dumps({'root': str(root)}), encoding='utf-8')
-    monkeypatch.setattr(creation_destinations, 'POLICY_PATH', policy)
+    monkeypatch.setenv('LDS_DATASET_DESTINATIONS', str(policy))
     result = _create(client, name='Amber art', folder_category='style')
     assert result.status_code == 201, result.get_json()
     data = result.get_json()
