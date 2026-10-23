@@ -197,6 +197,7 @@ export const CORE_GUIDE_ANCHORS = {
     "krea-2-the-checkpoints-on-your-disk-are-listed-as-bases",
     "concept-face-masking",
     "advanced-options-per-run",
+    "atk-recipe",
     "storage",
     "moving-a-folder-to-another-drive",
     "trash-and-archives",
@@ -207,7 +208,8 @@ export const CORE_GUIDE_ANCHORS = {
     "usage-statistics",
     "per-dataset-settings",
     "config-file-only-settings",
-    "config-json-key-reference-all-keys"
+    "config-json-key-reference-all-keys",
+    "new-media-destinations"
   ],
   "troubleshooting": [
     "the-page-is-completely-blank-on-windows-in-every-browser",
