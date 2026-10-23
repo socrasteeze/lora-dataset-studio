@@ -134,10 +134,10 @@ test('large result counts have room above the portrait selection actions', () =>
 });
 
 test('the probe knows what a layer is, and charges it to no budget', () => {
-  // the budget exemption names both kinds of not-in-your-way surface…
+  // the budget exemption names both kinds of not-in-your-way surface...
   assert.match(probe, /el\.hasAttribute\('data-probe-reading'\) \? 'reading'/);
   assert.match(probe, /: el\.hasAttribute\('data-probe-layer'\) \? 'layer' : null/);
-  // …and the overlap check pairs a layer with nothing
+  // ...and the overlap check pairs a layer with nothing
   assert.match(probe, /chrome\[i\]\.el\.hasAttribute\('data-probe-layer'\)/);
   // only VISIBLE chrome counts: a marker inside a closed <details> keeps a box
   assert.match(probe, /checkVisibility/);
@@ -155,7 +155,7 @@ test('the ✨ improve window is a state the probe actually opens', () => {
   assert.match(probe, /name: 'improve', open: \['\[aria-controls="bank-passes-panel"\]',/);
   assert.match(probe, /'#bank-edits button:visible',/);
   assert.match(probe, /'button:visible:has-text\("Upscale & improve"\)'\]/);
-  // …and both openers still exist on the page, or the state silently skips.
+  // ...and both openers still exist on the page, or the state silently skips.
   const editPanel = read('BankEditPanel.jsx');
   assert.match(editPanel, /id="bank-edits"/);
   assert.match(editPanel, /✨ Upscale &amp; improve/);

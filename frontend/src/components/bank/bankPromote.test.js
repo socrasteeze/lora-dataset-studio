@@ -147,7 +147,7 @@ test('the dialog renders its tabs FROM the constant, and posts the third route',
   assert.match(src, /PROMOTE_DESTINATIONS\.map\(\(d\) => tab\(d\.id, d\.label\)\)/)
   assert.match(src, /grid-cols-1 gap-2 sm:grid-cols-3/)  // three tabs at 400 px
   assert.match(src, /promote-to-new-dataset/)
-  assert.match(src, /trigger_word: newDsTrigger\.trim\(\)/)
+  assert.match(src, /trigger_word: newDsKind === 'style' \? '' : newDsTrigger\.trim\(\)/)
   // Both gate call sites must carry the new fields, or the button and the
   // handler disagree about whether the form is complete.
   assert.equal(src.match(/datasetName: newDsName, datasetTrigger: newDsTrigger/g).length, 2)

@@ -17,6 +17,7 @@ class DatasetRecord:
     kind: str | None
     ref_filename: str | None
     subject_type: str | None = None
+    folder_category: str | None = None
 
 
 @dataclass(frozen=True)

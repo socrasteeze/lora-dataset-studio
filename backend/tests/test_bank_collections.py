@@ -342,7 +342,7 @@ def test_collection_promotion_rechecks_kept_members_and_never_falls_back_to_all(
     from app.services import image_bank_service as banks
     bank_id, ids, folder = bank_rows
     captured = []
-    def start(_app, _user, _bank, image_ids, *args):
+    def start(_app, _user, _bank, image_ids, *args, **kwargs):
         captured.append(image_ids)
         return 123
     monkeypatch.setattr(banks, 'start_promote', start)

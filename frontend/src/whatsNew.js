@@ -141,7 +141,7 @@ export const WHATS_NEW = [
   {
     id: '2026-10-19-zzzzzzz-quiet-probes', date: '2026-10-19', title: 'Keep Checks Quiet',
     blurb: 'Background capability checks now hide their helper consoles on Windows, preventing a console window from opening for each import probe.',
-    to: '/settings?section=local-tools',
+    to: '/settings/local-tools',
   },
   {
     id: '2026-10-19-zzzzzz-framing-overlap', date: '2026-10-19', title: 'Overlap Framing Requests',
