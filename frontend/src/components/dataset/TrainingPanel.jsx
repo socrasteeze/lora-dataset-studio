@@ -25,6 +25,7 @@ import {
   trainFamilyLabel,
 } from '../../utils/checkpointBrowser';
 import { stepsRecipeRefreshDelay } from '../../utils/stepsRecipeRefresh';
+import { singleFlight } from '../../utils/singleFlight';
 import { confirmableRetryFlag } from '../../utils/trainingRefusals';
 import {
   deployedFilenamesOf,
@@ -273,6 +274,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   };
   const [status, setStatus] = useState({ in_progress: false, installed: true, queue: [], current: null });
   const [statusLoaded, setStatusLoaded] = useState(false);
+  const launchOnce = useRef(singleFlight());
+  const [launchPending, setLaunchPending] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [checkpointsOpen, setCheckpointsOpen] = useState(false);
   // ◉ Graph of this dataset's runs + checkpoints — now the DEFAULT surface of the
@@ -1878,7 +1881,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
         {!fullMode && <TrainingMachinePicker value={machineId} onChange={onMachineChange}
           onConfigured={setPeerConfigured} disabled={peerActive}
           className="[&_select]:min-h-10 lg:[&_select]:min-h-0 lg:[&_select]:h-8" />}
-        {!fullMode && <button type="button" disabled={!status.installed || belowFloor || status.in_progress || peerActive || baseBlocksTrain || sdxlNeedsBase || customWeightsEmpty || sliderPromptsMissing}
+        {!fullMode && <button type="button" aria-busy={launchPending} disabled={!status.installed || belowFloor || status.in_progress || peerActive || baseBlocksTrain || sdxlNeedsBase || customWeightsEmpty || sliderPromptsMissing || launchPending}
           title={baseBlocksTrain ? baseBlockTitle
             : customWeightsEmpty ? 'Enter the path to your custom weights .safetensors'
             : sdxlNeedsBase ? 'Choose a base SDXL checkpoint'
@@ -1889,60 +1892,67 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 ? `${keptCount} kept image(s) — slider training still needs ${trainMinFloor}+ images as a denoising substrate`
                 : `${keptCount} kept image(s) — the minimum for ${typeLabel} is ${trainMinFloor}`)
               : undefined}
-          onClick={async () => {
-            if (!(await preflightOk())) return;
-            // ds.train takes camelCase opts — map the confirmable force flags.
-            const OPT_FOR_FLAG = { allow_caption_mismatch: 'allowCaptionMismatch',
-                                   allow_uncaptioned: 'allowUncaptioned',
-                                   allow_caption_quality: 'allowCaptionQuality',
-                                   allow_unverified_weights: 'allowUnverifiedWeights' };
-            /* The launch, plus the confirm-and-retry loop over the refusals the
-               server states and the user may override. Shared by both lanes on
-               purpose: the peer lane runs the SAME `assert_trainable` guards, so
-               it raises the same markers, and a second copy of this loop would
-               be the place they quietly diverged. */
-            const trainWithConfirms = async (initial) => {
-              let opts = initial;
-              let d = await ds.train(opts);
-              for (let flag; d && d.ok === false && (flag = confirmableRetryFlag(d.error, 'Train anyway (force)')); ) {
-                if (flag === 'declined') break;      // the confirm WAS the answer
-                opts = { ...opts, [OPT_FOR_FLAG[flag]]: true };
-                d = await ds.train(opts);
+          onClick={() => launchOnce.current(async () => {
+            setLaunchPending(true);
+            try {
+              if (!(await preflightOk())) return;
+              // ds.train takes camelCase opts — map the confirmable force flags.
+              const OPT_FOR_FLAG = { allow_caption_mismatch: 'allowCaptionMismatch',
+                                     allow_uncaptioned: 'allowUncaptioned',
+                                     allow_caption_quality: 'allowCaptionQuality',
+                                     allow_unverified_weights: 'allowUnverifiedWeights' };
+              /* The launch, plus the confirm-and-retry loop over the refusals the
+                 server states and the user may override. Shared by both lanes on
+                 purpose: the peer lane runs the SAME `assert_trainable` guards, so
+                 it raises the same markers, and a second copy of this loop would
+                 be the place they quietly diverged. */
+              const trainWithConfirms = async (initial) => {
+                let opts = initial;
+                let d = await ds.train(opts);
+                for (let flag; d && d.ok === false && (flag = confirmableRetryFlag(d.error, 'Train anyway (force)')); ) {
+                  if (flag === 'declined') break;      // the confirm WAS the answer
+                  opts = { ...opts, [OPT_FOR_FLAG[flag]]: true };
+                  d = await ds.train(opts);
+                }
+                return d;
+              };
+              const common = { baseModel: base, variant, trainType, trainingMode,
+                               masked: maskedOpt, steps: stepsN,
+                               vaePath, tePath, allowNotReady };
+              // Another machine: no Resume/Fresh question, because there is only
+              // one answer. This app does not send previous checkpoints over, so
+              // the run starts from the base weights there whatever is on disk
+              // here — asking would offer a choice the lane cannot honour.
+              if (remoteTarget) {
+                const d = await trainWithConfirms({ ...common, deviceId: machineId });
+                if (d?.ok) setPeerActive(true);
+                return;
               }
-              return d;
-            };
-            const common = { baseModel: base, variant, trainType, trainingMode,
-                             masked: maskedOpt, steps: stepsN,
-                             vaePath, tePath, allowNotReady };
-            // Another machine: no Resume/Fresh question, because there is only
-            // one answer. This app does not send previous checkpoints over, so
-            // the run starts from the base weights there whatever is on disk
-            // here — asking would offer a choice the lane cannot honour.
-            if (remoteTarget) {
-              const d = await trainWithConfirms({ ...common, deviceId: machineId });
-              if (d?.ok) setPeerActive(true);
-              return;
+              // Run existant → Resume (continue le LoRA) ou Fresh (archive le run,
+              // repart de zéro). Le mismatch-retry re-passe fresh : le 1er appel a
+              // échoué AVANT l'archivage (assert_trainable), rien n'a été écarté.
+              const mode = await askResumeOrFresh();
+              if (!mode) return;
+              // The old "Resume" button called /train and let ai-toolkit infer
+              // what it would restore. Route every existing run through the
+              // shared dialog instead, where Full state vs Weights only is
+              // explicit and checkpoint-specific.
+              if (mode === 'continue') {
+                setContinueInitialStep(null); // null deliberately selects the latest save
+                setContinueSource(null);
+                setContinueOpen(true);
+                return;
+              }
+              await trainWithConfirms({ ...common, fresh: mode === 'fresh' });
+              await refreshStatus();
+            } catch (error) {
+              toastTrainError({ error: error?.message }, 'Could not start training');
+            } finally {
+              setLaunchPending(false);
             }
-            // Run existant → Resume (continue le LoRA) ou Fresh (archive le run,
-            // repart de zéro). Le mismatch-retry re-passe fresh : le 1er appel a
-            // échoué AVANT l'archivage (assert_trainable), rien n'a été écarté.
-            const mode = await askResumeOrFresh();
-            if (!mode) return;
-            // The old "Resume" button called /train and let ai-toolkit infer
-            // what it would restore. Route every existing run through the
-            // shared dialog instead, where Full state vs Weights only is
-            // explicit and checkpoint-specific.
-            if (mode === 'continue') {
-              setContinueInitialStep(null); // null deliberately selects the latest save
-              setContinueSource(null);
-              setContinueOpen(true);
-              return;
-            }
-            await trainWithConfirms({ ...common, fresh: mode === 'fresh' });
-            refreshStatus();
-          }}
+          })}
           className={`${btnClass({ variant: 'primary' })} min-w-36`}>
-          <Rocket aria-hidden="true" className="h-4 w-4" /> Train the LoRA
+          <Rocket aria-hidden="true" className="h-4 w-4" /> {launchPending ? 'Preparing training' : 'Train the LoRA'}
         </button>}
         {!fullMode && <HelpBadge topic="action-training-launch" />}
         <PluginSlot slot="training.launch" surface="dataset"
