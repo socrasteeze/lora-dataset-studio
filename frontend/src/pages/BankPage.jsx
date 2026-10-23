@@ -277,7 +277,10 @@ export default function BankPage() {
   }, [toast])
 
   const refreshQueue = useCallback(async () => {
-    try { setQueue(await apiFetch('/api/bank-queue')) } catch { /* transient */ }
+    // A 2s automatic poll: `background` keeps a bad answer (a 503 while the
+    // server closes admissions for a profile change) from toasting once per
+    // tick. The badge simply keeps its last value until the server answers.
+    try { setQueue(await apiFetch('/api/bank-queue', { background: true })) } catch { /* transient */ }
   }, [])
   const [rescanning, setRescanning] = useState(false)
   const rescan = async () => {

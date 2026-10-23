@@ -91,6 +91,11 @@ export const WHATS_NEW = [
     to: '/bank',
   },
   {
+    id: '2026-10-22-zz1-profile-switch-unblocked', date: '2026-10-22',
+    title: 'Switching profiles works while the app is busy',
+    blurb: 'Switch Profile used to answer "Another request is still running" on almost every click, because any background check the app happened to be making counted as work to wait for. It now waits for those to finish instead of refusing, and the slow machine scan behind the setup badges no longer holds the switch at all.',
+  },
+  {
     id: '2026-10-21-zz3-anima-hybrid-captions', date: '2026-10-21',
     title: 'Caption Anima with tags and a sentence',
     blurb: 'PixAI tags + VLM writes normalized booru tags, then a short description on the same line. The trigger stays out. If PixAI Tagger v1.0 is not installed, the pass stops and tells you to install it.',

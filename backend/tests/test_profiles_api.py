@@ -200,11 +200,106 @@ def test_profile_freeze_excludes_its_writer_but_refuses_inflight_reads():
     gate = _Gate()
     own, other = object(), object()
     gate.writers.add(own)
-    gate.readers.add(other)
+    gate.readers[other] = '/api/example'
     with pytest.raises(RestartBlocked):
         gate.freeze(own, 'Example profile change.')
     assert gate.frozen is False
     gate.readers.clear()
     gate.freeze(own, 'Example profile change.')
+    assert gate.frozen is True
+    gate.release()
+
+
+def test_profile_freeze_waits_out_a_brief_concurrent_read():
+    """A dashboard poll overlapping the click must not refuse the switch.
+
+    The UI runs many short GET polls, so at any instant a read is likely in
+    flight. Refusing on contact made the button unusable; the freeze now waits
+    briefly for those reads to drain.
+    """
+    from app.plugins.restart import _Gate
+    gate = _Gate()
+    own, poll = object(), object()
+    gate.writers.add(own)
+    gate.readers[poll] = '/api/example-poll'
+
+    def finish_poll():
+        with gate.lock:
+            gate.readers.pop(poll, None)
+            gate.lock.notify_all()
+
+    threading.Timer(0.05, finish_poll).start()
+    gate.freeze(own, 'Example profile change.')
+    assert gate.frozen is True
+    gate.release()
+
+
+def test_profile_freeze_still_refuses_a_read_that_will_not_drain():
+    """A read that outlasts the grace period keeps its old refusal."""
+    from app.plugins.restart import RestartBlocked, _Gate
+    gate = _Gate()
+    own, stuck = object(), object()
+    gate.writers.add(own)
+    gate.readers[stuck] = '/api/example-stuck'
+    with pytest.raises(RestartBlocked, match='still running'):
+        gate.freeze(own, 'Example profile change.', drain_timeout=0.1)
+    assert gate.frozen is False
+
+
+def test_a_poll_arriving_during_the_drain_is_turned_away(profiles_app):
+    """New reads must not refill the set a freeze is waiting to empty.
+
+    Without this the drain could wait out its whole timeout while the
+    dashboard's 2s pollers kept handing it fresh reads.
+    """
+    from app.plugins.restart import _EXTENSION
+    app, _store = profiles_app
+    gate = app.extensions[_EXTENSION]
+    with gate.lock:
+        gate.draining = True
+    try:
+        response = app.test_client().get('/api/profiles')
+        assert response.status_code == 503
+        assert response.get_json()['code'] == 'restarting'
+    finally:
+        with gate.lock:
+            gate.draining = False
+            gate.lock.notify_all()
+    assert app.test_client().get('/api/profiles').status_code == 200
+
+
+def test_a_cold_capability_probe_does_not_block_a_profile_change():
+    """REGRESSION — /api/capabilities takes ~10s on a cold cache.
+
+    It probes installed tooling and answers in milliseconds once warm, so a
+    setup re-check just before a click left it running well past the drain and
+    the switch refused for the whole probe. It guards no state a profile change
+    waits for, so it must never enter the reader set.
+    """
+    from app.plugins.restart import _UNBLOCKING_READS
+    assert '/api/capabilities' in _UNBLOCKING_READS
+
+
+def test_the_capability_probe_is_admitted_without_being_counted(profiles_app, monkeypatch):
+    """The exempt path is admitted and served, but never counted as in flight."""
+    from app.plugins import restart
+    from app.plugins.restart import _EXTENSION
+    app, _store = profiles_app
+    gate = app.extensions[_EXTENSION]
+    seen = {}
+
+    @app.route('/__probe_caps')
+    def _probe():
+        from flask import jsonify as _j
+        seen['readers'] = dict(gate.readers)
+        return _j({'ok': True})
+
+    monkeypatch.setattr(restart, '_UNBLOCKING_READS', frozenset(('/__probe_caps',)))
+    assert app.test_client().get('/__probe_caps').status_code == 200
+    assert seen['readers'] == {}, 'an exempt probe must not count as work in flight'
+    # A freeze proceeds immediately even while such a probe is in flight.
+    own = object()
+    gate.readers.clear()
+    gate.freeze(own, 'Example profile change.', drain_timeout=0.1)
     assert gate.frozen is True
     gate.release()
