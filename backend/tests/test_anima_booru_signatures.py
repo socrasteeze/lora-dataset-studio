@@ -217,11 +217,26 @@ def test_external_recaption_writes_only_to_the_output_folder(folder, tmp_path, m
     assert result['suggested_signature_tags'] == ['armor', 'long hair']
     assert seen['backend'] == 'ollama'
     assert 'start with 1girl, solo' in seen['prompt']
-    assert sorted(os.listdir(out)) == [f'img-{i:02d}.txt' for i in range(5)]
+    assert sorted(os.listdir(out)) == [*(f'img-{i:02d}.txt' for i in range(5)), 'out.txt']
     first = (out / 'img-00.txt').read_text(encoding='utf-8').strip()
     assert first == 'zchar_\\(x\\), 1girl, solo, from behind, standing, dark corridor'
     second = (out / 'img-01.txt').read_text(encoding='utf-8').strip()
     assert second == 'zchar_\\(x\\), 1girl, solo, sitting, green lighting'
+    assert result['summary'] == 'zchar_\\(x\\), 1girl, solo, armor, long hair'
+    assert result['summary_file'] == str(out / 'out.txt')
+    assert (out / 'out.txt').read_text(encoding='utf-8') == result['summary'] + '\n'
+
+
+def test_external_recaption_writes_the_trigger_once(folder, tmp_path, monkeypatch):
+    from app.services.external_recaption import recaption_external_folder
+    _fake_ollama(monkeypatch, ['1girl, zchar_x, solo, Zchar X, smile'])
+    # Named like an image, so the summary takes the _shared suffix.
+    out = tmp_path / 'img-02'
+    result = recaption_external_folder(str(folder), str(out), 'zchar_x', signature_tags=[])
+    assert (out / 'img-00.txt').read_text(encoding='utf-8') == 'zchar_x, 1girl, solo, smile\n'
+    assert result['summary'] == 'zchar_x, 1girl, solo'
+    assert result['summary_file'] == str(out / 'img-02_shared.txt')
+    assert (out / 'img-02.txt').read_text(encoding='utf-8') == 'zchar_x, 1girl, solo, smile\n'
 
 
 def test_external_recaption_uses_an_explicit_list_as_given(folder, tmp_path, monkeypatch):

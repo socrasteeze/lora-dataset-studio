@@ -12,7 +12,9 @@ import { HelpBadge } from '../../help/HelpMode';
  * The call is synchronous (the vision model runs over every image before it
  * answers), so the dialog shows a busy state, not a per-image count, and stays
  * open until the answer arrives. A blank traits field OMITS the key: an empty
- * list means "strip nothing", while no key means "apply the suggested list". */
+ * list means "strip nothing", while no key means "apply the suggested list".
+ * The answer also names the summary file (trigger, count tags, traits) the
+ * service writes beside the captions, and its line, ready to copy. */
 export default function ExternalRecaptionDialog({ onClose }) {
   const [source, setSource] = useState('');
   const [output, setOutput] = useState('');
@@ -69,7 +71,7 @@ export default function ExternalRecaptionDialog({ onClose }) {
             hint="Images directly inside it. Subfolders are not read." />
           <FolderPickerField id="external-recaption-output" label="Output folder"
             value={output} onChange={setOutput} required
-            hint="Gets one .txt per image and replaces a .txt with the same name. Type a new path to create it." />
+            hint="Gets one .txt per image, plus a summary .txt named after this folder. A .txt with the same name is replaced. Type a new path to create it." />
           <div>
             <label htmlFor="external-recaption-trigger" className="block text-sm font-medium text-content">Trigger word</label>
             <Input id="external-recaption-trigger" value={trigger} required
@@ -112,6 +114,16 @@ export default function ExternalRecaptionDialog({ onClose }) {
             </p>
             <p className="text-xs text-content-muted">Suggested traits: {list(result.suggested_signature_tags)}</p>
             <p className="text-xs text-content-muted">Applied traits: {list(result.signature_tags)}</p>
+            {result.summary && (
+              <div className="pt-1">
+                <p className="text-xs text-content-muted break-all">
+                  Summary file: <span className="font-mono">{result.summary_file}</span>
+                </p>
+                <p className="mt-0.5 rounded bg-surface-raised px-2 py-1 font-mono text-xs text-content break-words select-all">
+                  {result.summary}
+                </p>
+              </div>
+            )}
             {result.skipped > 0 && (
               <p className="text-xs text-content-subtle">A skipped image got no tags, so no .txt was written for it.</p>
             )}

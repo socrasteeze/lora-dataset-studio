@@ -504,6 +504,18 @@ one line: your trigger word, then the tags, for example
    suggested list: the hair, eye, mark, accessory and outfit traits found in
    most of the images.
 
+Each line holds every tag once. Repeats, case and underscore variants
+(`Long Hair`, `long_hair`) collapse to one tag, and a tag equal to the trigger
+is dropped, so the trigger appears only at the start.
+
+**The summary file.** Next to the captions, the run writes one more `.txt`
+named after the output folder: the trigger, the usual count tags and the
+signature traits, for example `trigger, 1girl, solo, long hair, red eyes,
+armor`. That line is what the trigger now carries, so you can use it as your
+default prompt without picking the shared traits by hand. If an image has the
+same name as the folder, the file is named `<folder>_shared.txt` instead, so
+it never replaces a real caption. No image has its name, so trainers skip it.
+
 Both folder fields use the in-app folder browser, so this works from a phone or
 another computer on your network.
 
@@ -513,7 +525,8 @@ images, and no image is copied or moved.
 The run takes the vision model for the whole folder and the dialog stays busy
 until it finishes. Tags come from PixAI when it is installed, else from your
 configured vision model. The result shows how many captions were written, how
-many images were skipped, the suggested traits and the traits that were applied.
+many images were skipped, the suggested traits, the traits that were applied,
+and the summary file with its line.
 
 Limits:
 

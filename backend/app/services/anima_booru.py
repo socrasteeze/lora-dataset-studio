@@ -189,6 +189,13 @@ def anima_character_tags(caption: str) -> str:
     return ', '.join(counts + rest)
 
 
+def count_tags(caption: str) -> list:
+    """The count tags of a tag line (``1girl``, ``solo``, ``multiple boys``),
+    in Anima form and in their order."""
+    tags = (normalize_anima_tag(raw.strip()) for raw in (caption or '').split(','))
+    return [tag for tag in tags if _COUNT_RE.fullmatch(tag)]
+
+
 def hybrid_grounding(tags: str) -> str:
     """The sentence that hands PixAI tags to the vision model."""
     shown = ' '.join((tags or '').split()) or '(none)'
