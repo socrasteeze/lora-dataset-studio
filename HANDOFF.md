@@ -215,4 +215,13 @@ On 2026-10-23, upstream's default branch was v2 at 153c4d86539b7196a29bc36e2cedc
 | 153c4d865 | SKIP-BUILD. |
 | 64ae2ce57 (from 2026-10-21) | PORT, still open. Port on its own task branch (conflicts and Divergence 5 test patch as noted on 2026-10-21). |
 
-Decision: the port is local commits on `upstream-review/2026-10-23` (based on `upstream-review/2026-10-22`, whose 2026-10-22 ports are still not on main), not pushed. Gates (`-Phase Gates -ScratchRoot D:\tmp`) ran on 7002f55ca: lint, build, startup, plugins and the frontend suite passed (frontend 5255/5255 and bundled 1073 pass, 0 fail); backend 1 failed / 10339 passed, the one failure being the known `test_video_bank_service::test_a_stills_set_reuses...`. Fork bundle `95ffd555a` is the gates build. A later review starts after `153c4d865`. Do not merge upstream/v1 or upstream/v2.
+Decision: the port is local commits on `upstream-review/2026-10-23` (based on `upstream-review/2026-10-22`, whose 2026-10-22 ports are still not on main), not pushed. Gates (`-Phase Gates -ScratchRoot D:\tmp`) ran on 7002f55ca: lint, build, startup, plugins and the frontend suite passed (frontend 5255/5255 and bundled 1073 pass, 0 fail); backend 1 failed / 10339 passed, the one failure being the known `test_video_bank_service::test_a_stills_set_reuses...`. Fork bundle `95ffd555a` is the gates build. The next review (2026-10-24, below) started after `153c4d865`. Do not merge upstream/v1 or upstream/v2.
+
+On 2026-10-24, upstream's default branch was v2 at 54f5bbe53ff0949245cbd12dcc164eec6c4412b0. v1 remained 3fe3d4f0e29e28de583a6e22bce886c35e5ecd3f. The review started after 153c4d865 (an ancestor of the new head) on fork `main` at 361dc9768; merge base with upstream/v2 is d13337cc3. The window has 2 commits, both about the plugin store's free/member feature comparison. No new upstream branches.
+
+| Upstream commits | Class and evidence |
+| --- | --- |
+| 5b764fccd | REJECT. Divergence 12 (offline runtime, no plugin catalog) and the support/Patreon-wording skip. Seven of its eight files (`plugins/store/catalog.py`, `routes.py`, `services/patreon_core.py`, `tests/test_patreon_access.py`, `pages/store/Catalog.jsx`, `PluginCard.jsx`, `tests/patreon-access-render.test.mjs`) do not exist in the fork. The eighth, `whatsNew.js`, only gains an entry for the rejected /plugins comparison feature. |
+| 54f5bbe53 | SKIP-BUILD. Only `frontend/dist`; the fork rebuilds its own bundle. |
+
+Decision: nothing ported, so no ports, branch, or FORK_CHANGELOG row. A later review starts after `54f5bbe53`. Do not merge upstream/v1 or upstream/v2.
