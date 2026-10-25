@@ -485,6 +485,44 @@ to the captions instead.
 
 *Requested by Qeeyana (Reddit).*
 
+## Caption a folder outside LDS
+
+**Datasets ▸ Caption folder** writes Anima character booru tags for a folder of
+images that LDS did not build. You do not need a dataset for it. Each caption is
+one line: your trigger word, then the tags, for example
+`trigger, 1girl, solo, …`.
+
+1. **Source folder**: the folder that holds the images. Only the images directly
+   inside it are captioned; subfolders are not read.
+2. **Output folder**: where the `.txt` files go, one per image with the same
+   name. It must not be the source folder. Type a new path to create it. A
+   `.txt` already there with the same name is replaced.
+3. **Trigger word**: required. It starts every line.
+4. **Signature traits** (optional): a comma-separated list such as
+   `red eyes, armor`. These traits are kept out of every caption, so the LoRA
+   binds them to the trigger. Leave the field empty and the app applies a
+   suggested list: the hair, eye, mark, accessory and outfit traits found in
+   most of the images.
+
+Both folder fields use the in-app folder browser, so this works from a phone or
+another computer on your network.
+
+**Captions go only to the output folder.** Nothing is written beside the source
+images, and no image is copied or moved.
+
+The run takes the vision model for the whole folder and the dialog stays busy
+until it finishes. Tags come from PixAI when it is installed, else from your
+configured vision model. The result shows how many captions were written, how
+many images were skipped, the suggested traits and the traits that were applied.
+
+Limits:
+
+- A skipped image got no tags, so no `.txt` was written for it.
+- The suggested list is a starting point. A trait seen only from some angles
+  can fall below the threshold; check the list and run again with your own.
+- The run does not start while another vision task or training holds the GPU.
+  The dialog says what is running; try again when it finishes.
+
 ## Krea and the shape of your reference photo
 
 **Krea 2 Edit now follows the framing of the selected shot card** during dataset
