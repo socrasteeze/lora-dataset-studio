@@ -1,5 +1,44 @@
 # HANDOFF
 
+## Anima booru captions and signature traits (2026-10-25)
+
+Task branch `feat/anima-booru-signature-tags` source `f912bcfb1` and bundle `ea52609bc`
+are committed locally only. Nothing is pushed, merged to main or activated; the
+running app still serves the previous build. This supersedes the "retain prose as
+default" line in the 2026-10-20 Anima section below.
+
+Anima datasets now default to booru captions (one rule in
+`pixai_tagger.resolved_mode`, used by the recipe, short captions, PixAI and the
+workspace selector). Anima Auto uses PixAI when installed, else the configured
+vision model. Character tag lines lead with count tags, add `solo` to a lone
+`1girl`/`1boy` and drop quality/score/meta/rating tags. New
+`caption_options.signature_tags` is stripped from all caption forms and added to
+the prompt omit rules; Suggest counts traits in 60% of kept booru captions. New
+`POST /api/captions/external-recaption` writes `.txt` files to a separate output
+folder only.
+
+The operator authorized the caption-related test scope locally: 274 passed and
+2 skipped (the optional privacy name list is not configured), plus 60 frontend
+tests for What's New and caption options. Ruff and ESLint passed. Full
+qualification, responsive probes and rendered validation were not run.
+
+A 30-image character acceptance set was recaptioned into a separate output folder
+with the local vision model. With the explicit list `armor, earring`, all 30 lines
+are trigger-led single lines with no hair, eye, mark, armor, earring or quality
+terms. Auto-suggest alone found `armor` in two of three runs (17-18 of 30 against
+an 18-image threshold) and never found earrings (3 of 30, close-ups only).
+
+Unfinished:
+- The external recaption route has no UI button. A separate session holds that
+  task and stopped because this branch was uncommitted; restart it from this branch.
+- PixAI is not installed on this machine. The PixAI Auto path is covered only by
+  mocked tests.
+- Auto-suggest is a starting list. View-dependent traits fall below 60%, so the
+  operator must confirm or edit the list before captioning.
+- Suggest on a dataset reads stored captions, which no longer contain applied
+  traits; a second Suggest after recaptioning finds only new ones.
+- Push, merge to main and activation need separate authorization.
+
 ## Worktree cleanup guard (2026-10-21)
 
 `scripts/worktree_cleanup_guard.py` provides read-only preflight and Codex
