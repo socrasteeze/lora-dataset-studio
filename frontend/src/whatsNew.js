@@ -87,7 +87,7 @@ export const WHATS_NEW = [
   {
     id: '2026-10-25-external-folder-recaption', date: '2026-10-25',
     title: 'Caption a folder you built outside LDS',
-    blurb: 'Datasets ▸ Caption folder writes Anima character booru tags (your trigger, then 1girl, solo, …) for a folder of images LDS did not build. Captions go only to a separate output folder; the images are never copied, moved or captioned in place. Name the signature traits to keep out of the captions, or leave the field empty and the suggested list is applied and shown.',
+    blurb: 'Datasets ▸ Caption folder writes Anima character booru tags (your trigger, then 1girl, solo, …) for a folder of images LDS did not build. Captions go only to a separate output folder; the images are never copied, moved or captioned in place. Name the signature traits to keep out of the captions, or leave the field empty and the suggested list is applied and shown. Each tag appears once per line, and a summary file named after the output folder holds your trigger with the shared traits, ready to use as a default prompt.',
   },
   {
     id: '2026-10-25-anima-booru-signatures', date: '2026-10-25',

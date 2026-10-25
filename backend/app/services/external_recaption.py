@@ -5,10 +5,15 @@ source folder is only read: no caption is written beside the images, and no
 image is copied or moved. Tags come from PixAI when it is installed, else from
 the configured vision model with the Anima booru prompt. Identity tags and the
 signature traits are stripped, so they bind to the trigger.
+
+One more file, named after the output folder, holds the summary line: the
+trigger, the usual count tags and the signature traits. It is what the trigger
+now carries, ready to use as a default prompt.
 """
 from __future__ import annotations
 
 import os
+from collections import Counter
 
 _IMAGE_EXTS = ('.jpg', '.jpeg', '.png', '.webp')
 
@@ -38,15 +43,27 @@ def _draft_tags(paths, *, signature_tags=(), ollama_model=None, progress=None) -
         ollama_model=ollama_model or anima_auto_vision_model(), progress=progress)
 
 
+def _summary_name(output_dir, paths) -> str:
+    """``<output folder name>.txt``, or ``<name>_shared.txt`` when an image has
+    that stem, so the summary never replaces a real caption."""
+    name = os.path.basename(os.path.normpath(output_dir)) or 'shared'
+    stems = {os.path.normcase(os.path.splitext(os.path.basename(p))[0]) for p in paths}
+    if os.path.normcase(name) in stems:
+        name += '_shared'
+    return name + '.txt'
+
+
 def recaption_external_folder(source_dir, output_dir, trigger, *, signature_tags=None,
                               ollama_model=None, progress=None) -> dict:
     """Caption every image directly inside ``source_dir`` into ``output_dir``.
 
     ``signature_tags`` None uses the suggested list (traits in 60% of the
-    drafts); a list, even an empty one, is used as given. Returns
-    {written, skipped, output_dir, suggested_signature_tags, signature_tags}.
+    drafts); a list, even an empty one, is used as given. A tag equal to the
+    trigger is dropped, so the trigger is written once. Returns {written,
+    skipped, output_dir, suggested_signature_tags, signature_tags,
+    summary_file, summary}; the summary is None when nothing was written.
     """
-    from .anima_booru import anima_character_tags
+    from .anima_booru import anima_character_tags, count_tags, normalize_anima_tag
     from .face_dataset_service import normalize_signature_tags
     from .face_variations import (drop_identity_tags, drop_signature_tags,
                                   suggest_signature_tags)
@@ -71,16 +88,26 @@ def recaption_external_folder(source_dir, output_dir, trigger, *, signature_tags
     suggested = suggest_signature_tags(list(drafts.values()))
     chosen = suggested if given is None else given
     os.makedirs(output_dir, exist_ok=True)
-    written = 0
+    trigger_tag = normalize_anima_tag(trigger)
+    lines = []
     for path in paths:
         tags = anima_character_tags(drop_signature_tags(
             drop_identity_tags(drafts.get(path) or '', keep_count_tags=True), chosen))
+        tags = ', '.join(t for t in tags.split(', ') if t and t != trigger_tag)
         if not tags:
             continue
         stem = os.path.splitext(os.path.basename(path))[0]
         with open(os.path.join(output_dir, stem + '.txt'), 'w', encoding='utf-8') as fh:
             fh.write(f'{trigger}, {tags}\n')
-        written += 1
-    return {'written': written, 'skipped': len(paths) - written,
+        lines.append(tags)
+    summary_file = summary = None
+    if lines:
+        usual = Counter(tuple(count_tags(line)) for line in lines).most_common(1)[0][0]
+        shared = anima_character_tags(', '.join([*usual, *chosen]))
+        summary = f'{trigger}, {shared}' if shared else trigger
+        summary_file = os.path.join(output_dir, _summary_name(output_dir, paths))
+        with open(summary_file, 'w', encoding='utf-8') as fh:
+            fh.write(summary + '\n')
+    return {'written': len(lines), 'skipped': len(paths) - len(lines),
             'output_dir': output_dir, 'suggested_signature_tags': suggested,
-            'signature_tags': chosen}
+            'signature_tags': chosen, 'summary_file': summary_file, 'summary': summary}
