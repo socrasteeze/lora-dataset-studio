@@ -67,7 +67,7 @@ def test_concept_datasets_are_refused_and_other_kinds_are_not():
 
 def test_resolved_mode_matches_the_dataset_default():
     assert p.resolved_mode('sdxl', None) == 'booru'
-    assert p.resolved_mode('anima', None) == 'prose'
+    assert p.resolved_mode('anima', None) == 'booru'
     assert p.resolved_mode('anima', 'booru') == 'booru'
     assert p.resolved_mode('zimage', 'prose') == 'prose'
 

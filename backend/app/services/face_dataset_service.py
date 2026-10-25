@@ -65,6 +65,8 @@ from .face_variations import (DESCRIPTIVE_CAPTION_PROMPT,
                               appearance_describe_phrases, appearance_omit_shorten_clause,
                               compose_prompt_suffix, concept_lexical_field,
                               drop_identity_sentences, drop_identity_tags,
+                              drop_signature_sentences, drop_signature_tags,
+                              normalize_signature_tag, signature_omit_rule,
                               drop_style_lead_in, identity_leak_chips,
                               is_nsfw_label, prompt_by_label, wrap_variation_klein, wrap_variation_krea,
                               get_identity_prompt,
@@ -1068,11 +1070,11 @@ _LENGTH_INSTRUCTION = {
 
 def caption_options(ds) -> dict:
     """Normalized per-dataset caption overrides: {backend, ollama_model, instructions,
-    vocabulary, length, appearance}. Empty strings / empty appearance = "use the
-    global default" / historical identity lock. Never raises ({} defaults on a
+    vocabulary, length, appearance, signature_tags}. Empty strings / empty appearance =
+    "use the global default" / historical identity lock. Never raises ({} defaults on a
     missing or corrupt blob) so every caption path can read it unconditionally."""
     out = {'backend': '', 'ollama_model': '', 'instructions': '', 'vocabulary': '',
-           'length': '', 'appearance': {}}
+           'length': '', 'appearance': {}, 'signature_tags': []}
     raw = getattr(ds, 'caption_options', None) if ds else None
     if not raw:
         return out
@@ -1100,7 +1102,22 @@ def caption_options(ds) -> dict:
     if length in _CAPTION_LENGTHS:
         out['length'] = length
     out['appearance'] = normalize_appearance(data.get('appearance'))
+    out['signature_tags'] = normalize_signature_tags(data.get('signature_tags'))
     return out
+
+
+_SIGNATURE_TAGS_MAX = 64
+
+
+def normalize_signature_tags(raw) -> list:
+    """A list or comma-separated string -> unique comparison-form tags, in order."""
+    items = raw.split(',') if isinstance(raw, str) else (raw if isinstance(raw, list) else [])
+    out = []
+    for item in items:
+        tag = normalize_signature_tag(item)
+        if tag and tag not in out:
+            out.append(tag)
+    return out[:_SIGNATURE_TAGS_MAX]
 
 
 def set_caption_options(user_id, dataset_id, patch) -> dict:
@@ -1146,10 +1163,23 @@ def set_caption_options(user_id, dataset_id, patch) -> dict:
             if not normalized and raw_app:
                 raise ValueError('invalid caption appearance: no known family')
             cur['appearance'] = normalized
+    if 'signature_tags' in patch:
+        cur['signature_tags'] = normalize_signature_tags(patch.get('signature_tags'))
     stored = {k: v for k, v in cur.items() if v}
     ds.caption_options = json.dumps(stored) if stored else None
     db.session.commit()
     return cur
+
+
+def suggest_dataset_signature_tags(user_id, dataset_id) -> list:
+    """Signature-trait suggestions from the kept images' booru captions. Prose
+    captions are not counted; the operator confirms the list before it is saved."""
+    from .face_variations import caption_style, suggest_signature_tags
+    if not get_dataset(user_id, dataset_id):
+        raise ValueError('dataset not found')
+    rows = FaceDatasetImage.query.filter_by(dataset_id=dataset_id, status='keep').all()
+    return suggest_signature_tags(
+        [r.caption for r in rows if caption_style(r.caption) == 'booru'])
 
 
 # --- Which Klein model this dataset runs on ----------------------------------
@@ -8018,35 +8048,53 @@ def _is_anima_dataset(ds) -> bool:
     return (getattr(ds, 'train_type', None) or '').strip().lower() == 'anima'
 
 
+def _anima_auto_pixai(ds, mode) -> bool:
+    """Auto on an Anima booru dataset tags with PixAI when it is installed.
+    Without it, Auto keeps the configured vision model and the Anima booru prompt."""
+    from . import pixai_tagger
+    return (_is_anima_dataset(ds) and not is_concept(ds)
+            and pixai_tagger.resolved_mode(getattr(ds, 'train_type', None), mode) == 'booru'
+            and pixai_tagger.is_installed())
+
+
 def _dataset_caption_recipe(ds, opts, mode=None):
     """Return the base prompt and cleaner shared by batch and preview paths."""
     if is_concept(ds):
         return (caption_prompt_for_concept((ds.concept_desc or '').strip()),
                 lambda text: text)
+    from . import pixai_tagger
     train_type = (getattr(ds, 'train_type', None) or 'zimage').lower()
-    mode = (mode or ('booru' if train_type == 'sdxl' else 'prose')).lower()
+    mode = pixai_tagger.resolved_mode(train_type, mode)
     if is_style(ds):
         return caption_prompt_for_style(mode), drop_style_lead_in
     body = is_body_fidelity(ds)
     appearance = opts.get('appearance') or None
+    signatures = opts.get('signature_tags') or []
     # Anima keeps count tags (1girl, solo). Other families still drop them.
     keep_counts = train_type == 'anima' and mode == 'booru'
     if mode == 'booru':
         def _clean(text, body=body, appearance=appearance, keep_counts=keep_counts):
-            return drop_identity_tags(
-                text, body=body, appearance=appearance, keep_count_tags=keep_counts)
+            tags = drop_signature_tags(drop_identity_tags(
+                text, body=body, appearance=appearance, keep_count_tags=keep_counts),
+                signatures)
+            if keep_counts:
+                from .anima_booru import anima_character_tags
+                tags = anima_character_tags(tags)
+            return tags
     else:
         def _clean(text, body=body, appearance=appearance):
-            return drop_identity_sentences(text, body=body, appearance=appearance)
+            return drop_signature_sentences(
+                drop_identity_sentences(text, body=body, appearance=appearance), signatures)
     prompt_for = caption_prompt_for_anima if train_type == 'anima' else caption_prompt_for
-    return (prompt_for(mode, body=body, appearance=appearance), _clean)
+    return (prompt_for(mode, body=body, appearance=appearance)
+            + signature_omit_rule(signatures), _clean)
 
 
 
 def _store_pixai_dataset_captions(ds, todo, *, token, dataset_id, force,
                                   spare_asserted, cleaner, report, outcome):
     """Write PixAI booru tags as dataset captions. The caller already refused
-    concept datasets and prose mode. Auto never reaches this function."""
+    concept datasets and prose mode. Auto reaches it only through _anima_auto_pixai."""
     from . import pixai_tagger
     include_character = pixai_tagger.include_character_tags(getattr(ds, 'kind', None))
 
@@ -8136,13 +8184,13 @@ def _preview_pixai_caption(ds, img, path, cleaner):
 
 
 def _clean_hybrid_tags(ds, tags, opts) -> str:
-    """Drop identity tags from the PixAI half. Anima keeps its count tags."""
+    """Drop identity and signature tags from the PixAI half. Anima keeps its count tags."""
     if is_style(ds) or not (tags or '').strip():
         return tags or ''
-    return drop_identity_tags(
+    return drop_signature_tags(drop_identity_tags(
         tags, body=is_body_fidelity(ds),
         appearance=(opts or {}).get('appearance') or None,
-        keep_count_tags=_is_anima_dataset(ds)) or ''
+        keep_count_tags=_is_anima_dataset(ds)), (opts or {}).get('signature_tags')) or ''
 
 
 def _hybrid_vision_model(ds, ollama_model):
@@ -8315,6 +8363,8 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None, 
     backend = (opts.get('backend') or cfg.get('captioning.backend') or 'auto').lower()
     if backend == 'none':
         raise RuntimeError('No captioning backend configured')
+    if backend == 'auto' and _anima_auto_pixai(ds, mode):
+        backend = 'pixai'
     if backend in ('pixai', 'pixai_hybrid'):
         from . import pixai_tagger
         refusal = pixai_tagger.concept_refusal(getattr(ds, 'kind', None))
@@ -8366,8 +8416,8 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None, 
     # Style de caption : prose (Z-Image) vs tags booru (SDXL booru-native type bigLove).
     # Défaut AUTO selon le type entraîné ; un mode explicite (UI) l'emporte — c'est ce
     # qui rend le captioning « model-matched » réglable sans 2e mécanisme.
-    # Anima est HYBRIDE (booru ET langage naturel sont natifs) : son défaut reste la
-    # prose, mais mode='booru' est un choix légitime, pas un contournement — le garde
+    # Anima est HYBRIDE (booru ET langage naturel sont natifs) : son défaut est
+    # booru, mais mode='prose' est un choix légitime, pas un contournement — le garde
     # MISMATCH_CAPTION du lancement ne dit rien sur anima (lora_training.assert_trainable).
     cap_prompt, cleaner = _dataset_caption_recipe(ds, opts, mode=mode)
     # Extra user instructions ride at the END of the prompt (both engines) — the kind
@@ -8884,6 +8934,8 @@ def preview_caption(user_id, dataset_id, image_id, *, backend=None,
     resolved_backend = (opts.get('backend') if backend is None else backend)
     resolved_backend = (resolved_backend or cfg.get('captioning.backend') or 'auto')
     resolved_backend = str(resolved_backend).strip().lower()
+    if resolved_backend == 'auto' and _anima_auto_pixai(ds, None):
+        resolved_backend = 'pixai'
     if resolved_backend == 'pixai':
         return _preview_pixai_caption(ds, img, path, cleaner)
     if resolved_backend == 'pixai_hybrid':
@@ -9015,9 +9067,14 @@ def _scrub_short_like_long(ds, text, mode) -> str:
         leak_re = _concept_terms_re(_get_concept_terms(ds, describe=None))
         return _enforce_concept_omission(t, leak_re, b'', (ds.concept_desc or '').strip(),
                                          describe=None) or ''
-    cleaner = drop_identity_tags if mode == 'booru' else drop_identity_sentences
-    return cleaner(t, body=is_body_fidelity(ds),
-                   appearance=(caption_options(ds).get('appearance') or None)) or ''
+    opts = caption_options(ds)
+    if mode == 'booru':
+        cleaner, strip = drop_identity_tags, drop_signature_tags
+    else:
+        cleaner, strip = drop_identity_sentences, drop_signature_sentences
+    return strip(cleaner(t, body=is_body_fidelity(ds),
+                         appearance=(opts.get('appearance') or None)) or '',
+                 opts.get('signature_tags')) or ''
 
 
 def derive_short_captions(user_id, dataset_id, image_ids=None, force=False, mode=None,
@@ -9036,8 +9093,8 @@ def derive_short_captions(user_id, dataset_id, image_ids=None, force=False, mode
     ds = get_dataset(user_id, dataset_id)
     if not ds or not dual_captions_enabled(ds):
         return 0
-    ttype = (getattr(ds, 'train_type', None) or 'zimage').lower()
-    mode = (mode or ('booru' if ttype == 'sdxl' else 'prose')).lower()
+    from . import pixai_tagger
+    mode = pixai_tagger.resolved_mode(getattr(ds, 'train_type', None), mode)
     q = FaceDatasetImage.query.filter_by(dataset_id=dataset_id, status='keep')
     if image_ids is not None:
         ids = [int(i) for i in image_ids

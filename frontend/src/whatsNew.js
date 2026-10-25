@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-25-anima-booru-signatures', date: '2026-10-25',
+    title: 'Anima character captions as clean booru tags',
+    blurb: 'Anima datasets now caption as short booru tag lines by default, with count tags first and no quality or rating tags. List the signature traits of a character (tattoos, armor, signature outfit) in Captions ▸ ⚙️ Options, or let Suggest find them, and they are kept out of every caption so they bind to the trigger. Prose stays one click away.',
+  },
+  {
     id: '2026-10-22-training-launch-once', date: '2026-10-23',
     title: 'One training launch per click sequence',
     blurb: 'The Train button stays busy through preparation and confirmation, so repeated clicks cannot submit overlapping launches. It becomes available again if preparation is cancelled or fails.',

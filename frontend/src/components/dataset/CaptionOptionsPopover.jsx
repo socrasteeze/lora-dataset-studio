@@ -12,6 +12,8 @@ import { modelPickerCopy } from '../../utils/localLlm.js';
      output cleaners stay in force server-side, so this can't reintroduce a banned term);
    - for character datasets, which appearance families to Omit (bind to the trigger) vs
      Describe (stay prompt-controllable). Extra instructions cannot move a family.
+   - for character datasets, signature traits (tattoos, armor, signature outfit) that
+     are stripped from every caption so they bind to the trigger.
    Saved to caption_options and picked up by the next caption / re-caption run (targeted
    and dual-short included). Modal so it never fights the workspace layout. */
 
@@ -84,6 +86,8 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
   const [vocabulary, setVocabulary] = useState('');
   const [length, setLength] = useState('');
   const [instructions, setInstructions] = useState('');
+  const [signatureTags, setSignatureTags] = useState('');
+  const [suggesting, setSuggesting] = useState(false);
   const [appearance, setAppearance] = useState(null); // null = no policy (classic lock)
   const [appearanceDirty, setAppearanceDirty] = useState(false);
   // The policy as LOADED, to tell a real edit from a plain re-save on Save.
@@ -121,6 +125,7 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
         setVocabulary(o.vocabulary || '');
         setLength(o.length || '');
         setInstructions(o.instructions || '');
+        setSignatureTags((o.signature_tags || []).join(', '));
         const stored = o.appearance && Object.keys(o.appearance).length ? o.appearance : null;
         setAppearance(stored);
         initialAppearanceRef.current = stored;
@@ -215,10 +220,32 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
 
   const startPull = () => startPullByName(pullName);
 
+  // Adds the suggested traits to the list. Nothing is saved until Save.
+  const suggestSignatures = async () => {
+    setSuggesting(true);
+    try {
+      const r = await apiFetch(`/api/dataset/${datasetId}/caption/signature-suggestions`);
+      const current = signatureTags.split(',').map((t) => t.trim()).filter(Boolean);
+      const added = (r.signature_tags || []).filter((t) => !current.includes(t));
+      if (!added.length) {
+        toast.success('No new signature traits found in the booru captions');
+        return;
+      }
+      setSignatureTags([...current, ...added].join(', '));
+    } catch (e) {
+      toast.error(e.message || 'Could not suggest signature traits');
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
   const save = async () => {
     setSaving(true);
     try {
-      const payload = { backend, ollama_model: ollamaModel, vocabulary, length, instructions };
+      const payload = {
+        backend, ollama_model: ollamaModel, vocabulary, length, instructions,
+        signature_tags: signatureTags,
+      };
       // Saving vocabulary / length / Extra instructions must not invent a policy.
       if (appearanceDirty) {
         payload.appearance = { ...APPEARANCE_DEFAULTS, ...(appearance || {}) };
@@ -295,14 +322,14 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
                 {ENGINE_OPTIONS.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.id === 'auto' && trainType === 'anima'
-                      ? 'Auto — Qwen3-VL in Ollama'
+                      ? 'Auto — PixAI tags, else Qwen3-VL'
                       : o.label}
                   </option>
                 ))}
               </select>
               <p className="text-xs text-content-subtle">
                 Overrides the global default only for this dataset. Leave on “default” to follow Settings.
-                {trainType === 'anima' ? ' Auto on an Anima dataset uses Qwen3-VL and skips JoyCaption.' : ''}
+                {trainType === 'anima' ? ' Auto on an Anima dataset tags with PixAI when it is installed, else Qwen3-VL. It skips JoyCaption.' : ''}
               </p>
             </div>
 
@@ -468,6 +495,27 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
               </div>
               <p className="text-xs text-content-subtle leading-relaxed">
                 Always omitted (the trigger’s job): {APPEARANCE_LOCKED.join(', ')}.
+              </p>
+            </div>
+            )}
+
+            {/* Signature traits (character only): stripped from every caption. */}
+            {showAppearance && (
+            <div className="flex flex-col gap-1">
+              <label htmlFor="cap-opt-signatures" className="text-sm font-medium text-content">Signature traits</label>
+              <textarea id="cap-opt-signatures" value={signatureTags} rows={2}
+                onChange={(e) => setSignatureTags(e.target.value)}
+                placeholder="e.g. tattoo, scar, earring, armor"
+                className="w-full px-2 py-1.5 rounded-lg bg-app/60 border border-border text-content text-sm resize-y" />
+              <button type="button" onClick={suggestSignatures} disabled={suggesting}
+                className="self-start min-h-10 lg:min-h-0 px-3 py-1.5 rounded-lg bg-surface-raised border border-border text-content text-xs font-semibold disabled:opacity-40 hover:bg-surface">
+                {suggesting ? 'Suggesting' : 'Suggest'}
+              </button>
+              <p className="text-xs text-content-subtle">
+                Comma-separated. These are removed from every caption and the prompt is told to
+                leave them out, so they bind to the trigger. Clothing is tagged only when it
+                differs from these. Suggest adds hair, eye, mark, accessory and outfit tags found
+                in 60% of the booru captions. Edit the list, then Save and re-caption.
               </p>
             </div>
             )}
