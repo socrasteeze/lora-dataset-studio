@@ -1237,6 +1237,36 @@ def dataset_caption_options_set(dataset_id):
     return jsonify({'ok': True, 'options': options})
 
 
+@bp.get('/dataset/<int:dataset_id>/caption/signature-suggestions')
+def dataset_caption_signature_suggestions(dataset_id):
+    """Signature traits found in 60% of the kept booru captions. Writes nothing."""
+    try:
+        tags = svc.suggest_dataset_signature_tags(LOCAL_USER, dataset_id)
+    except ValueError:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify({'ok': True, 'signature_tags': tags})
+
+
+@bp.post('/captions/external-recaption')
+def captions_external_recaption():
+    """Caption a folder LDS did not build into a separate output folder, as Anima
+    character booru tags. Never writes beside the source images, never copies or
+    moves them. Body: {source, output, trigger, signature_tags?, ollama_model?}."""
+    from ..services.external_recaption import recaption_external_folder
+    data = request.get_json(silent=True) or {}
+    signature_tags = data.get('signature_tags')
+    if signature_tags is not None and not isinstance(signature_tags, (list, str)):
+        return jsonify({'error': "'signature_tags' must be a list"}), 400
+    try:
+        with gpu_exclusive_vision_window(flag_ttl=1800):
+            result = recaption_external_folder(
+                data.get('source'), data.get('output'), data.get('trigger'),
+                signature_tags=signature_tags, ollama_model=data.get('ollama_model'))
+    except Exception as e:
+        return _map_error(e)
+    return jsonify({'ok': True, **result})
+
+
 @bp.post('/dataset/<int:dataset_id>/image/<int:image_id>/caption/preview')
 def dataset_image_caption_preview(dataset_id, image_id):
     """🧪 Caption Lab: run ONE candidate config on ONE image and return the caption

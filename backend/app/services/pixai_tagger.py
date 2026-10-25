@@ -1,9 +1,10 @@
 """PixAI Tagger v1.0 ? booru captions for a dataset, never a bank tag column.
 
 A CLASSIFIER that writes the dataset caption itself when the operator picks the
-``pixai`` backend and the caption mode is booru (SDXL's default, or Anima when
-they choose booru). It is not WD14: that pass fills BankImage.tags and stays
-there. It is not part of Auto. Auto remains JoyCaption, then the local LLM.
+``pixai`` backend and the caption mode is booru (the SDXL and Anima default).
+It is not WD14: that pass fills BankImage.tags and stays there. Auto reaches it
+only for an Anima booru dataset when it is installed; every other Auto pass
+remains JoyCaption, then the local LLM.
 
 The weights live under the app data directory by default.
 ``pixai.models_root`` replaces the parent only. This module never creates
@@ -44,7 +45,7 @@ NOT_INSTALLED = (
 )
 PROSE_REFUSAL = (
     'PixAI Tagger only writes booru tag captions. '
-    'SDXL uses booru by default; Anima can choose booru. '
+    'SDXL and Anima use booru by default. '
     'Prose captioning stays on JoyCaption or the local LLM.'
 )
 BANK_REFUSAL = (
@@ -134,6 +135,11 @@ def missing_snapshot(path: str | None = None) -> bool:
     return True
 
 
+def is_installed() -> bool:
+    """Weights and the isolated interpreter are both on disk."""
+    return not missing_snapshot() and os.path.isfile(pixai_python())
+
+
 def device() -> str:
     """``pixai.device``: auto | cuda | cpu. Anything else reads as auto."""
     value = str(cfg.get('pixai.device') or 'auto').strip().lower()
@@ -148,12 +154,12 @@ def concept_refusal(kind) -> str | None:
 
 
 def resolved_mode(train_type, mode=None) -> str:
-    """Same default as the dataset caption recipe: SDXL is booru, everything else prose."""
+    """The dataset caption default: SDXL and Anima are booru, everything else prose."""
     chosen = (mode or '').strip().lower()
     if chosen:
         return chosen
     family = (train_type or 'zimage').strip().lower()
-    return 'booru' if family == 'sdxl' else 'prose'
+    return 'booru' if family in ('sdxl', 'anima') else 'prose'
 
 
 def include_character_tags(kind) -> bool:

@@ -170,6 +170,25 @@ def format_anima_booru(results, *, include_character: bool) -> str:
     return ', '.join(ordered)
 
 
+def anima_character_tags(caption: str) -> str:
+    """A character tag line in final shape: count tags first, then the rest in
+    their order. Quality, score, meta, year and rating tags are removed, and
+    each tag is put in Anima form (see normalize_anima_tag). A lone 1girl, 1boy
+    or 1other gains ``solo``: vision models drop it even when told to write it."""
+    counts, rest = [], []
+    for raw in (caption or '').replace('\n', ',').split(','):
+        tag = normalize_anima_tag(raw.strip().rstrip('.'))
+        if not tag or tag in counts or tag in rest:
+            continue
+        bucket = _bucket(tag, '')
+        if bucket in ('quality', 'meta', 'year', 'safety'):
+            continue
+        (counts if bucket == 'count' else rest).append(tag)
+    if len(counts) == 1 and counts[0] in ('1girl', '1boy', '1other'):
+        counts.append('solo')
+    return ', '.join(counts + rest)
+
+
 def hybrid_grounding(tags: str) -> str:
     """The sentence that hands PixAI tags to the vision model."""
     shown = ' '.join((tags or '').split()) or '(none)'

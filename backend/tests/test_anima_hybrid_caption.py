@@ -111,7 +111,7 @@ def test_anima_auto_skips_joycaption_and_uses_the_configured_model(app, monkeypa
             'backend': 'auto', 'anima_auto_model': 'anima-test-model'}})
         ds = svc.create_dataset(LOCAL_USER, 'Au', 'zchar_au', train_type='anima')
         img = _kept(svc, ds)
-        n = svc.caption_images(LOCAL_USER, ds.id)
+        n = svc.caption_images(LOCAL_USER, ds.id, mode='prose')
         row = svc.db.session.get(FaceDatasetImage, img.id)
         assert n == 1
         assert row.caption == 'A short factual caption.'

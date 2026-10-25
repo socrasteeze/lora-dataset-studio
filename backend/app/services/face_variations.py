@@ -2779,7 +2779,11 @@ def caption_prompt_for_anima(mode, body=False, appearance=None) -> str:
     if mode == 'booru':
         guidance += (
             "For Anima, write lowercase comma-separated tags with spaces instead "
-            "of underscores. Do not add prose.")
+            "of underscores, in this order: count tags (start with 1girl, solo or "
+            "1boy, solo when one person is shown), framing, "
+            "pose, expression, clothing and props, background, lighting. Count "
+            "tags are allowed here even though the rules above exclude them. Do "
+            "not add quality, score or rating tags. Do not add prose.")
     else:
         guidance += (
             "Write a compact factual paragraph. Natural language is supported "
@@ -3335,6 +3339,125 @@ def drop_identity_tags(caption, body=False, appearance=None, *,
             if t.strip() and not _is_identity_tag(
                 t, body=body, appearance=appearance, keep_count_tags=keep_count_tags)]
     return ', '.join(kept).strip()
+
+
+# Per-dataset signature traits (caption_options.signature_tags): the marks, gear
+# and outfit a drawn CHARACTER always wears. The identity filter above is built
+# for real faces and keeps them; stripping them binds them to the trigger.
+_SIGNATURE_GEAR_WORDS = frozenset({
+    'earring', 'necklace', 'choker', 'glove', 'gauntlet', 'armor', 'armour',
+    'pauldron', 'helmet', 'mask', 'horn', 'wing', 'tail', 'halo', 'eyepatch',
+    'jacket', 'coat', 'cape', 'cloak', 'bodysuit', 'uniform', 'boot', 'belt',
+    'harness', 'goggles', 'headband', 'hat', 'hood', 'scarf', 'dress', 'skirt', 'shirt',
+    'pants', 'shorts', 'leotard', 'thighhighs', 'pantyhose',
+})
+
+
+def normalize_signature_tag(tag) -> str:
+    """One signature tag in comparison form: lowercase, spaces, no escapes."""
+    text = str(tag or '').replace('\\', '').replace('_', ' ').lower()
+    return ' '.join(text.split())[:64]
+
+
+# Adjective forms of gear words. Explicit, so scar never matches "scared".
+_SIGNATURE_ED_FORMS = {
+    'armored': 'armor', 'armoured': 'armour', 'horned': 'horn', 'winged': 'wing',
+    'gloved': 'glove', 'masked': 'mask', 'helmeted': 'helmet', 'tailed': 'tail',
+    'belted': 'belt', 'hooded': 'hood',
+}
+
+
+def _names_signature(text, signatures) -> bool:
+    plain = normalize_signature_tag(text)
+    for s in signatures:
+        forms = [re.escape(s) + '(?:s|es)?'] + [
+            re.escape(w) for w, base in _SIGNATURE_ED_FORMS.items() if base == s]
+        if re.search(rf'(?<!\w)(?:{"|".join(forms)})(?!\w)', plain):
+            return True
+    return False
+
+
+def drop_signature_tags(caption, signature_tags) -> str:
+    """Remove every tag that names a signature trait (whole words; armor also
+    removes armors and armored)."""
+    sigs = [s for s in (normalize_signature_tag(t) for t in signature_tags or ()) if s]
+    if not caption or not sigs:
+        return caption or ''
+    kept = [t.strip() for t in caption.split(',')
+            if t.strip() and not _names_signature(t, sigs)]
+    return ', '.join(kept)
+
+
+def drop_signature_sentences(caption, signature_tags) -> str:
+    """Prose twin of drop_signature_tags: remove sentences naming a signature trait."""
+    sigs = [s for s in (normalize_signature_tag(t) for t in signature_tags or ()) if s]
+    if not caption or not sigs:
+        return caption or ''
+    parts = re.split(r'(?<=[.!?])\s+', caption)
+    return ' '.join(s for s in parts if s.strip() and not _names_signature(s, sigs)).strip()
+
+
+def signature_omit_rule(signature_tags) -> str:
+    """Prompt suffix naming the signature traits to leave out. Empty when none."""
+    sigs = [s for s in (normalize_signature_tag(t) for t in signature_tags or ()) if s]
+    if not sigs:
+        return ''
+    return ("\n\nThese are the character's signature traits and they belong to the "
+            "trigger. Never mention them, and tag clothing only when it differs from "
+            "this usual outfit: " + ', '.join(sigs) + '.')
+
+
+_SIGNATURE_MARK_WORDS = frozenset({'tattoo', 'scar', 'birthmark', 'piercing'})
+
+
+def _signature_word(word) -> str:
+    """The gear or body-mark word that ``word`` is a form of (armored -> armor), or ''."""
+    if word in _SIGNATURE_ED_FORMS:
+        return _SIGNATURE_ED_FORMS[word]
+    for suffix in ('es', 's', ''):
+        if not word.endswith(suffix):
+            continue
+        base = word[:len(word) - len(suffix)] if suffix else word
+        if base in _SIGNATURE_GEAR_WORDS or base in _SIGNATURE_MARK_WORDS:
+            return base
+    return ''
+
+
+def _signature_traits(tag) -> set:
+    """What one tag counts toward: its gear and mark words, or the whole tag
+    for a hair or eye tag. Empty when the tag is no signature candidate."""
+    words = {w for w in map(_signature_word, tag.split()) if w}
+    if words:
+        return words
+    t = tag.replace(' ', '_')
+    if t in _COUNT_TAG_EXACT:
+        return set()
+    if _is_hair_identity_tag(t) or any(sub in t for sub in _BODY_TAG_CONTAINS):
+        return {tag}
+    if ('eyes' in t or 'pupils' in t) and not any(k in t for k in ('closed', 'wink', 'half')):
+        return {tag}
+    return set()
+
+
+def suggest_signature_tags(tag_lines, threshold=0.6) -> list:
+    """Hair, eye, body-mark, accessory and outfit traits found in at least
+    ``threshold`` of the tag lines, most frequent first. Gear and marks count
+    by word, so black armor and armored outfit both count toward armor. A
+    starting list the operator confirms or edits; nothing here writes it."""
+    lines = [line for line in (tag_lines or ()) if (line or '').strip()]
+    if not lines:
+        return []
+    counts = {}
+    for line in lines:
+        found = set()
+        for tag in (normalize_signature_tag(t) for t in line.split(',')):
+            if tag:
+                found.update(_signature_traits(tag))
+        for trait in found:
+            counts[trait] = counts.get(trait, 0) + 1
+    need = threshold * len(lines)
+    picked = [t for t, n in counts.items() if n >= need]
+    return sorted(picked, key=lambda t: (-counts[t], t))
 
 
 def caption_style(text) -> str:

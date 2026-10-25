@@ -732,7 +732,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
   // Caption style defaults to AUTO: booru tags for booru-native SDXL, prose otherwise, unless
   // overridden by the picker. Anima is HYBRID: both forms are native. Prose is only a starting
   // point; choosing booru is valid and triggers no launch safeguard.
-  const effCaptionMode = captionMode || (d.train_type === 'sdxl' ? 'booru' : 'prose');
+  const effCaptionMode = captionMode || (['sdxl', 'anima'].includes(d.train_type) ? 'booru' : 'prose');
   // ── Grid tag-filter (session-only) ──────────────────────────────────────────
   // A tag is toggled in its list and mutually excluded from the other (a tag can't
   // be both hidden and isolated). Match mode follows the caption style so booru

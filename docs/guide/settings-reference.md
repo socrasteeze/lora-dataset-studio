@@ -809,15 +809,29 @@ fixed sizes on purpose.
 
 | Value | Behaviour |
 |---|---|
-| `auto` *(default)* | Prefer JoyCaption (via ai-toolkit), then the local vision model. An **Anima** dataset skips JoyCaption and uses `captioning.anima_auto_model`. |
+| `auto` *(default)* | Prefer JoyCaption (via ai-toolkit), then the local vision model. An **Anima** dataset skips JoyCaption: in booru mode it uses PixAI Tagger when PixAI is installed, otherwise `captioning.anima_auto_model` with the Anima booru prompt. |
 | `joycaption` | JoyCaption only. |
 | `ollama` | Local vision model only. |
-| `pixai` | PixAI Tagger from local weights. Booru dataset captions only; refuses prose, Concept datasets and Bank captioning. Auto does not select it. Anima captions keep safety and count tags and use Anima tag order. |
+| `pixai` | PixAI Tagger from local weights. Booru dataset captions only; refuses prose, Concept datasets and Bank captioning. Auto selects it only for an Anima booru dataset. Anima character captions keep count tags first (a lone `1girl` or `1boy` gains `solo`) and drop quality, score and rating tags. |
 | `pixai_hybrid` | PixAI tags, then a 1–3 sentence local vision description on one line. Missing PixAI v1.0 weights fail with an install message. No silent fallback. Concept datasets and Bank captioning are refused. |
 | `none` | No auto-captioning — you write them yourself. |
 
 `captioning.anima_auto_model` defaults to `huihui_ai/qwen3-vl-abliterated:8b-instruct`.
 A blank value uses `ollama.vision_model`. A per-dataset vision model still wins.
+
+**Signature traits** (Captions ▸ ⚙️ Options, character datasets) → `caption_options.signature_tags`
+on the dataset. A comma-separated list of the marks, gear and outfit the character always
+wears. Every caption drops tags (or, in prose, sentences) that name one, and the prompt is
+told to leave them out, so they bind to the trigger. Matching is by whole words, so
+`armor` also removes `black armor` and `armored outfit`. **Suggest** adds hair, eye, mark, accessory and outfit
+tags found in at least 60% of the kept booru captions. Nothing is saved until **Save**, and
+existing captions change only when you re-caption.
+
+**Recaption an external folder** → `POST /api/captions/external-recaption` with
+`{source, output, trigger, signature_tags?}`. Captions every image directly inside
+`source` as an Anima character tag line (`<trigger>, 1girl, solo, …`) and writes one
+`.txt` per image into `output`. It refuses `output` equal to `source`, and it never
+copies or moves an image. Omitting `signature_tags` applies the suggested list.
 
 `auto` is a **chain**, not a coin toss: JoyCaption captions the images it can in one
 batch, the local vision model covers whatever is left, and on a **Concept** dataset
@@ -972,7 +986,7 @@ Defaults for new local runs. This fork has no cloud-training plugin.
 
 ### Defaults
 
-- **Default training family** → `training.default_family`. The model family preselected when you start a new run. One of `zimage`, `sdxl`, `krea`, `flux`, `flux2klein`, `anima`. Default **`zimage`**. Purely a starting point — you can switch family per run. `anima` trains the open [Anima](https://huggingface.co/circlestone-labs/Anima-Base-v1.0-Diffusers) anime model on its public base (no gated download). It is local-only and needs an up-to-date ai-toolkit + diffusers. **Anima is the one family with hybrid prompting:** booru tags *and* natural language are both first-class on it, so the caption-style guard says nothing there — prose is merely the preselected default, and a booru-captioned Anima dataset trains without being flagged or forced. Every other family keeps its single expected form (SDXL = booru tags, the rest = prose).
+- **Default training family** → `training.default_family`. The model family preselected when you start a new run. One of `zimage`, `sdxl`, `krea`, `flux`, `flux2klein`, `anima`. Default **`zimage`**. Purely a starting point — you can switch family per run. `anima` trains the open [Anima](https://huggingface.co/circlestone-labs/Anima-Base-v1.0-Diffusers) anime model on its public base (no gated download). It is local-only and needs an up-to-date ai-toolkit + diffusers. **Anima is the one family with hybrid prompting:** booru tags *and* natural language are both first-class on it, so the caption-style guard says nothing there — booru is merely the preselected default, and a prose-captioned Anima dataset trains without being flagged or forced. Every other family keeps its single expected form (SDXL = booru tags, the rest = prose).
 
 This fork's Settings → Training keeps **Defaults** and **Train on another machine**. There is no rental-GPU card (no key field, no cost/budget knobs). A dataset that already has a cloud run in its history can still show the local checkpoint files. Nothing in this install resumes, continues or retries that run on a rented GPU. See **Cloud training (vast.ai)** under [Config-file-only settings](#config-file-only-settings).
 
