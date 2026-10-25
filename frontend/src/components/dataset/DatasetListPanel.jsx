@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { familyBadge } from '../../utils/familyBadges';
-import { AlertTriangle, Download, Image as ImageIcon, LayoutGrid, Lightbulb, Palette, PenLine, PersonStanding, Plus, Save, Smile, Trash2, User, X } from 'lucide-react';
+import { AlertTriangle, Download, Image as ImageIcon, LayoutGrid, Lightbulb, Palette, PenLine, PersonStanding, Plus, Save, Smile, Tags, Trash2, User, X } from 'lucide-react';
 import { datasetThumbUrl } from '../../utils/datasetThumbUrl';
 import ShotIllustration from './ShotIllustration';
 import TileSizeControl from '../shared/TileSizeControl';
 import FullBackupControls from './FullBackupControls';
+import ExternalRecaptionDialog from './ExternalRecaptionDialog.jsx';
 import { Button, Chip, Input, btnClass, btnShape, fieldClass } from '../common/Controls.jsx';
 import Pagination from '../common/Pagination.jsx';
 import { HelpBadge } from '../../help/HelpMode';
@@ -428,6 +429,7 @@ export default function DatasetListPanel({
   // page opens on the collection — except on an empty library, where creating
   // is the only meaningful action.
   const [creating, setCreating] = useState(false);
+  const [recaptioning, setRecaptioning] = useState(false);
   const [query, setQuery] = useState('');
   // Kind chip filter — transient (see KIND_CHIPS): reset on every page load.
   const [kindFilter, setKindFilter] = useState('all');
@@ -521,6 +523,12 @@ export default function DatasetListPanel({
           {/* Back up everything, its include-LoRAs option and Import backup
               all live in ONE Backup menu. New dataset stays out of it. */}
           <FullBackupControls backup={backup} onRestore={onRestore} />
+          {/* Not a dataset action: it captions a folder LDS did not build, so it
+              lives on the library, beside Backup, and needs no open dataset. */}
+          <Button size="md" onClick={() => setRecaptioning(true)}
+            title="Write Anima booru tag captions for a folder LDS did not build, into a separate output folder">
+            <Tags aria-hidden="true" className="h-4 w-4" /> Caption folder
+          </Button>
           {!empty && (
             <>
               <Input
@@ -563,6 +571,8 @@ export default function DatasetListPanel({
           )}
         </div>
       </div>
+
+      {recaptioning && <ExternalRecaptionDialog onClose={() => setRecaptioning(false)} />}
 
       {formOpen && (
         <NewDatasetForm onCreate={onCreate}

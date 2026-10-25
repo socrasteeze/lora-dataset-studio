@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-25-external-folder-recaption', date: '2026-10-25',
+    title: 'Caption a folder you built outside LDS',
+    blurb: 'Datasets ▸ Caption folder writes Anima character booru tags (your trigger, then 1girl, solo, …) for a folder of images LDS did not build. Captions go only to a separate output folder; the images are never copied, moved or captioned in place. Name the signature traits to keep out of the captions, or leave the field empty and the suggested list is applied and shown.',
+  },
+  {
     id: '2026-10-25-anima-booru-signatures', date: '2026-10-25',
     title: 'Anima character captions as clean booru tags',
     blurb: 'Anima datasets now caption as short booru tag lines by default, with count tags first and no quality or rating tags. List the signature traits of a character (tattoos, armor, signature outfit) in Captions ▸ ⚙️ Options, or let Suggest find them, and they are kept out of every caption so they bind to the trigger. Prose stays one click away.',

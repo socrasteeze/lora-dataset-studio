@@ -27,6 +27,7 @@ export const CORE_GUIDE_ANCHORS = {
     "concept-datasets-an-object-or-action-not-a-person",
     "style-datasets-a-global-aesthetic",
     "caption-your-images-in-another-tool",
+    "caption-a-folder-outside-lds",
     "krea-and-the-shape-of-your-reference-photo",
     "your-own-shot-catalog-json-import",
     "keeping-a-shot-you-wrote-by-hand",
