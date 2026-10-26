@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-25-bank-queue-keeps-models-loaded', date: '2026-10-25',
+    title: 'A long bank queue loads each model once',
+    blurb: 'While the queue works through your banks, the 🔖 Tags, ✨ Score and Faces passes keep their models loaded from one bank to the next instead of loading them again for every bank. The models are unloaded when the queue finishes, when you cancel it, and when ComfyUI or a training run needs the GPU.',
+  },
+  {
     id: '2026-10-25-wd14-gpu-finds-cuda', date: '2026-10-25',
     title: 'Tagging finds your GPU on its own',
     blurb: 'When the tagger\'s Python has no CUDA build, the 🔖 Tags pass now uses another ML environment on this machine that has one. If no environment can use the GPU, Settings ▸ Captioning and the Tags button say so before you start.',
