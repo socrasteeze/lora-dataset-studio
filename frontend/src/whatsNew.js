@@ -85,6 +85,64 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-26-keyboard-delete-controls', date: '2026-10-26',
+    title: 'Keyboard Deletion Controls',
+    blurb: 'The rejected-file deletion dialog keeps keyboard focus inside it. Escape cancels before deletion starts, and focus returns to the opening control.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-26-preserve-pending-settings-edits', date: '2026-10-26',
+    title: 'Preserve New Edits',
+    blurb: 'You can edit settings while a save request runs. The response keeps newer edits in your draft for the next save.',
+    to: '/settings',
+  },
+  {
+    id: '2026-10-26-bank-field-errors', date: '2026-10-26',
+    title: 'Bank Field Errors',
+    blurb: 'Bank creation marks invalid fields and links the error summary to them. Failed requests keep your entries.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-26-bank-load-recovery', date: '2026-10-26',
+    title: 'Bank Load Recovery',
+    blurb: 'A failed library request shows a persistent Retry control. It no longer claims that your library is empty. Bank and Settings loads reserve space for their content.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-26-readable-control-states', date: '2026-10-26',
+    title: 'Clearer Control States',
+    blurb: 'Small secondary text has higher contrast. Primary buttons show hover and pressed states without changing size.',
+  },
+  {
+    id: '2026-10-26-guide-mobile-settings-search', date: '2026-10-26',
+    title: 'Find Help Faster',
+    blurb: 'Search Guide finds topics across core and active plugin chapters. Settings search now works on phones as well as desktops.',
+    to: '/guide/getting-started',
+  },
+  {
+    id: '2026-10-26-credential-visibility-controls', date: '2026-10-26',
+    title: 'Inspect Pending Credentials',
+    blurb: 'Source credentials, the training access token and the plugin admin token now have Show and Hide controls. Stored source credentials stay hidden.',
+  },
+  {
+    id: '2026-10-26-guide-content-revisions', date: '2026-10-26',
+    title: 'Guide Revision Dates',
+    blurb: 'Guide chapters show the latest Git content revision for their core and plugin guidance. Local Edits marks uncommitted changes instead of claiming a new published date.',
+    to: '/guide/getting-started',
+  },
+  {
+    id: '2026-10-26-print-guide-chapters', date: '2026-10-26',
+    title: 'Print Guide Chapters',
+    blurb: 'Your browser can print the current Guide chapter on a light background without navigation, search or floating controls.',
+    to: '/guide/getting-started',
+  },
+  {
+    id: '2026-10-26-guide-reading-progress', date: '2026-10-26',
+    title: 'Guide Reading Progress',
+    blurb: 'A thin bar at the bottom shows your position in the current Guide chapter. It follows page size changes without adding animation.',
+    to: '/guide/getting-started',
+  },
+  {
     id: '2026-10-25-zero-glass-plainer-chrome', date: '2026-10-25',
     title: 'Plainer, easier-to-read panels',
     blurb: 'Bars, docks, toasts and dialogs now sit on solid backgrounds instead of blurred glass, so text stays crisp over busy images. The header title is plain orange, live indicators no longer pulse, and Guide chapters are numbered 1 to 6.',
