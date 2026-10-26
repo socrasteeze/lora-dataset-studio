@@ -31,7 +31,7 @@ function StartingPresets({ config, setField }) {
     ...table, [family]: { ...(table[family] || {}), [kind]: value },
   })
   return (
-    <div id="training-starting-presets" className="mt-3">
+    <div id="training-starting-presets" className="col-span-full">
       <p className="text-sm font-medium text-content">Starting preset for new {family} datasets</p>
       <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-3">
         {STARTING_KINDS.map(([kind, label]) => {
