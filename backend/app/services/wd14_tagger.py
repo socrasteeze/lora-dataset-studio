@@ -114,6 +114,70 @@ def wd14_python() -> str:
     return cfg.get('wd14.python') or cfg.get('masks.python') or sys.executable
 
 
+# One import that proves an interpreter can run THIS pass on the card: the CUDA
+# provider plus the two other modules the child needs. Shared with
+# capabilities.wd14_gpu_available so the gate and the run cannot disagree.
+GPU_IMPORT = ("import sys, cv2, numpy, onnxruntime; "
+              "sys.exit(0 if 'CUDAExecutionProvider' in "
+              "onnxruntime.get_available_providers() else 1)")
+
+_auto_noted: set = set()
+
+
+def candidate_pythons() -> list[str]:
+    """Interpreters that may carry a CUDA onnxruntime, in preference order: the
+    tagger's own chain, the other ML extras' configured interpreters, the
+    app-managed envs under data/envs, then the app's own Python.
+
+    WHY THIS EXISTS. The tagger used to run only in ``wd14_python()``. When that
+    interpreter lost its CUDA build (a rebuilt ``.venv`` reinstalls the CPU
+    onnxruntime that requirements-ml.txt pins), every GPU tag pass refused,
+    while a perfectly good CUDA env sat next to it serving the masks pass."""
+    names = [cfg.get('wd14.python'), cfg.get('masks.python'),
+             cfg.get('face_scoring.python'), cfg.get('bank_scoring.python')]
+    envs = []
+    try:
+        root = cfg.data_dir() / 'envs'
+        for env in sorted(root.iterdir()) if root.is_dir() else []:
+            for rel in (('Scripts', 'python.exe'), ('bin', 'python')):
+                envs.append(str(env.joinpath(*rel)))
+    except OSError:
+        pass
+    out, seen = [], set()
+    for path in [*names, *envs, sys.executable]:
+        if not path:
+            continue
+        key = os.path.normcase(os.path.abspath(str(path)))
+        if key in seen or not os.path.isfile(str(path)):
+            continue
+        seen.add(key)
+        out.append(str(path))
+    return out
+
+
+def run_python() -> str:
+    """Interpreter a tag pass RUNS in. ``wd14_python()`` unless the GPU is wanted
+    (device auto/cuda) and that interpreter has no CUDA onnxruntime; then the
+    first candidate that does. ``wd14_python()`` stays the Setup install target,
+    so this never redirects a pip install into another feature's env."""
+    base = wd14_python()
+    if device() == 'cpu':
+        return base
+    from ..capabilities import _cached_import
+    if _cached_import('wd14_gpu', base, GPU_IMPORT):
+        return base
+    for python in candidate_pythons():
+        if python == base:
+            continue
+        if _cached_import('wd14_gpu', python, GPU_IMPORT):
+            if python not in _auto_noted:
+                _auto_noted.add(python)
+                logger.info('wd14: the configured tagger Python has no CUDA '
+                            'onnxruntime; GPU tagging uses %s instead', python)
+            return python
+    return base
+
+
 def models_dir() -> str:
     """Where the two model files live. `wd14.models_root` overrides it; the
     default sits under the app's data dir next to the other cached weights."""
@@ -179,9 +243,27 @@ def gpu_refusal() -> str | None:
     from ..capabilities import wd14_gpu_available
     if wd14_gpu_available():
         return None
-    return ('GPU tagging is selected, but the tagger\'s Python has no CUDA '
-            'onnxruntime. Point the WD14 interpreter at an environment with '
-            'onnxruntime-gpu, or set Tagging device to Auto (Settings ▸ Captioning)')
+    return ('GPU tagging is selected, but no Python on this machine has a CUDA '
+            'onnxruntime (checked the tagger, masks, face scoring and bank scoring '
+            'interpreters and data/envs). Install onnxruntime-gpu into one of '
+            'them, or set Tagging device to Auto or CPU (Settings ▸ Captioning)')
+
+
+def gpu_warning() -> str | None:
+    """What the Settings card and the Tags button say about the device, or None
+    when tagging will run where the operator asked. A blocking reason for GPU
+    only; a slow-path notice for Auto, which falls back to the CPU."""
+    refusal = gpu_refusal()
+    if refusal:
+        return refusal
+    if device() != 'auto':
+        return None
+    from ..capabilities import wd14_gpu_available
+    if wd14_gpu_available():
+        return None
+    return ('No Python on this machine has a CUDA onnxruntime, so tagging runs '
+            'on the CPU (much slower). Install onnxruntime-gpu into an ML '
+            'environment to tag on the GPU.')
 
 
 def default_timeout(n_images: int) -> int:
@@ -234,7 +316,8 @@ def tag_images(image_paths, threshold_value=None, timeout=None,
 
     try:
         stdout, stderr_lines, rc, timed_out = run_infer_script(
-            wd14_python(), _SCRIPT, payload, budget, _on_line)
+            wd14_python() if force_cpu else run_python(), _SCRIPT, payload,
+            budget, _on_line)
     except OSError as e:
         logger.warning('wd14: could not start the tagger: %s', e)
         return {'ok': False, 'error_kind': 'unavailable',

@@ -12356,8 +12356,11 @@ def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None, *,
 # so a bigger chunk amortises that load better — but nothing is committed until
 # the chunk returns, so a bigger chunk is also more work a Stop throws away. 400
 # puts the load (a few seconds) well under 1% of the chunk's run time while
-# capping what a cancel can cost at a couple of minutes.
+# capping what a cancel can cost at a couple of minutes. On CUDA a chunk of 400
+# finishes in seconds, so the model load dominated it; 2000 keeps a cancel's
+# cost under a minute there.
 _TAG_CHUNK = 400
+_TAG_CHUNK_GPU = 2000
 
 
 def _tags_prereq() -> str | None:
@@ -12443,14 +12446,16 @@ def _tags_job(bank_id, rescan, threshold=None):
             return
         thr = threshold if threshold is not None else wd14_tagger.threshold()
         # Only hold the card when the run will actually use it (see start_tags).
+        on_gpu = wd14_tagger.uses_gpu()
         window = (gpu_exclusive_vision_window(flag_ttl=1800)
-                  if wd14_tagger.uses_gpu() else contextlib.nullcontext())
+                  if on_gpu else contextlib.nullcontext())
+        chunk_size = _TAG_CHUNK_GPU if on_gpu else _TAG_CHUNK
         tagged = errors = missing = seen = 0
         with window:
-            for start in range(0, len(items), _TAG_CHUNK):
+            for start in range(0, len(items), chunk_size):
                 if bank_jobs.cancelled(job):
                     break
-                chunk = items[start:start + _TAG_CHUNK]
+                chunk = items[start:start + chunk_size]
                 by_path = {}
                 for row_id, relpath in chunk:
                     path = _abs_under(root, relpath)
