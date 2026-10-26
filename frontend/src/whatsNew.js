@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-25-wd14-gpu-finds-cuda', date: '2026-10-25',
+    title: 'Tagging finds your GPU on its own',
+    blurb: 'When the tagger\'s Python has no CUDA build, the 🔖 Tags pass now uses another ML environment on this machine that has one. If no environment can use the GPU, Settings ▸ Captioning and the Tags button say so before you start.',
+  },
+  {
     id: '2026-10-25-external-folder-recaption', date: '2026-10-25',
     title: 'Caption a folder you built outside LDS',
     blurb: 'Datasets ▸ Caption folder writes Anima character booru tags (your trigger, then 1girl, solo, …) for a folder of images LDS did not build. Captions go only to a separate output folder; the images are never copied, moved or captioned in place. Name the signature traits to keep out of the captions, or leave the field empty and the suggested list is applied and shown. Each tag appears once per line, and a summary file named after the output folder holds your trigger with the shared traits, ready to use as a default prompt.',

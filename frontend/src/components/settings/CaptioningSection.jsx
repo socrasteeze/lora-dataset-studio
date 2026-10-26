@@ -2,6 +2,7 @@ import { INPUT_CLASS, Card } from './primitives'
 import { SettingsGroup, SettingsGroupsToc, useSettingsGroupProps } from './SettingsGroupsView'
 import { CAPTIONING_GROUPS } from './settingsGroups'
 import ResetToDefault from './ResetToDefault'
+import { useCapabilities } from '../../context/CapabilitiesContext'
 import { defaultValueAt } from './settingDefaults.js'
 import { localLlmLabel } from '../../utils/localLlm.js'
 import { importInputLimitLine, IMPORT_INPUT_UNLIMITED_NOTE } from '../dataset/importPolicy.js'
@@ -52,6 +53,7 @@ const WATERMARK_BACKEND_OPTIONS = [
 ]
 
 export default function CaptioningSection({ config, setField, configDefaults }) {
+  const { caps } = useCapabilities()
   // From `config`, not from caps: this screen shows what is SAVED, and the provider
   // select sits on it -- reading a capability snapshot would lag a change by a refresh.
   const llmName = localLlmLabel({ local_llm: config.local_llm })
@@ -259,6 +261,9 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
           </select>
           <ResetToDefault label="Tagging device" section="wd14" field="device"
             config={config} configDefaults={configDefaults} setField={setField} />
+          {caps?.wd14_gpu_warning && (
+            <p role="status" className="mt-2 text-xs text-amber-400">{caps.wd14_gpu_warning}</p>
+          )}
         </div>
       </Card>
 
