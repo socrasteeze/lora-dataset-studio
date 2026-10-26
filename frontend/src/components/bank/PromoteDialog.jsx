@@ -139,7 +139,7 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
   const tab = (id, label) => (
     <button type="button" key={id} onClick={() => setDestination(id)}
       aria-pressed={destination === id}
-      className={`flex-1 rounded-md border px-3 py-2 text-sm ${destination === id
+      className={`flex-1 whitespace-nowrap rounded-md border px-3 py-2 text-sm ${destination === id
         ? 'border-indigo-400 bg-indigo-500/20 font-semibold text-content'
         : 'border-border text-content-muted hover:bg-surface-raised'}`}>
       {label}
@@ -149,14 +149,14 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
   return (
     <div role="dialog" aria-modal="true" aria-label="Promote the selection"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4">
-      <div className="w-full max-w-md max-h-full overflow-y-auto rounded-xl border border-border bg-surface-overlay p-4 sm:p-5 shadow-2xl space-y-4">
-        <h2 className="text-base font-bold text-content">⬆ Promote the selection</h2>
+      <div className="w-full max-w-2xl max-h-full overflow-y-auto rounded-xl border border-border bg-surface-overlay p-4 sm:p-5 shadow-2xl space-y-4">
+        <h2 className="text-base font-bold text-content">Promote the selection</h2>
 
         <div>
           <p className="text-sm font-medium text-content">Send it to</p>
-          {/* Rendered FROM the constant so the two cannot drift. A grid rather
-              than flex-1 in a row: three tabs at these label lengths wrap badly
-              inside max-w-md, and 400 px is a real viewport here. */}
+          {/* Rendered FROM the constant so the two cannot drift. One row from
+              sm up (the dialog is wide enough for three one-line labels);
+              stacked below sm, since 400 px is a real viewport here. */}
           <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-3">
             {PROMOTE_DESTINATIONS.map((d) => tab(d.id, d.label))}
           </div>
@@ -171,12 +171,12 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
 
         {weight && (
           <p className="rounded-md border border-border bg-surface-raised px-3 py-2 text-xs text-content-muted">
-            💾 {weight}
+            {weight}
           </p>
         )}
 
         {destination === 'new-dataset' ? (
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="promote-new-dataset-name" className="block text-sm font-medium text-content">
                 Name
@@ -186,19 +186,19 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
                 placeholder="Emma"
                 className="mt-1 w-full rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content" />
             </div>
-            <label className="flex flex-col gap-1 text-sm">Dataset Type
+            <label className="flex flex-col gap-1 text-sm sm:col-start-1">Dataset Type
               <select value={newDsKind} onChange={(event) => setNewDsKind(event.target.value)} disabled={busy}
                 className="min-h-10 rounded border border-border bg-surface-raised px-2 text-content">
                 <option value="character">Character</option><option value="concept">Concept</option><option value="style">Style</option>
               </select>
             </label>
-            {newDsKind === 'concept' && <label className="flex flex-col gap-1 text-sm">Concept Description
+            {newDsKind === 'concept' && <label className="flex flex-col gap-1 text-sm sm:col-span-2">Concept Description
               <textarea value={conceptDesc} maxLength={500} onChange={(event) => setConceptDesc(event.target.value)}
                 className="min-h-10 rounded border border-border bg-surface-raised p-2 text-content" />
             </label>}
             <FolderCategoryFields name={newDsName} category={folderCategory || categoryForKind(newDsKind)}
               onChange={setFolderCategory} onReady={setDestinationReady} disabled={busy} />
-            {newDsKind !== 'style' && <div>
+            {newDsKind !== 'style' && <div className="sm:col-start-2 sm:row-start-1">
               <label htmlFor="promote-new-dataset-trigger" className="block text-sm font-medium text-content">
                 Trigger word
               </label>
@@ -212,11 +212,11 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
                   cheap; discovering it after a LoRA is deployed is not. */}
               {triggerWarning(newDsTrigger, datasets) && (
                 <p className="mt-1 text-xs text-amber-300">
-                  ⚠ {triggerWarning(newDsTrigger, datasets)}
+                  {triggerWarning(newDsTrigger, datasets)}
                 </p>
               )}
             </div>}
-            <p className="text-xs text-content-subtle">Dataset type controls captions and import. Folder category only labels the folder.</p>
+            <p className="text-xs text-content-subtle sm:col-span-2">Dataset type controls captions and import. Folder category only labels the folder.</p>
           </div>
         ) : toBank ? (
           <div>
@@ -250,7 +250,7 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
             </select>
             {datasets != null && datasets.length === 0 && (
               <p className="mt-1 text-xs text-amber-300">
-                No dataset yet — pick 🆕 New dataset above to make one right here, or send
+                No dataset yet — pick New dataset above to make one right here, or send
                 this selection to a new image bank instead.
               </p>
             )}

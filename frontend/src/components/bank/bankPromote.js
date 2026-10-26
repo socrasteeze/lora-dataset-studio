@@ -26,9 +26,9 @@ import { canCreateDataset } from '../dataset/newDataset.js'
  * The two dataset doors sit adjacent, and the labels are short because three
  * tabs have to survive a 400 px viewport. */
 export const PROMOTE_DESTINATIONS = [
-  { id: 'dataset', label: '📁 Existing dataset' },
-  { id: 'new-dataset', label: '🆕 New dataset' },
-  { id: 'bank', label: '🗃 New image bank' },
+  { id: 'dataset', label: 'Existing dataset' },
+  { id: 'new-dataset', label: 'New dataset' },
+  { id: 'bank', label: 'New image bank' },
 ]
 
 const UNITS = ['B', 'KB', 'MB', 'GB', 'TB']
