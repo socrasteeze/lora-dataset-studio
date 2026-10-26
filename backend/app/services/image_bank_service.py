@@ -2450,6 +2450,46 @@ def _curated(bank_id):
     return and_(crit, ~hidden)
 
 
+def excluded_folder_names() -> list:
+    """``bank_processing.excluded_folder_names``, lower-cased and cleaned. A
+    comma-separated string is accepted too (a hand-edited config)."""
+    raw = cfg.get('bank_processing.excluded_folder_names')
+    if raw is None:
+        raw = cfg.DEFAULTS['bank_processing']['excluded_folder_names']
+    if isinstance(raw, str):
+        raw = raw.split(',')
+    if not isinstance(raw, (list, tuple)):
+        return []
+    out = []
+    for item in raw:
+        name = str(item or '').strip().strip('/\\').lower()
+        if name and '/' not in name and '\\' not in name and name not in out:
+            out.append(name)
+    return out
+
+
+def _name_excluded_clause():
+    """SQL: the row sits in a folder whose NAME is excluded from processing, at
+    any depth below the bank root. None when the list is empty. Only folder
+    parts of the relpath count, never the file name, and never the bank's own
+    root folder: a bank opened on a reference folder still processes."""
+    names = excluded_folder_names()
+    if not names:
+        return None
+    rel = func.lower(_relpath_posix_col())
+    return or_(*(or_(rel.startswith(name + '/', autoescape=True),
+                     rel.contains('/' + name + '/', autoescape=True))
+                 for name in names))
+
+
+def _processable(bank_id):
+    """What the passes work on: the curated rows minus excluded folder names.
+    The grid keeps showing those images; no pass computes anything for them."""
+    crit = _curated(bank_id)
+    skip = _name_excluded_clause()
+    return crit if skip is None else and_(crit, ~skip)
+
+
 def _visible_ids(bank_id, ids) -> list:
     """``ids`` in the same order, without images that sit in an excluded folder."""
     ids = list(ids)
@@ -3508,12 +3548,17 @@ def bank_pass_coverage(user_id, bank_ids=None) -> dict:
     cols = [func.sum(case((PASS_PENDING[s](), 1), else_=0)).label(s)
             for s in PASS_PENDING]
 
+    skip = _name_excluded_clause()
+
     def _base():
-        return (db.session.query(BankImage.bank_id,
-                                 func.count(BankImage.id).label('total'), *cols)
-                .join(ImageBank, ImageBank.id == BankImage.bank_id)
-                .filter(ImageBank.user_id == user_id)
-                .filter(BankImage.status != 'reject'))
+        q = (db.session.query(BankImage.bank_id,
+                              func.count(BankImage.id).label('total'), *cols)
+             .join(ImageBank, ImageBank.id == BankImage.bank_id)
+             .filter(ImageBank.user_id == user_id)
+             .filter(BankImage.status != 'reject'))
+        # Excluded folder names never get processed, so they are never "left
+        # to do": counting them would re-queue a finished bank forever.
+        return q if skip is None else q.filter(~skip)
 
     if bank_ids is None:
         queries = [_base()]
@@ -4598,7 +4643,7 @@ def _scoped_pool(bank_id, statuses=None, ids=None):
     """The rows a pass may touch: this bank, this scope, and — when the user made
     a selection — only those ids. The selection is INTERSECTED with the scope,
     never widened, the same contract the caption pass has always had."""
-    q = BankImage.query.filter(_curated(bank_id)).filter(_scope_clause(statuses))
+    q = BankImage.query.filter(_processable(bank_id)).filter(_scope_clause(statuses))
     if ids:
         q = q.filter(BankImage.id.in_([int(i) for i in ids][:_SQL_IN_CHUNK]))
     return q
@@ -4620,7 +4665,7 @@ def _todo_by_status(bank_id, todo_clause):
         return func.coalesce(func.sum(case((cond, 1), else_=0)), 0)
     keep, pending, reject = (
         db.session.query(_sum('keep'), _sum('pending'), _sum('reject'))
-        .filter(_curated(bank_id)).one())
+        .filter(_processable(bank_id)).one())
     return {'keep': int(keep or 0), 'pending': int(pending or 0),
             'reject': int(reject or 0)}
 
@@ -8380,7 +8425,7 @@ def _angle_pool(bank_id, statuses=None, ids=None):
     explicitly narrows it — which is the only thing this lane gains, since it
     writes nothing but `face_yaw` and leaves every cluster alone, so a partial
     run cannot renumber anything."""
-    q = BankImage.query.filter(_curated(bank_id)).filter(_angle_todo_clause())
+    q = BankImage.query.filter(_processable(bank_id)).filter(_angle_todo_clause())
     if statuses is not None:
         q = q.filter(BankImage.status.in_(statuses))
     if ids:
@@ -8425,7 +8470,7 @@ def start_faces(app, user_id, bank_id, device_id=None, angles_only=False,
             '👥 Group by person always covers the whole bank: the person clusters '
             'are one numbering computed from every face at once, so a partial run '
             'would renumber groups you have already worked with')
-    q = BankImage.query.filter(_curated(bank_id))
+    q = BankImage.query.filter(_processable(bank_id))
     if angles_only:
         q = _angle_pool(bank_id, want, scope_ids)
         # BEFORE the install probe, and the order is the point: sending someone
@@ -8470,7 +8515,7 @@ def _faces_job(bank_id, device_id=None, angles_only=False, statuses=None, ids=No
         if angles_only:
             q = _angle_pool(bank_id, statuses, ids)
         else:
-            q = BankImage.query.filter(_curated(bank_id))
+            q = BankImage.query.filter(_processable(bank_id))
             # Asserted rows are EXCLUDED from the identity lane, not merely
             # preserved: the user already told us who is in them, so paying an
             # embedding to re-derive it is exactly the cost "Single person here"
@@ -8766,7 +8811,7 @@ def start_semantic_index(app, user_id, bank_id, rescan=False):
         raise RuntimeError(reason)
     # SigLIP2 is a semantic Bank index, not the aesthetic Score pool: the bin is
     # searchable and participates in near-duplicate grouping too.
-    total = BankImage.query.filter(_curated(bank_id)).count()
+    total = BankImage.query.filter(_processable(bank_id)).count()
     return bank_jobs.start(
         app, bank_id, 'semantic_index',
         _semantic_index_job(bank_id, bool(rescan)), total=total)
@@ -8781,7 +8826,7 @@ def _semantic_index_job(bank_id, rescan=False):
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
             return
-        rows = (BankImage.query.filter(_curated(bank_id))
+        rows = (BankImage.query.filter(_processable(bank_id))
                 .order_by(BankImage.id.asc()).all())
         paths = []
         for row in rows:
@@ -8971,7 +9016,7 @@ def start_score(app, user_id, bank_id, device_id=None, rescore=False):
         reason = _gpu_busy_reason() if use_gpu else None
         if reason:
             raise RuntimeError(reason)
-    total = (BankImage.query.filter(_curated(bank_id))
+    total = (BankImage.query.filter(_processable(bank_id))
              .filter(BankImage.status != 'reject').count())
     return bank_jobs.start(app, bank_id, 'score',
                            _score_job(bank_id, device_id if remote else None,
@@ -9232,7 +9277,7 @@ def _score_job(bank_id, device_id=None, rescore=False):
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
             return
-        rows = (BankImage.query.filter(_curated(bank_id))
+        rows = (BankImage.query.filter(_processable(bank_id))
                 .filter(BankImage.status != 'reject')
                 .order_by(BankImage.id.asc()).all())
         by_path = {}
@@ -12411,7 +12456,7 @@ def start_tags(app, user_id, bank_id, rescan=False, threshold=None):
         busy = _gpu_busy_reason()
         if busy:
             raise RuntimeError(busy)
-    q = BankImage.query.filter(_curated(bank_id)).filter(BankImage.status != 'reject')
+    q = BankImage.query.filter(_processable(bank_id)).filter(BankImage.status != 'reject')
     if not rescan:
         q = q.filter(BankImage.tags_state.is_(None))
     return bank_jobs.start(app, bank_id, 'tags',
@@ -12432,7 +12477,7 @@ def _tags_job(bank_id, rescan, threshold=None):
         # turns that read into a write. Same trap _framing_job documents.
         source_path = bank.source_path
         root = os.path.realpath(source_path)
-        q = (BankImage.query.filter(_curated(bank_id))
+        q = (BankImage.query.filter(_processable(bank_id))
              .filter(BankImage.status != 'reject'))
         if not rescan:
             q = q.filter(BankImage.tags_state.is_(None))
