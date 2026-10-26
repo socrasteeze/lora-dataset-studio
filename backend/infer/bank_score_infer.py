@@ -74,6 +74,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 from _harness import _cancel_requested, _log, _write_count
+from model_memo import memo
 from score_pipeline import native_thread_limits, predict_adaptive, score_plan
 from pass_resources import CACHE_SAVE_SECONDS
 
@@ -597,7 +598,10 @@ def _main() -> int:
             runtime = score_plan(os.cpu_count(), device == 'cuda')
             runtime['torch_threads'] = min(runtime['torch_threads'], int(os.environ['OMP_NUM_THREADS']))
             torch.set_num_threads(runtime['torch_threads'])
-            torch.set_num_interop_threads(1)
+            try:
+                torch.set_num_interop_threads(1)
+            except RuntimeError:
+                pass   # a resident worker already set it on an earlier request
             import numpy as np  # noqa: F401
             import open_clip
             from PIL import Image  # noqa: F401 — fail fast here, not once per image
@@ -610,8 +614,11 @@ def _main() -> int:
         # decides whether the ~1 GB CLIP load is needed at all. Loading CLIP first
         # would charge that load to every relaunch of a bank whose head is
         # permanently unavailable, for zero work.
-        aes_head, aes_ok, aes_why = _load_aesthetic_head(models_root, device)
-        nsfw_bundle, nsfw_ok, nsfw_why = _load_nsfw(device)
+        aes_head, aes_ok, aes_why = memo(
+            ('aesthetic', models_root, device),
+            lambda: _load_aesthetic_head(models_root, device), keep=lambda r: r[1])
+        nsfw_bundle, nsfw_ok, nsfw_why = memo(
+            ('nsfw', device), lambda: _load_nsfw(device), keep=lambda r: r[1])
         head_errors = {k: v for k, v in (('aesthetic', aes_why),
                                          ('nsfw', nsfw_why)) if v}
         retry = [p for p in holed
@@ -628,11 +635,15 @@ def _main() -> int:
         work = []
 
     if work:
-        try:
-            clip_model, _, preprocess = open_clip.create_model_and_transforms(
+        def _load_clip():
+            model, _, transform = open_clip.create_model_and_transforms(
                 'ViT-L-14', pretrained='openai',
                 cache_dir=(os.path.join(models_root, 'open_clip') if models_root else None))
-            clip_model.to(device).eval()
+            model.to(device).eval()
+            return model, transform
+
+        try:
+            clip_model, preprocess = memo(('clip', models_root, device), _load_clip)
         except Exception as e:  # noqa: BLE001
             print(json.dumps({'ok': False, 'results': {}, 'clusters': {},
                               'error': f'CLIP load failed: {type(e).__name__}: {e}'}), file=_OUT)

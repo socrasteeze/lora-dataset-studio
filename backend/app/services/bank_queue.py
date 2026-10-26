@@ -554,9 +554,15 @@ def _ensure_worker(app):
 
 
 def _worker_loop(app, lane):
+    import contextlib
+
+    from . import infer_pool
     _current.lane = lane
     try:
-        with app.app_context():
+        # The local lane keeps WD14, Score and Faces loaded from one bank to the
+        # next (infer_pool). Peer lanes run their passes on the peer.
+        warm = infer_pool.keep_warm() if lane == _LOCAL_LANE else contextlib.nullcontext()
+        with app.app_context(), warm:
             _drain(app)
     finally:
         # Admission can happen after the last claim check but before this
@@ -683,6 +689,10 @@ def _process_next(app) -> bool:
             with _lock:
                 entry['waiting_for'] = why
             logger.info('bank_queue: bank %s is waiting — %s', bank_id, why)
+            # Whatever holds the machine now may need the VRAM the resident
+            # workers keep between banks.
+            from . import infer_pool
+            infer_pool.shutdown(f'the queue is waiting: {why}')
         _wait_for_a_job_to_end(seen)
     if said is not None:
         logger.info('bank_queue: bank %s stopped waiting, starting now', bank_id)
@@ -775,6 +785,8 @@ def cancel(bank_id) -> bool:
         _queue.remove(entry)
     _safely('forget the cancelled bank', _persist_remove_entry, entry)
     if was_running:
+        from . import infer_pool
+        infer_pool.shutdown('a running queued bank was cancelled')
         bank_jobs.cancel(bank_id)
         _log(bank_id, 'removed from queue (was running)', 'warn')
     else:
@@ -799,6 +811,9 @@ def clear(pending_only=False) -> int:
         _queue[:] = kept
     for entry in removed:
         _safely('forget the cleared queue entry', _persist_remove_entry, entry)
+    if running_ids:
+        from . import infer_pool
+        infer_pool.shutdown('the queue was cleared')
     for bid in running_ids:
         bank_jobs.cancel(bid)
     if n:
@@ -863,5 +878,7 @@ def reset(durable=True):
         _queue.clear()
     with _worker_lock:
         _workers.clear()
+    from . import infer_pool
+    infer_pool.shutdown('the queue was reset')
     if durable and ids:
         _safely('forget the reset queue', _persist_remove, ids)

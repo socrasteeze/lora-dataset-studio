@@ -117,6 +117,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bank_image_guard import read_validated_bank_image  # noqa: E402
 from face_score_infer import _discard_incomplete_pack  # noqa: E402
 from face_score_infer import _repair_nested_antelopev2  # noqa: E402
+from model_memo import memo  # noqa: E402
 import npz_atomic  # noqa: E402
 
 # Library banners belong on the progress channel, not the result one: a bare
@@ -419,8 +420,13 @@ def main() -> int:
                       'sess_options': onnx_session_options(ort)}
             if models_root:
                 kwargs['root'] = models_root
-            app = FaceAnalysis(**kwargs)
-            app.prepare(ctx_id=0 if used_gpu else -1, det_size=DET_SIZE)
+
+            def _load_faces():
+                analysis = FaceAnalysis(**kwargs)
+                analysis.prepare(ctx_id=0 if used_gpu else -1, det_size=DET_SIZE)
+                return analysis
+
+            app = memo(('faces', models_root, tuple(providers), DET_SIZE), _load_faces)
         except Exception as e:  # noqa: BLE001 — must exit as clean JSON, not a mute traceback
             print(json.dumps({'ok': False, 'results': {}, 'clusters': {},
                               'error': f'model load failed: {type(e).__name__}: {e}'}), file=_OUT)

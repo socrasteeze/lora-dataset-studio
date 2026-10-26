@@ -25,7 +25,6 @@ grammar (one regex each); this module owns the plumbing:
 from __future__ import annotations
 import json
 import logging
-import subprocess
 import threading
 import time
 from collections import deque
@@ -122,17 +121,17 @@ def run_infer_script(python, script, payload, timeout, on_line=None,
     """
     from ..timeout_settings import processing_timeout
     timeout = processing_timeout(timeout)
-    proc = subprocess.Popen(
+    # While the bank queue drains, WD14 reuses a resident worker with the model
+    # already loaded (infer_pool); every other script gets a plain Popen.
+    from . import infer_pool
+    proc = infer_pool.popen(
         infer_env.worker_argv(python, script),
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE, text=True, encoding='utf-8', errors='replace',
         # Both sides kept: upstream's no-user-site instruction is layered ON TOP
         # of the caller's environment rather than replacing it — `base=env` falls
         # back to os.environ when the caller passed none, so JoyCaption's HF_HOME
         # (and the peer worker's models_root) still reach the child.
         env=infer_env.worker_env(python, base=env,
-                                limit_native_threads=limit_native_threads), cwd=cwd,
-        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+                                limit_native_threads=limit_native_threads), cwd=cwd)
     lines: deque = deque(maxlen=_TAIL_LINES)
 
     def _drain():
