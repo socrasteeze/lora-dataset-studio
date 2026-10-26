@@ -466,6 +466,12 @@ DEFAULTS = {
              #   before the 'bars' flag. 0.04 ~ a thin band; it caught ~4% of the
              #   reference bank (screenshots of videos, padded stills).
              'bars_max': 0.04},
+    # Folder NAMES (any depth inside a bank, case-insensitive) whose images the
+    # bank passes never process: reference sheets, scratch work and review
+    # piles are not training material. They stay in the grid. Kept out of
+    # 'bank' because every value there is read as a numeric threshold.
+    'bank_processing': {'excluded_folder_names': [
+        'reference', 'references', 'scratch', 'review', '_review']},
     'masks': {'python': ''},
     # 🏷️ WD14 tagger (image-bank Tags pass). A ~400 MB ONNX classifier that names
     # what is IN a picture as booru tags — hair colour, clothing, setting — so a
