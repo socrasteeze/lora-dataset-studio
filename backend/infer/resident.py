@@ -41,11 +41,13 @@ END_KEY = '__resident__'
 END_ERR = '[resident] end'
 
 
-def _end(rc):
+def _end(rc, exiting=False):
+    """Close one request. ``exiting`` tells the parent this process is about to
+    end, so it must not hand it the next request."""
     sys.stderr.flush()
     _OUT.flush()
     print(f'{END_ERR} rc={rc}', file=sys.stderr, flush=True)
-    print(json.dumps({END_KEY: 'end', 'rc': rc}), file=_OUT)
+    print(json.dumps({END_KEY: 'end', 'rc': rc, 'exiting': exiting}), file=_OUT)
     _OUT.flush()
 
 
@@ -63,7 +65,7 @@ def main() -> int:
     if os.path.basename(script) not in RESIDENT_SCRIPTS:
         print(json.dumps({'ok': False, 'error': f'not a resident script: {script}'}),
               file=_OUT)
-        _end(2)
+        _end(2, exiting=True)
         return 2
     model_memo.ENABLED = True
     try:
@@ -71,7 +73,7 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001 — clean JSON, never a mute traceback
         print(json.dumps({'ok': False, 'error': f'import: {type(e).__name__}: {e}'}),
               file=_OUT)
-        _end(1)
+        _end(1, exiting=True)
         return 1
     stdin = sys.stdin
     for line in stdin:
@@ -90,7 +92,7 @@ def main() -> int:
             healthy = False
         finally:
             sys.stdin = stdin
-        _end(rc if isinstance(rc, int) else 0)
+        _end(rc if isinstance(rc, int) else 0, exiting=not healthy)
         if not healthy:
             return 1
     return 0

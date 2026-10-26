@@ -139,6 +139,7 @@ class _Stdout:
                 marker = parse_result_json(line) or {}
                 if marker.get(END_KEY) == 'end':
                     request.rc = marker.get('rc', 0)
+                    request.exiting = bool(marker.get('exiting'))
                     break
             lines.append(line)
         request.out_done.set()
@@ -171,6 +172,7 @@ class _Request:
         self.worker = worker
         self.pid = worker.proc.pid
         self.rc = None
+        self.exiting = False
         self.err_marker = False
         self.out_done = threading.Event()
         self.err_done = threading.Event()
@@ -197,7 +199,12 @@ class _Request:
         if healthy:
             healthy = self.err_done.wait(_END_GRACE) and self.err_marker
         self._finished = True
-        if healthy and self.worker.alive():
+        if healthy and self.exiting:
+            # The harness said it is ending (the script raised): report the
+            # request's own result, and never reuse the process.
+            self.returncode = self.rc
+            self.worker.kill()
+        elif healthy and self.worker.alive():
             self.returncode = self.rc
             _checkin(self.worker)
         else:
@@ -269,17 +276,21 @@ def shutdown(reason):
         logger.info('infer pool: stopped %s resident worker(s) — %s', len(workers), reason)
 
 
+def _reap(now):
+    """Stop every idle worker unused for IDLE_SECONDS at ``now``."""
+    with _lock:
+        expired = [k for k, w in _idle.items() if now - w.last_used >= IDLE_SECONDS]
+        workers = [_idle.pop(k) for k in expired]
+    for worker in workers:
+        logger.info('infer pool: stopped the idle resident %s (pid %s)',
+                    worker.script, worker.proc.pid)
+        worker.kill()
+
+
 def _reap_loop():
     while True:
         time.sleep(_REAP_POLL)
-        now = time.monotonic()
-        with _lock:
-            expired = [k for k, w in _idle.items() if now - w.last_used >= IDLE_SECONDS]
-            workers = [_idle.pop(k) for k in expired]
-        for worker in workers:
-            logger.info('infer pool: stopped the idle resident %s (pid %s)',
-                        worker.script, worker.proc.pid)
-            worker.kill()
+        _reap(time.monotonic())
 
 
 @contextmanager
