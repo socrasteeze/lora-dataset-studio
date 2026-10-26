@@ -540,10 +540,10 @@ def _assert_qwenimage21_ready(family) -> None:
             'Python environment before training.')
 
 
-def _aitoolkit_supports_automagic3() -> bool:
-    """Whether this checkout can resolve the Automagic3 optimizer.
+def _aitoolkit_supports_optimizer(name) -> bool:
+    """Whether this checkout can resolve the named Automagic optimizer.
 
-    Automagic3 is newer than the other optimizer choices and older ai-toolkit
+    Automagic3/4 are newer than the other optimizer choices and older ai-toolkit
     checkouts fail only when constructing the optimizer.  Detect the concrete
     implementation and registry entry so local preflight/launch can fail early
     with an actionable update instruction.
@@ -551,16 +551,31 @@ def _aitoolkit_supports_automagic3() -> bool:
     root = cfg.aitoolkit_path('dir')
     if not root:
         return False
-    implementation = root / 'toolkit' / 'optimizers' / 'automagic3.py'
+    implementation = root / 'toolkit' / 'optimizers' / f'{name}.py'
     registry = root / 'toolkit' / 'optimizer.py'
     if not implementation.is_file() or not registry.is_file():
         return False
     try:
         return bool(re.search(
-            r"(?:lower_type|optimizer_type)\s*==\s*['\"]automagic3['\"]",
+            rf"(?:lower_type|optimizer_type)\s*==\s*['\"]{re.escape(name)}['\"]",
             registry.read_text(encoding='utf-8', errors='ignore')))
     except OSError:
         return False
+
+
+def _aitoolkit_supports_automagic3() -> bool:
+    return _aitoolkit_supports_optimizer('automagic3')
+
+
+def _aitoolkit_supports_automagic4() -> bool:
+    return _aitoolkit_supports_optimizer('automagic4')
+
+
+def _aitoolkit_supports_fused_automagic(name) -> bool:
+    """Dispatch through the named wrappers, which tests patch."""
+    if name == 'automagic4':
+        return _aitoolkit_supports_automagic4()
+    return _aitoolkit_supports_automagic3()
 
 
 def _safe_trigger(ds) -> str:
@@ -1321,7 +1336,12 @@ _DEFAULT_TIMESTEP = {'zimage': 'sigmoid', 'krea': 'linear', 'flux': 'sigmoid',
                      # Optimizer, LR schedule and effective batch values verified against
                      # ai-toolkit get_optimizer and toolkit/scheduler.py. CAME is unsupported.
 _OPTIMIZER_CHOICES = (
-    'adamw8bit', 'adafactor', 'automagic', 'automagic2', 'automagic3', 'prodigy')
+    'adamw8bit', 'adafactor', 'automagic', 'automagic2', 'automagic3', 'automagic4',
+    'prodigy')
+# Fused Automagic: steps inside the backward pass, so ai-toolkit refuses
+# gradient accumulation above 1 for both, and both take min_lr/max_lr rails
+# (Automagic4 subclasses Automagic3; toolkit/config_modules.py).
+_FUSED_AUTOMAGIC = ('automagic3', 'automagic4')
 _LR_SCHEDULER_CHOICES = ('constant', 'linear', 'cosine', 'cosine_with_restarts', 'constant_with_warmup')
 _WARMUP_CHOICES = (50, 100, 200, 500)          # num_warmup_steps; constant_with_warmup only
 _GRAD_ACCUM_CHOICES = (1, 2, 4)
@@ -1807,7 +1827,7 @@ def _train_serializer_fields(ds) -> dict:
     if (isinstance(decay, (int, float)) and not isinstance(decay, bool)
             and 0 <= float(decay) <= 1):
         out['optimizer_params'] = {'weight_decay': float(decay)}
-    if _optimizer_eff(ds) == 'automagic3':
+    if _optimizer_eff(ds) in _FUSED_AUTOMAGIC:
         for key in ('min_lr', 'max_lr'):
             if key in s:
                 out.setdefault('optimizer_params', {})[key] = s[key]
@@ -2676,6 +2696,7 @@ def effective_train_settings(ds, family=None) -> dict:
             'optimizer': s.get('optimizer') if s.get('optimizer') in _OPTIMIZER_CHOICES else None,   # None → adamw8bit
             'optimizer_choices': list(_OPTIMIZER_CHOICES),
             'automagic3_supported': _aitoolkit_supports_automagic3(),
+            'automagic4_supported': _aitoolkit_supports_automagic4(),
             # Effective LR (absolute) this run trains at — the ▶ Continue dialog's LR
             # factor shows the resulting rate and hides the knob for Prodigy.
             'learning_rate': _lr_eff(ds),
@@ -3017,11 +3038,11 @@ def _ts_apply_optim(patch, cur):
         if v in (None, 'auto', '', 'adamw8bit'):
             cur.pop('optimizer', None)                     # default removes the key
         elif v in _OPTIMIZER_CHOICES:
-            if (v == 'automagic3'
+            if (v in _FUSED_AUTOMAGIC
                     and _numeric_choice(cur.get('grad_accum'),
                                         _GRAD_ACCUM_CHOICES) not in (None, 1)):
                 raise ValueError(
-                    'Automagic3 does not support gradient accumulation above 1; '
+                    f'{v.capitalize()} does not support gradient accumulation above 1; '
                     'set grad_accum to 1/auto or choose another optimizer')
             cur['optimizer'] = v
         else:
@@ -3047,10 +3068,11 @@ def _ts_apply_optim(patch, cur):
         if v in (None, 'auto') or (type(v) is int and v == 1):
             cur.pop('grad_accum', None)                    # one is the default; remove the key
         elif type(v) is int and v in _GRAD_ACCUM_CHOICES:
-            if v > 1 and cur.get('optimizer') == 'automagic3':
+            if v > 1 and cur.get('optimizer') in _FUSED_AUTOMAGIC:
                 raise ValueError(
-                    'Automagic3 does not support gradient accumulation above 1; '
-                    'set grad_accum to 1/auto or choose another optimizer')
+                    f"{cur['optimizer'].capitalize()} does not support gradient "
+                    'accumulation above 1; set grad_accum to 1/auto or choose '
+                    'another optimizer')
             cur['grad_accum'] = v
         else:
             raise ValueError(f'grad_accum must be one of {_GRAD_ACCUM_CHOICES} (or auto)')
@@ -4104,10 +4126,14 @@ BUILTIN_TRAIN_PRESETS = [
                        'no Klein-specific study yet), 250-step probes.',
         'settings': _character_preset_settings(16, 16, timestep_type='sigmoid'),
     },
-    # No Anima-specific study exists yet (model shipped mid-2026): extrapolated
-    # from ai-toolkit's own defaults (options.ts entry 'anima', PR #860) — rank 32
-    # (defaultLinearRank) with weighted timesteps (the entry's canonical default,
-    # NOT subject-tuned sigmoid). Drop rank to 16 manually for small clean sets.
+    # Rebuilt from the owner's fastest local ai-toolkit Anima run: rank 32/32 +
+    # Conv 16/16, 1024 only, Automagic at LR 2e-5 railed to 1e-6..2e-5, weight
+    # decay 1e-4, weighted/Balanced, RAM-cached latents, no caption dropout, the
+    # sd-scripts block-only layer targeting, a save + probe every 100 steps (4
+    # kept). Owner-chosen changes from that run: batch 2 (it ran 4), automagic4
+    # (it ran automagic3) and no person masking (it was masked). Steps are the
+    # run's own table (75/image at effective batch 1, 1500..3000) halved for
+    # batch 2: LDS does not divide preset steps by the effective batch.
     {
         'id': 'builtin-character-anima',
         'name': 'Anima · Character',
@@ -4115,10 +4141,37 @@ BUILTIN_TRAIN_PRESETS = [
         'dataset_kind': 'character',
         'variants': [],
         'builtin': True,
-        'description': "ai-toolkit's Anima defaults: rank 32/32 with weighted "
-                       'timesteps — no Anima-specific study yet, extrapolated '
-                       'from options.ts; probe every 250 steps.',
-        'settings': _character_preset_settings(32, 32, timestep_type='weighted'),
+        'description': 'Your fastest local Anima run: batch 2, Automagic4 '
+                       '(LR 2e-5, floor 1e-6), rank 32/32 + Conv 16/16, 1024, '
+                       'weighted/Balanced, no masking; 38 steps/image '
+                       '(750-1500) at batch 2, probe every 100 steps.',
+        'settings': {
+            **_character_preset_settings(32, 32, resolution='1024',
+                                         timestep_type='weighted'),
+            'save_every': 100,
+            'max_step_saves': 4,
+            'sample_every': 100,
+            'conv': 16,
+            'conv_alpha': 16,
+            'batch_size': 2,
+            'optimizer': 'automagic4',
+            'learning_rate': 2e-5,
+            'min_lr': 1e-6,
+            'max_lr': 2e-5,
+            'weight_decay': 1e-4,
+            'content_or_style': 'balanced',
+            'masked': False,
+            'caption_dropout_rate': 0.0,
+            'cache_latents': True,
+            'skip_first_sample': True,
+            'loss_sync_every': 4,
+            'ignore_if_contains': [
+                'norm1.linear', 'norm2.linear', 'norm3.linear', 'norm_out.linear',
+                'patch_embed', 'time_embed', 'proj_out'],
+            'preset_steps_per_image': 38,
+            'preset_steps_min': 750,
+            'preset_steps_max': 1500,
+        },
     },
     # --- Concept / composition (one per family) --------------------------
     # Historical ID kept stable. rank 16 / alpha 8: concept research (vault
@@ -6973,14 +7026,16 @@ _VRAM24_FAMILIES = ('krea', 'flux')   # 12B families recommending about 24 GB at
 
 
 def _pf_automagic3(ds, lane, _machine_warn, _check):
-    """Automagic3 selected but this ai-toolkit checkout lacks it (machine scope)."""
-    if (_optimizer_eff(ds) == 'automagic3'
+    """Automagic3/4 selected but this ai-toolkit checkout lacks it (machine scope)."""
+    opt = _optimizer_eff(ds)
+    if (opt in _FUSED_AUTOMAGIC
             and (lane or 'local') != 'cloud'
-            and not _aitoolkit_supports_automagic3()):
-        message = ("Automagic3 is selected, but this ai-toolkit checkout does not "
+            and not _aitoolkit_supports_fused_automagic(opt)):
+        label = opt.capitalize()
+        message = (f"{label} is selected, but this ai-toolkit checkout does not "
                    "provide it. Update ai-toolkit (git pull) or choose another optimizer.")
         _machine_warn(message)
-        _check('automagic3', 'Automagic3 available', 'fail', message,
+        _check(opt, f'{label} available', 'fail', message,
                'gf-training', bypassable=False, scope='machine')
 
 
@@ -8031,11 +8086,12 @@ def _lt_refuse_or_resolve(user_id, dataset_id, train_type, variant,
             "ai-toolkit doesn't support Anima yet (anima arch missing) - "
             "update it (git pull) before training an Anima LoRA.")
     _assert_qwenimage21_ready(launch_fam)
-    if (_optimizer_eff(launch_view) == 'automagic3'
-            and not _aitoolkit_supports_automagic3()):
+    _launch_opt = _optimizer_eff(launch_view)
+    if (_launch_opt in _FUSED_AUTOMAGIC
+            and not _aitoolkit_supports_fused_automagic(_launch_opt)):
         raise ValueError(
-            "ai-toolkit doesn't support Automagic3 yet - update it (git pull) "
-            "or choose another optimizer before training.")
+            f"ai-toolkit doesn't support {_launch_opt.capitalize()} yet - update it "
+            "(git pull) or choose another optimizer before training.")
     # Slider mode (Beta) : the modern `concept_slider` trainer is an ai-toolkit
     # EXTENSION — an older install would crash at job boot on the unknown process
     # type. Refuse early with the fix, like the krea2/flux2klein arch guards.
@@ -10288,11 +10344,12 @@ def enqueue_training(user_id, dataset_id, extra_steps=None,
             "ai-toolkit doesn't support Anima yet (anima arch missing) - "
             "update it (git pull) before queuing an Anima LoRA.")
     _assert_qwenimage21_ready(ttype)
-    if (_optimizer_eff(queue_view) == 'automagic3'
-            and not _aitoolkit_supports_automagic3()):
+    _queue_opt = _optimizer_eff(queue_view)
+    if (_queue_opt in _FUSED_AUTOMAGIC
+            and not _aitoolkit_supports_fused_automagic(_queue_opt)):
         raise ValueError(
-            "ai-toolkit doesn't support Automagic3 yet - update it (git pull) "
-            "or choose another optimizer before queuing.")
+            f"ai-toolkit doesn't support {_queue_opt.capitalize()} yet - update it "
+            "(git pull) or choose another optimizer before queuing.")
     # Reject queued jobs that would share another dataset's trigger/base/recipe run directory.
     clash = find_run_collision(user_id, dataset_id, base_model=base, variant=var)
     if clash:

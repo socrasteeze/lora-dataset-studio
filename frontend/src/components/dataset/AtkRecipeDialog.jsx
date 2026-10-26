@@ -148,7 +148,7 @@ export default function AtkRecipeDialog({ settings, optimizer, instanceId, onSav
             {NUMBERS.map(([key, label, example]) => <label key={key} className="flex min-w-0 flex-col gap-1 text-xs text-content">
               <span>{label}</span>
               <input type="text" inputMode="decimal" value={draft[key]} placeholder={`Auto (example: ${example})`}
-                disabled={((key === 'min_lr' || key === 'max_lr') && optimizer !== 'automagic3') || (key === 'learning_rate' && optimizer === 'prodigy')}
+                disabled={((key === 'min_lr' || key === 'max_lr') && optimizer !== 'automagic3' && optimizer !== 'automagic4') || (key === 'learning_rate' && optimizer === 'prodigy')}
                 onChange={(event) => change(key, event.target.value)} className={`${fieldClass()} w-full`} />
             </label>)}
             {FLAGS.map(([key, label]) => <label key={key} className="flex min-w-0 flex-col gap-1 text-xs text-content">

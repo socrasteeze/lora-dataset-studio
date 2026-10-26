@@ -672,6 +672,57 @@ def test_automagic3_grad_accum_rejection_never_leaves_invalid_candidate(client, 
             'optimizer': 'automagic3'}
 
 
+def test_automagic4_shares_the_fused_automagic_accumulation_rule(client, app):
+    ds_id = _create_ds(client)
+    r = client.post(f'/api/dataset/{ds_id}/train/presets/apply', json={
+        'settings': {'optimizer': 'automagic4', 'grad_accum': 2},
+    })
+    assert r.status_code == 200
+    body = r.get_json()
+    assert [item['key'] for item in body['rejected']] == ['grad_accum']
+    assert 'Automagic4' in body['rejected'][0]['reason']
+    with app.app_context():
+        from app.services import lora_training as lt
+        assert lt.snapshot_train_settings('local', ds_id) == {
+            'optimizer': 'automagic4'}
+
+
+def test_anima_character_preset_emits_the_owner_run_recipe(client, app, tmp_path):
+    """The built-in Anima Character preset is the owner's fastest local run,
+    with batch 2, Automagic4 and person masking off."""
+    ds_id = _create_ds(client, name='Anima', trigger='anima_char',
+                       train_type='anima', kind='character')
+    r = client.post(f'/api/dataset/{ds_id}/train/presets/apply', json={
+        'preset_id': 'builtin-character-anima', 'train_type': 'anima',
+    })
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body['ignored'] == [] and body['rejected'] == []
+    with app.app_context():
+        from app.services import face_dataset_service as svc
+        from app.services import lora_training as lt
+        ds = svc.get_dataset('local', ds_id)
+        assert lt.person_masking_enabled(ds) is False
+        proc = lt.build_job_config(
+            ds, str(tmp_path / 'anima'), steps=1102,
+            training_folder=str(tmp_path / 'runs'))['config']['process'][0]
+    train = proc['train']
+    assert train['optimizer'] == 'automagic4'
+    assert train['batch_size'] == 2 and train['gradient_accumulation'] == 1
+    assert train['lr'] == 2e-5
+    assert train['optimizer_params'] == {
+        'weight_decay': 1e-4, 'min_lr': 1e-6, 'max_lr': 2e-5}
+    assert train['timestep_type'] == 'weighted'
+    assert train['content_or_style'] == 'balanced'
+    assert proc['network']['linear'] == proc['network']['linear_alpha'] == 32
+    assert proc['network']['conv'] == proc['network']['conv_alpha'] == 16
+    assert 'proj_out' in proc['network']['network_kwargs']['ignore_if_contains']
+    assert proc['datasets'][0]['resolution'] == [1024]
+    assert proc['datasets'][0]['caption_dropout_rate'] == 0.0
+    assert proc['save']['save_every'] == proc['sample']['sample_every'] == 100
+    assert proc['save']['max_step_saves_to_keep'] == 4
+
+
 def test_automagic3_capability_preflight_and_16gb_vram_warning_survive(
         client, app, monkeypatch):
     ds_id = _create_ds(

@@ -3018,7 +3018,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   <b className="text-content-muted font-medium">Why:</b> how the weights are updated — the biggest training
                   lever after the dataset. <b className="text-content-muted font-medium">How:</b> <i>adamw8bit</i> (default)
                   is fast and VRAM-light; <i>adafactor</i> uses less memory and auto-scales; <i>automagic</i>/<i>automagic2</i>
-                  use ai-toolkit&apos;s adaptive update rule; the Krea community starter still records its reported initial
+                  use ai-toolkit&apos;s adaptive update rule; <i>automagic3</i>/<i>automagic4</i> adapt too but need gradient
+                  accumulation 1 (raise batch size instead); the Krea community starter still records its reported initial
                   LR of 1e-4. <i>prodigy</i> also auto-tunes the LR and is popular for tiny sets — but may need
                   <code className="text-content-muted">pip install prodigyopt</code> in the ai-toolkit venv. Picking an
                   adaptive optimiser is the &quot;push further without cranking the LR&quot; move.
