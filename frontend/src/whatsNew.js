@@ -85,7 +85,7 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
-    id: '2026-10-25-bank-queue-keeps-models-loaded', date: '2026-10-25',
+    id: '2026-10-25-workers-stay-loaded-in-bank-queue', date: '2026-10-25',
     title: 'A long bank queue loads each model once',
     blurb: 'While the queue works through your banks, the 🔖 Tags, ✨ Score and Faces passes keep their models loaded from one bank to the next instead of loading them again for every bank. The models are unloaded when the queue finishes, when you cancel it, and when ComfyUI or a training run needs the GPU.',
   },
