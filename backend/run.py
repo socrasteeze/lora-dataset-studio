@@ -61,6 +61,12 @@ if __name__ == '__main__':
         _profile_lease = prepare_runtime()
     except ProfileError as exc:
         print(f'[LDS] {exc}', flush=True)
+        # Usually a second launch of an app that is already open: show that one.
+        from single_instance import open_existing, running_url
+        _running = running_url()
+        if _running:
+            print(f'[LDS] Opening the running app: {_running}', flush=True)
+            open_existing(_running)
         sys.exit(0)
     atexit.register(_profile_lease.__exit__)
 
@@ -78,7 +84,8 @@ if _pil_version and _pil_mixed:
 
 from app import create_app
 from port_utils import startup_port
-from single_instance import live_instance, refusal_message, release_lock, write_lock
+from single_instance import (instance_url, lds_on_port, live_instance, open_existing,
+                             refusal_message, release_lock, write_lock)
 
 try:
     from app.config import get as cfg_get
@@ -171,10 +178,19 @@ if __name__ == '__main__':
     running = live_instance(data_dir)
     if running:
         print(refusal_message(running), flush=True)
-        if os.environ.get('LDS_OPEN_BROWSER') == '1':
-            # The double-click case: the person wanted the app on screen, and
-            # it exists already — open THAT one instead of printing at them.
-            webbrowser.open(f"http://127.0.0.1:{running['port']}/")
+        # The double-click case: the person wanted the app on screen, and it
+        # exists already — open THAT one instead of printing at them. This no
+        # longer waits for LDS_OPEN_BROWSER=1, which start.bat never sets.
+        open_existing(instance_url(running))
+        sys.exit(0)
+    # Another copy of the app (any checkout or data folder) on the requested
+    # port: sliding to the next port would put a second session on the desktop.
+    if lds_on_port(host, requested_port):
+        _url = instance_url({'host': host, 'port': requested_port})
+        print(f'[LDS] LoRA Dataset Studio is already running on {_url} — not '
+              f'starting a second copy. Set LDS_ALLOW_SECOND_INSTANCE=1 or pick '
+              f'another LDS_PORT to run two on purpose.', flush=True)
+        open_existing(_url)
         sys.exit(0)
     # Never a slide under a container's fixed publish (LDS_BIND_MANAGED).
     port = startup_port(host, requested_port)
