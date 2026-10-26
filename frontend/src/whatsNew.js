@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-25-your-fastest-anima-run-preset', date: '2026-10-25',
+    title: 'Anima characters train with your fastest recipe',
+    blurb: 'The Anima · Character preset now carries your fastest local run: batch 2, the new Automagic4 optimizer, rank 32 with Conv 16, 1024 px and no person masking, with step counts sized for batch 2. Automagic4 is also in the optimizer list for every family.',
+    to: '/datasets?section=training',
+  },
+  {
     id: '2026-10-25-workers-stay-loaded-in-bank-queue', date: '2026-10-25',
     title: 'A long bank queue loads each model once',
     blurb: 'While the queue works through your banks, the 🔖 Tags, ✨ Score and Faces passes keep their models loaded from one bank to the next instead of loading them again for every bank. The models are unloaded when the queue finishes, when you cancel it, and when ComfyUI or a training run needs the GPU.',
