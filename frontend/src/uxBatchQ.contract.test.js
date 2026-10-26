@@ -37,7 +37,7 @@ test('anchors clear the sticky app bar', () => {
 test('the Guide does not nest a second <main>, and its side menus can stick', () => {
   const guide = read('pages/GuidePage.jsx')
   assert.doesNotMatch(guide, /<main[\s>]/)
-  assert.match(guide, /<article className=/)
+  assert.match(guide, /<article\b[^>]*\bclassName=/)
   assert.match(guide, /<aside className="lg:self-stretch">/)
   assert.match(guide, /<aside className="hidden xl:block xl:self-stretch">/)
   assert.match(read('pages/SettingsPage.jsx'), /<aside className="lg:self-stretch">/)

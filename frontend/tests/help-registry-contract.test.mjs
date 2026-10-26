@@ -53,13 +53,18 @@ const anchorsFor = (chapterId) => {
 const SETTINGS_IDS = new Set(SETTINGS_SECTIONS.map((s) => s.id))
 const WORKSPACE_IDS = new Set(WORKSPACE_SECTIONS.map((s) => s.id))
 const STATIC_ROUTES = new Set(['/datasets', '/bank', '/video-bank', '/setup', '/settings', '/studio', '/cloud', '/canvas', '/gallery', '/help', '/plugins'])
+// /guide/:section opens one chapter; the ids are the Guide's own chapter ids.
+const GUIDE_CHAPTER_IDS = new Set([...read('src/pages/GuidePage.jsx')
+  .matchAll(/\{ id: '([a-z0-9-]+)', num: '/g)].map((m) => m[1]))
 
 // route ∈ {static} OR /settings/<settings-id> OR /setup?step=<setup-step-id>
-//         OR /datasets?section=<ws-id>[&panel=<panel>]
+//         OR /guide/<chapter-id> OR /datasets?section=<ws-id>[&panel=<panel>]
 const routeValid = (route) => {
   const [path, qs] = route.split('?')
   if (!qs) {
     if (STATIC_ROUTES.has(path) || pluginRoutes().some(route => route.path === path)) return true
+    const chapter = path.match(/^\/guide\/([a-z0-9-]+)$/)
+    if (chapter) return GUIDE_CHAPTER_IDS.has(chapter[1])
     const pluginSettings = path.match(/^\/plugins\/([^/]+)\/settings$/)
     if (pluginSettings) return PUBLIC_PLUGIN_IDS.includes(pluginSettings[1])
     const m = path.match(/^\/settings\/([a-z0-9-]+)$/)
@@ -245,7 +250,7 @@ test('(8) search matches settings by keyword/id', () => {
 test('(9) GuidePage registers the settings-reference chapter before troubleshooting', () => {
   const guide = read('src/pages/GuidePage.jsx')
   assert.match(guide, /import settingsReference from '[^']*settings-reference\.md\?raw'/)
-  assert.match(guide, /\{ id: 'settings-reference', num: '04',[^\n]*source: settingsReference \}/)
+  assert.match(guide, /\{ id: 'settings-reference', num: '4',[^\n]*source: settingsReference \}/)
   // The pre-existing help-navigation contract still holds: HELP_CHAPTER shape and
   // CHAPTERS excluding getting-help.
   assert.match(guide, /const HELP_CHAPTER = [^\n]*source: gettingHelp, extra: 'diagnostic'/)
