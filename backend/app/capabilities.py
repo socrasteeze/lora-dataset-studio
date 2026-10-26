@@ -1238,7 +1238,8 @@ def probe_wd14() -> dict:
     needs nothing insightface/rembg do not already pull in, so a machine that
     installed either of those is one probe away from having this too."""
     from .services import wd14_tagger
-    python = wd14_tagger.wd14_python()
+    # The interpreter the pass will really run in (a CUDA env when one exists).
+    python = wd14_tagger.run_python()
     if not _cached_import('wd14', python, CAPABILITY_IMPORTS['wd14']):
         return {'ok': False, 'detail': 'onnxruntime import failed'}
     missing = wd14_tagger.missing_model_files()
@@ -1273,6 +1274,16 @@ def probe_pixai() -> dict:
     return {'ok': True, 'detail': 'PixAI Tagger ready'}
 
 
+def _wd14_gpu_warning():
+    from .services import wd14_tagger
+    return wd14_tagger.gpu_warning()
+
+
+def _wd14_gpu_refusal():
+    from .services import wd14_tagger
+    return wd14_tagger.gpu_refusal()
+
+
 def wd14_gpu_available() -> bool:
     """True only when the tagger's interpreter can run ONNX on CUDA. Read the
     same way face_gpu_available() is, and for the same reason the bank pass
@@ -1282,11 +1293,7 @@ def wd14_gpu_available() -> bool:
     thing you want on a machine that cannot host a captioning model — so the
     common answer here is False and that is not a degraded state."""
     from .services import wd14_tagger
-    python = wd14_tagger.wd14_python()
-    return _cached_import(
-        'wd14_gpu', python,
-        "import onnxruntime,sys; "
-        "sys.exit(0 if 'CUDAExecutionProvider' in onnxruntime.get_available_providers() else 1)")
+    return _cached_import('wd14_gpu', wd14_tagger.run_python(), wd14_tagger.GPU_IMPORT)
 def probe_bank_siglip2() -> dict:
     """Optional Bank semantic engine: packages AND the pinned local checkpoint.
 
@@ -2872,6 +2879,10 @@ def _probe_uncached():
         # different places — a bare bool would send half of them to the wrong one.
         'wd14': wd14['ok'],
         'wd14_detail': wd14['detail'],
+        # Said up front instead of a per-bank log line: GPU-only with no CUDA
+        # interpreter anywhere (blocks the pass), or Auto falling back to CPU.
+        'wd14_gpu_warning': _wd14_gpu_warning() if wd14['ok'] else None,
+        'wd14_gpu_refusal': _wd14_gpu_refusal() if wd14['ok'] else None,
         'pixai': pixai['ok'],
         'pixai_detail': pixai['detail'],
         # Optional, user-selected semantic alternative. It is deliberately not

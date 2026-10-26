@@ -53,8 +53,18 @@ _CAT_CHARACTER = 4
 
 # Images per forward pass. The model's batch axis is dynamic, and batching is
 # most of the speed on CPU; 8 keeps peak memory modest (8 x 448 x 448 x 3 x 4 B
-# ~ 19 MB of input) on the small machines this pass exists to serve.
+# ~ 19 MB of input) on the small machines this pass exists to serve. On CUDA
+# (RTX 5090, onnxruntime-gpu 1.30) batches of 8, 16 and 32 measured the same
+# 60-70 images/s end to end and 64 was half that, since every new batch shape
+# pays a cuDNN tuning step; 16 is the default. The payload's "batch" overrides
+# either (benchmarks, small cards).
 _BATCH = 8
+_BATCH_GPU = 16
+_BATCH_MAX = 128
+
+# Decode + pad + resize run on a small thread pool, one batch ahead of the
+# model. cv2 releases the GIL in imdecode/resize, so the threads overlap.
+_LOAD_WORKERS = max(2, min(8, (os.cpu_count() or 4) // 2))
 
 _DOWNLOAD_TIMEOUT = 120
 
@@ -180,6 +190,44 @@ def _read_image(path):
     return cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_UNCHANGED)
 
 
+def _load(path, size):
+    """(path, tensor, None) or (path, None, reason). Never raises: one bad file
+    must not kill the pass."""
+    try:
+        img = _read_image(path)
+        if img is None:
+            raise ValueError('unreadable')
+        return path, preprocess(img, size), None
+    except Exception as e:  # noqa: BLE001
+        return path, None, str(e)
+
+
+def _loaded_batches(images, size, batch, workers=_LOAD_WORKERS):
+    """Yield one list of _load results per batch, decoding the NEXT batch on
+    the pool while the caller runs the model on this one."""
+    from concurrent.futures import ThreadPoolExecutor
+    chunks = [images[i:i + batch] for i in range(0, len(images), batch)]
+    if not chunks:
+        return
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        ahead = [pool.submit(_load, p, size) for p in chunks[0]]
+        for k in range(len(chunks)):
+            current = ahead
+            ahead = ([pool.submit(_load, p, size) for p in chunks[k + 1]]
+                     if k + 1 < len(chunks) else [])
+            yield [f.result() for f in current]
+
+
+def _batch_size(requested, provider):
+    try:
+        value = int(requested)
+    except (TypeError, ValueError):
+        value = 0
+    if value > 0:
+        return min(value, _BATCH_MAX)
+    return _BATCH_GPU if provider == 'CUDAExecutionProvider' else _BATCH
+
+
 def main() -> int:
     try:
         payload = json.loads(sys.stdin.read())
@@ -188,6 +236,7 @@ def main() -> int:
         models_dir = payload.get('models_dir') or ''
         model_files = payload.get('model_files') or {}
         device = str(payload.get('device') or 'auto').lower()
+        requested_batch = payload.get('batch')
     except Exception as e:  # noqa: BLE001 — must exit as clean JSON, never a mute traceback
         print(json.dumps({"ok": False, "error": f"payload: {e}"}), file=_OUT)
         return 1
@@ -242,26 +291,28 @@ def main() -> int:
         print(json.dumps({"ok": False, "error": f"model load failed: {type(e).__name__}: {e}"}),
               file=_OUT)
         return 1
-    _log(f'[wd14] provider={session.get_providers()[0]} input={size}x{size} tags={len(names)}')
+    provider = session.get_providers()[0]
+    batch_size = _batch_size(requested_batch, provider)
+    _log(f'[wd14] provider={provider} input={size}x{size} tags={len(names)} '
+         f'batch={batch_size}')
 
+    cats_arr = np.asarray(cats)
+    rating_idx = np.nonzero(cats_arr == _CAT_RATING)[0].tolist()
+    taggable = np.isin(cats_arr, (_CAT_GENERAL, _CAT_CHARACTER))
     results, ratings, errors = {}, {}, {}
     total = len(images)
     _phase('tagging')
     done = 0
-    for start in range(0, total, _BATCH):
-        chunk = images[start:start + _BATCH]
+    for loaded in _loaded_batches(images, size, batch_size):
         batch, kept = [], []
-        for p in chunk:
-            try:
-                img = _read_image(p)
-                if img is None:
-                    raise ValueError('unreadable')
-                batch.append(preprocess(img, size))
+        for p, tensor, err in loaded:
+            if err is None:
+                batch.append(tensor)
                 kept.append(p)
-            except Exception as e:  # noqa: BLE001 — one bad file must not kill the pass
-                errors[p] = str(e)
+            else:
+                errors[p] = err
                 done += 1
-                _log(f'[wd14] {done}/{total} ERROR {e}')
+                _log(f'[wd14] {done}/{total} ERROR {err}')
         if not batch:
             continue
         try:
@@ -273,18 +324,15 @@ def main() -> int:
                 _log(f'[wd14] {done}/{total} ERROR {e}')
             continue
         for p, row in zip(kept, probs):
-            general, rate = {}, {}
-            for i, score in enumerate(row):
-                if i >= len(names):
-                    break
-                s = float(score)
-                if cats[i] == _CAT_RATING:
-                    # Ratings are reported IN FULL, never thresholded: they are
-                    # four mutually-exclusive alternatives, so "none passed the
-                    # cut" is not a meaningful answer — the argmax always is.
-                    rate[names[i]] = round(s, 4)
-                elif s >= threshold and cats[i] in (_CAT_GENERAL, _CAT_CHARACTER):
-                    general[names[i]] = round(s, 4)
+            row = row[:len(names)]
+            # Ratings are reported IN FULL, never thresholded: they are four
+            # mutually-exclusive alternatives, so "none passed the cut" is not
+            # a meaningful answer — the argmax always is. Vectorised: a Python
+            # loop over ~10 000 scores per image cost more than the GPU did.
+            rate = {names[i]: round(float(row[i]), 4) for i in rating_idx
+                    if i < len(row)}
+            hits = np.nonzero(taggable[:len(row)] & (row >= threshold))[0]
+            general = {names[i]: round(float(row[i]), 4) for i in hits}
             results[p] = general
             ratings[p] = rate
             done += 1
