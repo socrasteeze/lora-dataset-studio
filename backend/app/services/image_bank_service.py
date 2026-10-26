@@ -83,6 +83,7 @@ from .face_dataset_service import (_dhash,
 from .image_quality import ANALYSIS_MAX_SIDE, quality_metrics
 from .image_provenance import ORIGINS, provenance_metrics
 from . import infer_env
+from .bank_shared_results import shared_pass
 
 logger = logging.getLogger(__name__)
 
@@ -1461,6 +1462,12 @@ def relocate_preview(user_id, bank_id, folder) -> dict:
     if bank is None:
         raise ValueError('bank not found')
     target = _relocate_target(folder)
+    # One folder, one bank — the same rule create_bank and the split follow.
+    # Moving a bank onto a folder that already IS another bank made the pair.
+    other = bank_for_source(user_id, target, root_only=bool(bank.root_only))
+    if other is not None and other.id != bank.id:
+        raise ValueError(f'that folder is already the bank "{other.name}" — open '
+                         'that bank instead of pointing a second one at it')
     known = {}
     for (rel,) in db.session.query(BankImage.relpath).filter_by(bank_id=bank_id):
         known.setdefault(os.path.normcase(rel), rel)
@@ -4841,6 +4848,7 @@ def _folder_holds_scanned_images(bank, bank_id) -> bool:
     return bool(sample) and found * 2 > len(sample)
 
 
+@shared_pass('scan')
 def _scan_job(bank_id, rescan, regroup=False, statuses=None, ids=None):
     def run(job):
         bank = db.session.get(ImageBank, bank_id)
@@ -8505,6 +8513,7 @@ def _asserted_image_count(bank_id) -> int:
                     BankImage.face_cluster_origin == 'asserted').count())
 
 
+@shared_pass('faces')
 def _faces_job(bank_id, device_id=None, angles_only=False, statuses=None, ids=None):
     def run(job):
         import json as _json
@@ -9267,6 +9276,7 @@ def _write_style_clusters(by_path, clusters, results):
     return True
 
 
+@shared_pass('score')
 def _score_job(bank_id, device_id=None, rescore=False):
     def run(job):
         import json as _json
@@ -9693,6 +9703,7 @@ def start_watermark(app, user_id, bank_id, rescan=False, device_id=None,
                            device_label=_device_label(device_id), device_id=device_id)
 
 
+@shared_pass('watermark')
 def _watermark_job(bank_id, rescan, device_id=None, use_detector=False,
                    statuses=None, ids=None, note='', limit=None):
     if use_detector:
@@ -12114,6 +12125,7 @@ def start_framing(app, user_id, bank_id, rescan=False, device_id=None,
 _FENCE_STREAK_WARN = 5
 
 
+@shared_pass('framing')
 def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None, *,
                  auto_crop=False, min_crop_confidence=None):
     def run(job):
@@ -12464,6 +12476,7 @@ def start_tags(app, user_id, bank_id, rescan=False, threshold=None):
                            total=q.count())
 
 
+@shared_pass('tags')
 def _tags_job(bank_id, rescan, threshold=None):
     def run(job):
         import contextlib
@@ -12652,6 +12665,7 @@ def _medium_prototype_matrix():
     return names, np.stack(rows).astype('float32')
 
 
+@shared_pass('medium')
 def _medium_job(bank_id, rescan, statuses=None, ids=None):
     def run(job):
         import numpy as np
@@ -13162,6 +13176,7 @@ def _caption_writers_note(wrote, unrecorded=0):
     return f' ({", ".join(parts)})' if parts else ''
 
 
+@shared_pass('caption')
 def _caption_job(bank_id, ids, force, vocabulary=None, length=None, device_id=None,
                  *, backend=None, ollama_model=None, statuses=None,
                  keep_asserted=False):
