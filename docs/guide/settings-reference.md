@@ -992,6 +992,8 @@ Defaults for new local runs. This fork has no cloud-training plugin.
 
 - **Default training family** → `training.default_family`. The model family preselected when you start a new run. One of `zimage`, `sdxl`, `krea`, `flux`, `flux2klein`, `anima`. Default **`zimage`**. Purely a starting point — you can switch family per run. `anima` trains the open [Anima](https://huggingface.co/circlestone-labs/Anima-Base-v1.0-Diffusers) anime model on its public base (no gated download). It is local-only and needs an up-to-date ai-toolkit + diffusers. **Anima is the one family with hybrid prompting:** booru tags *and* natural language are both first-class on it, so the caption-style guard says nothing there — booru is merely the preselected default, and a prose-captioned Anima dataset trains without being flagged or forced. Every other family keeps its single expected form (SDXL = booru tags, the rest = prose).
 
+- **Starting preset for new datasets** → `training.starting_presets`. For the selected training family, one preset per dataset type (Character, Concept, Style). A new dataset, or one switched to that family before it has saved settings, starts on that preset; settings a dataset already has are never replaced. Default: none for every family (app defaults). To change the values, tune a dataset in Advanced options, save it as a preset, and pick it here.
+
 This fork's Settings → Training keeps **Defaults** and **Train on another machine**. There is no rental-GPU card (no key field, no cost/budget knobs). A dataset that already has a cloud run in its history can still show the local checkpoint files. Nothing in this install resumes, continues or retries that run on a rented GPU. See **Cloud training (vast.ai)** under [Config-file-only settings](#config-file-only-settings).
 
 ### Speed: what a step costs, and what it costs you to make it cheaper
@@ -1689,6 +1691,7 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `krea.base_model` | Krea 2 Edit base model file. Blank = auto-resolve a Turbo then Raw build. |
 | `krea.identity_lora` | Krea 2 Edit identity LoRA, relative to `models/loras`. |
 | `captioning.backend` | Caption backend: `auto` (prefer JoyCaption, fall back to Ollama), `joycaption`, `ollama`, or `none`. |
+| `training.starting_presets` | Preset id a new dataset starts on, per family and dataset type: `{family: {character|concept|style: preset id}}`. Empty means app defaults. |
 | `training.default_family` | Default model family preselected for new training runs (`zimage`, `sdxl`, `krea`, `flux`, `flux2klein`, or `anima`). |
 | `cloud.max_concurrent_runs` | Unused on this fork. A stored value does not rent a GPU. |
 | `cloud.max_price_per_hour` | Unused on this fork. A stored value does not rent a GPU. |

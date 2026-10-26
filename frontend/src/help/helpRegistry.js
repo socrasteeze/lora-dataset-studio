@@ -2195,6 +2195,8 @@ const TOPICS = [
   // training
   setting('training.default_family', 'training', 'training-default-family', 'Default training family',
     ['training', 'family', 'default', 'zimage', 'sdxl', 'krea', 'flux']),
+  setting('training.starting_presets', 'training', 'training-starting-presets', 'Starting preset for new datasets',
+    ['training', 'defaults', 'preset', 'starting', 'new dataset', 'anima', 'batch', 'optimizer', 'recipe']),
   // Two settings, one feature: the address turns the "Train on" picker on, the
   // token is only needed if that ai-toolkit asks for one. Separate topics
   // because they fail differently — a wrong address means "did not answer", a

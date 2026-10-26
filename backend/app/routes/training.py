@@ -6,6 +6,7 @@ No login - single local user (`cfg.LOCAL_USER`). Every route except
 (409 with a UI hint): `/train/status` must stay pollable even when
 ai-toolkit isn't configured, so it degrades to `{'available': False}` instead.
 """
+import logging
 import os
 from ..extensions import db
 import re
@@ -30,6 +31,7 @@ from ..utils.comfyui import get_zimage_models, get_checkpoint_models, get_krea_m
 from ._common import _map_error
 
 bp = Blueprint('training', __name__, url_prefix='/api')
+logger = logging.getLogger(__name__)
 
 
 class _CloseCallbackFile:
@@ -1308,6 +1310,55 @@ def _builtin_preset_by_id(preset_id, train_type):
 
 def _dataset_kind(ds):
     return (getattr(ds, 'kind', None) or 'character').strip().lower()
+
+
+def apply_starting_preset(user_id, dataset_id):
+    """Seed a dataset that has no saved training settings with the preset
+    Settings ▸ Training names for its family and kind
+    (``training.starting_presets``). Never overwrites saved settings and never
+    raises: a missing or out-of-scope preset leaves the app defaults in place.
+    Returns the applied preset id, or None."""
+    import json
+    from ..extensions import db
+    from ..models import TrainingPreset
+    try:
+        ds = svc.get_dataset(user_id, dataset_id)
+        if ds is None or any(k in lt._train_settings(ds) for k in lt.TRAIN_SETTING_KEYS):
+            return None
+        family = ds.train_type or 'zimage'
+        kind = _dataset_kind(ds)
+        table = cfg.get('training.starting_presets') or {}
+        preset_id = ((table.get(family) or {}) if isinstance(table, dict) else {}).get(kind)
+        if not preset_id:
+            return None
+        preset = _builtin_preset_by_id(preset_id, family) if isinstance(preset_id, str) else None
+        if preset is None:
+            try:
+                row = db.session.get(TrainingPreset, int(preset_id))
+            except (TypeError, ValueError):
+                row = None
+            if row is None:
+                logger.warning('starting preset %r for %s/%s not found', preset_id, family, kind)
+                return None
+            preset = {'id': row.id, 'train_type': row.train_type, 'dataset_kind': row.dataset_kind,
+                      'variants': json.loads(row.variants or '[]'),
+                      'settings': json.loads(row.settings or '{}')}
+        if (preset.get('train_type') or family) != family or \
+                (preset.get('dataset_kind') or kind) != kind:
+            logger.warning('starting preset %r does not fit %s/%s', preset_id, family, kind)
+            return None
+        lt.apply_train_settings_dict(user_id, dataset_id, dict(preset.get('settings') or {}),
+                                     preset_scope={
+                                         'preset_id': preset['id'], 'train_type': family,
+                                         'dataset_kind': kind,
+                                         'variants': preset.get('variants') or [],
+                                         'selected_variant': (ds.train_variant
+                                                              or lt._default_variant_for(family))})
+        return preset['id']
+    except Exception:  # noqa: BLE001 - a starting preset is a convenience, never a blocker
+        logger.warning('could not apply the starting preset to dataset %s', dataset_id,
+                       exc_info=True)
+        return None
 
 
 def _normalise_preset_kind(value):
