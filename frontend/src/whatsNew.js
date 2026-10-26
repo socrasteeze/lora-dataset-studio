@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-26-yes-starting-presets-per-family', date: '2026-10-26',
+    title: 'Pick the settings new datasets start with',
+    blurb: 'Settings ▸ Training ▸ Defaults now has a starting preset for each dataset type of the selected family. New datasets, and datasets switched to that family before they have saved settings, start on it. Settings a dataset already has are never replaced.',
+    to: '/settings/training',
+  },
+  {
     id: '2026-10-26-wider-promote-dialog', date: '2026-10-26',
     title: 'A roomier Promote dialog',
     blurb: 'Promote the selection is wider, its three destinations sit on one row with plain labels, and the new-dataset fields pair up side by side, so the form fits in far fewer lines. On a phone the choices still stack.',
