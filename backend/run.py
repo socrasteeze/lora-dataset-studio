@@ -187,9 +187,11 @@ if __name__ == '__main__':
     # port: sliding to the next port would put a second session on the desktop.
     if lds_on_port(host, requested_port):
         _url = instance_url({'host': host, 'port': requested_port})
+        # prepare_runtime() has already dropped LDS_ALLOW_SECOND_INSTANCE, so a
+        # different LDS_PORT is the way to run a second copy on purpose.
         print(f'[LDS] LoRA Dataset Studio is already running on {_url} — not '
-              f'starting a second copy. Set LDS_ALLOW_SECOND_INSTANCE=1 or pick '
-              f'another LDS_PORT to run two on purpose.', flush=True)
+              f'starting a second copy. Set another LDS_PORT to run two on '
+              f'purpose.', flush=True)
         open_existing(_url)
         sys.exit(0)
     # Never a slide under a container's fixed publish (LDS_BIND_MANAGED).
