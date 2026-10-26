@@ -94,3 +94,18 @@ test('install state: an unknown python probe must never hide the button', () => 
   assert.equal(wd14InstallState({ capable: false }).canInstall, true);
   assert.equal(wd14InstallState({ capable: false, python: {} }).canInstall, true);
 });
+
+test('GPU-only with no CUDA Python blocks the button with the reason, before a click', () => {
+  const reason = 'GPU tagging is selected, but no Python on this machine has a CUDA onnxruntime';
+  const s = tagsButtonState({ capable: true, scanned: 40, gpuRefusal: reason });
+  assert.equal(s.disabled, true);
+  assert.equal(s.blocked, true);
+  assert.equal(s.reason, reason);
+  assert.equal(s.setupRoute, '#/settings?section=captioning');
+});
+
+test('Auto falling back to the CPU still runs, and the title says so', () => {
+  const s = tagsButtonState({ capable: true, scanned: 40, gpuWarning: 'tagging runs on the CPU' });
+  assert.equal(s.disabled, false);
+  assert.match(s.title, /runs on the CPU/);
+});

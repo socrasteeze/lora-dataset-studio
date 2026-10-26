@@ -1944,6 +1944,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     capable: caps.wd14, detail: caps.wd14_detail, capsLoading,
     busyKind: live ? payload?.activity?.kind : null,
     scanned: counts?.scanned || 0,
+    gpuRefusal: caps.wd14_gpu_refusal, gpuWarning: caps.wd14_gpu_warning,
   })
   const grouped = useMemo(() => groupTags(tagFacets?.tags), [tagFacets])
   const tagFiltersShown = showTagFilters({ tagged: taggedCount, activeTags: filter.wd14Tags })

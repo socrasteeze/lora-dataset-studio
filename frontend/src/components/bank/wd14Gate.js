@@ -17,6 +17,7 @@ const RUN_TITLE = 'Labels what is in each picture (hair colour, clothing, settin
   + 'bank can be filtered by it. Runs locally and never writes captions.';
 const EMPTY_TITLE = 'Scan the bank first — there is nothing to tag yet';
 const SETUP_ROUTE = '#/setup?step=quality';
+const DEVICE_ROUTE = '#/settings?section=captioning';
 
 const notInstalled = (detail) => 'Image tagging is not installed — Setup ▸ Quality tools'
   + (detail ? ` (${detail})` : ' (installs the WD14 tagger, ~400 MB)');
@@ -28,9 +29,12 @@ const notInstalled = (detail) => 'Image tagging is not installed — Setup ▸ Q
  *  @param capsLoading  capabilities still in flight
  *  @param busyKind     the kind of job already running on this bank, or null
  *  @param scanned      how many images the bank has inventoried
+ *  @param gpuRefusal   caps.wd14_gpu_refusal — GPU only, and no CUDA Python
+ *  @param gpuWarning   caps.wd14_gpu_warning — Auto will fall back to the CPU
  */
 export function tagsButtonState({ capable = true, detail = '', capsLoading = false,
-                                  busyKind = null, scanned = 0 } = {}) {
+                                  busyKind = null, scanned = 0,
+                                  gpuRefusal = null, gpuWarning = null } = {}) {
   if (busyKind) {
     const title = `A ${busyKind} pass is already running on this bank`;
     return { disabled: true, title, blocked: false, reason: null, setupRoute: null };
@@ -39,11 +43,18 @@ export function tagsButtonState({ capable = true, detail = '', capsLoading = fal
     const reason = notInstalled(detail);
     return { disabled: true, title: reason, blocked: true, reason, setupRoute: SETUP_ROUTE };
   }
+  // Said on the button, before a click: the pass used to be skipped bank by
+  // bank with the reason only in a log line.
+  if (!capsLoading && gpuRefusal) {
+    return { disabled: true, title: gpuRefusal, blocked: true,
+             reason: gpuRefusal, setupRoute: DEVICE_ROUTE };
+  }
   if (!Number(scanned)) {
     return { disabled: true, title: EMPTY_TITLE, blocked: false,
              reason: null, setupRoute: null };
   }
-  return { disabled: false, title: RUN_TITLE, blocked: false,
+  const title = gpuWarning ? `${RUN_TITLE} ${gpuWarning}` : RUN_TITLE;
+  return { disabled: false, title, blocked: false,
            reason: null, setupRoute: null };
 }
 
