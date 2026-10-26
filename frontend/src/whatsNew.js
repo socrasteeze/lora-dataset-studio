@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-26-wider-promote-dialog', date: '2026-10-26',
+    title: 'A roomier Promote dialog',
+    blurb: 'Promote the selection is wider, its three destinations sit on one row with plain labels, and the new-dataset fields pair up side by side, so the form fits in far fewer lines. On a phone the choices still stack.',
+  },
+  {
     id: '2026-10-26-readable-control-states', date: '2026-10-26',
     title: 'Clearer Control States',
     blurb: 'Small secondary text has higher contrast. Primary buttons show hover and pressed states without changing size.',
