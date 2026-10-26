@@ -90,6 +90,17 @@ export const WHATS_NEW = [
     blurb: 'When the tagger\'s Python has no CUDA build, the 🔖 Tags pass now uses another ML environment on this machine that has one. If no environment can use the GPU, Settings ▸ Captioning and the Tags button say so before you start.',
   },
   {
+    id: '2026-10-25-bank-shared-results', date: '2026-10-25',
+    title: 'Nested banks no longer process the same picture twice',
+    blurb: 'A character bank and its outfit banks now share each picture\'s scan, score, faces, tags, framing, medium, caption and watermark results. A pass computes only what no other bank has yet, and every bank that holds the picture shows the result. Each bank keeps its own keep/reject decisions and groups, and adding a folder that is already a bank opens that bank.',
+  },
+  {
+    id: '2026-10-25-bank-skip-folders', date: '2026-10-25',
+    title: 'The Bank skips reference, scratch and review folders',
+    blurb: 'Bank passes no longer spend time on images in folders named reference, references, scratch, review or _review. They stay in the grid. Change the list in Settings ▸ Captioning ▸ Folders the Bank skips.',
+    to: '/settings/captioning',
+  },
+  {
     id: '2026-10-25-external-folder-recaption', date: '2026-10-25',
     title: 'Caption a folder you built outside LDS',
     blurb: 'Datasets ▸ Caption folder writes Anima character booru tags (your trigger, then 1girl, solo, …) for a folder of images LDS did not build. Captions go only to a separate output folder; the images are never copied, moved or captioned in place. Name the signature traits to keep out of the captions, or leave the field empty and the suggested list is applied and shown. Each tag appears once per line, and a summary file named after the output folder holds your trigger with the shared traits, ready to use as a default prompt.',
