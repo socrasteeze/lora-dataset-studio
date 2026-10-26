@@ -2433,7 +2433,7 @@ const TOPICS = [
     tip: { trigger: 'training-speed-advanced',
       text: 'New: Advanced options → Speed. Batch size, the quantisation backend, gradient checkpointing and compile were fixed at the values that fit 24 GB — on a bigger card you can trade that memory back for time.' } },
   { id: 'training.atk_recipe', kind: 'setting', title: 'ATK Recipe',
-    keywords: ['automagic3', 'minimum lr', 'maximum lr', 'learning rate', 'weight decay',
+    keywords: ['automagic3', 'automagic4', 'minimum lr', 'maximum lr', 'learning rate', 'weight decay',
       'layer exclusions', 'caption dropout', 'ram cache', 'text encoder', 'unload',
       'conv rank', 'preview seed', 'negative prompt', 'trigger', 'anima'],
     guide: { chapter: 'settings-reference', anchor: 'atk-recipe' },
