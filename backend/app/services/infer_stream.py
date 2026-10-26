@@ -25,6 +25,7 @@ grammar (one regex each); this module owns the plumbing:
 from __future__ import annotations
 import json
 import logging
+import subprocess  # noqa: F401 — the launch seam tests patch (infer_pool shares the module)
 import threading
 import time
 from collections import deque
