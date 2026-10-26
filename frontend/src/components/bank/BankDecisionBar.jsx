@@ -60,7 +60,7 @@ export default function BankDecisionBar({
   const count = selected?.size || 0
   if (count === 0 && !undoOffer) return null
   return (
-    <div className="sticky bottom-0 z-30 -mx-3 sm:-mx-4 border-t border-border bg-surface-overlay/95 px-3 sm:px-4 py-2 shadow-[0_-4px_12px_-6px_rgb(0_0_0/0.4)] backdrop-blur-sm pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+    <div className="sticky bottom-0 z-30 -mx-3 sm:-mx-4 border-t border-border bg-surface-overlay px-3 sm:px-4 py-2 shadow-[0_-4px_12px_-6px_rgb(0_0_0/0.4)] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
       {count > 0 ? (
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5">

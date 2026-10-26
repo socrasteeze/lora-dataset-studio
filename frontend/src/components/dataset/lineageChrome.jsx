@@ -19,7 +19,7 @@ export function StatusDot({ status }) {
   const tone = STATUS_TONE[status] || (status ? 'bg-sky-400' : 'bg-content-subtle');
   return (
     <span aria-hidden title={status || 'no recorded status'}
-      className={`h-2 w-2 shrink-0 rounded-full ${tone} ${status === 'done' ? 'shadow-[0_0_6px] shadow-emerald-400/50' : ''}`} />
+      className={`h-2 w-2 shrink-0 rounded-full ${tone}`} />
   );
 }
 

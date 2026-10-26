@@ -63,10 +63,10 @@ export function useToast() {
 // ── Renderer ──
 
 const TYPE_STYLES = {
-  info: 'border-blue-500/50 bg-blue-500/10 text-blue-300',
-  success: 'border-green-500/50 bg-green-500/10 text-green-300',
-  error: 'border-red-500/50 bg-red-500/10 text-red-300',
-  warning: 'border-yellow-500/50 bg-yellow-500/10 text-yellow-300',
+  info: 'border-blue-500/50 bg-surface-overlay text-blue-300',
+  success: 'border-green-500/50 bg-surface-overlay text-green-300',
+  error: 'border-red-500/50 bg-surface-overlay text-red-300',
+  warning: 'border-yellow-500/50 bg-surface-overlay text-yellow-300',
 }
 
 const ICONS = {
@@ -102,7 +102,7 @@ function ToastContainer({ toasts, onRemove }) {
           aria-live={t.type === 'error' ? 'assertive' : 'polite'}
           aria-atomic="true"
           title={toastLabel(t)}
-          className={`flex items-start gap-2 border rounded-lg px-4 py-3 shadow-lg backdrop-blur-sm animate-slideIn ${
+          className={`flex items-start gap-2 border rounded-lg px-4 py-3 shadow-lg animate-slideIn ${
             TYPE_STYLES[t.type] || TYPE_STYLES.info
           }`}
         >

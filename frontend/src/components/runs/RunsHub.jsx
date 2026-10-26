@@ -19,7 +19,7 @@ import { isFullTransformerRun } from '../../utils/trainingMode.js'
 // while leaving the call sites diffable against upstream.
 const denseContinueBlocker = () => null
 import { runStagingCleanup } from '../../utils/stagingCleanup.js'
-import { StatusBadge, timeAgo, famLabel, cardAccent, RunThumb, PodKeptNote, FullArtifactStatus, AutoRetryBadges, RecipeWarning, settingsLine, checkpointHref } from './RunHistoryAtoms.jsx'
+import { StatusBadge, timeAgo, famLabel, RunThumb, PodKeptNote, FullArtifactStatus, AutoRetryBadges, RecipeWarning, settingsLine, checkpointHref } from './RunHistoryAtoms.jsx'
 import useRunsHubContinue from './useRunsHubContinue.js'
 import { studioRunTarget } from '../../utils/studioRunNavigation.js'
 import { controlHeight } from '../common/controls.js'
@@ -296,7 +296,7 @@ const renderRunCard = (run, i) => {
     const cleanup = runStagingCleanup(run, stagingSizes);
     return (
       <div key={key} id={ident ? runRowDomId(ident.source, ident.id) : undefined}
-        className={`flex gap-2.5 sm:gap-3 rounded-lg border border-border border-l-2 bg-app/40 p-2.5 ${cardAccent(run.status)}`}>
+        className={`flex gap-2.5 sm:gap-3 rounded-lg border border-border bg-app/40 p-2.5`}>
         <RunThumb run={run} broken={!!brokenThumbs[thumbKey]}
           onBroken={() => setBrokenThumbs((m) => ({ ...m, [thumbKey]: true }))} />
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">

@@ -133,10 +133,7 @@ function PeerWorkingChip({ activity }) {
   return (
     <span role="status" title={title} aria-label={title}
       className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-2xs font-medium text-emerald-200">
-      <span aria-hidden className="relative inline-flex h-2 w-2">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/70" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-      </span>
+      <span aria-hidden className="inline-flex h-2 w-2 rounded-full bg-emerald-400" />
       <span aria-hidden>🖥</span>
       <span className="hidden sm:inline">{label}</span>
     </span>
@@ -238,10 +235,7 @@ function NavBar() {
               /* Presence IS the message, so it must not be colour-only: the
                  label is read out and shown on hover/long-press. */
               <span title={activityTitle} aria-label={activityTitle} role="status"
-                className="relative inline-flex h-2 w-2 shrink-0">
-                <span aria-hidden className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/70" />
-                <span aria-hidden className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-              </span>
+                className="inline-flex h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
             )}
           </span>
         </NavLink>
@@ -288,10 +282,10 @@ function NavBar() {
     </>
   )
   return (
-    <header ref={headerRef} className="app-header border-b border-border bg-surface-overlay/90 backdrop-blur-sm sticky top-0 z-40">
+    <header ref={headerRef} className="app-header border-b border-border bg-surface-overlay sticky top-0 z-40">
       <div className="app-header-shell mx-auto flex max-w-5xl items-center gap-3 px-4 py-3 sm:gap-6">
         <NavLink to="/datasets" title="Back to the datasets page" onClick={goHome}
-          className="flex min-w-0 max-w-48 flex-col items-start gap-0.5 whitespace-nowrap bg-gradient-primary bg-clip-text text-base font-bold text-transparent no-underline">
+          className="flex min-w-0 max-w-48 flex-col items-start gap-0.5 whitespace-nowrap text-base font-bold text-primary no-underline">
           <span className="max-w-full truncate">LoRA Dataset Studio</span>
           <InstanceProfile />
         </NavLink>

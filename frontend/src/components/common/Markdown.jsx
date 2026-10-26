@@ -179,8 +179,8 @@ function renderBlock(b, idx, guide = false) {
                   }
                   if (guide && b.ordered) {
                     return (
-                      <li key={ii} className="flex gap-3 rounded-lg border border-border bg-app px-3 py-3 leading-relaxed">
-                        <span aria-hidden className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-indigo-500/15 font-mono text-2xs font-bold text-indigo-300">{String(ii + 1).padStart(2, '0')}</span>
+                      <li key={ii} className="flex gap-3 leading-relaxed">
+                        <span aria-hidden className="w-5 shrink-0 text-right font-semibold tabular-nums text-content-subtle">{ii + 1}.</span>
                         <span>{renderInline(it, `${key}i${ii}`)}</span>
                       </li>
                     );
@@ -211,7 +211,7 @@ export default function Markdown({ source, variant = 'default', sectionActions =
     return (
       <div className="flex max-w-none flex-col gap-4">
         {intro.length > 0 && (
-          <div className="flex flex-col gap-3 rounded-xl border border-indigo-400/20 bg-gradient-to-br from-indigo-500/10 via-surface to-surface px-4 py-4 sm:px-5">
+          <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface px-4 py-4 sm:px-5">
             {intro.map(({ block, index }) => renderBlock(block, index, true))}
           </div>
         )}

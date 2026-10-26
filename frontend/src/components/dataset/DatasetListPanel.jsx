@@ -138,12 +138,12 @@ function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBacku
             </span>
           )}
           {d.kind === 'concept' && (
-            <span className="absolute left-1.5 top-1.5 rounded border border-fuchsia-400/40 bg-black/50 px-1.5 py-px text-2xs font-semibold uppercase text-fuchsia-300 backdrop-blur-sm inline-flex items-center gap-1">
+            <span className="absolute left-1.5 top-1.5 rounded border border-fuchsia-400/40 bg-black/75 px-1.5 py-px text-2xs font-semibold uppercase text-fuchsia-300 inline-flex items-center gap-1">
               <Lightbulb aria-hidden="true" className="h-2.5 w-2.5" /> Concept
             </span>
           )}
           {d.kind === 'style' && (
-            <span className="absolute left-1.5 top-1.5 rounded border border-cyan-400/40 bg-black/50 px-1.5 py-px text-2xs font-semibold uppercase text-cyan-300 backdrop-blur-sm inline-flex items-center gap-1">
+            <span className="absolute left-1.5 top-1.5 rounded border border-cyan-400/40 bg-black/75 px-1.5 py-px text-2xs font-semibold uppercase text-cyan-300 inline-flex items-center gap-1">
               <Palette aria-hidden="true" className="h-2.5 w-2.5" /> Style
             </span>
           )}
@@ -190,7 +190,7 @@ function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBacku
         {onRename && (
           <button type="button" onClick={() => promptRename(onRename, d)}
             title="Rename this dataset" aria-label={`Rename the dataset ${d.name}`}
-            className="grid h-6 w-6 place-items-center rounded-lg border border-border bg-black/50 text-xs text-content-subtle opacity-70 backdrop-blur-sm transition-opacity hover:bg-white/10 hover:text-content hover:opacity-100">
+            className="grid h-6 w-6 place-items-center rounded-lg border border-border bg-black/75 text-xs text-content-subtle opacity-70 transition-opacity hover:bg-white/10 hover:text-content hover:opacity-100">
             <PenLine aria-hidden="true" className="h-3.5 w-3.5" />
           </button>
         )}
@@ -200,7 +200,7 @@ function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBacku
               if (window.confirm(`Permanently delete the dataset "${d.name}" and all its images? This cannot be undone.`)) onDelete(d.id);
             }}
             title="Delete this dataset" aria-label={`Delete the dataset ${d.name}`}
-            className="grid h-6 w-6 place-items-center rounded-lg border border-red-500/40 bg-black/50 text-xs text-red-300 opacity-70 backdrop-blur-sm transition-opacity hover:bg-red-500/25 hover:opacity-100">
+            className="grid h-6 w-6 place-items-center rounded-lg border border-red-500/40 bg-black/75 text-xs text-red-300 opacity-70 transition-opacity hover:bg-red-500/25 hover:opacity-100">
             <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
           </button>
         )}
