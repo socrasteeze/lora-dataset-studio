@@ -1,10 +1,14 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import Markdown, { markdownHeadingId } from '../components/common/Markdown'
 import DiagnosticReport from '../components/common/DiagnosticReport'
 import { helpTopicsForChapter } from '../help/helpRegistry'
-import { guideChapters } from '../plugins/registry.js'
+import { guideChapters, plugins } from '../plugins/registry.js'
 import { findGuideChapter, guideHeadings } from '../plugins/guideContent.js'
+import { buildGuideTextIndex } from '../help/guideTextIndex.js'
+import ReadingProgress from '../components/common/ReadingProgress.jsx'
+import revisions from 'virtual:guide-revisions'
+import { HelpBadge } from '../help/HelpMode'
 // Vite inlines every chapter as a string at build time (?raw) → the guide
 // lives in the bundle, no fetch, nothing extra to ship in the portable build.
 // DATASET_GUIDE.md keeps its historical path (linked from GitHub); the other
@@ -42,9 +46,26 @@ export default function GuidePage({ helpOnly = false }) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const targetHeading = searchParams.get('h')
+  const [query, setQuery] = useState('')
+  const searchRef = useRef(null)
+  const resultsRef = useRef(null)
+  const articleRef = useRef(null)
+  const searchChapters = useMemo(() => guideChapters([...CHAPTERS, HELP_CHAPTER]), [])
+  const searchIndex = useMemo(() => searchChapters.flatMap((item) => [
+    { chapter: item, title: item.title, anchor: '', text: `${item.title}\n${item.description}\n${item.source.split(/^##\s/m)[0]}`.toLowerCase() },
+    ...buildGuideTextIndex(item.source).map((entry) => ({ ...entry, chapter: item })),
+  ]), [searchChapters])
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const results = words.length ? searchIndex.filter((entry) => words.every((word) => entry.text.includes(word))) : []
   const chapters = useMemo(() => guideChapters(helpOnly ? [HELP_CHAPTER] : CHAPTERS), [helpOnly])
   const selected = findGuideChapter(chapters, helpOnly ? HELP_CHAPTER.id : section)
   const chapter = selected || { id: section, source: '' }
+  const contributors = plugins().filter((plugin) => plugin.guide?.chapters?.some((item) => item.id === chapter.id)
+    || plugin.guide?.sections?.some((item) => item.chapter === chapter.id))
+  const revisionParts = [...(chapter.plugin ? [] : [revisions[chapter.id]]), ...contributors.map((plugin) => revisions[`plugin:${plugin.id}`])]
+  const revisionKnown = revisionParts.length > 0 && revisionParts.every((part) => part?.date)
+  const updated = revisionKnown ? revisionParts.map((part) => part.date).sort().at(-1) : null
+  const locallyEdited = revisionParts.some((part) => part?.modified)
   const idx = chapters.indexOf(selected)
   const prev = idx > 0 ? chapters[idx - 1] : null
   const next = idx < chapters.length - 1 ? chapters[idx + 1] : null
@@ -52,7 +73,13 @@ export default function GuidePage({ helpOnly = false }) {
     title: cleanHeading(match[1]), id: markdownHeadingId(match[1]),
   }))
   const readingMinutes = Math.max(1, Math.ceil(chapter.source.trim().split(/\s+/).length / 210))
-  const jumpToHeading = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const jumpToHeading = (id) => {
+    const element = document.getElementById(id)
+    if (!element) return
+    element.tabIndex = -1
+    element.focus({ preventScroll: true })
+    element.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+  }
 
   // doc → app: an "Open this screen →" button in each guide section header that
   // has a matching help topic. Keyed by heading anchor; the FIRST topic in the
@@ -81,7 +108,9 @@ export default function GuidePage({ helpOnly = false }) {
     if (!targetHeading) return undefined
     const el = document.getElementById(targetHeading)
     if (!el) return undefined
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    el.tabIndex = -1
+    el.focus({ preventScroll: true })
+    el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
     const ring = ['ring-2', 'ring-indigo-400/70', 'ring-offset-2', 'ring-offset-app']
     el.classList.add(...ring)
     const t = setTimeout(() => el.classList.remove(...ring), 2000)
@@ -119,9 +148,40 @@ export default function GuidePage({ helpOnly = false }) {
   }
 
   return (
-    <div className={helpOnly
+    <div className={`guide-page ${helpOnly
       ? 'mx-auto max-w-5xl xl:grid xl:grid-cols-[minmax(0,1fr)_190px] xl:items-start xl:gap-7'
-      : 'lg:grid lg:grid-cols-[210px_minmax(0,1fr)] lg:items-start lg:gap-7 xl:grid-cols-[210px_minmax(0,1fr)_190px]'}>
+      : 'lg:grid lg:grid-cols-[210px_minmax(0,1fr)] lg:items-start lg:gap-7 xl:grid-cols-[210px_minmax(0,1fr)_190px]'}`}>
+      <ReadingProgress articleRef={articleRef} chapterId={chapter.id} />
+      <section className="guide-search mb-4 min-w-0 lg:col-span-full" aria-label="Guide Search">
+        <div className="mb-1 flex items-center gap-2">
+          <label htmlFor="guide-search" className="block text-sm font-medium">Search Guide</label>
+          <HelpBadge topic="guide-reader" />
+        </div>
+        <input ref={searchRef} id="guide-search" type="search" value={query}
+          aria-controls="guide-search-results" onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') setQuery('')
+            if (event.key === 'ArrowDown') { event.preventDefault(); resultsRef.current?.querySelector('a')?.focus() }
+            if (event.key === 'Enter' && results.length) { event.preventDefault(); resultsRef.current?.querySelector('a')?.click() }
+          }} placeholder="Find a topic"
+          className="min-h-10 w-full rounded-md border border-border bg-surface px-3 text-base text-content lg:text-sm" />
+        <div id="guide-search-results" ref={resultsRef}>
+          {words.length > 0 && <>
+            <p role="status" className="my-2 text-sm text-content-muted">{results.length ? `${results.length} results` : 'No matches. Try another term.'}</p>
+            <ul className="max-h-64 overflow-y-auto" onKeyDown={(event) => {
+              if (event.key === 'Escape') { setQuery(''); searchRef.current?.focus() }
+            }}>
+              {results.map((result) => <li key={`${result.chapter.id}:${result.anchor}`}>
+                <Link to={`${result.chapter.id === HELP_CHAPTER.id ? '/help' : `/guide/${result.chapter.id}`}${result.anchor ? `?h=${encodeURIComponent(result.anchor)}` : ''}`}
+                  onClick={() => { setQuery(''); if (chapter.id === result.chapter.id && result.anchor) jumpToHeading(result.anchor) }}
+                  className="flex min-h-10 flex-wrap items-center gap-x-2 rounded-md px-3 py-2 text-sm hover:bg-surface-raised">
+                  <span>{result.title}</span><span className="text-xs text-content-subtle">{result.chapter.title}</span>
+                </Link>
+              </li>)}
+            </ul>
+          </>}
+        </div>
+      </section>
       {/* lg:self-stretch: the grid is items-start, which shrinks the aside to the
           height of its nav — a sticky child has no room to travel in a parent
           exactly its own height. Stretching makes the aside as tall as the page. */}
@@ -142,7 +202,7 @@ export default function GuidePage({ helpOnly = false }) {
         </nav>
       </aside>}
 
-      <article className={`min-w-0 max-w-4xl pb-10 ${helpOnly ? 'mx-auto' : 'mt-2 lg:mt-0'}`}>
+      <article ref={articleRef} className={`guide-article min-w-0 max-w-4xl pb-10 ${helpOnly ? 'mx-auto' : 'mt-2 lg:mt-0'}`}>
         <header className="relative mb-3 overflow-hidden rounded-2xl border border-border bg-surface px-4 py-4 sm:px-5 sm:py-5">
           <div className="relative">
             <div className="mb-3 flex flex-wrap items-center gap-2 font-mono text-2xs uppercase tracking-[0.14em] text-content-subtle">
@@ -150,6 +210,8 @@ export default function GuidePage({ helpOnly = false }) {
                 {helpOnly ? 'Support' : `Chapter ${chapter.num}`}
               </span>
               <span>{readingMinutes} min read</span>
+              <span>{updated ? <>Updated <time dateTime={updated}>{updated}</time></> : 'Revision unavailable'}</span>
+              {locallyEdited && <span>Local Edits</span>}
               {!helpOnly && <><span aria-hidden>·</span><span>{idx + 1} of {chapters.length}</span></>}
             </div>
             <h1 className="m-0 max-w-2xl text-2xl font-bold tracking-tight text-content sm:text-2xl">{chapter.title}</h1>

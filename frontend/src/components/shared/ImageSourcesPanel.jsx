@@ -6,6 +6,7 @@ import FolderPickerField from '../common/FolderPicker.jsx'
 import InstallRunner from '../setup/InstallRunner'
 import SourceImagePreview from './SourceImagePreview'
 import { useUnsavedWork } from '../../hooks/useUnsavedWork.js'
+import PasswordInput from '../common/PasswordInput.jsx'
 import { SOURCE_NAMES, jobLabel, jobRuns, sourceLink, sourceName, sourceProvider, sourceTags } from './imageSources.js'
 
 const CREDENTIAL_FIELDS = [['username', 'Username'], ['password', 'Password'], ['api_key', 'API Key'],
@@ -305,7 +306,7 @@ export default function ImageSourcesPanel({ datasetId, datasetName, banks = [], 
                 <div className="grid min-w-0 gap-2 lg:grid-cols-2">
                   {CREDENTIAL_FIELDS.map(([key, label]) =>
                     <label key={key} htmlFor={fieldId(key)} className="min-w-0 space-y-1 text-sm">{label}
-                      <Input id={fieldId(key)} type="password" autoComplete="new-password" value={credentials[key]} disabled={busy || !credentialSource}
+                      <PasswordInput key={`${credentialSource}:${key}`} label={label} id={fieldId(key)} autoComplete="new-password" value={credentials[key]} disabled={busy || !credentialSource}
                         onChange={(event) => { setCredentialOwner(credentialSource); setCredentials((old) => ({ ...old, [key]: event.target.value })) }} className="w-full text-base lg:text-sm" />
                     </label>)}
                 </div>

@@ -17,6 +17,10 @@ Save or discard credential edits before changing the source or switching jobs.
 Cookies use `name=value; name=value` format. The application does not read a
 browser profile or import browser cookies on its own.
 
+Use **Show** to inspect a value you type or paste. **Hide** masks it again.
+These controls do not reveal stored source credentials. An empty field returns
+to masked mode.
+
 Danbooru and e621/e926 can use Username and API Key. Gelbooru and Rule34 can
 require API Key and User ID. Source requirements can change. A source access
 failure stays visible and does not fall back to another provider.

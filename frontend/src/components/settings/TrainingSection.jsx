@@ -1,4 +1,5 @@
 import { INPUT_CLASS, Card } from './primitives'
+import PasswordInput from '../common/PasswordInput.jsx'
 import { SettingsGroup, SettingsGroupsToc, useSettingsGroupProps } from './SettingsGroupsView'
 import { TRAINING_GROUPS } from './settingsGroups'
 import ResetToDefault from './ResetToDefault'
@@ -115,9 +116,9 @@ export default function TrainingSection(props) {
             <label htmlFor="aitoolkit-token" className="block text-sm font-medium text-content">
               Its access token <span className="text-content-subtle">(blank if it has none)</span>
             </label>
-            <input
+            <PasswordInput
               id="aitoolkit-token"
-              type="password"
+              label="Access Token"
               value={config.aitoolkit?.token || ''}
               onChange={(e) => setField('aitoolkit', 'token', e.target.value)}
               className={INPUT_CLASS}

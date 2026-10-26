@@ -168,10 +168,20 @@ stopped ComfyUI or Ollama can be started only when you need it.
   download the LoRA (appears once ai-toolkit is set).
 - **Test Studio** — grid-test a trained LoRA across checkpoints and strengths,
   vote, and rank (appears once ComfyUI is reachable).
-- **Guide** — this manual.
+- **Guide** — this manual. **Search Guide** finds topics in the core chapters
+  and active plugin guidance. Select a result to open its section. The thin
+  bar at the bottom shows your position in the current chapter. **Updated**
+  shows the latest Git content revision among the chapter and its plugin
+  contributors. **Local Edits** marks uncommitted guide changes. A source
+  archive without Git history shows **Revision unavailable**. Use your
+  browser's Print action to print the current chapter without workspace controls.
 - **Setup** — the guided wizard, re-runnable anytime.
 - **Settings** — everything the wizard configures, plus server, updates,
   maintenance and the diagnostic report.
+
+Settings search works on phones and desktops. You can continue to edit settings
+while a save request runs. The response keeps newer edits in the local draft.
+Save again to accept those edits on the server.
 
 Next chapter: **Using the app** — the full walkthrough, dataset type by dataset
 type.

@@ -204,6 +204,14 @@ export default function BankPage() {
   const { caps } = useCapabilities()
   const visionReady = !!caps?.ollama?.vision_model_ready
   const [banks, setBanks] = useState(null)
+  const [listError, setListError] = useState('')
+  const [listLoading, setListLoading] = useState(false)
+  const [createErrors, setCreateErrors] = useState({})
+  const [createError, setCreateError] = useState('')
+  const createErrorRef = useRef(null)
+  useEffect(() => {
+    if (createError) createErrorRef.current?.focus()
+  }, [createError])
   const [queue, setQueue] = useState(null)
   const [currentId, setCurrentId] = useState(() => {
     try { return Number(localStorage.getItem(CURRENT_KEY)) || null } catch { return null }
@@ -260,9 +268,11 @@ export default function BankPage() {
   // (690-1 190 ms on a real 8-bank / 86 493-image library). `rescan` is the 🔄
   // button, and it is the only caller that asks the server to walk.
   const refresh = useCallback(async ({ rescan = false } = {}) => {
+    setListLoading(true)
     try {
       const d = await apiFetch(`/api/banks${rescan ? '?rescan=1' : ''}`)
       setBanks(d.banks || [])
+      setListError('')
       if (!rescan) return
       // A walk just happened: say what it found, so the counters never move
       // without an explanation — and say so even when it found nothing, because
@@ -271,8 +281,9 @@ export default function BankPage() {
       if (note) toast[note.type](note.text)
       else toast.success('Source folders checked — no new image found.')
     } catch (e) {
-      toast.error(e?.message || 'Could not load the banks.')
-      if (!rescan) setBanks([])
+      setListError(e?.message || 'Could not load the banks. Retry the request.')
+    } finally {
+      setListLoading(false)
     }
   }, [toast])
 
@@ -360,6 +371,7 @@ export default function BankPage() {
   useEffect(() => { setExcluded(new Set()) }, [folder])
   const changeImportFolder = (value) => {
     setFolder(value)
+    setCreateErrors((errors) => ({ ...errors, folder: '' }))
     setExcluded(new Set())
     setPreview(null)
     setPreviewError('')
@@ -461,6 +473,16 @@ export default function BankPage() {
     // A bank over a dataset's folder would share the dataset's LIVE files; the
     // server refuses it, and so does the form (the notice says what to do).
     if (creating || folderNotice || emptySelection || previewPending || needsImportRestart) return
+    const errors = {}
+    if (!splitMode && !name.trim()) errors.name = 'Enter a bank name.'
+    if (!folder.trim()) errors.folder = 'Choose a folder.'
+    setCreateErrors(errors)
+    setCreateError('')
+    if (Object.keys(errors).length) {
+      setCreateError('Check the marked fields. Your entries stay in this form.')
+      createErrorRef.current?.focus()
+      return
+    }
     setCreating(true)
     try {
       if (splitMode) {
@@ -495,7 +517,12 @@ export default function BankPage() {
         open(d.id)
       }
     } catch (err) {
-      toast.error(err?.message || 'Could not create the bank(s).')
+      const message = err?.message || 'Could not create the bank. Retry the request.'
+      // These endpoints validate the folder after the required name check.
+      // Network and server failures stay form-level errors.
+      if (err?.status === 400) setCreateErrors({ folder: message })
+      setCreateError(message)
+      createErrorRef.current?.focus()
     } finally {
       setCreating(false)
     }
@@ -693,21 +720,35 @@ export default function BankPage() {
         <BankLaneTabs className="w-full sm:ml-auto sm:w-72" />
       </header>
 
-      <form onSubmit={create}
+      <form onSubmit={create} noValidate aria-busy={creating}
         className="space-y-3">
+        {createError && <div ref={createErrorRef} tabIndex={-1} role="alert"
+          className="rounded-md border border-rose-500/50 p-3 text-sm text-rose-200">
+          <p>{createError}</p>
+          {Object.entries(createErrors).filter(([, message]) => message).map(([field, message]) =>
+            <a key={field} href={`#bank-${field}`} className="mr-3 underline"
+              onClick={(event) => { event.preventDefault(); document.getElementById(`bank-${field}`)?.focus() }}>{message}</a>)}
+        </div>}
+        <fieldset disabled={creating} className="space-y-3">
         <div className="grid grid-cols-4 items-end gap-2 lg:flex lg:flex-wrap">
           <div className="col-span-2 min-w-0 lg:min-w-40 lg:grow">
             <label htmlFor="bank-name" className="mb-1 block text-sm font-medium text-content">Name</label>
-            <Input id="bank-name" size="lg" value={name} onChange={(e) => setName(e.target.value)}
+            <Input id="bank-name" size="lg" value={name} onChange={(e) => {
+              setName(e.target.value); setCreateErrors((errors) => ({ ...errors, name: '' }))
+            }} aria-invalid={!!createErrors.name} aria-describedby={createErrors.name ? 'bank-name-error' : undefined}
               placeholder={splitMode ? 'Named per subfolder automatically' : 'Telegram export 07/2026'}
               required={!splitMode} disabled={splitMode}
               className="w-full" />
+            {createErrors.name && <p id="bank-name-error" className="text-xs text-rose-200">{createErrors.name}</p>}
           </div>
           <FolderPickerField inline size="lg" id="bank-folder" label="Folder"
             fieldClassName="col-span-2 min-w-0 lg:min-w-64 lg:grow-[3]"
             browseClassName="min-w-0 w-full !px-1 !text-xs lg:w-auto lg:!px-4 lg:!text-sm"
             value={folder} onChange={changeImportFolder} required
+            inputProps={{ 'aria-invalid': !!createErrors.folder || !!folderNotice,
+              'aria-describedby': [createErrors.folder && 'bank-folder-error', folderNotice && 'bank-folder-notice'].filter(Boolean).join(' ') || undefined }}
             placeholder="C:\path\to\unsorted-images (subfolders included)" />
+          {createErrors.folder && <p id="bank-folder-error" className="col-span-4 text-xs text-rose-200">{createErrors.folder}</p>}
           <Button type="button" size="lg" aria-expanded={foldersOpen}
             aria-controls="bank-import-subfolders" aria-label="Choose Subfolders"
             onClick={() => setFoldersOpen((value) => !value)}
@@ -804,11 +845,12 @@ export default function BankPage() {
           </p>
         </div>}
         {folderNotice && (
-          <p role="alert"
+          <p id="bank-folder-notice" role="alert"
             className="basis-full rounded-md border border-rose-500/70 bg-rose-500/15 p-3 text-sm text-rose-100">
             <Ban aria-hidden="true" className="mr-1 inline h-4 w-4 align-[-2px]" />{folderNotice.text}
           </p>
         )}
+        </fieldset>
       </form>
 
       {/* One button for "triage everything I have". It QUEUES — one entry per
@@ -835,8 +877,15 @@ export default function BankPage() {
       <ImageSourcesPanel banks={banks || []} onImported={() => refresh()} />
       <PluginSlot slot="sources.panel" surface="bank" banks={banks} onDone={() => refresh()} />
 
+      {listError && <div role="alert" className="min-h-24 space-y-2 rounded-md border border-rose-500/50 p-3 text-sm">
+        <p>{listError}</p>
+        <Button disabled={listLoading} onClick={() => refresh()}>Retry</Button>
+      </div>}
       {banks == null ? (
-        <p className="text-sm text-content-muted">Loading</p>
+        !listError && <div role="status" aria-label="Loading banks" className="grid min-h-48 grid-cols-2 gap-3">
+          <span className="rounded-lg bg-surface-raised" /><span className="rounded-lg bg-surface-raised" />
+          <span className="sr-only">Loading banks</span>
+        </div>
       ) : banks.length === 0 ? (
         <p className="text-sm text-content-muted">
           No bank yet — create one above to start triaging a folder.

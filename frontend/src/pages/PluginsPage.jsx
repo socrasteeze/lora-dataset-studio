@@ -7,6 +7,7 @@ import { waitForPluginBoot } from '../plugins/lifecycle.js'
 import { useSearchParams } from 'react-router'
 import { useCapabilities } from '../context/CapabilitiesContext'
 import InstalledPlugins from './plugins/InstalledPlugins.jsx'
+import PasswordInput from '../components/common/PasswordInput.jsx'
 
 const BTN = 'min-h-10 lg:min-h-0 rounded-md border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-surface-raised disabled:opacity-50'
 const BTN_PRIMARY = BTN + ' border-primary bg-primary text-primary-foreground hover:bg-primary/90'
@@ -20,7 +21,7 @@ export function PluginAdminLock({ value, onChange, onUnlock, checking, rejected 
       <form onSubmit={onUnlock} className="space-y-2">
         <label htmlFor="plugin-admin-token" className="block font-medium">Plugin admin token</label>
         <div className="flex flex-wrap items-center gap-2">
-          <input id="plugin-admin-token" type="password" autoComplete="off" required minLength={32}
+          <PasswordInput label="Admin Token" id="plugin-admin-token" autoComplete="off" required minLength={32}
             value={value} onChange={event => onChange(event.target.value)}
             aria-describedby="plugin-admin-token-hint" aria-invalid={rejected || undefined}
             className="min-h-10 min-w-0 flex-1 rounded border border-border bg-surface px-3" />

@@ -89,6 +89,7 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
   const [testResults, setTestResults] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const [query, setQuery] = useState('')
   const [loadError, setLoadError] = useState('')
   const [missingFocus, setMissingFocus] = useState(null)
@@ -211,6 +212,8 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
   }
 
   const handleSave = async () => {
+    if (savingRef.current) return false
+    savingRef.current = true
     setSaving(true)
     try {
       // Only send secret fields the user actually typed into — the fields
@@ -222,8 +225,8 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
           .map(([k, v]) => [k, (v || '').trim()])
           .filter(([, v]) => v)
       )
-      const data = await putJson('/api/settings', { config, secrets })
-      setConfig(data.config)
+      const data = await putJson(settingsUrl, { config, secrets })
+      setConfig((current) => reconcileSettings(current, savedConfig, data.config, config, config))
       setSavedConfig(data.config)
       setRuntime(data.runtime || { host: null, port: null })
       setSecretsPresence(data.secrets)
@@ -239,6 +242,7 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
       toast.error(`Save failed: ${e.message}`)
       return false
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -394,7 +398,11 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
     return <div role="alert" className="space-y-3"><p>{loadError}</p><button type="button" onClick={load}>Retry</button></div>
   }
   if (loading || !config || pluginTarget) {
-    return <p className="text-content-muted">Loading settings</p>
+    return <div role="status" aria-label="Loading settings" className="grid min-h-64 gap-6 lg:grid-cols-[230px_minmax(0,1fr)]">
+      <div className="hidden rounded-lg bg-surface lg:block" />
+      <div className="space-y-4"><div className="h-8 w-40 rounded bg-surface-raised" /><div className="h-48 rounded-lg bg-surface" /></div>
+      <span className="sr-only">Loading settings</span>
+    </div>
   }
 
   const sectionProps = {
@@ -417,9 +425,10 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
   )
 
   const q = query.trim()
+  const matchedSections = SETTINGS_SECTIONS.filter((item) => matchesQuery(item, query))
   // Flat, keyboard-navigable result list: matched sections first, then settings.
   const flatResults = q
-    ? [...visibleSections.map((s) => ({ type: 'section', id: s.id })),
+    ? [...matchedSections.map((s) => ({ type: 'section', id: s.id })),
        ...settingResults.map((t) => ({ type: 'setting', topic: t }))]
     : []
   const goToSetting = (t) => {
@@ -505,8 +514,8 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
             {visibleSections.map((s) => navItem(s, true))}
           </nav>
           {/* Desktop: sticky LED rail */}
-          <nav aria-label="Settings sections" className="hidden lg:block lg:sticky lg:top-[calc(var(--app-header-h)+1rem)] lg:max-h-[calc(100vh-var(--app-header-h)-2rem)] lg:overflow-y-auto">
-            <p className="px-3 pb-2 font-mono text-2xs uppercase tracking-[0.18em] text-content-subtle">Settings</p>
+          <nav aria-label="Settings Search" className="lg:sticky lg:top-[calc(var(--app-header-h)+1rem)] lg:max-h-[calc(100vh-var(--app-header-h)-2rem)] lg:overflow-y-auto">
+            <p className="hidden px-3 pb-2 font-mono text-2xs uppercase tracking-[0.18em] text-content-subtle lg:block">Settings</p>
             <input
               type="search"
               value={query}
@@ -514,16 +523,16 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
               onKeyDown={onSearchKeyDown}
               placeholder="Find a setting"
               aria-label="Find a setting"
-              className="mb-2 w-full rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-content placeholder:text-content-subtle focus:border-primary focus:outline-none"
+              className="mb-2 min-h-10 w-full rounded-md border border-border bg-surface px-3 py-1.5 text-base text-content placeholder:text-content-subtle focus:border-primary focus:outline-none lg:min-h-0 lg:text-xs"
             />
             {q ? (
               <div className="space-y-3">
                 <div>
                   <p className="px-3 pb-1 text-2xs uppercase tracking-wide text-content-subtle" role="status">
-                    Sections ({visibleSections.length})
+                    Sections ({matchedSections.length})
                   </p>
                   <div className="flex flex-col gap-0.5">
-                    {visibleSections.map((s, i) => navItem(s, false, i))}
+                    {matchedSections.map((s, i) => navItem(s, false, i))}
                   </div>
                 </div>
                 {settingResults.length > 0 && (
@@ -532,16 +541,16 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
                       Settings ({settingResults.length})
                     </p>
                     <div className="flex flex-col gap-0.5">
-                      {settingResults.map((t, j) => settingResultItem(t, visibleSections.length + j))}
+                      {settingResults.map((t, j) => settingResultItem(t, matchedSections.length + j))}
                     </div>
                   </div>
                 )}
-                {visibleSections.length === 0 && settingResults.length === 0 && (
+                {matchedSections.length === 0 && settingResults.length === 0 && (
                   <p className="px-3 text-xs text-content-subtle">No matches.</p>
                 )}
               </div>
             ) : (
-              <div className="flex flex-col gap-0.5">
+              <div className="hidden flex-col gap-0.5 lg:flex">
                 {visibleSections.map((s) => navItem(s, false))}
               </div>
             )}

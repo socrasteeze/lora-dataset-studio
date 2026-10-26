@@ -7,6 +7,7 @@ import tailwindcss from 'tailwindcss'
 import autoprefixer from 'autoprefixer'
 import { createTailwindConfig } from './tailwind.config.js'
 import { privatePluginBuild, resolvePluginBuildMode } from './scripts/privatePluginBuild.mjs'
+import { guideRevisions } from './scripts/guideRevisions.mjs'
 
 /* Bundled plugins live in the repository's `bundled/` directory, outside this
  * Vite root, one folder per plugin with both halves (docs/specs/
@@ -56,7 +57,7 @@ export default defineConfig(({ mode }) => {
     || DEFAULT_DEV_API_TARGET
   const distribution = resolvePluginBuildMode(env)
   return {
-    plugins: [privatePluginBuild({ distribution }), react(), {
+    plugins: [privatePluginBuild({ distribution }), guideRevisions(REPO_ROOT, FORK_PLUGINS), react(), {
       name: 'lds-plugin-build-mode',
       enforce: 'pre',
       generateBundle() {
