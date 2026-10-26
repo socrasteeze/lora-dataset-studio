@@ -257,7 +257,9 @@ DEFAULTS = {
     # hostile file can be decoded until it exhausts memory. That is a real
     # trade, offered rather than imposed; the Settings card says so.
     'image_input': {'max_side': 16384, 'max_pixels': 64 * 1024 * 1024},
-    'training': {'default_family': 'zimage'},
+    # starting_presets: {family: {kind: preset id}}. A new dataset (or one switched
+    # to a family it has no saved settings for) starts on that preset.
+    'training': {'default_family': 'zimage', 'starting_presets': {}},
     # Empty slots discover compatible local assets; explicit pins remain visible
     # as missing when moved, rather than silently choosing another model.
     'studio_models': {

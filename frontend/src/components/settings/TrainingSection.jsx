@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import { apiFetch } from '../../api/fetchClient'
 import { INPUT_CLASS, Card } from './primitives'
 import PasswordInput from '../common/PasswordInput.jsx'
 import { SettingsGroup, SettingsGroupsToc, useSettingsGroupProps } from './SettingsGroupsView'
@@ -8,6 +10,52 @@ import { defaultValueAt } from './settingDefaults.js'
 // Keep in sync with backend TRAIN_TYPES (face_dataset_service.py) — 'flux' had
 // been forgotten here when the FLUX.1 family landed (fixed alongside flux2klein).
 const FAMILY_OPTIONS = ['zimage', 'sdxl', 'krea', 'flux', 'flux2klein', 'anima', 'qwenimage21']
+
+const STARTING_KINDS = [['character', 'Character'], ['concept', 'Concept'], ['style', 'Style']]
+
+/* The preset a new dataset of this family starts on, per dataset type. Stored
+   as training.starting_presets[family][kind]; '' means the app defaults. Saved
+   settings are never overwritten: only a dataset with none gets the preset. */
+function StartingPresets({ config, setField }) {
+  const family = config.training.default_family
+  const [presets, setPresets] = useState(null)
+  useEffect(() => {
+    let live = true
+    apiFetch('/api/train/presets')
+      .then((d) => { if (live) setPresets(d.presets || []) })
+      .catch(() => { if (live) setPresets([]) })
+    return () => { live = false }
+  }, [])
+  const table = config.training.starting_presets || {}
+  const choose = (kind, value) => setField('training', 'starting_presets', {
+    ...table, [family]: { ...(table[family] || {}), [kind]: value },
+  })
+  return (
+    <div id="training-starting-presets" className="mt-3">
+      <p className="text-sm font-medium text-content">Starting preset for new {family} datasets</p>
+      <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {STARTING_KINDS.map(([kind, label]) => {
+          const options = (presets || []).filter((p) => p.train_type === family
+            && (!p.dataset_kind || p.dataset_kind === kind))
+          return (
+            <label key={kind} className="flex flex-col gap-1 text-sm text-content-muted">{label}
+              <select value={table[family]?.[kind] ?? ''} disabled={presets == null}
+                onChange={(e) => choose(kind, e.target.value)} className={INPUT_CLASS}>
+                <option value="">None (app defaults)</option>
+                {options.map((p) => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+              </select>
+            </label>
+          )
+        })}
+      </div>
+      <p className="mt-1 text-xs text-content-muted">
+        A new dataset, or one switched to this family before it has saved settings, starts on
+        this preset. Settings a dataset already has are never replaced. To change the values,
+        tune a dataset in Advanced options, save it as a preset, and pick it here.
+      </p>
+    </div>
+  )
+}
 
 /* Concept face masking (issue #15, reported by shivdbz2010 on GitHub). Both knobs
    are exposed because nobody has measured the right value — no public A/B of a
@@ -92,6 +140,7 @@ export default function TrainingSection(props) {
             {FAMILY_OPTIONS.map((f) => <option key={f} value={f}>{f}</option>)}
           </select>
         </div>
+        <StartingPresets config={config} setField={setField} />
       </Card>
       </SettingsGroup>
 

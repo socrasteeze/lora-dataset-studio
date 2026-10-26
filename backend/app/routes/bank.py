@@ -1629,6 +1629,8 @@ def bank_promote_to_new_dataset(bank_id):
         return _busy(e)
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
+    from .training import apply_starting_preset
+    apply_starting_preset(LOCAL_USER, new_id)
     return jsonify({'ok': True, 'id': new_id}), 202
 
 

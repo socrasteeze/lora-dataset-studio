@@ -121,6 +121,8 @@ def dataset_create():
     except ValueError as e:
         # concept dataset without a concept description -> 400 (not a 500)
         return jsonify({'error': str(e)}), 400
+    from .training import apply_starting_preset
+    apply_starting_preset(LOCAL_USER, ds.id)
     return jsonify({'ok': True, 'id': ds.id, 'instance_id': ds.instance_id})
 
 
@@ -143,6 +145,11 @@ def dataset_set_train_type(dataset_id):
         ok = svc.set_train_type(LOCAL_USER, dataset_id, data.get('train_type'))
     except ValueError as e:
         return _map_error(e)
+    if ok:
+        # A family switch restores that family's saved settings; with none saved
+        # yet, start from the family's starting preset.
+        from .training import apply_starting_preset
+        apply_starting_preset(LOCAL_USER, dataset_id)
     return (jsonify({'ok': True}), 200) if ok else (jsonify({'error': 'not found'}), 404)
 
 
