@@ -154,6 +154,6 @@ test('the dialog renders its tabs FROM the constant, and posts the third route',
   // The warning is advisory: it renders, but nothing about it disables anything.
   assert.match(src, /triggerWarning\(newDsTrigger, datasets\)/)
   // The dead-end note now points at the tab, not at another page.
-  assert.match(src, /pick 🆕 New dataset above/)
+  assert.match(src, /pick New dataset above/)
   assert.doesNotMatch(src, /create one on the Datasets page first/)
 })
