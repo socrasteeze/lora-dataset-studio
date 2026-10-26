@@ -40,6 +40,7 @@ import sys
 # points at stderr, so anything a library prints is progress output.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from infer_io import claim_result_stream  # noqa: E402
+from model_memo import memo  # noqa: E402
 from pass_resources import onnx_session_options  # noqa: E402
 _OUT = claim_result_stream(__name__)
 
@@ -275,9 +276,11 @@ def main() -> int:
                                f'CUDA provider (available: {", ".join(available)})')
         providers = (['CPUExecutionProvider'] if device == 'cpu' or not cuda
                      else ['CUDAExecutionProvider', 'CPUExecutionProvider'])
-        session = onnxruntime.InferenceSession(
-            os.path.join(models_dir, 'model.onnx'), providers=providers,
-            sess_options=onnx_session_options(onnxruntime))
+        model_file = os.path.join(models_dir, 'model.onnx')
+        session = memo(('wd14', model_file, tuple(providers)),
+                       lambda: onnxruntime.InferenceSession(
+                           model_file, providers=providers,
+                           sess_options=onnx_session_options(onnxruntime)))
         # onnxruntime silently drops to CPU when CUDA fails to initialise
         # (missing cuDNN, driver mismatch); GPU-only must not.
         if device == 'cuda' and session.get_providers()[0] != 'CUDAExecutionProvider':

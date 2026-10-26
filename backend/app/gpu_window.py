@@ -337,6 +337,12 @@ def gpu_exclusive_vision_window(flag_ttl=300):
             raise GpuBusyError('Could not keep the Vision GPU reservation alive safely.') from exc
 
         yield
+    except GpuBusyError:
+        # ComfyUI or training holds the card: give back the VRAM the bank
+        # queue's resident workers keep between passes (services.infer_pool).
+        from .services import infer_pool
+        infer_pool.shutdown('the GPU window was refused')
+        raise
     finally:
         heartbeat_stop.set()
         # `join` here is a tidy-up, not the mutual exclusion — see the long

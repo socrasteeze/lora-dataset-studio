@@ -8264,12 +8264,12 @@ def _drive_infer_subprocess(job, python, script, payload, cache_path,
         # The configured image budget rides along too: without it the worker's
         # guard falls back to its shipped 16 Mi-pixel cap and refuses images
         # the app itself imports and shows.
-        proc = subprocess.Popen(
-            _infer_subprocess_argv(python, script), stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, encoding='utf-8', errors='replace',
-            env=infer_env.worker_env(python, **infer_worker_env()),
-            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        # While the bank queue drains, Score and Faces reuse a resident worker
+        # with the model already loaded (infer_pool); otherwise a plain Popen.
+        from . import infer_pool
+        proc = infer_pool.popen(
+            _infer_subprocess_argv(python, script),
+            env=infer_env.worker_env(python, **infer_worker_env()))
         killer = {'timer': None}
 
         def _cancel():
