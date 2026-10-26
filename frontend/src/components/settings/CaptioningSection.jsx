@@ -4,6 +4,7 @@ import { CAPTIONING_GROUPS } from './settingsGroups'
 import ResetToDefault from './ResetToDefault'
 import { useCapabilities } from '../../context/CapabilitiesContext'
 import { defaultValueAt } from './settingDefaults.js'
+import { folderNamesValue, splitFolderNames } from './bankFolderNames.js'
 import { localLlmLabel } from '../../utils/localLlm.js'
 import { importInputLimitLine, IMPORT_INPUT_UNLIMITED_NOTE } from '../dataset/importPolicy.js'
 
@@ -62,6 +63,8 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
   // re-tuned between releases: the numbers shown when a key is missing, like the
   // ones "Reset to default" writes, come from the server (config_defaults).
   const bankDefault = (key) => defaultValueAt(configDefaults, 'bank', key)
+  const excludedNames = folderNamesValue(config.bank_processing?.excluded_folder_names,
+    defaultValueAt(configDefaults, 'bank_processing', 'excluded_folder_names'))
   const importDefault = (key) => defaultValueAt(configDefaults, 'dataset_import', key)
   const importEncoding = String(config.dataset_import?.encoding ?? importDefault('encoding') ?? 'preserve')
   const preservesOriginals = importEncoding === 'preserve'
@@ -578,6 +581,24 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
             <ResetToDefault label="Semantic duplicate similarity" section="bank" field="semantic_dup_threshold"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
+        </div>
+      </Card>
+      <Card
+        title="Folders the Bank skips"
+        help="Bank passes (scan, score, faces, tags, captions and the rest) never process images in folders with these names, at any depth inside a bank. The images stay visible in the grid."
+      >
+        <div>
+          <label htmlFor="bank-excluded-folder-names" className="block text-sm font-medium text-content">
+            Skipped folder names
+          </label>
+          <input id="bank-excluded-folder-names" type="text"
+            key={excludedNames.join(',')}
+            defaultValue={excludedNames.join(', ')}
+            onBlur={(e) => setField('bank_processing', 'excluded_folder_names', splitFolderNames(e.target.value))}
+            className={INPUT_CLASS} />
+          <p className="mt-0.5 text-xs text-content-muted">Comma-separated, not case-sensitive. Leave empty to process every folder.</p>
+          <ResetToDefault label="Skipped folder names" section="bank_processing" field="excluded_folder_names"
+            config={config} configDefaults={configDefaults} setField={setField} />
         </div>
       </Card>
       </SettingsGroup>
