@@ -138,7 +138,7 @@ export function QueueDockBody({ listing, open = false, pending = null, sharing =
   return (
     <div className={`fixed ${bottomClass} left-3 z-40 w-[min(23rem,calc(100vw-1.5rem))]`}>
       {open && (
-        <div className="mb-2 max-h-[min(60vh,28rem)] overflow-y-auto rounded-xl border border-indigo-400/40 bg-surface-overlay/95 shadow-lg backdrop-blur">
+        <div className="mb-2 max-h-[min(60vh,28rem)] overflow-y-auto rounded-xl border border-indigo-400/40 bg-surface-overlay shadow-lg">
           {/* Above the list, because it explains the whole list: nothing here is
               moving, and this is what is holding the GPU instead. */}
           {paused && (
@@ -166,7 +166,7 @@ export function QueueDockBody({ listing, open = false, pending = null, sharing =
           ? `Generation queue — ${summarize(listing)}, on hold: ${paused}`
           : `Generation queue — ${summarize(listing)}`}
         title={paused || undefined}
-        className="flex w-full items-center gap-2 rounded-xl border border-indigo-400/40 bg-surface-overlay/95 px-3 py-2 text-left shadow-lg backdrop-blur hover:border-indigo-400/70">
+        className="flex w-full items-center gap-2 rounded-xl border border-indigo-400/40 bg-surface-overlay px-3 py-2 text-left shadow-lg hover:border-indigo-400/70">
         <span aria-hidden="true"
           className={listing.generating && !paused ? 'animate-pulse' : undefined}>
           {paused ? '⏸' : '⏳'}

@@ -2659,7 +2659,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
 
           {/* Expert — last-mile levers. Collapsed by default; every control defaults
               to the current behaviour, so a newcomer who never opens this is unaffected. */}
-          {!fullMode && (<details className="group rounded-lg border border-indigo-400/40 border-l-[3px] border-l-indigo-400 bg-indigo-500/[0.14] transition-colors hover:bg-indigo-500/20">
+          {!fullMode && (<details className="group rounded-lg border border-indigo-400/40 bg-indigo-500/[0.14] transition-colors hover:bg-indigo-500/20">
             <summary className="flex items-center gap-2 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden px-2.5 py-2.5 text-2xs font-semibold uppercase tracking-wider text-indigo-100 hover:text-white">
               <span aria-hidden className="text-indigo-300 transition-transform group-open:rotate-90">▸</span>
               <Microscope aria-hidden="true" className="h-3.5 w-3.5" />

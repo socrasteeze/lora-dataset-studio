@@ -146,7 +146,7 @@ export function WhatsNewModal() {
       aria-modal="true"
       aria-labelledby="whats-new-title"
       onClick={() => setOpen(false)}
-      className="fixed inset-0 z-[9997] flex items-start justify-center bg-black/60 p-4 pt-16 backdrop-blur-sm sm:pt-24"
+      className="fixed inset-0 z-[9997] flex items-start justify-center bg-black/75 p-4 pt-16 sm:pt-24"
     >
       <div
         ref={dialogRef}

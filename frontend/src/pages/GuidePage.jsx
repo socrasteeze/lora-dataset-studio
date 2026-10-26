@@ -20,13 +20,13 @@ import gettingHelp from '../../../docs/guide/getting-help.md?raw'
    intended order, not decoration. `extra` mounts a live component under the
    markdown (the diagnostic button on the help chapter). */
 const CHAPTERS = [
-  { id: 'getting-started', num: '01', title: 'Getting started', description: 'Install the app, connect the tools you need, and understand the workspace.', source: gettingStarted },
-  { id: 'using-the-app', num: '02', title: 'Using the app', description: 'Follow the complete workflow for character, concept, and style datasets.', source: usingTheApp },
-  { id: 'dataset-guide', num: '03', title: 'Building a good dataset', description: 'Make stronger choices about images, captions, settings, and checkpoints.', source: datasetGuide },
-  { id: 'settings-reference', num: '04', title: 'Settings reference', description: 'Every setting explained — what it does, its default, and when to change it.', source: settingsReference },
-  { id: 'troubleshooting', num: '05', title: 'Troubleshooting', description: 'Find a symptom, understand the cause, and apply the shortest reliable fix.', source: troubleshooting },
+  { id: 'getting-started', num: '1', title: 'Getting started', description: 'Install the app, connect the tools you need, and understand the workspace.', source: gettingStarted },
+  { id: 'using-the-app', num: '2', title: 'Using the app', description: 'Follow the complete workflow for character, concept, and style datasets.', source: usingTheApp },
+  { id: 'dataset-guide', num: '3', title: 'Building a good dataset', description: 'Make stronger choices about images, captions, settings, and checkpoints.', source: datasetGuide },
+  { id: 'settings-reference', num: '4', title: 'Settings reference', description: 'Every setting explained — what it does, its default, and when to change it.', source: settingsReference },
+  { id: 'troubleshooting', num: '5', title: 'Troubleshooting', description: 'Find a symptom, understand the cause, and apply the shortest reliable fix.', source: troubleshooting },
 ]
-const HELP_CHAPTER = { id: 'getting-help', num: '06', title: 'Getting help', description: 'Create a useful report and share the details needed to solve a problem.', source: gettingHelp, extra: 'diagnostic' }
+const HELP_CHAPTER = { id: 'getting-help', num: '6', title: 'Getting help', description: 'Create a useful report and share the details needed to solve a problem.', source: gettingHelp, extra: 'diagnostic' }
 
 const cleanHeading = (heading) => heading.replace(/[`*_]/g, '')
 
@@ -144,7 +144,6 @@ export default function GuidePage({ helpOnly = false }) {
 
       <article className={`min-w-0 max-w-4xl pb-10 ${helpOnly ? 'mx-auto' : 'mt-2 lg:mt-0'}`}>
         <header className="relative mb-3 overflow-hidden rounded-2xl border border-border bg-surface px-4 py-4 sm:px-5 sm:py-5">
-          <div aria-hidden className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-indigo-500/10 blur-3xl" />
           <div className="relative">
             <div className="mb-3 flex flex-wrap items-center gap-2 font-mono text-2xs uppercase tracking-[0.14em] text-content-subtle">
               <span className="rounded-md border border-indigo-400/30 bg-indigo-500/10 px-2 py-1 text-indigo-300">

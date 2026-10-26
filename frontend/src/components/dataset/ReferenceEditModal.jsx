@@ -163,7 +163,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
 
   return (
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Edit reference photo"
-      className="fixed inset-0 z-[9995] bg-black/80 backdrop-blur-sm flex flex-col p-3 sm:p-4 overflow-y-auto">
+      className="fixed inset-0 z-[9995] bg-black/90 flex flex-col p-3 sm:p-4 overflow-y-auto">
       {/* Opaque card — DO NOT remove. The form has transparent gaps; laid straight
           on the dim overlay, the page reads through. bg-surface is only 4% alpha
           (--surface-alpha) — the opaque modal-panel token is bg-surface-overlay,

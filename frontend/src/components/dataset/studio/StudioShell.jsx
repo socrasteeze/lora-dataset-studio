@@ -98,7 +98,7 @@ export default function StudioShell({ preselectDataset = null, preselectFamily =
   return (
     <div className="flex flex-col gap-2">
       <header data-probe-chrome="header"
-        className="flex items-center gap-2 flex-wrap sticky top-0 z-10 bg-app/80 backdrop-blur py-1">
+        className="flex items-center gap-2 flex-wrap sticky top-0 z-10 bg-app py-1">
         <h1 className="flex items-center gap-2 text-xl font-semibold text-content"><FlaskConical aria-hidden="true" className="h-4 w-4" />Test Studio<HelpBadge topic="page-studio" /></h1>
         {comparison && (
           <span className="px-2 py-0.5 rounded-lg border border-amber-400/40 bg-amber-400/10 text-amber-200 text-2xs font-semibold">

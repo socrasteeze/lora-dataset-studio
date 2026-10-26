@@ -20,7 +20,7 @@ export default function StudioActionBar({ shortcuts = [], canRun, running, onRun
   };
   return (
     <nav aria-label="Studio quick navigation" data-probe-chrome="action-bar"
-      className="fixed bottom-0 left-0 right-0 z-[9960] border-t border-border bg-app/90 backdrop-blur-md">
+      className="fixed bottom-0 left-0 right-0 z-[9960] border-t border-border bg-app">
       <div className="flex items-center gap-1.5 px-3 sm:px-5 py-2 overflow-x-auto">
         {shortcuts.map((s) => (
           <button key={s.id} type="button" onClick={() => jump(s.id)}

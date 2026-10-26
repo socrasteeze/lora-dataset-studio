@@ -81,7 +81,7 @@ export function TipHost() {
   if (!tip) return null
   return (
     <div role="status"
-      className="fixed bottom-4 right-4 z-50 max-w-xs rounded-xl border border-indigo-400/40 bg-surface-overlay/95 p-3 shadow-lg backdrop-blur">
+      className="fixed bottom-4 right-4 z-50 max-w-xs rounded-xl border border-indigo-400/40 bg-surface-overlay p-3 shadow-lg">
       <div className="flex items-start gap-2">
         <Lightbulb aria-hidden="true" className="h-4 w-4 shrink-0" />
         <div className="min-w-0 flex-1">

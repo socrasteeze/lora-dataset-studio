@@ -536,7 +536,7 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
   return (
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="checkpoint-timeline-title"
       data-testid="checkpoint-timeline-panel"
-      className="fixed inset-0 z-[90] flex items-stretch justify-center bg-black/80 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+      className="fixed inset-0 z-[90] flex items-stretch justify-center bg-black/90 p-0 sm:items-center sm:p-4">
       <section className="flex h-full min-h-0 w-full flex-col overflow-hidden border-border bg-surface-overlay shadow-2xl sm:max-h-[94vh] sm:max-w-5xl sm:rounded-xl sm:border">
         <header className="flex shrink-0 items-start gap-3 border-b border-border px-3 py-3 sm:px-4">
           <div className="min-w-0 flex-1">
