@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-25-zero-glass-plainer-chrome', date: '2026-10-25',
+    title: 'Plainer, easier-to-read panels',
+    blurb: 'Bars, docks, toasts and dialogs now sit on solid backgrounds instead of blurred glass, so text stays crisp over busy images. The header title is plain orange, live indicators no longer pulse, and Guide chapters are numbered 1 to 6.',
+  },
+  {
     id: '2026-10-25-your-fastest-anima-run-preset', date: '2026-10-25',
     title: 'Anima characters train with your fastest recipe',
     blurb: 'The Anima · Character preset now carries your fastest local run: batch 2, the new Automagic4 optimizer, rank 32 with Conv 16, 1024 px and no person masking, with step counts sized for batch 2. Automagic4 is also in the optimizer list for every family.',
