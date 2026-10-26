@@ -8,6 +8,15 @@ REM (UnicodeDecodeError). Reported by the community. Requirements comments are
 REM also kept ASCII-only as a second line of defence.
 set "PYTHONUTF8=1"
 
+REM --- One copy on the desktop. When the app is already running, open it in the
+REM     browser and stop here, before any venv or pip work. The check is stdlib
+REM     only (backend\single_instance.py); exit code 10 means "already running".
+REM     LDS_ALLOW_SECOND_INSTANCE=1 skips it on purpose.
+if exist ".venv\Scripts\python.exe" if not "%LDS_ALLOW_SECOND_INSTANCE%"=="1" (
+  ".venv\Scripts\python.exe" backend\single_instance.py
+  if errorlevel 10 if not errorlevel 11 exit /b 0
+)
+
 REM --- Pick a Python the OPTIONAL ML extras have wheels for (CPython 3.10-3.12).
 REM     insightface / numpy<2 / onnxruntime publish NO wheels for 3.13+, so a venv
 REM     built on e.g. 3.14 cannot install requirements-ml.txt (pip falls back to

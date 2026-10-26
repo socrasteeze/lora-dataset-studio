@@ -212,3 +212,109 @@ def test_the_duplicate_launch_browser_path_has_a_module_level_import():
         for alias in node.names
     }
     assert 'webbrowser' in imported
+
+
+# ── a busy server, the port slide and the double-click ──────────────────────
+
+def test_a_port_that_accepts_but_does_not_answer_in_time_is_busy():
+    """A long GPU pass can keep /api/health from answering inside the window.
+    That server is still running; reading it as stale started a second one."""
+    import socket
+    listener = socket.socket()
+    listener.bind(('127.0.0.1', 0))
+    listener.listen(1)          # accepts at the kernel, never replies
+    try:
+        port = listener.getsockname()[1]
+        assert si.health_state('127.0.0.1', port, timeout=0.3) == 'busy'
+        assert si.health_answers('127.0.0.1', port, timeout=0.3) is False
+    finally:
+        listener.close()
+
+
+def test_a_closed_port_is_not_busy():
+    probe = HTTPServer(('127.0.0.1', 0), _Handler)
+    port = probe.server_port
+    probe.server_close()
+    assert si.health_state('127.0.0.1', port, timeout=0.5) == 'no'
+
+
+def test_an_alive_pid_with_a_busy_port_still_refuses_the_boot(tmp_path, monkeypatch):
+    _foreign_lock(tmp_path)
+    monkeypatch.setattr(si, 'health_state', lambda host, port, timeout=None: 'busy')
+    info = si.live_instance(tmp_path, environ={}, _pid_alive=lambda pid: True)
+    assert info and info['port'] == 5050
+
+
+def test_another_copy_on_the_requested_port_blocks_the_slide():
+    assert si.lds_on_port('0.0.0.0', 5050, environ={},
+                          _health=lambda host, port: True) is True
+    assert si.lds_on_port('0.0.0.0', 5050, environ={},
+                          _health=lambda host, port: False) is False
+    assert si.lds_on_port('0.0.0.0', 5050, environ={si.BYPASS_ENV: '1'},
+                          _health=lambda host, port: True) is False
+
+
+def test_running_url_prefers_a_profile_lock_then_the_port(tmp_path):
+    def live(data_dir, environ):
+        return ({'pid': 1, 'port': 5099, 'host': '0.0.0.0'}
+                if str(data_dir).endswith('b') else None)
+    assert si.running_url(environ={}, data_dirs=['a', 'b'], port=5050,
+                          _live=live, _on_port=lambda *a, **k: True) \
+        == 'http://127.0.0.1:5099/'
+    assert si.running_url(environ={}, data_dirs=['a'], port=5050,
+                          _live=live, _on_port=lambda *a, **k: True) \
+        == 'http://127.0.0.1:5050/'
+    assert si.running_url(environ={}, data_dirs=['a'], port=5050,
+                          _live=live, _on_port=lambda *a, **k: False) is None
+    assert si.running_url(environ={si.BYPASS_ENV: '1'}, data_dirs=['b'],
+                          _live=live, _on_port=lambda *a, **k: True) is None
+
+
+def test_the_precheck_opens_the_running_app_and_says_stop(capsys):
+    opened = []
+    code = si.main({}, _running=lambda environ: 'http://127.0.0.1:5050/',
+                   _open=opened.append)
+    assert code == si.ALREADY_RUNNING_EXIT
+    assert opened == ['http://127.0.0.1:5050/']
+    assert 'already running' in capsys.readouterr().out
+
+
+def test_the_precheck_lets_a_first_launch_through():
+    opened = []
+    assert si.main({}, _running=lambda environ: None, _open=opened.append) == 0
+    assert opened == []
+
+
+def test_no_browser_settings_keep_the_existing_app_closed():
+    opened = []
+    assert si.open_existing('u', environ={'LDS_NO_BROWSER': '1'},
+                            _open=opened.append) is False
+    assert si.open_existing('u', environ={'LDS_OPEN_BROWSER': '0'},
+                            _open=opened.append) is False
+    assert si.open_existing('u', environ={}, _open=opened.append) is True
+    assert opened == ['u']
+
+
+def test_configured_port_reads_env_then_config(tmp_path):
+    cfg = tmp_path / 'config.json'
+    cfg.write_text(json.dumps({'server': {'port': 5123}}), encoding='utf-8')
+    assert si.configured_port({'LDS_PORT': '5077', 'LDS_CONFIG': str(cfg)}) == 5077
+    assert si.configured_port({'LDS_CONFIG': str(cfg)}) == 5123
+    assert si.configured_port({'LDS_CONFIG': str(tmp_path / 'none.json')}) \
+        == si.DEFAULT_PORT
+
+
+def test_start_bat_runs_the_precheck_before_any_venv_or_pip_work():
+    bat = (Path(__file__).parents[2] / 'start.bat').read_bytes()
+    assert bat.isascii(), 'Windows scripts stay ASCII-only'
+    text = bat.decode('ascii')
+    check = text.index(r'backend\single_instance.py')
+    assert check < text.index('-m venv') and check < text.index('pip install')
+    assert 'if errorlevel 10' in text[check:check + 400]
+
+
+def test_run_py_refuses_before_sliding_onto_another_copy():
+    run_py = (Path(__file__).parents[1] / 'run.py').read_text(encoding='utf-8')
+    main_block = run_py[run_py.index("if __name__ == '__main__':\n    host"):]
+    assert main_block.index('lds_on_port(') < main_block.index('startup_port(')
+    assert 'open_existing(' in main_block
