@@ -20,6 +20,58 @@
   padding-inline: 0;
 }
 
+/* The manual prints as a document without workspace controls or clipped rails. */
+@media print {
+  body:has(.guide-page) {
+    --bg-app: 255 255 255;
+    --surface: 255 255 255;
+    --surface-raised: 245 245 245;
+    --surface-overlay: 255 255 255;
+    --text-base: 0 0 0;
+    --content: 0 0 0;
+    --content-muted: 40 40 40;
+    --content-subtle: 65 65 65;
+    --border: 170 170 170;
+    color-scheme: light;
+    margin: 0;
+    padding: 0;
+    background: white;
+    color: black;
+  }
+  body:has(.guide-page) #root > :not(:has(.guide-page)),
+  body:has(.guide-page) #root > :has(.guide-page) > :not(main),
+  body:has(.guide-page) #main-content > :not(.guide-page),
+  .guide-page :is(aside, nav, button, .guide-search, .guide-progress) {
+    display: none !important;
+  }
+  body:has(.guide-page) #main-content,
+  .guide-page,
+  .guide-article {
+    display: block !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .guide-article * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    color: black !important;
+    background: transparent !important;
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  .guide-article :is(h1, h2, h3) { break-after: avoid; }
+  .guide-article :is(pre, tr, img) { break-inside: avoid; }
+  .guide-article pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .guide-article table { table-layout: fixed; overflow-wrap: anywhere; }
+  .guide-article img { max-width: 100%; }
+  .guide-article a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.8em; overflow-wrap: anywhere; }
+}
+
 /* Core and plugin Settings share one field layout. Compound panels keep a
    full row; individual fields use the width available beside the sidebar. */
 .settings-page .settings-fields {
@@ -306,7 +358,7 @@
      --surface-overlay modal/backdrop panels    (#212124, opaque)
      --content         primary text             (#E8E6E1, warm off-white)
      --content-muted   secondary text           (#98968F)
-     --content-subtle  tertiary / placeholder   (#6E6C66)
+     --content-subtle  tertiary / placeholder   (#93918C)
      --border          hairline borders         (#333338, opaque)
      --border-strong   stronger borders         (#45454B, opaque)
      --accent          the safelight amber      (#E1861F — dark text on fills)
@@ -344,7 +396,7 @@
   --surface-overlay: 33 33 36;     /* #212124 — opaque modal panel */
   --content: 232 230 225;          /* #E8E6E1 */
   --content-muted: 152 150 143;    /* #98968F */
-  --content-subtle: 110 108 102;   /* #6E6C66 */
+  --content-subtle: 147 145 140;   /* #93918C */
   --border: 51 51 56;              /* #333338 — opaque hairline */
   --border-alpha: 1;
   --border-strong: 69 69 75;       /* #45454B */

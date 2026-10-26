@@ -201,10 +201,12 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
 export default function FolderPickerField({
   id, label, value, onChange, placeholder, required, hint, size = 'md', inline = false,
   fieldClassName = 'min-w-64 grow-[3]', browseClassName,
+  inputProps = {},
 }) {
   const [browsing, setBrowsing] = useState(false)
   const field = (
     <Input id={id} size={size} value={value} onChange={(e) => onChange(e.target.value)}
+      {...inputProps}
       placeholder={placeholder} required={required}
       className="w-full min-w-0 grow font-mono" />
   )

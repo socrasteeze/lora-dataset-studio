@@ -1,5 +1,23 @@
 # HANDOFF
 
+## Web polish audit fixes (2026-10-26)
+
+Branch `fix/web-polish-audit` holds the ten applicable audit fixes as local
+working-tree changes. No commit, push, merge, release or backend restart.
+The frontend bundle is rebuilt from this source for the fork distribution.
+
+Changes cover deletion-dialog keyboard containment, pending settings edits,
+Bank validation/load recovery, readable controls, mobile settings search,
+guide search, credential visibility, Git revision dates, guide print layout
+and reading progress. README, Guide, help registry and What's New describe them.
+Guide dates include active bundled contributors; uncommitted content shows
+Local Edits, and absent Git history reports revision unavailable.
+
+Ruff passed. ESLint passed with 32 existing warnings and no errors. The source
+privacy scan reported zero findings. Tests, responsive probes, print rendering,
+physical-device checks and full qualification were not requested and did not run.
+Reload the app to load the rebuilt frontend. Run no tests without authorization.
+
 ## Anima booru captions and signature traits (2026-10-25)
 
 Task branch `feat/anima-booru-signature-tags` source `f912bcfb1` and bundle `ea52609bc`

@@ -84,6 +84,9 @@ const action = (id, title, keywords, route, chapter, anchor, tip) => ({
 });
 
 const TOPICS = [
+  action('guide-reader', 'Guide Reader Tools',
+    ['guide', 'manual', 'search', 'print', 'revision', 'updated', 'reading progress'],
+    '/guide/getting-started', 'getting-started', 'around-the-app'),
   { id: 'dataset-folder-category', kind: 'setting', title: 'Folder Category',
     keywords: ['dataset', 'folder', 'category', 'CHAR', 'STYL', 'MISC', 'destination'],
     guide: { chapter: 'settings-reference', anchor: 'new-media-destinations' },

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useFocusTrap } from '../../hooks/useFocusTrap'
 import { apiFetch, postJson } from '../../api/fetchClient'
 import { useToast } from '../common/Toast'
 import {
@@ -19,6 +20,25 @@ export default function DeleteRejectedDialog({ bankId, count, sourcePath, onClos
   const [confirm, setConfirm] = useState('')
   const [busy, setBusy] = useState(false)
   const [preview, setPreview] = useState(null)
+  const dialogRef = useRef(null)
+  const cancelRef = useRef(null)
+  useFocusTrap(dialogRef)
+  useEffect(() => {
+    cancelRef.current?.focus()
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = overflow }
+  }, [])
+  useEffect(() => {
+    const close = (event) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      if (!busy) onClose()
+    }
+    window.addEventListener('keydown', close, true)
+    return () => window.removeEventListener('keydown', close, true)
+  }, [busy, onClose])
   const armed = confirm.trim().toUpperCase() === 'DELETE'
 
   useEffect(() => {
@@ -61,7 +81,7 @@ export default function DeleteRejectedDialog({ bankId, count, sourcePath, onClos
   }
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Delete rejected from disk"
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Delete rejected from disk" aria-busy={busy}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
       <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl border border-rose-500/60 bg-surface-overlay p-4 sm:p-5 shadow-2xl space-y-4">
         <h2 className="text-base font-bold text-rose-300">🗑 Delete rejected from disk</h2>
@@ -113,7 +133,7 @@ export default function DeleteRejectedDialog({ bankId, count, sourcePath, onClos
             className="mt-1 w-full rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content" />
         </div>
         <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-          <button type="button" onClick={onClose} autoFocus
+          <button ref={cancelRef} type="button" onClick={() => { if (!busy) onClose() }} aria-disabled={busy}
             className="rounded-md border border-border px-3 py-1.5 text-sm text-content hover:bg-surface-raised">
             Cancel
           </button>

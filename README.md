@@ -966,6 +966,10 @@ console.
 
 ## Documentation
 
+The in-app Guide searches core chapters and active plugin guidance. It shows
+content revision dates and reading progress, and prints the current chapter
+without workspace controls. Settings search also works on phones.
+
 - [Getting started](docs/guide/getting-started.md) and [end-to-end workflow](docs/guide/workflow.md)
 - [Task instructions](docs/guide/using-the-app.md) and [dataset quality](docs/DATASET_GUIDE.md)
 - [Settings, models and paths](docs/guide/settings-reference.md), [external tools](docs/guide/installation.md#external-tools)

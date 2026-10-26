@@ -30,7 +30,7 @@ const BTN_SIZE = {
 }
 
 const BTN_VARIANT = {
-  primary: 'bg-gradient-primary text-gray-950 font-semibold',
+  primary: 'bg-gradient-primary text-gray-950 font-semibold enabled:hover:brightness-110 enabled:active:brightness-90',
   secondary: 'border border-border bg-surface text-content hover:bg-surface-raised',
   danger: 'bg-red-600/80 text-white font-semibold hover:bg-red-600',
   ghost: 'text-content-muted hover:text-content hover:bg-surface-raised',
