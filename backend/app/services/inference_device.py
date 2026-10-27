@@ -12,8 +12,9 @@ logger = logging.getLogger(__name__)
 
 
 @contextmanager
-def preferred_device(python, *, backend='onnx', preference='auto'):
-    """Yield CUDA only with a capable runtime and an owned GPU window."""
+def preferred_device(python, *, backend='onnx', preference='auto', on_cpu=None):
+    """Yield CUDA only with a capable runtime and an owned GPU window.
+    ``on_cpu(reason)`` hears why an 'auto' run fell back, so a pass can say so."""
     from ..capabilities import _cached_import
 
     if preference not in ('auto', 'cuda'):
@@ -27,6 +28,8 @@ def preferred_device(python, *, backend='onnx', preference='auto'):
     else:
         raise ValueError('Unknown inference backend')
     if not _cached_import('preferred_' + backend + '_gpu', python, probe):
+        if on_cpu:
+            on_cpu('no CUDA runtime in its environment')
         yield 'cpu'
         return
     if vision_window_is_owned():
@@ -35,8 +38,10 @@ def preferred_device(python, *, backend='onnx', preference='auto'):
     with ExitStack() as stack:
         try:
             stack.enter_context(gpu_exclusive_vision_window(flag_ttl=1800))
-        except GpuBusyError:
+        except GpuBusyError as e:
             logger.info('GPU is occupied; inference uses CPU for this run')
+            if on_cpu:
+                on_cpu(str(e) or 'the GPU is busy')
             yield 'cpu'
             return
         yield 'cuda'

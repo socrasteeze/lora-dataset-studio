@@ -74,7 +74,7 @@ def caption_images(paths, infer, *, use_cache=True, on_progress=None, should_sto
     """Reuse raw scores only for identical bytes, weights, config and preprocessing."""
     model = model_signature()
     hashes, keys, results, facts, errors = {}, {}, {}, {}, {}
-    misses = []
+    misses, verified = [], set()
     for index, path in enumerate(paths):
         if should_stop and should_stop():
             break
@@ -125,6 +125,7 @@ def caption_images(paths, infer, *, use_cache=True, on_progress=None, should_sto
                     or signature != fingerprint(path)):
                 errors[path] = 'Image changed during pre-tagging. Run pre-tagging again.'
                 continue
+            verified.add(path)
             key = cache_key(model, signature)
             results[path], facts[path], keys[path] = raw, source, key
             pending.append({'key': key, 'payload': json.dumps({
@@ -137,10 +138,11 @@ def caption_images(paths, infer, *, use_cache=True, on_progress=None, should_sto
                 connection.execute(statement.on_conflict_do_update(
                     index_elements=['key'], set_={'payload': statement.excluded.payload}), pending)
     # Cache hits also require a final source check before a caller can publish them.
+    # Fresh results were hashed again just above; reading them a third time adds nothing.
     if model_signature() != model:
         raise RuntimeError('PixAI changed during tagging. Run pre-tagging again.')
     for path in list(results):
-        if fingerprint(path) != facts[path].get('sha256'):
+        if path not in verified and fingerprint(path) != facts[path].get('sha256'):
             results.pop(path)
             facts.pop(path)
             keys.pop(path, None)
