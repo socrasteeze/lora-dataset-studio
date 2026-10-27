@@ -21,6 +21,7 @@ _QUALITY = frozenset({
 })
 _META = frozenset({
     'highres', 'absurdres', 'lowres', 'incredibly absurdres',
+    'official art', 'ai-generated', 'ai generated', 'photoshop \\(medium\\)',
 })
 _SAFETY = frozenset({
     'safe', 'sensitive', 'nsfw', 'explicit', 'general', 'questionable',
@@ -170,6 +171,27 @@ def format_anima_booru(results, *, include_character: bool) -> str:
     return ', '.join(ordered)
 
 
+def format_anima_caption(results, *, include_character: bool,
+                         image_facts: dict | None = None) -> str:
+    """Keep caption content before category information is flattened.
+
+    General tags describe the image. A Style dataset may also name its subjects.
+    Copyright, artist, style, provenance, quality and rating categories do not
+    describe caption content, even when their tag names look like ordinary words.
+    The raw category maps remain intact for other callers, including recognition.
+    """
+    allowed = {'general', 'character'} if include_character else {'general'}
+    content = {category: dict(scores) for category, scores in _category_maps(results)
+               if category.strip().lower() in allowed}
+    if image_facts and image_facts.get('transparent') is False:
+        for scores in content.values():
+            for tag in list(scores):
+                if normalize_anima_tag(tag) == 'transparent background':
+                    del scores[tag]
+    text = format_anima_booru(content, include_character=include_character)
+    return anima_character_tags(text)
+
+
 def anima_character_tags(caption: str) -> str:
     """A character tag line in final shape: count tags first, then the rest in
     their order. Quality, score, meta, year and rating tags are removed, and
@@ -186,6 +208,8 @@ def anima_character_tags(caption: str) -> str:
         (counts if bucket == 'count' else rest).append(tag)
     if len(counts) == 1 and counts[0] in ('1girl', '1boy', '1other'):
         counts.append('solo')
+    # Subject counts precede solo/focus tags, regardless of confidence ordering.
+    counts.sort(key=lambda tag: tag in ('solo', 'solo focus'))
     return ', '.join(counts + rest)
 
 

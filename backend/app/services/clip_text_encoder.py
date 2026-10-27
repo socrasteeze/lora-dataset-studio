@@ -38,10 +38,11 @@ So the arbitration is three-layered, cheapest first:
    phrase beats surrendering 2.4 GB. ``release()`` reaps it immediately when the
    user closes the search panel; the timer is the backstop for a closed tab.
 
-**CPU, always.** The text tower is small and the cost is the load, not the maths,
-so the GPU would buy nothing measurable and would make a search collide with a
-training run. The child hides CUDA from itself, no GPU window is ever taken, and
-a search works fine WHILE a LoRA trains — it competes for RAM, never for VRAM.
+**GPU preferred, CPU fallback.** Uncached queries use CUDA when the prepared
+runtime supports it and the exclusive GPU window is available. GPU workers exit
+before that window closes. CPU fallback workers retain the idle warm-cache
+behavior above, so searches remain available while another task owns the GPU.
+The historical CPU timings above are not measurements of the CUDA path.
 
 **No silent download.** open_clip fetches ~1.6 GB of ViT-L/14 weights on first
 use. Text search never triggers that on its own: it refuses outright unless the
@@ -62,12 +63,14 @@ import sys
 import threading
 import time
 from collections import OrderedDict, deque
+from contextlib import contextmanager
 import zipfile
 
 from .. import config as cfg
 from ..utils.redact import redact_tokens, redact_user_paths
 from . import atomic_npz
 from . import infer_env
+from .inference_device import preferred_device
 
 logger = logging.getLogger(__name__)
 
@@ -565,6 +568,7 @@ def _stop_worker_locked():
     except Exception:  # noqa: BLE001
         try:
             proc.kill()
+            proc.wait()
         except Exception:  # noqa: BLE001
             pass
 
@@ -585,6 +589,7 @@ def _stop_siglip2_worker_locked():
     except Exception:  # noqa: BLE001
         try:
             proc.kill()
+            proc.wait()
         except Exception:  # noqa: BLE001
             pass
 
@@ -628,12 +633,13 @@ def status(engine='clip') -> dict:
             'weights_warning': warning, 'engine': selected}
 
 
-def _start_worker_locked():
+def _start_worker_locked(device='cpu'):
     """Spawn the child and block until it says it is ready. Caller holds the lock."""
     global _proc, _reaper
     python = cfg.get('bank_scoring.python') or sys.executable
     env = dict(os.environ)
-    env['CUDA_VISIBLE_DEVICES'] = ''          # belt and braces with the child
+    if device == 'cpu':
+        env['CUDA_VISIBLE_DEVICES'] = ''
     env['PYTHONUTF8'] = '1'
     try:
         proc = subprocess.Popen(
@@ -649,7 +655,8 @@ def _start_worker_locked():
     noise = []
     try:
         proc.stdin.write(json.dumps({
-            'models_root': cfg.get('bank_scoring.models_root') or None}) + '\n')
+            'models_root': cfg.get('bank_scoring.models_root') or None,
+            'device': device}) + '\n')
         proc.stdin.flush()
         data = _read_json_with_timeout(proc, START_TIMEOUT, noise)
     except TextEncodeError as e:
@@ -671,13 +678,14 @@ def _start_worker_locked():
     return proc
 
 
-def _start_siglip2_worker_locked():
-    """Spawn the local-only CPU SigLIP2 child and validate its exact space."""
+def _start_siglip2_worker_locked(device='cpu'):
+    """Spawn the local-only SigLIP2 child and validate its exact space."""
     global _siglip2_proc, _siglip2_reaper
     from . import bank_semantic_engine, bank_semantic_models
     python = bank_semantic_models.semantic_python()
     env = dict(os.environ)
-    env['CUDA_VISIBLE_DEVICES'] = ''
+    if device == 'cpu':
+        env['CUDA_VISIBLE_DEVICES'] = ''
     env['PYTHONUTF8'] = '1'
     try:
         proc = subprocess.Popen(
@@ -692,6 +700,7 @@ def _start_siglip2_worker_locked():
     _attach_stderr_drain(proc)
     noise = []
     contract = bank_semantic_engine.text_worker_handshake('siglip2')
+    contract['device'] = device
     try:
         proc.stdin.write(json.dumps(contract) + '\n')
         proc.stdin.flush()
@@ -867,6 +876,29 @@ def _transcript(proc, noise=None):
     return ' — ' + '; '.join(chunks)
 
 
+@contextmanager
+def _query_worker(engine):
+    """Release CUDA workers before their GPU ownership ends; keep CPU workers warm."""
+    from . import bank_semantic_models
+    python = (bank_semantic_models.semantic_python() if engine == 'siglip2'
+              else cfg.get('bank_scoring.python') or sys.executable)
+    preference = (cfg.get('bank_semantic.device') or 'auto') if engine == 'siglip2' else 'auto'
+    stop = _stop_siglip2_worker_locked if engine == 'siglip2' else _stop_worker_locked
+    start = _start_siglip2_worker_locked if engine == 'siglip2' else _start_worker_locked
+    with _lock, preferred_device(python, backend='torch', preference=preference) as device:
+        if device == 'cuda':
+            stop()
+        try:
+            current = _siglip2_proc if engine == 'siglip2' else _proc
+            proc = current if current is not None and current.poll() is None else None
+            if proc is None:
+                proc = start(device=device) if device == 'cuda' else start()
+            yield proc
+        finally:
+            if device == 'cuda' or idle_minutes() <= 0:
+                stop()
+
+
 def _encode_uncached(texts, models_root=None):
     """[vector] for `texts`, through the warm worker (started on demand). Raises
     TextEncodeError with the child's message on any failure. Monkeypatched
@@ -874,10 +906,7 @@ def _encode_uncached(texts, models_root=None):
     global _last_used
     import numpy as np
     out = []
-    with _lock:
-        proc = _proc if (_proc is not None and _proc.poll() is None) else None
-        if proc is None:
-            proc = _start_worker_locked()
+    with _query_worker('clip') as proc:
         for text in texts:
             noise = []
             try:
@@ -895,10 +924,6 @@ def _encode_uncached(texts, models_root=None):
                 raise TextEncodeError(str(data.get('error') or 'unknown encoder error'))
             out.append(np.asarray(data.get('vector') or [], dtype='float32'))
         _last_used = time.time()
-        # idle_minutes == 0 means "never stay warm" — reap as soon as the answer
-        # is in hand, so a memory-tight machine never carries the 2.4 GB.
-        if idle_minutes() <= 0:
-            _stop_worker_locked()
     return out
 
 
@@ -909,11 +934,7 @@ def _encode_siglip2_uncached(texts):
     from . import bank_semantic_engine
     contract = bank_semantic_engine.text_worker_handshake('siglip2')
     out = []
-    with _lock:
-        proc = (_siglip2_proc if (_siglip2_proc is not None
-                                  and _siglip2_proc.poll() is None) else None)
-        if proc is None:
-            proc = _start_siglip2_worker_locked()
+    with _query_worker('siglip2') as proc:
         for text in texts:
             noise = []
             try:
@@ -946,8 +967,6 @@ def _encode_siglip2_uncached(texts):
                     'the SigLIP2 text encoder returned an incompatible vector')
             out.append(vector)
         _siglip2_last_used = time.time()
-        if idle_minutes() <= 0:
-            _stop_siglip2_worker_locked()
     return out
 
 

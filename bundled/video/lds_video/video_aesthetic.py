@@ -12,10 +12,11 @@ WHY IT COSTS NOTHING. 🔎 Find scenes already embedded three frames of every sh
 into open_clip ViT-L/14 (openai) and wrote them to the bank's own .npz — the SAME
 768-d space the image bank's ✨ Score pass rates. The improved-aesthetic-predictor
 head is a 768→1 MLP over exactly that vector, so this pass DECODES NOTHING,
-EMBEDS NOTHING and TOUCHES NO CARD: it hands the store to a small CPU subprocess
-and writes the numbers back. The same argument that makes ✂ Duplicates instant.
-Measured, on a forged store the size of a 3 000-shot bank (9 000 frames, 25.7 MB):
-1.8 s end to end, cold subprocess and torch import included.
+EMBEDS NOTHING: it hands the store to a small subprocess and writes the numbers
+back. CUDA uses the exclusive GPU window; an unavailable or occupied GPU falls
+back to CPU. The historical CPU measurement on a synthetic 3 000-shot store
+(9 000 frames, 25.7 MB) was 1.8 s, including cold subprocess and torch import.
+No CUDA speed improvement is established by that measurement.
 
 WHY IT RIDES THE EMBED PASS RATHER THAN A BUTTON OF ITS OWN. Two reasons, and
 the second is the one that decided it. A shot cannot be rated before it is
@@ -131,18 +132,18 @@ def score_frames(bank_id, *, timeout=TIMEOUT):
         return {}
     python = cfg.get('bank_scoring.python') or sys.executable
     env = infer_env.worker_env(python, PYTHONUTF8='1')
-    # Belt and braces with the child, which hides CUDA again before it imports
-    # torch: this pass has no use for a card on any bank size, and must never be
-    # the reason a training run loses one.
-    env['CUDA_VISIBLE_DEVICES'] = ''
-    payload = json.dumps({'store': str(store),
-                          'models_root': cfg.get('bank_scoring.models_root') or None})
     try:
-        proc = subprocess.run(
-            infer_env.worker_argv(python, _SCRIPT),
-            input=payload + '\n', capture_output=True,
-            text=True, encoding='utf-8', errors='replace', timeout=timeout,
-            env=env, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        from lds_sdk.video_host.gpu import preferred_device
+        with preferred_device(python, backend='torch') as device:
+            if device == 'cpu':
+                env['CUDA_VISIBLE_DEVICES'] = ''
+            payload = json.dumps({'store': str(store), 'device': device,
+                                  'models_root': cfg.get('bank_scoring.models_root') or None})
+            proc = subprocess.run(
+                infer_env.worker_argv(python, _SCRIPT),
+                input=payload + '\n', capture_output=True,
+                text=True, encoding='utf-8', errors='replace', timeout=timeout,
+                env=env, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     except subprocess.TimeoutExpired:
         raise RuntimeError('the look score timed out — check the ✨ Score '
                            'interpreter') from None

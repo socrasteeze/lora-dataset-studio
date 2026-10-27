@@ -218,7 +218,7 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
       <SettingsGroup {...groupProps(captionGroup)}>
       <Card
         title="Captioning"
-        help={`Who writes the captions. Auto prefers JoyCaption (via ai-toolkit) and falls back to the ${llmName} vision model. An Anima dataset skips JoyCaption and uses the configured Qwen3-VL model.`}
+        help={`Auto prefers JoyCaption, then the ${llmName} vision model. Anima booru captions use installed PixAI, otherwise the configured vision model.`}
       >
         <div>
           <label htmlFor="captioning-backend" className="block text-sm font-medium text-content">Captioning Backend</label>
@@ -236,7 +236,7 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
       </Card>
       <Card
         title="PixAI Tagger"
-        help="Writes booru dataset captions. Auto does not select it. Concept datasets and prose require JoyCaption or the local LLM. Install the local model in Setup."
+        help="Anima Auto uses installed PixAI for booru tags. Prose and Concept captions require a vision model. Prepare the local model in Setup."
       >
         <div>
           <label htmlFor="pixai-device" className="block text-sm font-medium text-content">Device</label>

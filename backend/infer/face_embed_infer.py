@@ -312,6 +312,7 @@ def _cluster(order, cache, threshold):
     E /= (np.linalg.norm(E, axis=1, keepdims=True) + 1e-8)   # normed already; belt & braces
     n = len(scorable)
     parent = list(range(n))
+    components = n
 
     def find(a):
         while parent[a] != a:
@@ -320,17 +321,25 @@ def _cluster(order, cache, threshold):
         return a
 
     def union(a, b):
+        nonlocal components
         ra, rb = find(a), find(b)
         if ra != rb:
             parent[rb] = ra
+            components -= 1
 
     chunk = 512
     for i0 in range(0, n, chunk):
+        if components == 1:
+            break
         sims = E[i0:i0 + chunk] @ E.T
-        for a, b in np.argwhere(sims >= threshold):
-            a += i0
-            if a < b:
-                union(int(a), int(b))
+        for offset, similarities in enumerate(sims):
+            a = i0 + offset
+            for b in np.flatnonzero(similarities[a + 1:] >= threshold):
+                union(a, int(b) + a + 1)
+                if components == 1:
+                    break
+            if components == 1:
+                break
     groups = {}
     for i in range(n):
         groups.setdefault(find(i), []).append(i)

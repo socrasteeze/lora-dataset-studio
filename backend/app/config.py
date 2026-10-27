@@ -489,7 +489,7 @@ DEFAULTS = {
     # device: auto (CUDA when the tagger's onnxruntime has it, else CPU) | cuda
     # (refuse to tag rather than fall back to CPU) | cpu (keep the GPU free).
     'wd14': {'python': '', 'models_root': '', 'threshold': 0.35, 'device': 'auto'},
-    # 🔳 The burned-in-text reader (RapidOCR on CPU onnxruntime), used by the
+    # 🔳 The burned-in-text reader (RapidOCR; CPU runtime installed by default), used by the
     # video lane's safe-zone pass. Blank = the app's own interpreter, which is
     # where Setup installs it: the extra is small (an ONNX runtime the app
     # already ships for face scoring and masks, plus ~16 MB of bundled PP-OCR
@@ -497,6 +497,7 @@ DEFAULTS = {
     # the way the detector and the scorer do. The override exists for the user
     # who already keeps a CPU-ML interpreter and would rather not have a second
     # copy of onnxruntime.
+    # A prepared CUDA ONNX runtime uses the GPU when it is free, else CPU.
     'video_text': {'python': ''},
     # 🗣 Which checkpoint writes the video captions. A SETTING rather than a
     # constant because the choice is not a preference: a model that describes

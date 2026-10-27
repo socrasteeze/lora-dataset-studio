@@ -1,5 +1,301 @@
 # HANDOFF
 
+## Clean delivery checkpoint (2026-10-26)
+
+Operator authorized clean delivery to origin/main. Preserve the seven existing
+local training-preset commits as well as this session's GPU, caption-policy,
+Bank cache and shared-pass changes. Source and generated bundle are separate
+commits. Earlier local/uncommitted/no-push notes below are historical snapshots
+and are superseded by this delivery checkpoint. Check Git remote parity for
+the final publication state rather than inferring it from an earlier note.
+
+Tests and rendered probes remain unrun under the operator's repository rules.
+The delivery tip uses [skip ci]; full qualification is incomplete. Both linters,
+the production build and attribution/privacy inspections are required for this
+delivery. Runtime data, image/model files, credentials, private batch plans and
+receipts stay ignored. Preserve the running PixAI and Score queues; do not
+restart the backend or replay jobs as part of Git delivery.
+
+## Shared local-pass optimization audit (2026-10-26)
+
+Operator authorized extending the speedups across local passes. The coverage
+inventory and measured limits are in docs/PASS_BENCHMARKS.md, shared-pass extension.
+Quality, Score/Medium, WD14/PixAI, Faces/Angles, semantic indexing, watermark/text,
+mask/identity, inpaint/crop, framing/caption, ComfyUI operations and shared Video
+workers were inspected. Existing bounded preparation, GPU preference, caches,
+native exceptions and backend-owned model lifetimes remain in place. No new
+production watermark, mask, crop, inpaint, caption or Video job was queued.
+
+New resident families: SigLIP2 semantic indexing and watermark detection. The
+resident stdout adapter now supports streaming as well as read(), and watermark
+scans return complete workers to the pool while partial/stopped scans retire
+them. SigLIP2 model/processor reuse includes its validated contract and device.
+Watermark ranker reuse and successful lazy locator reuse keep the old threshold,
+label, source fingerprint and localization thread behavior. Cold one-shot calls
+remain available. Existing idle, drain, cancel and GPU-contention cleanup applies.
+
+Face grouping and both host/bundled Video grouping now avoid the dense matched
+edge array, preserving traversal/ownership/numbering and exact full-matrix
+arithmetic. Existing real face-cache ABBA timing on 4,096 vectors at 0.45 gave
+median 1.485s before, 0.364s after (4.08x), identical 488 groups. Host and bundled
+Video group_clips ASTs match. No real Video cache exists here; Video throughput
+was not measured. The old OCR module description was corrected to match the
+already-implemented prepared-CUDA/CPU-fallback behavior.
+
+Read-only isolated CPU model comparisons on four existing image copies:
+SigLIP2 9.490s cold, 8.588s initial resident, 0.960s warm; embeddings exactly
+equal. Watermark ranking (localization off) 7.544s cold, 6.272s initial resident,
+0.978s warm; scores/states/fingerprints exactly equal. These forced computation
+with fresh outputs/caches; no saved-result shortcut. They do not establish
+whole-pass GPU rates or localization gains. Receipts are in ignored
+data/pass-optimization-20261026-01. No regression suite or rendered probe ran.
+Three relevant synthetic regressions are written but unrun.
+
+The finite helpers were paused, 324 jobs checkpointed (314 Score and 10 PixAI),
+the active pass stopped cooperatively, and metadata backed up. A normal restart
+activated the new pool; all 324 jobs were restored with normal cache reuse.
+The Score coordinator and PixAI receipt collector were restarted. Score staging remains active. Protected caption/WD14 fingerprints
+still match the original backup. Latest recorded state: one PixAI running, nine
+PixAI pending, 314 Score pending, zero failures; 23,585 cached image receipts.
+These are snapshots. Use the live queue and coordinator plan for current state.
+
+Ruff passed; ESLint has zero errors and 32 existing warnings. Staged build passed
+in 8.42s, previous bundle retained, and served entry matches the build. Privacy
+scan and final review are recorded in the activation receipt. Source and bundle
+remain local and uncommitted. No push or release. Leave LDS running.
+
+## Score scheduling and exact grouping optimization (2026-10-26)
+
+Operator authorized Score alongside PixAI and optimization of those passes.
+Score already uses resident models, prepared CUDA, parallel preparation and
+adaptive batches. The configured scoring runtime confirms CUDA on the RTX 5090.
+Initial metadata had 31,739 missing score/style rows across 286 Banks. Normal
+resume/cache verification is planned for all 327 Banks; rescore remains false.
+
+LDS permits one queue entry per Bank. A finite coordinator submits Score when
+that Bank is free, preserving pending/running PixAI. At the recorded check,
+three Score passes finished, 288 were queued, and 36 remained staged behind
+PixAI, totaling 327. The existing queue had no failures. The plan is persisted
+under ignored data/score-queue-20261026-01/plan.json. The hidden coordinator was
+started from dispatch.py there; it writes progress and a
+final caption/WD14 preservation receipt, does not force rescore or retry failed
+jobs, and stops after the batch or its 48-hour limit. Restarting Studio alone
+does not destroy the plan; the helper tolerates temporary server outages. After
+a host reboot, inspect for an existing helper before resuming dispatch.py with
+the pinned interpreter. Staged jobs enter LDS only when a Bank slot frees.
+
+Style grouping now visits the original upper-triangle edges row by row instead
+of allocating a dense two-column edge array for a whole similarity block.
+The matrix arithmetic, threshold, union order and numbering remain exact.
+An all-connected partition can end early; Stop still returns no partial groups.
+Matched CPU-only ABBA timing on 4,096 existing 768-dimensional cached embeddings
+at threshold 0.7: median 3.316s before and 0.833s after, 3.98x faster, identical
+55 groups. This is the grouping phase, not an end-to-end Score speed claim.
+
+First Score initialization could clear a valid PixAI receipt while rebinding
+the shared analysis fingerprint. The invalidation path now retains only a
+receipt whose independent cached SHA proves the same current bytes. Changed
+images still lose that receipt. Three real authorized pilot Banks (48 images)
+finished with both score heads and style groups, identical PixAI receipt rows,
+and unchanged global caption/WD14 fingerprints. The 52 remaining PixAI jobs at
+activation were checkpointed and restored; completed tags stayed cached.
+
+Ruff passes. ESLint has zero errors and 32 existing warnings. The staged build
+passed in 9.30s, was promoted with the previous bundle retained, and served
+entry bytes match. The privacy scan covered 3,130 files with zero findings.
+The sandbox initially refused esbuild process creation; the authorized build
+succeeded with escalation. Three new regressions are written but unrun; no
+regression suite or rendered probe ran. Work remains local and uncommitted.
+
+## PixAI residency and preparation lanes (2026-10-26)
+
+Implemented, benchmarked and active. A 90-second pre-change sample showed 6.02%
+mean GPU utilization despite 100% bursts. Each small Bank was starting another
+worker and model. The unchanged 15-minute window produced 426 new committed raw
+results: 28.4/minute, 0.473/second. The matched older PixAI benchmark is a different
+workload; do not call its difference a controlled model-speed result.
+
+PixAI now joins the existing resident infer pool. A dedicated resident adapter
+retains one pipeline, invalidates it on model/device changes, and overlaps up to
+four CPU preparation threads with the GPU batches. Prefetch is bounded to eight
+images. One outer Pillow guard protects the process-global threshold while the
+unchanged per-image checks run in parallel. Input order, Stop, native thread caps,
+GPU lease, FP32 and thresholds are preserved. The original PixAI worker file and
+cache identity are unchanged, so completed tag results remain reusable. Resolving
+Transformers.pipeline replaces its lazy module; patch the resolved module. The
+first isolated attempt exposed this, and the repeated comparison verified one
+model load and model_reused true on later requests.
+
+Matched eight-image inference: cold 21.360s, resident repeats 1.196s and 1.192s
+(median 1.194s, 17.89x faster once warm). These runs forced actual inference.
+All 128 full-set raw result maps matched the pre-optimization results exactly;
+warm resident inference for 128 images took 16.124s. The initial resident request
+still pays startup. Private comparison receipts are retained under ignored
+data/pixai-residency-benchmark-20261026-01.
+
+The remaining 271 Bank jobs were checkpointed, stopped cooperatively and restored
+through the normal API after the isolated comparison. No completed tags were
+discarded. The same real resident worker PID served successive Banks after
+activation. A post-change 90-second sample averaged 78.5% GPU, peaking at 100%.
+Its saved cache-count snapshots measured 562 new results over 85 seconds:
+396.71/minute, 6.612/second, about 13.97x the earlier live rate. Bank sizes and
+sample durations differ; this live ratio is not a matched-workload guarantee.
+At the final recorded check, one Bank was running, 216 were pending and none
+were failed. Captions and WD14 fingerprints still match the original backup.
+The read-only completion collector was restarted. Live and final receipts remain
+under ignored data/pixai-bank-run-20261026-01; the original scheduled rate follow-up
+was completed and deleted. Leave LDS running.
+
+Ruff passes. ESLint has zero errors and 32 existing warnings. Build passed in
+7.51s. The privacy scan covered 3,130 text files with zero findings. Four synthetic
+resident regressions are written but unrun. No regression suite or rendered
+probe ran. Work remains local and uncommitted; no push or release.
+
+## All-Bank PixAI run (2026-10-26)
+
+The operator confirmed all 327 Banks are booru and authorized GPU pre-tagging
+without caption replacement. PixAI is set to cuda (GPU-only). All Banks are
+covered: two earlier passes completed, and 325 further passes were accepted by
+the durable local queue without submission errors. Scope is kept/pending images
+with existing folder exclusions preserved, rescan false, and valid cache reuse.
+There are 207,960 candidate rows before exclusions. At the recorded check, three
+Banks had completed, one was running, 323 were pending, and 601 image receipts
+were cached. These counts are a snapshot, not completion evidence.
+
+The complete metadata backup, protected caption/WD14 fingerprints, submission
+manifest and live receipts are in ignored data/pixai-bank-run-20261026-01.
+Both protected-field fingerprints still match after submission. No caption or
+WD14 pass was queued. Leave Studio running. Inspect the existing Bank queue for
+progress, failures, Retry and Stop. Do not automatically retry a failed Bank or
+claim that all images were tagged merely because the queue is empty.
+
+## PixAI Bank pre-tags (2026-10-26)
+
+Implemented and locally activated. Bank > Passes > PixAI Pre-Tags queues a local
+pass for the selection, or kept/pending images by default. Raw category scores
+and source facts live in a profile-local cache. Image SHA-256, weights, model
+configuration, processor code and inference-worker code identify reusable results.
+Dataset PixAI, Caption Lab and hybrid tags reuse them before dataset-specific
+formatting and omission rules. WD14 remains the Bank filtering pass. The pre-tag
+pass never writes captions or caption sidecars. Byte-changing promotion requires
+new inference. The Bank counter is a receipt; reuse validates current bytes again.
+
+The authorized isolated GPU benchmark used 128 byte-identical Bank image copies.
+Pre-tagging took 47.200s, including 7.186s loading and 36.780s tagging on CUDA,
+FP32, batches of four, with no retries or image errors. Three cached dataset
+formatting/output runs took 0.868s, 0.421s and 0.420s, with 128 cache hits and
+zero model invocations each. A fresh process reused all scores in 1.772s. A
+repeat Bank pass reused all scores in 2.075s. These are avoided inference costs,
+not faster GPU computation. Existing benchmark Bank captions and WD14 fields,
+all production table fingerprints, production settings, sources and sidecars
+stayed unchanged. Receipts and separate caption outputs remain under ignored
+data/pixai-bank-benchmark-20261026-01.
+
+The first attempt hit Windows denial while deleting the temporary cancellation
+directory. Cancellation now uses a unique single file in the app data directory,
+with best-effort cleanup. The repeated real GPU run succeeded. Six synthetic
+cache regressions are written but unrun. No regression suite or rendered probe
+was authorized. Ruff passes; ESLint has zero errors and 32 existing warnings.
+The production build passed in 7.27s. The publishable scan covered 3,128 text
+files with zero findings.
+
+Normal launcher activation followed a SQLite backup and empty-queue check.
+Health and Bank statistics return 200. Served entry bytes match the build; the
+cache table, Bank receipt column and new Bank count are present. All preexisting
+fields in the four checked Dataset/Bank metadata tables and three saved-setting
+hashes stayed unchanged. Production cache is empty; no production pre-tagging or
+captioning job ran. Backup and activation receipt remain under ignored
+data/pixai-bank-activation-20261026-01. Refresh the browser to load the control.
+Changes remain local and uncommitted. No push or release.
+
+## Active goal: optimize the Anima booru captioner (2026-10-26)
+
+The goal remains active. Implementation and local activation are complete;
+controlled timing and policy evidence is now recorded below. Three known visual
+tagging errors remain, and full qualification is incomplete. Do not infer
+qualification from lint, a build, capability readiness or unrun regression cases.
+
+Anima caption writers now filter structured PixAI categories before formatting.
+Character keeps general content; Style may also name depicted characters.
+Copyright, artist, style, provenance and rating categories stay out. Visible
+medium tags in general content remain. Batch, Caption Lab, hybrid tags and
+external caption exports share the same policy. The generic tag formatter and
+non-Anima hybrid behavior remain compatible.
+
+Anima Character now resolves the appearance defaults shown in Options without
+saving implicit overrides. Hair and Facial Hair omit; Makeup and Glasses describe.
+Explicit choices win. Batch, preview, hybrid, external exports and leak badges
+share this effective policy; legacy families keep their prior defaults.
+Skin aliases cover the installed model vocabulary. Body-mark matching preserves
+scarves, scarlet clothing and scared expressions. Anima booru short captions keep
+available long-caption count tags and reject stale results after a long edit.
+
+Empty Anima cleanup cannot restore the rejected draft. Source transparency removes
+false transparency tags, EXIF orientation is retained, and completed Dataset
+captions recheck source SHA-256 before saving. Stored captions remain unchanged.
+
+The worker uses CPU batches of one and CUDA batches of up to four, with memory
+backoff and per-image failure isolation. It keeps the installed model processor,
+weights, FP32 precision and confidence thresholds. Stop is cooperative between
+batches; cancelled Dataset jobs write no further captions. Device, batch size,
+retries and load/tag timing are logged for the next actual run.
+
+Ruff passed. ESLint passed with zero errors and 32 existing warnings. The frontend
+build passed in 7.26 seconds. The publishable scan checked 3,126 text files with
+zero findings. New policy/batching/source-fact regressions are written but unrun.
+No regression suite or training ran. Later operator-authorized local comparisons
+and the Bank cache benchmark are recorded above and under Verify.
+
+A healthy new backend boot serves the rebuilt entry. All eight checked
+Dataset/Bank/identity metadata tables and saved config/environment hashes stayed
+unchanged across the latest restart. The stored caption-options API response is
+also unchanged. Private rollback copies and receipts are retained in ignored
+runtime storage. PixAI readiness is confirmed. Separate optimized-worker and
+cache-reuse receipts now exist; neither proves exhaustive visual accuracy.
+
+Next: address remaining visual classification errors before claiming exhaustive
+accuracy. GPU batching showed no speed gain; cache reuse avoids repeated model
+work. Tests require an
+explicit operator request; local tests also require explicit local permission.
+Current edits remain local and uncommitted on `noble/gpu-preferred-inference`.
+No commit, push, merge or release. Preserve the earlier GPU changes and open
+items below. A later delivery must keep source and the bundle in separate commits.
+
+## GPU-preferred inference (2026-10-26)
+
+Branch `noble/gpu-preferred-inference` has local source and rebuilt frontend changes.
+A healthy controlled restart activated them. No commit, push, merge or release.
+Existing open work below remains in place.
+
+Prepared CUDA runtimes now serve PixAI, LaMa and shot detection. The existing
+CUDA scoring and face/mask runtimes remain selected; OCR uses the prepared
+CUDA face/mask runtime with RapidOCR dependencies. Device preferences remain
+Auto/GPU. Setup keeps CPU defaults and preserves operator-installed CUDA builds.
+
+Identity extraction, character suggestions, person/face masks, OCR, uncached
+CLIP/SigLIP2 text queries and video aesthetic scoring prefer CUDA under the
+shared exclusive GPU window. Missing or occupied CUDA uses CPU fallback.
+CUDA text workers exit before GPU release; CPU workers retain idle caching.
+The active bundled Video implementation and compatibility copies both carry
+this policy. No model, threshold, image, caption or identity decision was changed.
+
+Ruff passed. ESLint passed with 32 existing warnings and zero errors. The
+production frontend build passed in 7.67 seconds. The publishable scan checked
+3,045 text files with zero findings. Runtime probes detected CUDA and sm_120 in
+all three converted torch runtimes, and CUDA ONNX plus OCR imports in the selected
+OCR runtime. These are capability checks, not inference or performance results.
+
+The backend has a new healthy boot and serves the matching frontend entry.
+All eight checked dataset/Bank/identity metadata tables and both saved settings
+file hashes stayed unchanged across restart. Private rollback copies, package
+inventories and receipts are retained in ignored runtime storage.
+
+Open: nine new GPU-ownership/fallback regression cases and updated source
+contracts are written but unrun. No tests, rendered probes, production inference,
+captioning, generation, training or performance benchmarks ran for this change.
+Run tests only on an explicit operator request. Any later delivery must keep
+source and the consolidated frontend bundle in separate commits.
+
 ## Web polish audit fixes (2026-10-26)
 
 Branch `fix/web-polish-audit` holds the ten applicable audit fixes as local
@@ -49,8 +345,8 @@ an 18-image threshold) and never found earrings (3 of 30, close-ups only).
 Unfinished:
 - The external recaption route has no UI button. A separate session holds that
   task and stopped because this branch was uncommitted; restart it from this branch.
-- PixAI is not installed on this machine. The PixAI Auto path is covered only by
-  mocked tests.
+- PixAI installation is resolved by the GPU-preferred inference work above.
+  Real-model inference accuracy remains unmeasured for that wave.
 - Auto-suggest is a starting list. View-dependent traits fall below 60%, so the
   operator must confirm or edit the list before captioning.
 - Suggest on a dataset reads stored captions, which no longer contain applied
@@ -240,6 +536,8 @@ The earlier cloud tests and rendered checks are complete. No production inferenc
 | Identity/masking | Identity retains detection/recognition/3D pose. Face masking skips unused face heads. |
 
 ## Verify
+Local PixAI comparison (2026-10-26): operator authorized separate outputs only. The committed worker and current worker each processed the same 31 byte-identical local image snapshots on CUDA with FP32 and unchanged model thresholds. Four measured passes used before/after/after/before order after warm-up. Median worker wall time was 27.419s before and 27.424s after; no speed gain was demonstrated. Both repetitions returned identical raw maps within each version, with no image errors. All 31 baseline captions matched the stored captions. Category-policy violations affected 25 captions before and zero after; omitted identity tags affected three before and zero after; false transparency tags affected five opaque images before and zero after. These counts overlap. Three previously reviewed visual tagging errors remain, so exhaustive caption accuracy is not established. All production database table fingerprints, settings, source images and caption sidecars stayed unchanged. Each version has 31 separate text outputs under ignored data/pixai-comparison-20261026-01, with metrics in report.json. Studio was offline and its normal profile launch lock was held; the GPU window used an isolated database. Configured-address probes did not reach the local services, so direct loopback checks monitored idle ComfyUI/Ollama during measurement and local ComfyUI acknowledged release. The private harness now pins loopback addresses for future comparisons. No regression suite, cloud tests, commit or push ran. Performance improvement and the remaining visual errors are open.
+
 PWA spacing: privacy inspection covered 3087 text files with zero findings; added attribution and whitespace reviews were clear. The compiled CSS contains the new grid/wrapping rules. HTTP readback matched the delivered HTML, entry JavaScript, CSS and Bank chunk; the backend boot was unchanged. No API writes, model work, tests, responsive probes or screenshots were used for this frontend-only delivery. Publication receipt stays in ignored Git storage, pwa-spacing-delivery-20261020.json.
 Native-default activation: new healthy boot, same profile, served entry and JavaScript identical to the built bundle, all 46 metadata-table fingerprints and four saved-setting hashes unchanged. Work stayed idle. Backup and receipts remain under ignored Git storage, lds-auto-crop-activation-20261019-fec84f07. Source and bundle are separate commits with CI skipped. No model job or test was used for activation readback.
 Native-default correction: Ruff passed; ESLint has zero errors and 32 existing warnings. Five changed Python files parsed without imports or execution. The final production build passed in 7.00s after normalizing the two changed Guide sources to their committed LF form. Source inspection confirmed that only LaMa and localization bypass the default cap, including LaMa's shared streamer. The four Score/resource/Bank source files match the prior revision byte for byte. Privacy inspection covered 3087 text files with zero findings. Tests, new benchmarks, inference and rendered probes were not run; full qualification remains incomplete.

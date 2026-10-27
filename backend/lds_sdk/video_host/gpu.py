@@ -5,9 +5,14 @@ def gpu_exclusive_vision_window(*args, **kwargs):
     return gpu_exclusive_vision_window(*args, **kwargs)
 
 
+def preferred_device(*args, **kwargs):
+    from app.services.inference_device import preferred_device
+    return preferred_device(*args, **kwargs)
+
+
 from app.gpu_window import GpuBusyError as GpuBusyError  # noqa: E402 — stable value/type identity
 
-__all__ = ['gpu_exclusive_vision_window', 'GpuBusyError', 'ensure_released_for_comfy', 'release_vision_for_comfy', 'vision_block', 'vision_block_message']
+__all__ = ['gpu_exclusive_vision_window', 'preferred_device', 'GpuBusyError', 'ensure_released_for_comfy', 'release_vision_for_comfy', 'vision_block', 'vision_block_message']
 
 
 def ensure_released_for_comfy(*args, **kwargs):

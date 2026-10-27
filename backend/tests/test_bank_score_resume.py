@@ -33,6 +33,24 @@ def _load_child():
     return mod
 
 
+def test_style_groups_keep_transitive_bridges_and_global_numbering():
+    mod = _load_child()
+    order = ['input-a', 'input-b', 'input-c', 'input-d']
+    vectors = [(1., 0.), (.8, .6), (.28, .96), (-1., 0.)]
+    cache = {p: ('ok', None, None, np.asarray(v, dtype='float32'))
+             for p, v in zip(order, vectors)}
+    assert mod._cluster_style(order, cache, .75) == {
+        'input-a': 1, 'input-b': 1, 'input-c': 1, 'input-d': 2}
+
+
+def test_dense_style_groups_and_cancel_never_return_a_partial_partition():
+    mod = _load_child()
+    order = [f'input-{i}' for i in range(600)]
+    cache = {p: ('ok', None, None, np.ones(3, dtype='float32')) for p in order}
+    assert mod._cluster_style(order, cache, .7) == dict.fromkeys(order, 1)
+    assert mod._cluster_style(order, cache, .7, should_stop=lambda: True) is None
+
+
 # --- stub ML stack (the only way to count real embedding work) ---------------
 class _Val:
     def __init__(self, v):

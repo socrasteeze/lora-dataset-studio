@@ -295,20 +295,13 @@ def test_a_resumed_pass_keeps_counting_the_whole_kept_set(
     assert {t for _, t in seen} == {5}
 
 
-# --- 5. the GPU-exclusive window is not held, so it cannot be leaked ----------
+# --- 5. CPU fallback never takes GPU ownership ------------------------------
 
-def test_the_preview_pass_never_holds_the_gpu_exclusive_window(
+def test_the_cpu_preview_pass_never_holds_the_gpu_exclusive_window(
         app, client, tmp_path, monkeypatch):
-    """A stop that freed the screen without freeing the card would leave the next
-    pass waiting on a lock nobody holds.
-
-    It cannot happen here, and the reason is worth pinning rather than trusting:
-    this detector is CPU-only by construction (face_mask_infer pins
-    CPUExecutionProvider and ctx_id=-1), so the preview never takes the window in
-    the first place. Bank scoring takes it ONLY when its child really runs on the
-    card — same rule, opposite answer. If someone ever wires a window in here,
-    this fails and they have to think about the stop path with it."""
-    from app import gpu_window
+    """An unavailable CUDA runtime keeps the preview out of the GPU window."""
+    from app import capabilities, gpu_window
+    monkeypatch.setattr(capabilities, '_cached_import', lambda *args: False)
     _use(monkeypatch, tmp_path, 'stub.py', _STUB)
     ds_id = _dataset(app, tmp_path, n=3)
     monkeypatch.setenv('FMS_LOG', _log_path(tmp_path))
@@ -330,14 +323,14 @@ def test_the_preview_pass_never_holds_the_gpu_exclusive_window(
     assert gpu_window.vision_gpu_window_blocks_gpu() is False
 
 
-def test_the_detector_is_pinned_to_the_cpu(app):
-    """The premise of the test above, asserted at its source rather than assumed.
-    The day this script asks for CUDA, the preview starts contending for the card
-    and the window question becomes real."""
+def test_the_detector_requires_parent_gpu_permission(app):
+    """Keep CPU fallback while allowing only an explicit parent-owned CUDA request."""
     from app import config as cfg
     src = (cfg.BACKEND_DIR / 'infer' / 'face_mask_infer.py').read_text(encoding='utf-8')
     assert "'CPUExecutionProvider'" in src
-    assert 'ctx_id=-1' in src
+    assert "payload.get('device') == 'cuda'" in src
+    assert "'CUDAExecutionProvider'" in src
+    assert 'ctx_id=0 if use_cuda else -1' in src
 
 
 # --- 6. the child's own half of the contract ---------------------------------

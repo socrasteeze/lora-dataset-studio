@@ -30,6 +30,9 @@ def main() -> int:
         payload = json.loads(sys.stdin.read())
         images = payload.get('images') or []
         out_dir = payload['out_dir']
+        want_cuda = payload.get('device') == 'cuda'
+        if not want_cuda:
+            os.environ['CUDA_VISIBLE_DEVICES'] = ''
     except Exception as e:
         print(json.dumps({"ok": False, "error": f"payload: {e}"}), file=_OUT)
         return 1
@@ -37,7 +40,11 @@ def main() -> int:
     try:
         from PIL import Image
         from rembg import new_session, remove
-        session = new_session('u2net', providers=['CPUExecutionProvider'])
+        import onnxruntime
+        use_cuda = want_cuda and 'CUDAExecutionProvider' in onnxruntime.get_available_providers()
+        providers = (['CUDAExecutionProvider', 'CPUExecutionProvider'] if use_cuda
+                     else ['CPUExecutionProvider'])
+        session = new_session('u2net', providers=providers)
     except Exception as e:
         print(json.dumps({"ok": False, "error": f"rembg init: {e}"}), file=_OUT)
         return 1

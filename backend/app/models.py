@@ -501,6 +501,14 @@ class ImageBank(db.Model):
         return f'<ImageBank {self.id} {self.name}>'
 
 
+class PixaiTagCache(db.Model):
+    """Profile-local raw PixAI results, addressed by model and exact image bytes."""
+    __tablename__ = 'pixai_tag_cache'
+    key = db.Column(String(64), primary_key=True)
+    payload = db.Column(Text, nullable=False)
+    created_at = db.Column(DateTime, default=db.func.current_timestamp())
+
+
 class BankImage(db.Model):
     """One file of an image bank. RAW quality scores are persisted (never the
     verdicts): blur/noise/uniformity flags are recomputed against the current
@@ -704,6 +712,8 @@ class BankImage(db.Model):
     tags = db.Column(Text, nullable=True)
     tags_text = db.Column(Text, nullable=True)
     tags_state = db.Column(String(16), nullable=True, index=True)
+    # A coverage receipt only. Reuse always checks current image and model hashes.
+    pixai_cache_key = db.Column(String(64), nullable=True)
     # Medium pass — WHAT THE PICTURE IS MADE OF, as opposed to `origin`, which
     # reads the file's metadata. The two answer different questions and must
     # never be conflated: an AI-generated photorealistic portrait is origin='ai'

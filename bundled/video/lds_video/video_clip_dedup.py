@@ -153,6 +153,7 @@ def group_clips(vectors, threshold):
     import numpy as np
     ids = sorted(cid for cid, frames in vectors.items() if frames)
     parent = list(range(len(ids)))
+    components = len(ids)
 
     def find(a):
         while parent[a] != a:
@@ -161,9 +162,11 @@ def group_clips(vectors, threshold):
         return a
 
     def union(a, b):
+        nonlocal components
         ra, rb = find(a), find(b)
         if ra != rb:
             parent[rb] = ra
+            components -= 1
 
     if len(ids) >= 2:
         owner = []                      # frame row -> position in `ids`
@@ -174,17 +177,21 @@ def group_clips(vectors, threshold):
             owner.extend([pos] * len(M))
         E = np.vstack(blocks)
         owner = np.asarray(owner)
+        later_owner_start = np.searchsorted(owner, np.arange(len(ids)) + 1)
         for i0 in range(0, len(E), _ROW_BLOCK):
+            if components == 1:
+                break
             sims = E[i0:i0 + _ROW_BLOCK] @ E.T
-            for a, b in np.argwhere(sims >= threshold):
-                pa = int(owner[i0 + int(a)])
-                pb = int(owner[int(b)])
-                # `<` drops the diagonal, the mirror pairs, AND every pair of
-                # frames belonging to the SAME shot — a shot is not its own
-                # duplicate, and its own three frames are the most similar rows
-                # in the whole matrix.
-                if pa < pb:
-                    union(pa, pb)
+            for offset, similarities in enumerate(sims):
+                pa = int(owner[i0 + offset])
+                start = int(later_owner_start[pa])
+                # Skip the same shot and earlier owners before allocating edges.
+                for b in np.flatnonzero(similarities[start:] >= threshold):
+                    union(pa, int(owner[int(b) + start]))
+                    if components == 1:
+                        break
+                if components == 1:
+                    break
     piles = {}
     for i in range(len(ids)):
         piles.setdefault(find(i), []).append(ids[i])

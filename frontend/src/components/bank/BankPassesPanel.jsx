@@ -56,7 +56,7 @@ export default function BankPassesPanel({
   // at another machine, so the gate is passGate (which folds the peer's own
   // readiness in) and the picker rides with the buttons it governs.
   passGate, passDevice, tagsState, tagsLabel,
-  onPassDevice, onPassDeviceObj, onStartTags,
+  onPassDevice, onPassDeviceObj, onStartTags, onStartPixaiTags,
 }) {
   // Which Settings field this warning opens depends on the configured provider:
   // sending an LM Studio user to the Ollama model field is a dead end, in a
@@ -129,6 +129,16 @@ export default function BankPassesPanel({
               title={tagsState.title}>
               {tagsLabel}{tagsState.blocked && ' (needs setup)'}
             </PassButton>
+            <PassButton onClick={onStartPixaiTags} disabled={live || capsLoading || !caps.pixai}
+              title={caps.pixai
+                ? (selected.size ? 'Cache PixAI tags for selected images. Captions stay unchanged.'
+                  : 'Cache PixAI tags for kept and pending images. Captions stay unchanged.')
+                : 'Install PixAI Tagger in Setup.'}>
+              PixAI Pre-Tags{counts?.pixai_tagged > 0 && ` (${counts.pixai_tagged})`}
+            </PassButton>
+            {!capsLoading && !caps.pixai && (
+              <a href="#/setup" className="text-sm text-accent underline">Install PixAI</a>
+            )}
             <PassButton onClick={() => onPassOpen('semantic_dedup')} disabled={live || !semanticReady}
               title={semanticReady
                 ? `Group crops and re-compressed variants of the SAME shot the exact-duplicate hash misses from the ${semanticState.label} semantic index. Review them under the ✂ Same shot chip.`

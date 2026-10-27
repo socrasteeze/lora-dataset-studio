@@ -415,13 +415,16 @@ def test_the_worker_rates_with_the_head_that_matches_the_encoder():
          'not fitted on — every rating would be plausible and meaningless')
 
 
-def test_the_worker_never_takes_the_card():
-    """This is one small matmul. Hiding CUDA before torch is imported is what
-    stops a bank being rated from competing with a training run."""
+def test_the_worker_requires_parent_gpu_permission():
+    """An explicit parent request enables CUDA; CPU fallback still hides the card."""
     src = _infer_source('video_aesthetic_infer.py')
     hide = src.index("os.environ['CUDA_VISIBLE_DEVICES'] = ''")
     assert hide < src.index('import torch', hide), \
         'CUDA must be hidden before torch is imported'
+    assert "want_cuda = req.get('device') == 'cuda'" in src
+    assert 'if not want_cuda:' in src
+    assert '_load_aesthetic_head(models_root, device)' in src
+    assert '.to(device)' in src
 
 
 # --- helpers -------------------------------------------------------------------------

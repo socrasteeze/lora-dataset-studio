@@ -324,6 +324,7 @@ def _cluster_style(order, cache, threshold, should_stop=None):
     E /= (np.linalg.norm(E, axis=1, keepdims=True) + 1e-8)
     n = len(usable)
     parent = list(range(n))
+    components = n
 
     def find(a):
         while parent[a] != a:
@@ -332,19 +333,32 @@ def _cluster_style(order, cache, threshold, should_stop=None):
         return a
 
     def union(a, b):
+        nonlocal components
         ra, rb = find(a), find(b)
         if ra != rb:
             parent[rb] = ra
+            components -= 1
 
     chunk = 512
     for i0 in range(0, n, chunk):
         if should_stop is not None and should_stop():
             return None
+        if components == 1:
+            break
         sims = E[i0:i0 + chunk] @ E.T
-        for a, b in np.argwhere(sims >= threshold):
-            a += i0
-            if a < b:
-                union(int(a), int(b))
+        # Visit exactly the original upper-triangle edges in row-major order.
+        # A dense block formerly allocated an N-by-2 array for every match,
+        # including self/lower-triangle edges that were immediately discarded.
+        for offset, similarities in enumerate(sims):
+            if should_stop is not None and should_stop():
+                return None
+            a = i0 + offset
+            for b in np.flatnonzero(similarities[a + 1:] >= threshold):
+                union(a, int(b) + a + 1)
+                if components == 1:
+                    break
+            if components == 1:
+                break
     groups = {}
     for i in range(n):
         groups.setdefault(find(i), []).append(i)

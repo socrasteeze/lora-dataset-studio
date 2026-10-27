@@ -20,6 +20,7 @@ OPERATIONS = {
     'improve': ('image_bank_service', 'start_improve'),
     'framing': ('image_bank_service', 'start_framing'),
     'tags': ('image_bank_service', 'start_tags'),
+    'pixai_tags': ('image_bank_service', 'start_pixai_tags'),
     'medium': ('image_bank_service', 'start_medium'),
     'angles': ('image_bank_service', 'start_faces'),
     'caption': ('image_bank_service', 'start_caption'),

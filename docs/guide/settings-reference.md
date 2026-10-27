@@ -820,6 +820,12 @@ fixed sizes on purpose.
 | `pixai_hybrid` | PixAI tags, then a 1–3 sentence local vision description on one line. Missing PixAI v1.0 weights fail with an install message. No silent fallback. Concept datasets and Bank captioning are refused. |
 | `none` | No auto-captioning — you write them yourself. |
 
+Bank **PixAI Pre-Tags** caches raw categories separately from captions and WD14
+tags. Dataset PixAI, Caption Lab and the PixAI part of hybrid captioning reuse
+matching image/model results inside the active profile. Dataset omission rules
+still apply. Changed bytes, weights or preprocessing invalidate reuse. See
+[PixAI Pre-Tags](using-the-app.md#pixai-pre-tags).
+
 `captioning.anima_auto_model` defaults to `huihui_ai/qwen3-vl-abliterated:8b-instruct`.
 A blank value uses `ollama.vision_model`. A per-dataset vision model still wins.
 
@@ -839,15 +845,71 @@ copies or moves an image. Omitting `signature_tags` applies the suggested list.
 
 `auto` is a **chain**, not a coin toss: JoyCaption captions the images it can in one
 batch, the local vision model covers whatever is left, and on a **Concept** dataset
-the local model rewrites JoyCaption's drafts. Anima does not run that chain: Auto
-calls the model above and does not try JoyCaption. The engines write in different styles, so one
+the local model rewrites JoyCaption's drafts. Anima does not run that chain:
+Auto uses installed PixAI for booru captions, otherwise the configured vision
+model above. The engines write in different styles, so one
 batch can come back in two voices. Every caption pass now reports which engine wrote
 what — in the toast, and on a line under the caption buttons (Captions ▸ Generate
 captions), e.g. *“8 by JoyCaption · 4 by Ollama”*. That line describes the last pass
 of the current session only; nothing is stored per image. Pick a single value above
 (or per dataset, in Captions ▸ ⚙️ Options) if you want one voice across a set.
 
+### GPU inference
+
+Device `auto` prefers CUDA in the selected runtime. Installing CPU-only PyTorch
+cannot enable GPU execution. Setup keeps CPU defaults and preserves a CUDA build
+that the operator installs. Runtime discovery proves imports and CUDA availability;
+it does not prove inference accuracy or speed.
+
+Identity extraction, character tag suggestions, person and face masks, OCR, text
+embeddings, and video aesthetic scoring use the exclusive GPU window when their
+prepared runtime supports CUDA. They use CPU when CUDA is unavailable or the GPU
+is occupied. Explicit CPU choices remain effective. GPU text workers exit before
+releasing the GPU; CPU text workers retain their configured idle lifetime.
+
+`video_text.python` selects the OCR interpreter. A CUDA interpreter needs the
+RapidOCR dependencies and `onnxruntime-gpu`, without a second CPU ONNX runtime.
+The same OCR path serves Bank, Dataset and the Video safe-zone pass.
+
 ### PixAI device
+
+Anima captions keep only content categories before tag names become a text line.
+Character datasets use general tags. Style datasets may also name the depicted
+characters. Copyright, artist, style, provenance, quality and rating categories
+stay out of both. The low-level Anima tag formatter remains available for uses
+that need those categories; it is not the dataset caption policy.
+
+Batch captioning, Caption Lab, the tag half of PixAI + VLM and external caption
+exports use this same policy. Character appearance and signature omission rules
+still apply. Hair-style aliases and skin-colour tags cannot bypass those rules.
+An empty Anima cleanup result no longer restores the rejected draft.
+
+Untouched Anima Character options use the defaults displayed in Options: Hair
+and Facial Hair use Omit; Makeup and Glasses use Describe. Hair accessories stay
+captioned unless a signature rule omits them. This effective policy does not
+write appearance overrides into a dataset when options are read. Explicit
+operator choices still win. Other model families retain their legacy defaults.
+
+Anima booru short captions retain any subject counts present in the long caption
+instead of replacing them with model-generated counts. They use the same appearance,
+signature and tag-shape rules as long captions. A long caption edited during
+shortening rejects the stale short result.
+
+PixAI checks transparency from decoded pixels rather than an image mode or a
+predicted label. Opaque sources lose predicted transparency tags. The worker
+reads EXIF orientation and uses the configured image input budget. Dataset
+results are rejected when their source changes during inference.
+
+CUDA uses batches of up to four images, with smaller retries on memory pressure.
+An image-specific failure does not discard the other images. CPU uses one image
+per batch. Model weights, precision and confidence thresholds stay unchanged.
+The app log records the device, batch size, retries and load/tag timing. These
+paths need a measured comparison before any speed or accuracy claim.
+
+Stop asks the worker to finish its current batch and exit. A cancelled dataset
+pass writes no further captions. Existing stored captions are not rewritten by
+this update. Use Re-caption to regenerate machine captions; normal forced batch
+runs still protect captions that were manually reviewed or edited.
 
 - **Device** in the PixAI Tagger section maps to `pixai.device`. `auto` uses CUDA when available, otherwise CPU. `cuda` requires CUDA and refuses CPU fallback. `cpu` leaves the GPU free.
 - Prepare the model with **Setup > PixAI Tagger > Install**. This explicit action installs an isolated interpreter under `data/envs/pixai` and downloads the local snapshot. Captioning does not download files. Install everything does not include PixAI.
@@ -1204,7 +1266,7 @@ to compare in Test Studio, not as proof that a specific step will be best.
 
 - **Text embedding cache** — **Training → Advanced → Text Embedding Cache**, stored as `cache_text_embeddings`. The job writes `train.cache_text_embeddings` from the same value. **Anima and Krea 2 default on.** Other image families default off, including Qwen-Image 2.1. This app does not train the older Qwen-Image or Wan families.
 - **Dual captions (long + short)** — off by default. When on, the run uses ai-toolkit's native `short_and_long_captions`: every image trains with **both** its full caption and a short one (text-side augmentation, so the LoRA leans less on any single wording). The short variant is **derived from the long caption** the next time you (re-)caption — text-only, via the local vision model, honouring the same kind rules (no trigger; the identity/concept/aesthetic stays omitted) — and you can edit it per image in the **⛶** caption editor. **Ignored while the text embedding cache is on.** Anima and Krea 2 default that cache on and unload the text encoder, so no second caption can be encoded — the toggle is reported as ignored on the training panel and in the pre-launch check, and the run trains on the long caption alone (issue #22, reported by 1Tomber). Turn the cache off to train both captions.
-- **Masked training (background at 10%)** — **on by default**, and since the 28/07 wave it is stored **on the dataset** instead of in the browser you set it in. A person mask is generated for every image (rembg, CPU) and the background only weighs 10% of the loss, so the LoRA binds the identity to the subject rather than to the room. What changed and why it matters: the toggle used to be a `localStorage` preference (`trainMasked_v1`) that reached the server only as a launch parameter, so **the readiness badge could not warn about it**, opening the app **from a phone or another machine** silently reverted to the default, and the value appeared in **no run snapshot** — two runs differing only by masking looked identical when compared. All three are fixed: it is patched like any other advanced option, stamped into every run's snapshot (local **and** cloud), and the pre-flight badge now carries a **Masked training ready** row that says *rembg is not installed — this dataset is set to masked but the run trains unmasked* **before** you open the launch dialog. It is a **warning, never a blocker** (a run without masks is a valid run), and it is **not** filtered out on the cloud lane: the masks are generated locally and uploaded with the images, so rembg missing here means the run trains unmasked. **Concept and Style datasets force it off** (a person mask erases the recurring concept, and a style must be learned across the whole frame), and **slider mode** ignores masks entirely — the panel says so instead of hiding the control. **Existing datasets do not change behaviour:** an untouched dataset resolves to the historical default (on). A browser that had explicitly turned masking **off** is asked once, in the training panel, whether to carry that choice onto the dataset or keep masking on — nothing is written until you answer, in either direction.
+- **Masked training (background at 10%)** — **on by default**, and since the 28/07 wave it is stored **on the dataset** instead of in the browser you set it in. A person mask is generated for every image (rembg, GPU preferred with CPU fallback) and the background only weighs 10% of the loss, so the LoRA binds the identity to the subject rather than to the room. What changed and why it matters: the toggle used to be a `localStorage` preference (`trainMasked_v1`) that reached the server only as a launch parameter, so **the readiness badge could not warn about it**, opening the app **from a phone or another machine** silently reverted to the default, and the value appeared in **no run snapshot** — two runs differing only by masking looked identical when compared. All three are fixed: it is patched like any other advanced option, stamped into every run's snapshot (local **and** cloud), and the pre-flight badge now carries a **Masked training ready** row that says *rembg is not installed — this dataset is set to masked but the run trains unmasked* **before** you open the launch dialog. It is a **warning, never a blocker** (a run without masks is a valid run), and it is **not** filtered out on the cloud lane: the masks are generated locally and uploaded with the images, so rembg missing here means the run trains unmasked. **Concept and Style datasets force it off** (a person mask erases the recurring concept, and a style must be learned across the whole frame), and **slider mode** ignores masks entirely — the panel says so instead of hiding the control. **Existing datasets do not change behaviour:** an untouched dataset resolves to the historical default (on). A browser that had explicitly turned masking **off** is asked once, in the training panel, whether to carry that choice onto the dataset or keep masking on — nothing is written until you answer, in either direction.
 
 - **Dual captions (long + short)** — off by default. When on, the run uses ai-toolkit's native `short_and_long_captions`: every image trains with **both** its full caption and a short one (text-side augmentation, so the LoRA leans less on any single wording). The short variant is **derived from the long caption** the next time you (re-)caption — text-only, via the local vision model, honouring the same kind rules (no trigger; the identity/concept/aesthetic stays omitted) — and you can edit it per image in the **⛶** caption editor. **Local training only for now:** the cloud pod's dataset upload doesn't carry the JSON caption file the short is read from, so cloud runs train on the long caption alone. **Ignored while the text embedding cache is on.** Anima and Krea 2 default that cache on and unload the text encoder, so no second caption can be encoded — the toggle is reported as ignored on the training panel and in the pre-launch check, and the run trains on the long caption alone (issue #22, reported by 1Tomber). Turn the cache off to train both captions.
 
@@ -1537,7 +1599,7 @@ re-sorts every bank instantly, without rescanning.
 | `video_bank.watermark_max` | `0.94` | Flags shots whose watermark score exceeds this (`watermark`), after the **🔖 Watermarks** pass has scored them. This model's scores are compressed hard against 1, so 0.94 is the measured cut and not the 0.5 a probability normally implies — on a 110-image hand-labelled sample it flagged none of the 55 clean images and still caught 54 of the 55 marked ones. Lower it toward 0.92 to catch the faintest marks and hand-check a few clean shots. A shot the pass has not judged carries no score and is **never** flagged — that is "not evaluated", not "clean". Set it to empty to flag nothing. |
 | `video_bank.aesthetic_floor` | *(empty)* | Flags shots the LAION aesthetic head rates below this (`low_aesthetic`) — the same model and the same ~1–10 scale the image bank's **✨ Score** puts on a still. Shots are rated by **🔎 Find scenes**, which reads the frame vectors it already caches, so the rating costs no decode and no GPU; re-run it on an already-embedded bank and the whole thing is rated in seconds. **Empty on purpose**, unlike `watermark_max`: a watermark score is a classifier's probability, calibrated with the model, while this is a *taste* rating whose useful cut depends on the corpus. The published LAION references — 4 casual, 4.75 strict — were chosen to filter a web crawl, and deliberately-shot rushes sit well above both, so **Preview** 4 against your own bank before applying it. A shot with no rating carries no score and is **never** flagged. |
 | `video_bank.bars_max` | *(empty)* | Flags shots where more than this share of the frame is a flat band — letterbox, pillarbox, or a vertical video padded into a wide container (`letterboxed`), after the **🔳 Safe zone** pass has measured them. The share is the larger of *(top + bottom)* and *(left + right)*, the same arithmetic — and the same meaning — as the image bank's `bank.bars_max`, so a number you calibrated on stills carries over. **Empty on purpose** even though the image lane ships `0.04`: a 2.35:1 film honestly carries about `0.12` of bands and is not a defect, it is a crop waiting to happen. The pass calls a band *structural* only when it is present on all three frames it looks at, so a fade-out never creates one; a genuinely flat sky or the surround of a dark-themed screen recording still can, which is the other reason there is no default. A shot the pass has not measured is **never** flagged. |
-| `video_bank.text_coverage_max` | *(empty)* | Flags shots where burned-in text covers more than this share of the frame (`burned_text`). Only text that stays put **across** the shot's three frames counts — a subtitle, a chyron, a lower third, a text watermark — so a shop sign or a newspaper someone holds up is scene content and is never counted. `0.01` is already a full subtitle line, so this cut lives at small values. Reading text needs the **Burned-in text** extra from Setup (RapidOCR, CPU only, ~16 MB of weights inside the wheel). Without it the pass still measures bands, records `safe_zone_state: bars_only`, and stores **no** text reading at all — so this cut flags nothing rather than clearing every shot. |
+| `video_bank.text_coverage_max` | *(empty)* | Flags shots where burned-in text covers more than this share of the frame (`burned_text`). Only text that stays put **across** the shot's three frames counts — a subtitle, a chyron, a lower third, a text watermark — so a shop sign or a newspaper someone holds up is scene content and is never counted. `0.01` is already a full subtitle line, so this cut lives at small values. Reading text needs the **Burned-in text** extra from Setup (RapidOCR, CPU by default, with GPU support in a prepared CUDA interpreter). Without it the pass still measures bands, records `safe_zone_state: bars_only`, and stores **no** text reading at all — so this cut flags nothing rather than clearing every shot. |
 | `video_bank.safe_area_min` | *(empty)* | Flags shots where cropping away both the bands **and** the burned-in text would leave less than this share of the frame (`small_safe_zone`). This is where text in the MIDDLE of a frame lands: it is small, so the share above never catches it, and there is no crop that removes it — the rectangle collapses and this number goes with it. HunyuanVideo 1.5 keeps only clips whose crop leaves 60 % or more of the frame; below roughly 50 % there is not enough picture left to be worth the trouble. Both figures were set for a web-scale crawl, which is why they are quoted here and shipped nowhere. Needs the text extra, like the row above. |
 | `video_bank.dup_frames_max` | *(empty)* | Flags shots where more than this share of frames is a near-copy of the one before it (`dup_frames`), after the **🩻 Defects** pass has swept the file. This is what a 24 fps source uploaded as 30 fps looks like — one frame in five is a repeat, so `0.15` catches it — and it is **not** `freeze_max` under another name: that one reads the codec's motion vectors and says *nothing moved*, this one says *the same picture was delivered twice*. A moving shot run through a frame-rate conversion trips this and leaves `freeze_max` completely untouched. Measured over the shot's own window, so a shot straddling a frozen stretch reports the share it actually holds. |
 | `video_bank.block_max` | *(empty)* | Flags shots where the 8×8 macroblock grid shows through a hard squeeze (`blocky`), read as the worst tenth of the shot's sampled frames. **Empty on purpose, and here there is not even a published figure to quote:** the score depends on what is *in* the frame nearly as much as on the damage. Measured on this machine, the same scene from a good encode to a ruined one moved from **13 to 43**, while four *different* scenes at one fixed quality spanned **1 to 25 000**. So the signal is in the spread inside one bank, never in the number — use **Preview**, look at what a value caught, and move it. Worth reading next to the file card's **bits per pixel**, which predicts the same damage from the container header alone. |
@@ -1578,7 +1640,7 @@ re-sorts every bank instantly, without rescanning.
 |---|---|---|
 | `face_scoring.python` | `''` | Interpreter for the InsightFace subprocess (empty = current interpreter). |
 | `face_scoring.models_root` | `''` | Where InsightFace weights are stored/downloaded. Empty means `data/models/insightface` — except on an install that already downloaded them to `~/.insightface`, which keeps using that folder. |
-| `face_scoring.device` | `'auto'` | Device for BOTH face passes — the Image bank's person grouping and a dataset's 🎭 Analyze faces. `auto` uses the GPU when the face interpreter exposes CUDA (needs `onnxruntime-gpu` installed in it) and falls back to CPU otherwise; `cpu` forces CPU (never touches the GPU); `cuda` requests the GPU but still falls back to CPU when unavailable. A GPU run is serialized through the GPU-exclusive window so it never competes with a training/scoring pass. |
+| `face_scoring.device` | `'auto'` | Device for face scoring, identity face extraction and face masks on Bank and Dataset. `auto` uses the GPU when the face interpreter exposes CUDA (needs `onnxruntime-gpu` installed in it) and falls back to CPU otherwise; `cpu` forces CPU (never touches the GPU); `cuda` requests the GPU but still falls back to CPU when unavailable. A GPU run is serialized through the GPU-exclusive window so it never competes with a training/scoring pass. |
 | `bank_scoring.python` | `''` | Interpreter for the Image-bank Score pass (aesthetic / NSFW / style). Empty = current interpreter until Setup installs the managed `data/envs/bank_scoring` venv and records its path here. |
 | `bank_scoring.models_root` | `''` | Optional cache root for Score-pass model weights. |
 | `masks.python` | `''` | Interpreter for the rembg (person-mask) subprocess. |

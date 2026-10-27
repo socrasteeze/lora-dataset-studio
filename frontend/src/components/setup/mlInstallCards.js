@@ -38,7 +38,7 @@ export const ML_INSTALL_CARDS = [
   { action: 'pixai', cap: 'pixai', icon: 'PT',
     title: 'PixAI Tagger',
     detailKey: 'pixai_detail',
-    body: "Writes booru dataset captions from a local model. Install prepares an isolated Python and downloads the model only when selected. Auto does not use it. Concept datasets and prose require JoyCaption or the local LLM." },
+    body: "Writes booru dataset captions and caches Bank pre-tags for reuse. Install prepares an isolated Python and local weights. Prose and Concept captions require a vision model." },
   { action: 'watermark_detect', cap: 'watermark_detect', icon: '🚩',
     title: 'Watermark detector (faster 🚩 Find)',
     body: "Makes the Bank's 🚩 Find watermarks pass roughly ten times faster and lets it run without Ollama: a small classifier scores each image (~0.14 s instead of ~1.7 s asking the vision model in words), and a second model marks where the logo sits so ✂ Crop and 🧽 Inpaint have something to work on. Adds ~0.9 GB of weights into the scoring Python it shares with ✨ Score. Without it nothing breaks — the vision model keeps doing the same job, slower." },

@@ -15,15 +15,18 @@ _OUT = claim_result_stream(__name__)
 
 
 def main():
-    os.environ['CUDA_VISIBLE_DEVICES'] = ''
     try:
         payload = json.load(sys.stdin)
+        want_cuda = payload.get('device') == 'cuda'
+        if not want_cuda:
+            os.environ['CUDA_VISIBLE_DEVICES'] = ''
         items = payload['items']
         if not isinstance(items, list) or not 1 <= len(items) <= 64:
             raise ValueError('invalid batch')
         import numpy as np
         from PIL import Image, ImageOps
         from insightface.app import FaceAnalysis
+        import onnxruntime
         from face_score_infer import _repair_nested_antelopev2, _verdict
         root = payload['models_root']
         _repair_nested_antelopev2(root)
@@ -33,10 +36,13 @@ def main():
         if not all(os.path.isfile(os.path.join(folder, name)) for name in (
                 'glintr100.onnx', 'scrfd_10g_bnkps.onnx')):
             raise ValueError('missing prepared weights')
+        use_cuda = want_cuda and 'CUDAExecutionProvider' in onnxruntime.get_available_providers()
+        providers = (['CUDAExecutionProvider', 'CPUExecutionProvider'] if use_cuda
+                     else ['CPUExecutionProvider'])
         analyzer = FaceAnalysis(name='antelopev2', root=root,
-                                providers=['CPUExecutionProvider'],
+                                providers=providers,
                                 allowed_modules=list(FACE_SCORING_MODULES))
-        analyzer.prepare(ctx_id=-1, det_size=(640, 640))
+        analyzer.prepare(ctx_id=0 if use_cuda else -1, det_size=(640, 640))
     except Exception:
         json.dump({'ok': False, 'error': 'Face recognition is unavailable.'}, _OUT)
         return 1

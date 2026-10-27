@@ -36,7 +36,8 @@ import model_memo  # noqa: E402
 _OUT = claim_result_stream(__name__)
 
 RESIDENT_SCRIPTS = frozenset({'wd14_infer.py', 'bank_score_infer.py',
-                              'face_embed_infer.py'})
+                              'face_embed_infer.py', 'pixai_infer.py',
+                              'bank_semantic_infer.py', 'watermark_detect_infer.py'})
 END_KEY = '__resident__'
 END_ERR = '[resident] end'
 
@@ -57,6 +58,9 @@ def _load(script):
         'lds_resident_' + os.path.splitext(name)[0], script)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    if name == 'pixai_infer.py':
+        from pixai_resident import enable
+        enable(module)
     return module
 
 

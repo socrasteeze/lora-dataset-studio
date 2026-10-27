@@ -2910,6 +2910,7 @@ def _bp_counts(base, total, todo_keep, todo_pending, todo_reject,
         'reject': BankImage.status == 'reject',
         'scored': or_(BankImage.aesthetic_score.isnot(None), BankImage.nsfw_score.isnot(None)),
         'tagged': BankImage.tags_state == 'ok',
+        'pixai_tagged': BankImage.pixai_cache_key.isnot(None),
         'watermark_scanned': and_(BankImage.watermark_state.isnot(None),
                                   ~_watermark_history_inactive_clause()),
         'framing_classified': BankImage.framing.isnot(None),
@@ -2973,6 +2974,7 @@ def _bp_counts(base, total, todo_keep, todo_pending, todo_reject,
         # once this is non-zero. It was only ever counted for the pipeline
         # report, so the filter could never appear.
         'tagged': measured['tagged'],
+        'pixai_tagged': measured['pixai_tagged'],
         'watermark_scanned': measured['watermark_scanned'],
         'framing_classified': measured['framing_classified'],
         # ✂/✨ edited HERE, split by which edit produced the blob. Two numbers
@@ -4271,6 +4273,7 @@ def _clear_bank_pixel_analysis(
         if row.face_cluster_origin == 'asserted' else (None, None)
     for name in bank_transfer_metadata.BANK_PIXEL_DERIVED_FIELDS:
         setattr(row, name, None)
+    row.pixai_cache_key = None
     if asserted_cluster[1] == 'asserted':
         row.face_cluster, row.face_cluster_origin = asserted_cluster
     row.analysis_fingerprint = None
@@ -4361,6 +4364,9 @@ def _strict_semantic_group_for_generation(row: BankImage, path, fingerprint,
 def _invalidate_write_generation(row: BankImage, path, fingerprint, *,
                                  preserve_current_derivative=True) -> None:
     """Invalidate shared lanes but retain independently proven engine history."""
+    from . import pixai_cache
+    pixai_key = getattr(row, 'pixai_cache_key', None)
+    preserve_pixai = pixai_cache.proves_image(pixai_key, fingerprint)
     groups = {
         engine: _strict_semantic_group_for_generation(
             row, path, fingerprint, engine)
@@ -4370,6 +4376,8 @@ def _invalidate_write_generation(row: BankImage, path, fingerprint, *,
     selected_engine = _selected_semantic_engine(bank) if bank else 'clip'
     _invalidate_effective_analysis(
         row, preserve_current_derivative=preserve_current_derivative)
+    if preserve_pixai:
+        row.pixai_cache_key = pixai_key
     for engine, group in groups.items():
         if group is not None:
             setattr(row, f'{engine}_semantic_dup_group', group)
@@ -12592,6 +12600,101 @@ def _tags_job(bank_id, rescan, threshold=None):
 
 
 # --- 🎨 medium pass (zero-shot CLIP over the ✨ Score embeddings) ------------
+def start_pixai_tags(app, user_id, bank_id, rescan=False, *, statuses=None, ids=None):
+    """Cache PixAI categories for later dataset use without changing captions."""
+    if not get_bank(user_id, bank_id):
+        raise ValueError('bank not found')
+    if bank_jobs.running(bank_id):
+        raise bank_jobs.BankJobBusy((bank_jobs.get(bank_id) or {}).get('kind') or 'background')
+    from ..capabilities import probe_pixai
+    if not probe_pixai().get('ok'):
+        raise RuntimeError('Install PixAI Tagger in Setup before pre-tagging.')
+    statuses = normalize_pass_statuses(statuses)
+    return bank_jobs.start(app, bank_id, 'pixai_tags',
+                           _pixai_tags_job(bank_id, rescan, statuses, ids),
+                           total=_pixai_pool(bank_id, statuses, ids).count())
+
+
+def _pixai_pool(bank_id, statuses=None, ids=None):
+    q = BankImage.query.filter(_processable(bank_id))
+    q = q.filter(BankImage.status.in_(statuses or ['keep', 'pending']))
+    if ids:
+        q = q.filter(BankImage.id.in_(ids))
+    return q
+
+
+def _pixai_tags_job(bank_id, rescan=False, statuses=None, ids=None):
+    def run(job):
+        from . import pixai_cache, pixai_tagger
+        from .inference_device import preferred_device
+        bank = db.session.get(ImageBank, bank_id)
+        if not bank:
+            return
+        items = _pixai_pool(bank_id, statuses, ids).order_by(BankImage.id).with_entities(
+            BankImage.id, BankImage.instance_id).all()
+        bank_instance = bank.instance_id
+        bank_jobs.progress(job, done=0, total=len(items), detail='Checking PixAI cache')
+        if not items:
+            return
+        completed = cached = failed = 0
+        with preferred_device(pixai_tagger.pixai_python(), backend='torch',
+                              preference=pixai_tagger.device()) as device:
+            if device == 'cpu' and pixai_tagger.device() == 'cuda':
+                raise RuntimeError('PixAI GPU mode requires available CUDA. Check Setup and retry.')
+            for offset in range(0, len(items), 128):
+                if bank_jobs.cancelled(job):
+                    break
+                by_path = {}
+                for ident, instance in items[offset:offset + 128]:
+                    row = db.session.get(BankImage, ident)
+                    if row is None or row.instance_id != instance:
+                        continue
+                    path = analysis_image_path(bank, row)
+                    if path:
+                        by_path.setdefault(path, []).append((ident, instance))
+                    else:
+                        failed += 1
+                base = offset
+                def progress(rec):
+                    bank_jobs.progress(job, done=base + int(rec.get('done') or 0),
+                                       detail='PixAI: ' + (rec.get('phase') or 'tagging'))
+                result = pixai_tagger.caption_images(
+                    list(by_path), force_cpu=device == 'cpu', use_cache=not rescan,
+                    on_progress=progress, should_stop=lambda: bank_jobs.cancelled(job))
+                if not result.get('ok'):
+                    bank_jobs.fail(job, 'PixAI pre-tagging failed. Check Setup and retry.')
+                    return
+                pending = {}
+                for path, rows in by_path.items():
+                    key = (result.get('cache_keys') or {}).get(path)
+                    expected = (result.get('image_facts', {}).get(path) or {}).get('sha256')
+                    for ident, instance in rows:
+                        db.session.expire_all()
+                        current_bank = db.session.get(ImageBank, bank_id)
+                        row = db.session.get(BankImage, ident)
+                        if (bank_jobs.cancelled(job) or current_bank is None
+                                or current_bank.instance_id != bank_instance):
+                            return
+                        if (not key or row is None or row.instance_id != instance
+                                or analysis_image_path(current_bank, row) != path
+                                or pixai_cache.fingerprint(path) != expected):
+                            failed += 1
+                            continue
+                        pending[ident] = (instance, key)
+                        completed += 1
+                def store_receipts():
+                    for ident, (instance, key) in pending.items():
+                        db.session.execute(update(BankImage).where(
+                            BankImage.id == ident, BankImage.instance_id == instance,
+                            BankImage.bank_id == bank_id).values(pixai_cache_key=key))
+                if pending:
+                    write_with_retry(store_receipts)
+                cached += (result.get('stats') or {}).get('cache_hits', 0)
+                bank_jobs.progress(job, done=min(offset + 128, len(items)))
+        bank_jobs.progress(job, detail=f'{completed} cached, {cached} reused, {failed} unavailable')
+    return run
+
+
 def medium_prereq(bank_id=None) -> str | None:
     """Why 🎨 Medium cannot run here, or None. Two distinct refusals, and telling
     them apart is the point: a bank with no ✨ Score embeddings needs a pass run,
@@ -13474,7 +13577,7 @@ PIPELINE_STEPS = ('scan', 'auto_reject', 'score', 'semantic_dedup', 'watermark',
 # which by design refuses only on an EXPLICIT False — would wave it through and
 # the pass would die on the other side. A step nobody can honestly delegate is
 # refused at launch instead, where the message can say so.
-LOCAL_ONLY_STEPS = ('tags',)
+LOCAL_ONLY_STEPS = ('tags', 'pixai_tags')
 # SigLIP2 needs its index built before the dedup that reads it, so its canonical
 # order carries one extra pass. DERIVED from PIPELINE_STEPS rather than written
 # out a second time: upstream's literal omits the fork-only 'tags' step, and

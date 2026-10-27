@@ -123,7 +123,8 @@ def run_infer_script(python, script, payload, timeout, on_line=None,
     from ..timeout_settings import processing_timeout
     timeout = processing_timeout(timeout)
     # While the bank queue drains, WD14 reuses a resident worker with the model
-    # already loaded (infer_pool); every other script gets a plain Popen.
+    # already loaded (infer_pool), as do PixAI, Score and Faces. Other scripts
+    # get a plain Popen.
     from . import infer_pool
     proc = infer_pool.popen(
         infer_env.worker_argv(python, script),

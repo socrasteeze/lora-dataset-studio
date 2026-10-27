@@ -42,7 +42,7 @@ missing capability turning the whole thing off.
 
 TWO HALVES, TWO INSTALL STORIES, ONE PASS.
   bands → PIL, in-process, free. No capability, no subprocess, no card.
-  text  → RapidOCR in a CPU subprocess (see infer/video_text_infer.py). Absent,
+  text  → RapidOCR with GPU preference and CPU fallback (see infer/video_text_infer.py). Absent,
           the pass still runs and says so.
 
 ADVISORY, AND UNMEASURED IS A STATE. The raw numbers land in metrics_json beside

@@ -1,4 +1,4 @@
-"""Explicit, CPU-only extraction using prepared local model runtimes."""
+"""Explicit identity extraction using prepared runtimes and GPU ownership."""
 from __future__ import annotations
 
 import csv
@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 from .. import config as cfg
 from . import face_models, infer_stream
 from .identity_learning import FACE_MODEL
+from .inference_device import preferred_device
 
 
 class RecognitionUnavailable(ValueError):
@@ -20,11 +21,13 @@ def extract(items, kind):
         from .face_similarity import _scoring_python, is_available
         if not is_available() or not face_models._pack_present(face_models.models_root()):
             raise RecognitionUnavailable('Prepare Face Scoring in Setup > Quality Tools.')
-        payload = json.dumps({'items': items, 'models_root': face_models.models_root(),
-                              'model_key': FACE_MODEL})
-        stdout, _, returncode, timeout = infer_stream.run_infer_script(
-            _scoring_python(), str(cfg.BACKEND_DIR / 'infer' / 'identity_face_infer.py'),
-            payload, max(180, 60+len(items)*15))
+        python = _scoring_python()
+        with preferred_device(python, preference=cfg.get('face_scoring.device') or 'auto') as device:
+            payload = json.dumps({'items': items, 'models_root': face_models.models_root(),
+                                  'model_key': FACE_MODEL, 'device': device})
+            stdout, _, returncode, timeout = infer_stream.run_infer_script(
+                python, str(cfg.BACKEND_DIR / 'infer' / 'identity_face_infer.py'),
+                payload, max(180, 60+len(items)*15))
         result = infer_stream.parse_result_json(stdout)
         if timeout or returncode or not result or not result.get('ok'):
             raise RecognitionUnavailable('Face recognition failed. Check Setup > Quality Tools.')
@@ -64,8 +67,11 @@ def extract(items, kind):
         if not paths:
             return results
         try:
-            with ImageEncoder(use_gpu=False) as encoder:
-                vectors = encoder.encode(paths)
+            import sys
+            python = cfg.get('bank_scoring.python') or sys.executable
+            with preferred_device(python, backend='torch') as device:
+                with ImageEncoder(use_gpu=device == 'cuda') as encoder:
+                    vectors = encoder.encode(paths)
         except ImageEncodeError:
             raise RecognitionUnavailable('Image recognition failed. Check Setup > Quality Tools.') from None
         for position, vector in zip(positions, vectors):
@@ -78,7 +84,9 @@ def extract(items, kind):
 def character_tags(paths, engine):
     if engine == 'pixai':
         from . import pixai_tagger
-        result = pixai_tagger.caption_images(paths, force_cpu=True)
+        with preferred_device(pixai_tagger.pixai_python(), backend='torch',
+                              preference=pixai_tagger.device()) as device:
+            result = pixai_tagger.caption_images(paths, force_cpu=device == 'cpu')
         if not result.get('ok'):
             raise RecognitionUnavailable('Prepare PixAI Tagger in Setup > Quality Tools.')
         return {path: categories.get('character', {})
@@ -90,8 +98,9 @@ def character_tags(paths, engine):
     # character category from spelling or from a generated training caption.
     with open(wd14_tagger.model_path('selected_tags.csv'), encoding='utf-8') as stream:
         names = {row['name'] for row in csv.DictReader(stream) if row.get('category') == '4'}
-    # Identity tagging does not take the GPU from an active training/generation.
-    result = wd14_tagger.tag_images(paths, force_cpu=True)
+    with preferred_device(wd14_tagger.run_python(),
+                          preference=wd14_tagger.device()) as device:
+        result = wd14_tagger.tag_images(paths, force_cpu=device == 'cpu')
     if not result.get('ok'):
         raise RecognitionUnavailable('Character tagging failed. Check Setup > Quality Tools.')
     return {path: {name: score for name, score in tags.items() if name in names}

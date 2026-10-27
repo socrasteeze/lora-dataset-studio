@@ -121,16 +121,17 @@ def test_both_sides_l2_normalise():
             f'{path.name} must L2-normalise its embeddings'
 
 
-def test_the_text_child_never_takes_the_gpu():
-    """Text encoding is ~20 ms of compute behind an ~8 s load: the GPU buys
-    nothing and would make a search collide with a training run. The child must
-    hide CUDA from itself BEFORE torch is imported."""
+def test_the_text_child_requires_parent_gpu_permission():
+    """The CPU fallback hides CUDA; a parent-owned CUDA run moves both inputs and model."""
     src = TEXT.read_text(encoding='utf-8')
     hide = src.index("os.environ['CUDA_VISIBLE_DEVICES'] = ''")
     imp = src.index('import torch', hide - 4000 if hide > 4000 else 0)
     assert hide < src.index('import torch', imp), \
         'CUDA must be hidden before torch is imported'
-    assert "model.to('cpu')" in src
+    assert "want_cuda = req.get('device') == 'cuda'" in src
+    assert 'if not want_cuda:' in src
+    assert 'model.to(device)' in src
+    assert 'tokenizer([text]).to(device)' in src
 
 
 def _aesthetic_expects():

@@ -1,8 +1,8 @@
-"""Warm CPU SigLIP2 text tower paired with ``bank_semantic_infer.py``.
+"""SigLIP2 text tower with parent-controlled CUDA, paired with ``bank_semantic_infer.py``.
 
 The first stdin line is the app-provided model/provenance handshake; subsequent
 lines are ``{"text": "..."}`` queries.  Model assets are always resolved from
-the pinned local cache and this worker never takes CUDA.
+the pinned local cache. CUDA requires an explicit parent-owned GPU request.
 """
 from __future__ import annotations
 
@@ -67,13 +67,17 @@ def _contract_from_handshake(request: dict) -> dict:
     return contract
 
 
-def _move_to_cpu(inputs: Any) -> Any:
+def _move_to_device(inputs: Any, device='cpu') -> Any:
     if hasattr(inputs, 'to'):
-        return inputs.to('cpu')
+        return inputs.to(device)
     if isinstance(inputs, dict):
-        return {key: value.to('cpu') if hasattr(value, 'to') else value
+        return {key: value.to(device) if hasattr(value, 'to') else value
                 for key, value in inputs.items()}
     return inputs
+
+
+def _move_to_cpu(inputs: Any) -> Any:
+    return _move_to_device(inputs)
 
 
 def main() -> int:
@@ -87,9 +91,9 @@ def main() -> int:
         _emit({'ok': False, 'ready': False, 'error': f'bad handshake: {exc}'})
         return 1
 
-    # Hide the card before torch is imported.  Encoding one query is tiny; using
-    # CUDA here would only contend with training/vision work for no visible gain.
-    os.environ['CUDA_VISIBLE_DEVICES'] = ''
+    want_cuda = request.get('device') == 'cuda'
+    if not want_cuda:
+        os.environ['CUDA_VISIBLE_DEVICES'] = ''
     try:
         import numpy as np
         import torch
@@ -104,7 +108,8 @@ def main() -> int:
         'cache_dir': contract['models_root'],
         'local_files_only': True,
     }
-    _log(f'[text] loading {contract["model_key"]} (CPU, local files only)…')
+    device = 'cuda' if want_cuda and torch.cuda.is_available() else 'cpu'
+    _log(f'[text] loading {contract["model_key"]} ({device}, local files only)…')
     try:
         processor = AutoProcessor.from_pretrained(contract['model_id'], **model_kwargs)
         # AutoModel, not Siglip2Model. The pinned checkpoint is a SigLIP 2 model —
@@ -117,7 +122,7 @@ def main() -> int:
         # convolution against a linear projection, two different image front-ends.
         # The config names the class; let it.
         model = AutoModel.from_pretrained(contract['model_id'], **model_kwargs)
-        model.to('cpu').eval()
+        model.to(device).eval()
     except Exception as exc:
         _emit({'ok': False, 'ready': False,
                'error': f'SigLIP2 load failed: {type(exc).__name__}: {exc}'})
@@ -127,7 +132,7 @@ def main() -> int:
         inputs = processor(
             text=[text], return_tensors='pt', padding='max_length',
             truncation=True, max_length=64)
-        inputs = _move_to_cpu(inputs)
+        inputs = _move_to_device(inputs, device)
         with torch.no_grad():
             embedding = _pooled_features(model.get_text_features(**inputs))
             embedding = embedding / embedding.norm(dim=-1, keepdim=True)
