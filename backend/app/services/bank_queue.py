@@ -559,7 +559,7 @@ def _worker_loop(app, lane):
     from . import infer_pool
     _current.lane = lane
     try:
-        # The local lane keeps WD14, Score and Faces loaded from one bank to the
+        # The local lane keeps WD14, PixAI, Score and Faces loaded from one bank to the
         # next (infer_pool). Peer lanes run their passes on the peer.
         warm = infer_pool.keep_warm() if lane == _LOCAL_LANE else contextlib.nullcontext()
         with app.app_context(), warm:

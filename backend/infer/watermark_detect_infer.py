@@ -177,6 +177,7 @@ from bank_image_guard import read_validated_bank_image  # noqa: E402
 # fix in face_embed_infer.py). _OUT is the REAL stdout; sys.stdout now points
 # at stderr, so anything a library prints is progress output.
 from infer_io import claim_result_stream  # noqa: E402
+from model_memo import memo  # noqa: E402
 _OUT = claim_result_stream(__name__)
 
 
@@ -247,10 +248,14 @@ class _Locator:
             import torch
             from transformers import (AutoModelForZeroShotObjectDetection,
                                       AutoProcessor)
-            self.processor = AutoProcessor.from_pretrained(
-                LOCATE_MODEL, cache_dir=self.cache_dir)
-            self.model = AutoModelForZeroShotObjectDetection.from_pretrained(
-                LOCATE_MODEL, cache_dir=self.cache_dir).to(self.device).eval()
+            def load_locator():
+                processor = AutoProcessor.from_pretrained(
+                    LOCATE_MODEL, cache_dir=self.cache_dir)
+                model = AutoModelForZeroShotObjectDetection.from_pretrained(
+                    LOCATE_MODEL, cache_dir=self.cache_dir).to(self.device).eval()
+                return processor, model
+            self.processor, self.model = memo(
+                ('watermark_locator', LOCATE_MODEL, self.cache_dir, self.device), load_locator)
             self.torch = torch
             _log(f'[wmdet] locator ready ({LOCATE_MODEL}, {self.device})')
         except Exception as e:      # noqa: BLE001
@@ -754,7 +759,8 @@ def main():
 
     try:
         device = _pick_device(str(job.get('device') or 'auto'))
-        ranker = _Ranker(device, cache_dir)
+        ranker = memo(('watermark_rank', RANK_MODEL, cache_dir, device),
+                      lambda: _Ranker(device, cache_dir))
     except Exception as e:      # noqa: BLE001 — a load failure IS the whole pass
         _emit({'summary': {'ok': False,
                            'error': f'{type(e).__name__}: {e}'}})

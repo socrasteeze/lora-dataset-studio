@@ -56,6 +56,7 @@ export const JOB_LABELS = {
   improve: '✨ Upscale & improve',
   framing: '📐 Framing pass',
   tags: '🔖 Tags pass',
+  pixai_tags: 'PixAI Pre-Tags',
   medium: 'Medium pass',
   angles: '⤢ Angle measurement',
   caption: 'Captioning',

@@ -28,6 +28,7 @@ import sys
 from .. import config as cfg
 from . import face_models
 from .infer_stream import run_infer_script, stderr_tail
+from .inference_device import preferred_device
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +51,7 @@ _ITEM_RE = re.compile(r'\[facemask\] item (\{.*\})\s*$')
 # Ordered, so the UI can name what is happening without knowing the script.
 PHASES = ('starting', 'downloading', 'loading', 'detecting')
 
-# The detector is CPU-pinned by construction (face_mask_infer asks for
-# CPUExecutionProvider and ctx_id=-1, and a test pins that), so these are CPU
-# numbers and there is no GPU branch to add here.
-#
-# 20 s is the worst case measured per image on the reference machine (9-20 s).
+# Retain the measured CPU budget for the fallback path (9-20 s per image).
 PER_IMAGE_S = 20
 # Everything paid before image 1: interpreter start, onnxruntime import,
 # antelopev2 prepare — and, on a fresh install, a ~350 MB download. That download
@@ -207,9 +204,8 @@ def _run_detail(images, out_dir, expand, timeout, on_progress=None,
     if timeout is None:
         timeout = timeout_for(len(images))
     cancel_file, on_stop, cleanup = _stop_plumbing(should_stop)
-    payload = json.dumps({'images': images, 'out_dir': out_dir, 'expand': expand,
-                          'models_root': face_models.models_root(),
-                          'cancel_file': cancel_file})
+    payload = {'images': images, 'out_dir': out_dir, 'expand': expand,
+               'models_root': face_models.models_root(), 'cancel_file': cancel_file}
 
     # How far the child got, kept for the timeout log: "killed at 900s" says
     # nothing, "killed at 900s having analysed 97 of 138" names the fix.
@@ -225,9 +221,12 @@ def _run_detail(images, out_dir, expand, timeout, on_progress=None,
             on_progress(rec)
 
     try:
-        stdout, stderr_lines, rc, timed_out = run_infer_script(
-            _face_python(), _SCRIPT, payload, timeout, _on_line,
-            should_stop=should_stop, on_stop=on_stop)
+        python = _face_python()
+        with preferred_device(python, preference=cfg.get('face_scoring.device') or 'auto') as device:
+            payload['device'] = device
+            stdout, stderr_lines, rc, timed_out = run_infer_script(
+                python, _SCRIPT, json.dumps(payload), timeout, _on_line,
+                should_stop=should_stop, on_stop=on_stop)
     except OSError as e:
         logger.warning('face_mask: subprocess failed: %s', e)
         return {'ok': False, 'error': f'could not start face detection: {e}'}

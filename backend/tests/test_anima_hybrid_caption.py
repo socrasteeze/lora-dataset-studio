@@ -30,7 +30,10 @@ def test_hybrid_joins_normalized_tags_and_one_vlm_line(app, monkeypatch):
     def _tags(paths, **_kw):
         return {'ok': True, 'results': {paths[0]: {
             'general': {'1girl': 0.9, 'blue_eyes': 0.8, 'looking_at_viewer': 0.4,
-                        'score_8_up': 0.95, 'gwen_(fortnite)': 0.2},
+                        'score_8_up': 0.95},
+            'character': {'invented_character': 0.99},
+            'copyright': {'invented_series': 0.99},
+            'meta': {'official_art': 0.99},
             'rating': {'safe': 0.7},
         }}, 'errors': {}, 'model': 'pixai-tagger-v1.0'}
 
@@ -53,7 +56,7 @@ def test_hybrid_joins_normalized_tags_and_one_vlm_line(app, monkeypatch):
         assert row.caption_origin == 'pixai_hybrid'
         assert '\n' not in row.caption
         assert row.caption == (
-            'score_8_up, safe, 1girl, looking at viewer, gwen \\(fortnite\\). '
+            '1girl, solo, looking at viewer. '
             'She sits by the window. Soft daylight.'
         )
         assert 'zchar_hy' not in row.caption

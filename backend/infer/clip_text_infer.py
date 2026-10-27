@@ -35,11 +35,9 @@ search:
   EOF on stdin       : clean exit.
 A fatal load failure prints {"ok": false, "ready": false, "error": ...} and exits.
 
-CPU ON PURPOSE. The text tower is small and one sentence is microseconds of
-compute — the entire cost is the model LOAD. Taking the GPU for that would make
-a search race the training run and the captioning pass this project already
-serialises against each other, for no speed the user could notice. So CUDA is
-hidden from the child outright and the parent never takes a GPU window.
+CUDA requires an explicit parent-owned GPU request. Otherwise the worker hides
+CUDA before importing torch. The parent closes a CUDA worker before releasing
+GPU ownership; CPU workers may remain warm for the configured idle window.
 """
 from __future__ import annotations
 import json
@@ -78,9 +76,9 @@ def main() -> int:
         return 1
     models_root = req.get('models_root') or None
 
-    # Hidden BEFORE torch is imported — this is what actually keeps a text search
-    # off the card while a LoRA trains.
-    os.environ['CUDA_VISIBLE_DEVICES'] = ''
+    want_cuda = req.get('device') == 'cuda'
+    if not want_cuda:
+        os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
     try:
         import open_clip
@@ -90,7 +88,8 @@ def main() -> int:
                'error': import_report.import_failure(e)})
         return 1
 
-    _log(f'[text] loading CLIP {MODEL_NAME}/{PRETRAINED} (CPU)…')
+    device = 'cuda' if want_cuda and torch.cuda.is_available() else 'cpu'
+    _log(f'[text] loading CLIP {MODEL_NAME}/{PRETRAINED} ({device})…')
     try:
         # Same call, same cache_dir as bank_score_infer.py, so both halves resolve
         # the SAME checkpoint out of the SAME directory — a bank that has been
@@ -98,7 +97,7 @@ def main() -> int:
         model, _, _preprocess = open_clip.create_model_and_transforms(
             MODEL_NAME, pretrained=PRETRAINED,
             cache_dir=(os.path.join(models_root, 'open_clip') if models_root else None))
-        model.to('cpu').eval()
+        model.to(device).eval()
         tokenizer = open_clip.get_tokenizer(MODEL_NAME)
     except Exception as e:  # noqa: BLE001
         _emit({'ok': False, 'ready': False,
@@ -107,7 +106,7 @@ def main() -> int:
 
     def _encode(text):
         with torch.no_grad():
-            emb = model.encode_text(tokenizer([text]))
+            emb = model.encode_text(tokenizer([text]).to(device))
             # L2-normalised exactly like the image side, so a dot product IS the
             # cosine and the two halves stay comparable.
             emb = emb / emb.norm(dim=-1, keepdim=True)

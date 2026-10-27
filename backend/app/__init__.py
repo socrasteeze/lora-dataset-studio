@@ -484,6 +484,7 @@ _SCHEMA_ADDITIONS = (
     ('bank_image', 'tags', 'TEXT'),
     ('bank_image', 'tags_text', 'TEXT'),
     ('bank_image', 'tags_state', 'VARCHAR(16)'),
+    ('bank_image', 'pixai_cache_key', 'VARCHAR(64)'),
     # ✂ Crop / ✨ Upscale & improve made in the Bank itself: which edit produced
     # the current derived blob, which generation of it is on disk, and the turn
     # that was baked into it. Additive — a database that never gains them simply

@@ -145,6 +145,9 @@ def main() -> int:
         expand = float(payload.get('expand') or 2.0)
         models_root = payload.get('models_root') or None
         cancel_file = payload.get('cancel_file') or None
+        want_cuda = payload.get('device') == 'cuda'
+        if not want_cuda:
+            os.environ['CUDA_VISIBLE_DEVICES'] = ''
     except Exception as e:  # noqa: BLE001 — must exit as clean JSON, never a mute traceback
         print(json.dumps({"ok": False, "error": f"payload: {e}"}), file=_OUT)
         return 1
@@ -159,6 +162,7 @@ def main() -> int:
         import numpy as np  # noqa: F401 — insightface needs it importable
         from PIL import Image, ImageDraw, ImageFilter
         from insightface.app import FaceAnalysis
+        import onnxruntime
     except Exception as e:  # noqa: BLE001
         print(json.dumps({"ok": False, "error": f"import: {type(e).__name__}: {e}"}), file=_OUT)
         return 1
@@ -179,12 +183,15 @@ def main() -> int:
     # user already read as "stuck".
     _phase('downloading' if not _models_present(models_root) else 'loading')
     try:
-        kwargs = {'name': 'antelopev2', 'providers': ['CPUExecutionProvider'],
+        use_cuda = want_cuda and 'CUDAExecutionProvider' in onnxruntime.get_available_providers()
+        providers = (['CUDAExecutionProvider', 'CPUExecutionProvider'] if use_cuda
+                     else ['CPUExecutionProvider'])
+        kwargs = {'name': 'antelopev2', 'providers': providers,
                   'allowed_modules': ['detection']}
         if models_root:
             kwargs['root'] = models_root
         app = FaceAnalysis(**kwargs)
-        app.prepare(ctx_id=-1, det_size=(640, 640))
+        app.prepare(ctx_id=0 if use_cuda else -1, det_size=(640, 640))
     except Exception as e:  # noqa: BLE001
         print(json.dumps({"ok": False, "error": f"model load failed: {type(e).__name__}: {e}"}), file=_OUT)
         return 1

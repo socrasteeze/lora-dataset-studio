@@ -3,7 +3,7 @@
 A one-shot infer process runs ``main()`` once, so ``memo`` is a plain call
 there. Under ``resident.py`` the same process serves bank after bank while the
 queue drains, and the second request finds its model here instead of paying
-the load again (WD14 session, CLIP + heads, InsightFace).
+the load again (WD14, CLIP + heads, InsightFace, SigLIP2 and watermark models).
 
 Off unless resident.py turns it on. The test suite imports these scripts into
 one process and stubs a different fake model per test; a memo that outlived a

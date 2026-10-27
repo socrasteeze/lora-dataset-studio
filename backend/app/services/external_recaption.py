@@ -26,19 +26,22 @@ def _draft_tags(paths, *, signature_tags=(), ollama_model=None, progress=None) -
     """{path: raw tag line}, before identity and signature stripping. A known
     signature list also rides on the vision prompt as omit rules."""
     from . import pixai_tagger
-    from .anima_booru import format_anima_booru
+    from .anima_booru import format_anima_caption
     if pixai_tagger.is_installed():
         batch = pixai_tagger.caption_images(paths)
         if not batch.get('ok'):
             raise RuntimeError(batch.get('error') or 'PixAI Tagger failed')
         results = batch.get('results') or {}
-        return {p: format_anima_booru(results.get(p), include_character=False)
+        facts = batch.get('image_facts') or {}
+        return {p: format_anima_caption(results.get(p), include_character=False,
+                                        image_facts=facts.get(p))
                 for p in paths if results.get(p)}
     from .face_dataset_service import caption_paths
-    from .face_variations import caption_prompt_for_anima, signature_omit_rule
+    from .face_variations import APPEARANCE_DEFAULTS, caption_prompt_for_anima, signature_omit_rule
     from .vision_ollama import anima_auto_vision_model
     return caption_paths(
-        paths, prompt=caption_prompt_for_anima('booru') + signature_omit_rule(signature_tags),
+        paths, prompt=caption_prompt_for_anima('booru', appearance=APPEARANCE_DEFAULTS)
+        + signature_omit_rule(signature_tags),
         backend='ollama',
         ollama_model=ollama_model or anima_auto_vision_model(), progress=progress)
 
@@ -65,7 +68,7 @@ def recaption_external_folder(source_dir, output_dir, trigger, *, signature_tags
     """
     from .anima_booru import anima_character_tags, count_tags, normalize_anima_tag
     from .face_dataset_service import normalize_signature_tags
-    from .face_variations import (drop_identity_tags, drop_signature_tags,
+    from .face_variations import (APPEARANCE_DEFAULTS, drop_identity_tags, drop_signature_tags,
                                   suggest_signature_tags)
     trigger = ' '.join(str(trigger or '').split())
     if not trigger:
@@ -92,7 +95,8 @@ def recaption_external_folder(source_dir, output_dir, trigger, *, signature_tags
     lines = []
     for path in paths:
         tags = anima_character_tags(drop_signature_tags(
-            drop_identity_tags(drafts.get(path) or '', keep_count_tags=True), chosen))
+            drop_identity_tags(drafts.get(path) or '', keep_count_tags=True,
+                               appearance=APPEARANCE_DEFAULTS), chosen))
         tags = ', '.join(t for t in tags.split(', ') if t and t != trigger_tag)
         if not tags:
             continue

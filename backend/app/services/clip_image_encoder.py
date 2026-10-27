@@ -106,6 +106,7 @@ class ImageEncoder:
         except Exception:  # noqa: BLE001
             try:
                 proc.kill()
+                proc.wait()
             except Exception:  # noqa: BLE001
                 pass
 
@@ -191,5 +192,6 @@ class ImageEncoder:
 def _kill(proc):
     try:
         proc.kill()
+        proc.wait()
     except Exception:  # noqa: BLE001
         pass

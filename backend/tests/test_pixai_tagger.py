@@ -96,3 +96,12 @@ def test_a_missing_snapshot_refuses_without_a_download(tmp_path):
     assert out['error_kind'] == 'unavailable'
     assert out['model'] == 'pixai-tagger-v1.0'
     assert not (tmp_path / 'pixai-tagger-v1.0').exists()
+
+
+def test_cancel_before_launch_does_not_start_the_interpreter(monkeypatch):
+    monkeypatch.setattr(p, 'run_infer_script',
+                        lambda *a, **kw: pytest.fail('Cancelled pass started an interpreter'))
+    result = p.caption_images([__file__], should_stop=lambda: True)
+    assert result['ok'] is True
+    assert result['cancelled'] is True
+    assert result['results'] == {}

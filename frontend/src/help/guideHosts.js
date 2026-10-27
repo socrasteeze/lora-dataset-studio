@@ -10,6 +10,7 @@ export const CORE_GUIDE_ANCHORS = {
     "around-the-app"
   ],
   "using-the-app": [
+    "pixai-pre-tags",
     "assign-identities",
     "undo-a-folder-group",
     "image-sources",

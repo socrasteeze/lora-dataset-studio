@@ -1,4 +1,4 @@
-"""🔳 Where the letters are — RapidOCR over already-extracted frames, on CPU.
+"""🔳 Where the letters are — RapidOCR over already-extracted frames.
 
 WHY RapidOCR AND NOT THE OBVIOUS ALTERNATIVES. The two heads this repo already
 ships could both be pointed at text and both would be the wrong tool. The
@@ -17,9 +17,9 @@ machine with no egress on the day it is installed. It is also what the pipelines
 this pass copies use: Cosmos Curator's "Artificial Text Filter" is PaddleOCR, and
 these are the same PP-OCR weights without the Paddle runtime.
 
-THE CARD IS NEVER TAKEN. onnxruntime CPU only, deliberately: the whole point of
-this pass is that it can measure a bank while a training run owns the GPU. There
-is no `auto` branch to get wrong.
+Prepared CUDA runtimes may run this pass on the GPU under the parent's exclusive
+window. CPU fallback remains available when CUDA is unavailable or occupied.
+Each frame batch loads one engine; inference does not download models.
 
 Measured on this machine, 768 px frames, CPU: 0.86 s to import, 0.55 s to build
 the engine, 0.61 s per frame warm. Three frames per shot puts a thousand-shot
@@ -61,11 +61,6 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 from _harness import _cancel_requested, _log
-
-# Hidden BEFORE anything heavy is imported. onnxruntime's CPU build ignores it,
-# but an install that has replaced it with onnxruntime-gpu (the app never does,
-# the user may) would otherwise quietly take a card a training run is using.
-os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
 # DIVERGENCE (fork): the result channel carries the result and nothing else.
 # RapidOCR and onnxruntime both print on load, and a bare print() from a
@@ -169,6 +164,9 @@ def main() -> int:
               if f.get('path') and f.get('key')]
     score_min = float(req.get('score_min') or 0.0)
     cancel_file = req.get('cancel_file') or None
+    want_cuda = req.get('device') == 'cuda'
+    if not want_cuda:
+        os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
     if not frames:
         _emit({'ok': True, 'boxes': {}, 'read': 0, 'stopped': False})
@@ -189,7 +187,10 @@ def main() -> int:
         return 1
 
     try:
-        engine = RapidOCR()
+        if want_cuda:
+            engine = RapidOCR(det_use_cuda=True, cls_use_cuda=True, rec_use_cuda=True)
+        else:
+            engine = RapidOCR()
     except Exception as e:  # noqa: BLE001
         _emit({'ok': False, 'error': f'OCR engine unavailable: {type(e).__name__}: {e}'})
         return 1

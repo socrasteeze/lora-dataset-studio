@@ -1,6 +1,6 @@
 # Local pass benchmarks
 
-Measured on 2026-10-19 with synthetic fixtures only. Score has a clear throughput
+The historical comparison below was measured on 2026-10-19 with synthetic fixtures only. The 2026-10-26 extension at the end uses existing local caches and image copies. Score has a clear throughput
 gain. Face-mask startup is shorter. CPU inpainting and localization regress.
 The other completed comparisons do not establish a throughput gain.
 
@@ -161,3 +161,41 @@ the local harness remain in ignored Git storage under
 `pass-benchmarks-20261019-1`. No real source images or production image records
 were used or changed. Application settings were unchanged. No full test suite
 or cloud workflow was run for this work.
+
+
+## 2026-10-26 shared-pass extension
+
+The local-pass audit retained GPU ownership, cancellation, source fingerprints,
+CPU fallbacks, thresholds and model precision. It did not queue new watermark,
+mask, crop, inpaint or Video operations on production data.
+
+| Pass family | Existing optimization or change in this wave |
+| --- | --- |
+| Quality and exact duplicates | Bounded parallel CPU preparation and cached metrics already present. |
+| Score and Medium | Resident models, adaptive CUDA batches, parallel preparation and cached embeddings already present. Exact style grouping was optimized in the preceding wave. |
+| WD14 and PixAI | Resident queued workers and bounded preparation already present. |
+| Faces and Angles | Resident detection already present. Face grouping now uses bounded edge storage and exact early completion. |
+| CLIP semantic index | Delegates to Score and its cache. |
+| SigLIP2 semantic index | Added resident model/processor reuse keyed by the validated model contract and device. |
+| Watermark detection | Added resident ranker and lazy locator reuse; streamed per-image persistence and native localization thread policy stay intact. |
+| OCR, masks and identity | Existing batch model loading and prepared GPU/CPU selection retained. CPU/GPU environment switching keeps these out of the resident pool. |
+| Watermark crop, text fill and LaMa | Existing batch paths retained. Native/inherited limits for LaMa stay unchanged because the historical common cap regressed it. |
+| Framing, Auto-Crop and captions | Bounded vision concurrency, model keep-alive, source checks and batch workers retained. |
+| Improve, upscale and generation | ComfyUI owns model lifetime and scheduling; no competing GPU worker added. |
+| Video quality, motion, shots, AI checks and aesthetic scoring | Existing per-batch preparation/model lifetime and cached vectors retained. |
+| Video near-duplicates | Reduced temporary edge storage in host and bundled implementations; frame ownership and grouping semantics stay unchanged. |
+
+Current comparisons avoided the occupied GPU. Four-image inference comparisons
+used CPU, repeated computation and local weights. Warm resident requests used
+fresh result/cache targets, not a saved-result shortcut.
+
+| Comparison | Before/cold | After/warm | Evidence |
+| --- | --- | --- | --- |
+| Face grouping, 4096 cached 512-dimensional vectors, threshold 0.45 | 1.485s median | 0.364s median | ABBA order; identical 488 groups; 4.08x for grouping only. |
+| SigLIP2 indexing, 4 images | 9.490s | 0.960s | Embeddings exactly equal. Initial resident request still took 8.588s. |
+| Watermark ranking, 4 images, localization off | 7.544s | 0.978s | Scores, states and source fingerprints exactly equal. Initial resident request took 6.272s. |
+
+These small CPU comparisons establish startup/reuse gains, not whole-pass GPU
+throughput. Watermark localization was not benchmarked in this wave. No real
+Video cache was available for a Video throughput comparison. Regression suites
+and rendered probes were not run. Receipts remain in ignored runtime storage.

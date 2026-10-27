@@ -1157,6 +1157,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // No on(): the tag pass is local-only (the server refuses it for a peer), so
   // sending a device would be asking for a 400 rather than offering a choice.
   const startTags = () => act(() => postJson(`/api/bank/${bankId}/tags`, {}), null)
+  const startPixaiTags = () => act(() => postJson(`/api/bank/${bankId}/pixai-tags`, {
+    ...(selected.size ? { image_ids: [...selected], statuses: ['keep', 'pending', 'reject'] } : {}),
+  }), null)
   // ✨ Score always covers the WHOLE bank and skips what is already computed —
   // `rescore` is the explicit "recompute it all" lane (new model, scores you no
   // longer trust), exactly like the quality pass's "Rescan all".
@@ -2182,7 +2185,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             passGate={passGate} passDevice={passDevice}
             tagsState={tagsState} tagsLabel={tagsButtonLabel(counts)}
             onPassDevice={setPassDevice} onPassDeviceObj={setPassDeviceObj}
-            onStartTags={startTags} />
+            onStartTags={startTags} onStartPixaiTags={startPixaiTags} />
         </div>
       )}
 

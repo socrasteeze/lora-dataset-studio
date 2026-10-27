@@ -1213,6 +1213,14 @@ def bank_tags(bank_id):
                   threshold=data.get('threshold'))
 
 
+@bp.post('/bank/<int:bank_id>/pixai-tags')
+def bank_pixai_tags(bank_id):
+    """Cache raw PixAI categories locally. Never changes a caption or WD14 tags."""
+    data = request.get_json(silent=True) or {}
+    return _queued_start('pixai_tags', _app(), LOCAL_USER, bank_id,
+                         rescan=bool(data.get('rescan')), **_scope(data))
+
+
 @bp.get('/bank/<int:bank_id>/tags/facets')
 def bank_tag_facets(bank_id):
     """Every tag present in the bank with its non-rejected image count, most

@@ -15,10 +15,9 @@ there rather than copied — one URL, one filename, one MLP shape, one cache
 directory. A second copy of those four facts is how a video score and an image
 score end up on two different scales while both look plausible.
 
-THE CARD IS NEVER TAKEN. This is ~1 GFLOP per thousand frames; CUDA is hidden
-before torch is imported so a bank can be rated while a training run owns the
-GPU. The only real cost is the torch import itself, which is why the parent skips
-this whole subprocess when every shot already has a score.
+CUDA requires an explicit parent-owned GPU request. CPU fallback hides CUDA
+before torch is imported, so a bank can still be rated during a training run.
+The parent skips this subprocess when every shot already has a score.
 
 Protocol (one JSON line in, one JSON line out — this is a batch, not a worker):
   stdin  : {"store": "<abs path to a clip_embeddings.npz>",
@@ -44,12 +43,6 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 from _harness import _emit, _log
 
-# Hidden BEFORE torch is imported — the only thing that actually keeps this off
-# a card a training run is using. Same two-locks-on-one-door reflex as the frame
-# encoder, except here there is no "auto" branch at all: this pass has no use
-# for a GPU on any bank size.
-os.environ['CUDA_VISIBLE_DEVICES'] = ''
-
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import import_report  # noqa: E402
 import _aesthetic_head  # noqa: E402 — the head, imported rather than copied
@@ -74,6 +67,9 @@ def main() -> int:
         return 1
     store = req.get('store') or ''
     models_root = req.get('models_root') or None
+    want_cuda = req.get('device') == 'cuda'
+    if not want_cuda:
+        os.environ['CUDA_VISIBLE_DEVICES'] = ''
     if not store or not os.path.isfile(store):
         # Not an error the user should ever see: the parent only launches this
         # when the embed pass has written a store. Answered rather than crashed
@@ -105,7 +101,8 @@ def main() -> int:
         _emit({'ok': True, 'scores': {}, 'frames': 0})
         return 0
 
-    head, ok, why = _aesthetic_head._load_aesthetic_head(models_root, 'cpu')
+    device = 'cuda' if want_cuda and torch.cuda.is_available() else 'cpu'
+    head, ok, why = _aesthetic_head._load_aesthetic_head(models_root, device)
     if not ok:
         # The head is a one-time download from a public repo. On a machine with
         # no egress this is the whole reason every score comes back empty, so
@@ -125,8 +122,8 @@ def main() -> int:
     _log(f'[look] rating {len(vecs)} frame(s)')
     with torch.no_grad():
         for start in range(0, len(vecs), BLOCK):
-            block = torch.from_numpy(vecs[start:start + BLOCK])
-            out = head(block).squeeze(-1).tolist()
+            block = torch.from_numpy(vecs[start:start + BLOCK]).to(device)
+            out = head(block).squeeze(-1).cpu().tolist()
             for offset, value in enumerate(out):
                 cid = str(int(ids[start + offset]))
                 scores.setdefault(cid, []).append(round(float(value), 3))

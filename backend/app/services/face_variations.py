@@ -2510,7 +2510,8 @@ BODY_FIDELITY_BOORU_SUFFIX = (
 # A per-dataset policy opts four VARIABLE families into Omit or Describe. Core
 # identity (face, eyes, skin, age, gender, ethnicity, body build) stays locked
 # omit — describing those is how a character LoRA dies. No policy (None / {})
-# keeps the historical prompt and cleaners BYTE-IDENTICAL.
+# keeps the historical family defaults. Anima resolves its displayed defaults
+# before it calls these shared cleaners.
 #
 # Makeup defaults to Describe once a policy exists so mascara cannot silently
 # bind. Hair and facial hair default to Omit (classic lock). Glasses default to
@@ -2796,6 +2797,7 @@ def caption_prompt_for_anima(mode, body=False, appearance=None) -> str:
 # Calibrated empirically on 31 real captions.
 _IDENTITY_LEAK = re.compile(
     r'\bhair\b'
+    r'|\bsidelocks?\b|\bforelocks?\b|\bahoge\b'
     r'|\bcomplexion\b|\bfreckles?\b|\bjawline\b|\beyebrows?\b|\bfacial\s+features?\b'
     r'|\bskin\b'
     r'|\b(?:blue|brown|green|hazel|grey|gray|dark|light|pale|amber)\s+eyes\b'
@@ -2844,7 +2846,7 @@ _BODY_LEAK = re.compile(
 
 _HAIR_STYLE_LEAK = re.compile(
     r'\bponytails?\b|\btwintails?\b|\bbangs\b|\bbraids?\b|\bahoge\b'
-    r'|\bbun\b|\bbald\b|\bsidelocks?\b',
+    r'|\bbun\b|\bbald\b|\bsidelocks?\b|\bforelocks?\b',
     re.I)
 
 
@@ -3231,7 +3233,7 @@ CAPTION_PROMPT_BOORU = (
 # handling: retain closed_eyes/wink expressions, remove eye color.
 _IDENTITY_TAG_CONTAINS = (
     'hair', 'bangs', 'braid', 'ponytail', 'twintail', 'sideburn', 'eyebrow', 'eyelash',
-    'freckle', 'complexion', 'jawline',
+    'freckle', 'complexion', 'jawline', 'sidelock', 'forelock', 'ahoge',
 )
 _IDENTITY_TAG_EXACT = frozenset({
     '1girl', '1boy', '2girls', '3girls', 'multiple_girls', 'multiple_boys',
@@ -3249,7 +3251,7 @@ _IDENTITY_TAG_EXACT = frozenset({
 # sideburn moves with Facial hair; lipstick is Makeup (not locked-omit `lips`).
 _CORE_TAG_CONTAINS = ('eyebrow', 'eyelash', 'freckle', 'complexion', 'jawline')
 _CORE_TAG_EXACT = _IDENTITY_TAG_EXACT - frozenset({'bun', 'bald'})
-_HAIR_TAG_CONTAINS = ('bangs', 'braid', 'ponytail', 'twintail')
+_HAIR_TAG_CONTAINS = ('bangs', 'braid', 'ponytail', 'twintail', 'sidelock', 'forelock', 'ahoge')
 _HAIR_TAG_EXACT = frozenset({'bun', 'bald'})
 # Wardrobe, always described: hair_bow, hair_ornament, hairclip, hair_ribbon…
 _HAIR_ACCESSORY_MARKERS = (
@@ -3266,9 +3268,18 @@ _FACIAL_HAIR_TAG_CONTAINS = (
 _GLASSES_TAG_CONTAINS = ('glasses', 'sunglasses', 'spectacles', 'eyeglasses')
 
 
-# Permanent body marks for body fidelity, matched by substring to cover
-# tattoo/arm_tattoo/tattooed, scar/scar_on_face and piercing/ear_piercing.
-_BODY_TAG_CONTAINS = ('tattoo', 'scar', 'birthmark', 'piercing', 'pierced')
+# Match mark tokens, including inflections, without mistaking a scarf for a scar.
+_BODY_IDENTITY_TAG = re.compile(
+    r'(?:^|[_\s-])(?:tattoos?|tattooed|scars?|scarred|scarring|scarification|'
+    r'birthmarks?|piercings?|pierced)(?:$|[_\s-])')
+
+_SKIN_IDENTITY_TAG = re.compile(
+    r'^(?:(?:very|light|dark)_)?'
+    r'(?:pale|dark|fair|light|tan|tanned|brown|black|white|grey|gray|blue|green|'
+    r'purple|red|pink|yellow|orange|colored|coloured|multicolored|multicoloured|shiny|smooth|'
+    r'rough|wrinkled|scaly|translucent|metallic|two_tone|deep|cracked|patchwork|'
+    r'metal|gradient|aqua|silver|darkened|lightened|striped|gold|split_color|glowing)'
+    r'_skin(?:ned(?:_(?:female|male|palms))?)?$')
 
 
 def _is_hair_identity_tag(t) -> bool:
@@ -3296,6 +3307,8 @@ def _is_identity_tag(tag, body=False, appearance=None, *, keep_count_tags=False)
         return False
     if keep_count_tags and t in _COUNT_TAG_EXACT:
         return False
+    if _SKIN_IDENTITY_TAG.fullmatch(t.replace('-', '_')):
+        return True
     if appearance:
         if t in _CORE_TAG_EXACT:
             return True
@@ -3314,14 +3327,14 @@ def _is_identity_tag(tag, body=False, appearance=None, *, keep_count_tags=False)
         if (_family_state(appearance, 'glasses') == 'omit'
                 and any(sub in t for sub in _GLASSES_TAG_CONTAINS)):
             return True
-        if body and any(sub in t for sub in _BODY_TAG_CONTAINS):
+        if body and _BODY_IDENTITY_TAG.search(t):
             return True
         return False
     if t in _IDENTITY_TAG_EXACT:
         return True
     if 'eyes' in t:  # keep the EXPRESSION (closed_eyes, wink), drop the color (blue_eyes)
         return not any(k in t for k in ('closed', 'wink', 'half'))
-    if body and any(sub in t for sub in _BODY_TAG_CONTAINS):
+    if body and _BODY_IDENTITY_TAG.search(t):
         return True
     return any(sub in t for sub in _IDENTITY_TAG_CONTAINS)
 
@@ -3432,7 +3445,7 @@ def _signature_traits(tag) -> set:
     t = tag.replace(' ', '_')
     if t in _COUNT_TAG_EXACT:
         return set()
-    if _is_hair_identity_tag(t) or any(sub in t for sub in _BODY_TAG_CONTAINS):
+    if _is_hair_identity_tag(t) or _BODY_IDENTITY_TAG.search(t):
         return {tag}
     if ('eyes' in t or 'pupils' in t) and not any(k in t for k in ('closed', 'wink', 'half')):
         return {tag}

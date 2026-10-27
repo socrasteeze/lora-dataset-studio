@@ -255,11 +255,8 @@ def _run_chunk(chunk, *, device, locate, should_cancel, cancel_file, info=None):
     env = infer_env.worker_env(python, limit_native_threads=not locate,
                               PYTHONUTF8='1', PYTHONIOENCODING='utf-8')
     try:
-        proc = subprocess.Popen(
-            infer_env.worker_argv(python, _SCRIPT),
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, text=True, encoding='utf-8', errors='replace',
-            env=env, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        from . import infer_pool
+        proc = infer_pool.popen(infer_env.worker_argv(python, _SCRIPT), env=env)
     except OSError as e:
         raise DetectorUnavailable(f'could not start the watermark detector: {e}') from e
 
@@ -320,7 +317,8 @@ def _run_chunk(chunk, *, device, locate, should_cancel, cancel_file, info=None):
             if should_cancel and should_cancel():
                 break
     finally:
-        if proc.poll() is None:
+        complete = summary is not None and summary.get('ok') and index == len(chunk)
+        if not complete and proc.poll() is None:
             proc.kill()
         try:
             proc.wait(timeout=30)

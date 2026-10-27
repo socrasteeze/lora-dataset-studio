@@ -70,7 +70,7 @@ from .face_variations import (DESCRIPTIVE_CAPTION_PROMPT,
                               drop_style_lead_in, identity_leak_chips,
                               is_nsfw_label, prompt_by_label, wrap_variation_klein, wrap_variation_krea,
                               get_identity_prompt,
-                              normalize_appearance,
+                              APPEARANCE_DEFAULTS, normalize_appearance,
                               normalize_subject_type)
 
 logger = logging.getLogger(__name__)
@@ -1071,7 +1071,8 @@ _LENGTH_INSTRUCTION = {
 def caption_options(ds) -> dict:
     """Normalized per-dataset caption overrides: {backend, ollama_model, instructions,
     vocabulary, length, appearance, signature_tags}. Empty strings / empty appearance =
-    "use the global default" / historical identity lock. Never raises ({} defaults on a
+    inherit defaults; effective appearance is resolved separately without saving it.
+    Never raises ({} defaults on a
     missing or corrupt blob) so every caption path can read it unconditionally."""
     out = {'backend': '', 'ollama_model': '', 'instructions': '', 'vocabulary': '',
            'length': '', 'appearance': {}, 'signature_tags': []}
@@ -1104,6 +1105,16 @@ def caption_options(ds) -> dict:
     out['appearance'] = normalize_appearance(data.get('appearance'))
     out['signature_tags'] = normalize_signature_tags(data.get('signature_tags'))
     return out
+
+
+def _caption_appearance(ds, appearance=None):
+    """Resolve Anima's displayed defaults without materializing saved overrides."""
+    policy = normalize_appearance(appearance)
+    if policy:
+        return policy
+    if _is_anima_dataset(ds) and not is_style(ds) and not is_concept(ds):
+        return dict(APPEARANCE_DEFAULTS)
+    return None
 
 
 _SIGNATURE_TAGS_MAX = 64
@@ -5389,7 +5400,7 @@ def dataset_payload(user_id, dataset_id):
     kind_concept = is_concept(ds)
     kind_style = is_style(ds)
     body = is_body_fidelity(ds)
-    appearance = (caption_options(ds).get('appearance') or None)
+    appearance = _caption_appearance(ds, caption_options(ds).get('appearance'))
     # Cached concept ban-list (JSON on the row) → the concept-leak detector unions it with
     # concept_desc + the derived body/pose field, so the badge and the caption-time
     # enforcement agree on what "leaking" means. Ignored for non-concept kinds.
@@ -8068,7 +8079,7 @@ def _dataset_caption_recipe(ds, opts, mode=None):
     if is_style(ds):
         return caption_prompt_for_style(mode), drop_style_lead_in
     body = is_body_fidelity(ds)
-    appearance = opts.get('appearance') or None
+    appearance = _caption_appearance(ds, opts.get('appearance'))
     signatures = opts.get('signature_tags') or []
     # Anima keeps count tags (1girl, solo). Other families still drop them.
     keep_counts = train_type == 'anima' and mode == 'booru'
@@ -8091,12 +8102,43 @@ def _dataset_caption_recipe(ds, opts, mode=None):
 
 
 
+def _pixai_tag_line(ds, raw, image_facts=None, *, hybrid=False):
+    """One policy for PixAI batch, preview and hybrid tag content."""
+    from . import pixai_tagger
+    include_character = pixai_tagger.include_character_tags(getattr(ds, 'kind', None))
+    if _is_anima_dataset(ds):
+        from .anima_booru import format_anima_caption
+        return format_anima_caption(raw, include_character=include_character,
+                                    image_facts=image_facts)
+    if hybrid:
+        from .anima_booru import format_anima_booru
+        return format_anima_booru(raw, include_character=include_character)
+    return pixai_tagger.booru_caption(raw, include_character=include_character)
+
+
+def _pixai_source_matches(img, path, image_facts):
+    """Reject a caption if its source changed while the worker was running."""
+    expected = (image_facts or {}).get('sha256')
+    if expected is None:  # Compatibility with an older worker response.
+        return True
+    if not getattr(img, 'filename', None):
+        return False
+    current = _img_path(img)
+    return (os.path.normcase(os.path.realpath(current)) == os.path.normcase(os.path.realpath(path))
+            and bank_transfer_metadata.content_fingerprint_path(current) == expected)
+
+
+def _clean_caption_result(ds, text, cleaner):
+    """Anima omission rules must not restore the rejected draft when cleanup is empty."""
+    cleaned = cleaner(text)
+    return cleaned if cleaned or _is_anima_dataset(ds) else text
+
+
 def _store_pixai_dataset_captions(ds, todo, *, token, dataset_id, force,
                                   spare_asserted, cleaner, report, outcome):
     """Write PixAI booru tags as dataset captions. The caller already refused
     concept datasets and prose mode. Auto reaches it only through _anima_auto_pixai."""
     from . import pixai_tagger
-    include_character = pixai_tagger.include_character_tags(getattr(ds, 'kind', None))
 
     def _on_progress(rec):
         if not rec:
@@ -8112,34 +8154,39 @@ def _store_pixai_dataset_captions(ds, todo, *, token, dataset_id, force,
     dataset_activity.progress(
         token, detail=f'Loading PixAI Tagger and captioning {len(todo)} image(s)...')
     batch = pixai_tagger.caption_images(
-        [path for _image_id, path in todo], on_progress=_on_progress)
+        [path for _image_id, path in todo], on_progress=_on_progress,
+        should_stop=lambda: dataset_activity.cancel_requested(dataset_id))
     if not batch.get('ok'):
         raise RuntimeError(batch.get('error') or 'PixAI Tagger failed')
     raw_results = batch.get('results') or {}
     errors = batch.get('errors') or {}
+    image_facts = batch.get('image_facts') or {}
     n = vanished = spared = 0
     still = []
     for image_id, path in todo:
         if dataset_activity.cancel_requested(dataset_id):
             break
-        if _is_anima_dataset(ds):
-            from .anima_booru import format_anima_booru
-            cap = format_anima_booru(
-                raw_results.get(path), include_character=include_character)
-        else:
-            cap = pixai_tagger.booru_caption(
-                raw_results.get(path), include_character=include_character)
+        cap = _pixai_tag_line(ds, raw_results.get(path), image_facts.get(path))
         if not cap:
             still.append((image_id, path))
+            errors.setdefault(path, 'No caption content remains after category filtering.')
             continue
         img = _live_image_row(image_id)
         if img is None:
             vanished += 1
             continue
+        if not _pixai_source_matches(img, path, image_facts.get(path)):
+            still.append((image_id, path))
+            errors[path] = 'Image changed during captioning; run captioning again.'
+            continue
         if _caption_write_blocked(img, force=force, spare_asserted=spare_asserted):
             spared += 1
             continue
-        cleaned = cleaner(cap) or cap
+        cleaned = cleaner(cap)
+        if not cleaned:
+            still.append((image_id, path))
+            errors[path] = 'No caption content remains after the omission rules.'
+            continue
         caption_origin.stamp(
             img, _cap_caption(_with_camera_pose_phrase(img, cleaned)),
             caption_origin.PIXAI)
@@ -8167,15 +8214,14 @@ def _preview_pixai_caption(ds, img, path, cleaner):
     batch = pixai_tagger.caption_images([path])
     if not batch.get('ok'):
         raise RuntimeError(batch.get('error') or 'PixAI Tagger failed')
-    include_character = pixai_tagger.include_character_tags(getattr(ds, 'kind', None))
     raw = (batch.get('results') or {}).get(path)
-    if _is_anima_dataset(ds):
-        from .anima_booru import format_anima_booru
-        cap = format_anima_booru(raw, include_character=include_character)
-    else:
-        cap = pixai_tagger.booru_caption(raw, include_character=include_character)
+    facts = (batch.get('image_facts') or {}).get(path)
+    current = _live_image_row(img.id) if facts and facts.get('sha256') else img
+    if current is None or not _pixai_source_matches(current, path, facts):
+        raise RuntimeError('Image changed during captioning; run the preview again.')
+    cap = _pixai_tag_line(ds, raw, facts)
     if cap:
-        cap = cleaner(cap) or cap
+        cap = cleaner(cap)
         cap = _cap_caption(_with_camera_pose_phrase(img, cap))
     duration_ms = int((time.perf_counter() - started) * 1000)
     return {'caption': cap or '', 'chars': len(cap or ''),
@@ -8187,10 +8233,14 @@ def _clean_hybrid_tags(ds, tags, opts) -> str:
     """Drop identity and signature tags from the PixAI half. Anima keeps its count tags."""
     if is_style(ds) or not (tags or '').strip():
         return tags or ''
-    return drop_signature_tags(drop_identity_tags(
+    tags = drop_signature_tags(drop_identity_tags(
         tags, body=is_body_fidelity(ds),
-        appearance=(opts or {}).get('appearance') or None,
+        appearance=_caption_appearance(ds, (opts or {}).get('appearance')),
         keep_count_tags=_is_anima_dataset(ds)), (opts or {}).get('signature_tags')) or ''
+    if _is_anima_dataset(ds):
+        from .anima_booru import anima_character_tags
+        tags = anima_character_tags(tags)
+    return tags
 
 
 def _hybrid_vision_model(ds, ollama_model):
@@ -8207,10 +8257,9 @@ def _store_pixai_hybrid_dataset_captions(ds, todo, *, token, dataset_id, force,
                                          ollama_model, report, outcome):
     """PixAI tags, then one short vision sentence. No other backend on failure."""
     from . import pixai_tagger
-    from .anima_booru import compose_hybrid_caption, format_anima_booru, hybrid_grounding
+    from .anima_booru import compose_hybrid_caption, hybrid_grounding
     if pixai_tagger.missing_snapshot():
         raise RuntimeError(pixai_tagger.NOT_INSTALLED)
-    include_character = pixai_tagger.include_character_tags(getattr(ds, 'kind', None))
 
     def _on_progress(rec):
         if not rec:
@@ -8226,13 +8275,15 @@ def _store_pixai_hybrid_dataset_captions(ds, todo, *, token, dataset_id, force,
     dataset_activity.progress(
         token, detail=f'Loading PixAI Tagger and captioning {len(todo)} image(s)...')
     batch = pixai_tagger.caption_images(
-        [path for _image_id, path in todo], on_progress=_on_progress)
+        [path for _image_id, path in todo], on_progress=_on_progress,
+        should_stop=lambda: dataset_activity.cancel_requested(dataset_id))
     if not batch.get('ok'):
         if batch.get('error_kind') == 'unavailable' and pixai_tagger.missing_snapshot():
             raise RuntimeError(pixai_tagger.NOT_INSTALLED)
         raise RuntimeError(batch.get('error') or 'PixAI Tagger failed')
     raw_results = batch.get('results') or {}
     errors = batch.get('errors') or {}
+    image_facts = batch.get('image_facts') or {}
     base_prompt, prose_cleaner = _dataset_caption_recipe(ds, opts, mode='prose')
     base_prompt = _with_caption_instructions(base_prompt, extra_instructions)
     model = _hybrid_vision_model(ds, ollama_model)
@@ -8244,9 +8295,8 @@ def _store_pixai_hybrid_dataset_captions(ds, todo, *, token, dataset_id, force,
             if dataset_activity.cancel_requested(dataset_id):
                 break
             tags = _clean_hybrid_tags(
-                ds, format_anima_booru(
-                    raw_results.get(path), include_character=include_character),
-                opts)
+                ds, _pixai_tag_line(ds, raw_results.get(path), image_facts.get(path),
+                                    hybrid=True), opts)
             if not tags and not raw_results.get(path):
                 still.append((image_id, path))
                 dataset_activity.bump(token)
@@ -8266,6 +8316,11 @@ def _store_pixai_hybrid_dataset_captions(ds, todo, *, token, dataset_id, force,
             img = _live_image_row(image_id)
             if img is None:
                 vanished += 1
+                dataset_activity.bump(token)
+                continue
+            if not _pixai_source_matches(img, path, image_facts.get(path)):
+                still.append((image_id, path))
+                errors[path] = 'Image changed during captioning; run captioning again.'
                 dataset_activity.bump(token)
                 continue
             if _caption_write_blocked(img, force=force, spare_asserted=spare_asserted):
@@ -8294,7 +8349,7 @@ def _store_pixai_hybrid_dataset_captions(ds, todo, *, token, dataset_id, force,
 def _preview_pixai_hybrid_caption(ds, img, path, opts, *, ollama_model, extra_instructions):
     """One-image hybrid preview. Writes nothing. Missing weights fail clearly."""
     from . import pixai_tagger
-    from .anima_booru import compose_hybrid_caption, format_anima_booru, hybrid_grounding
+    from .anima_booru import compose_hybrid_caption, hybrid_grounding
     refusal = pixai_tagger.concept_refusal(getattr(ds, 'kind', None))
     if refusal:
         raise RuntimeError(refusal)
@@ -8306,11 +8361,10 @@ def _preview_pixai_hybrid_caption(ds, img, path, opts, *, ollama_model, extra_in
         if batch.get('error_kind') == 'unavailable' and pixai_tagger.missing_snapshot():
             raise RuntimeError(pixai_tagger.NOT_INSTALLED)
         raise RuntimeError(batch.get('error') or 'PixAI Tagger failed')
-    include_character = pixai_tagger.include_character_tags(getattr(ds, 'kind', None))
+    facts = (batch.get('image_facts') or {}).get(path)
     tags = _clean_hybrid_tags(
-        ds, format_anima_booru(
-            (batch.get('results') or {}).get(path), include_character=include_character),
-        opts)
+        ds, _pixai_tag_line(ds, (batch.get('results') or {}).get(path), facts,
+                            hybrid=True), opts)
     base_prompt, prose_cleaner = _dataset_caption_recipe(ds, opts, mode='prose')
     base_prompt = _with_caption_instructions(base_prompt, extra_instructions)
     model = _hybrid_vision_model(ds, ollama_model)
@@ -8326,6 +8380,9 @@ def _preview_pixai_hybrid_caption(ds, img, path, opts, *, ollama_model, extra_in
     if prose and not is_concept(ds):
         prose = prose_cleaner(prose) or ''
     cap = compose_hybrid_caption(tags, prose)
+    current = _live_image_row(img.id) if facts and facts.get('sha256') else img
+    if current is None or not _pixai_source_matches(current, path, facts):
+        raise RuntimeError('Image changed during captioning; run the preview again.')
     if cap:
         cap = ' '.join(_cap_caption(_with_camera_pose_phrase(img, cap)).split())
     duration_ms = int((time.perf_counter() - started) * 1000)
@@ -8360,6 +8417,7 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None, 
     # instruction appended to the prompt, and the Ollama vision model to run. Each falls
     # back to the global default when the dataset never set it.
     opts = caption_options(ds)
+    opts['appearance'] = _caption_appearance(ds, opts.get('appearance')) or {}
     backend = (opts.get('backend') or cfg.get('captioning.backend') or 'auto').lower()
     if backend == 'none':
         raise RuntimeError('No captioning backend configured')
@@ -8532,7 +8590,11 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None, 
                                               spare_asserted=spare_asserted):
                         spared += 1
                         continue
-                    cleaned = cleaner(cap) or cap
+                    cleaned = _clean_caption_result(ds, cap, cleaner)
+                    if not cleaned:
+                        still.append((image_id, p))
+                        jc_errors[p] = 'No caption content remains after the omission rules.'
+                        continue
                     caption_origin.stamp(
                         img, _cap_caption(_with_camera_pose_phrase(img, cleaned)),
                         caption_origin.JOYCAPTION)
@@ -8604,7 +8666,12 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None, 
                             spared += 1
                             dataset_activity.bump(token)
                             continue
-                        cleaned = cleaner(cap) or cap
+                        cleaned = _clean_caption_result(ds, cap, cleaner)
+                        if not cleaned:
+                            _record_caption_skips(outcome, [(image_id, p)], {
+                                p: 'No caption content remains after the omission rules.'})
+                            dataset_activity.bump(token)
+                            continue
                         # Which engine wrote THIS row, not which backend was asked
                         # for: in 'auto' the two branches both write inside one run.
                         caption_origin.stamp(
@@ -8930,6 +8997,7 @@ def preview_caption(user_id, dataset_id, image_id, *, backend=None,
     if not os.path.isfile(path):
         raise ValueError('image file missing on disk')
     opts = caption_options(ds)
+    opts['appearance'] = _caption_appearance(ds, opts.get('appearance')) or {}
     base_prompt, cleaner = _dataset_caption_recipe(ds, opts)
     resolved_backend = (opts.get('backend') if backend is None else backend)
     resolved_backend = (resolved_backend or cfg.get('captioning.backend') or 'auto')
@@ -8963,7 +9031,7 @@ def preview_caption(user_id, dataset_id, image_id, *, backend=None,
         prompt=base_prompt, appearance=opts.get('appearance'),
         should_cancel=should_cancel)
     if result['caption'] and not is_concept(ds):
-        cleaned = cleaner(result['caption']) or result['caption']
+        cleaned = _clean_caption_result(ds, result['caption'], cleaner)
         result['caption'] = _cap_caption(_with_camera_pose_phrase(img, cleaned))
         result['chars'] = len(result['caption'])
     if is_concept(ds):
@@ -9042,7 +9110,7 @@ def _shorten_prompt(ds, long_caption) -> str:
         rule = (f'Never mention or describe this recurring element: '
                 f'{(ds.concept_desc or "").strip()}. Keep it fully omitted.\n')
     else:
-        appearance = caption_options(ds).get('appearance') or None
+        appearance = _caption_appearance(ds, caption_options(ds).get('appearance'))
         if appearance:
             rule = ('Never mention or describe: '
                     f'{appearance_omit_shorten_clause(appearance)}.\n')
@@ -9052,17 +9120,29 @@ def _shorten_prompt(ds, long_caption) -> str:
     return f'{_SHORTEN_BASE}{rule}\nCAPTION:\n{(long_caption or "").strip()}\n'
 
 
-def _scrub_short_like_long(ds, text, mode) -> str:
+def _scrub_short_like_long(ds, text, mode, *, source_caption=None) -> str:
     """Apply the SAME deterministic kind omission a long caption gets — reusing the
     existing scrubbers, none of which touch the GPU: style content-only strip, concept
     ban-list clause-scrub (describe=None → mechanical net only), character identity drop."""
     t = (text or '').strip().strip('"').strip()
     if not t:
         return ''
+    if mode == 'booru' and _is_anima_dataset(ds) and source_caption:
+        from .anima_booru import count_tags, normalize_anima_tag
+        counts = count_tags(source_caption)
+        if counts:
+            generated_counts = set(count_tags(t))
+            content = [tag.strip() for tag in t.split(',')
+                       if normalize_anima_tag(tag) not in generated_counts]
+            t = ', '.join([*counts, *content])
     if is_style(ds):
         # Same net as the long pass: the shortening LLM is told not to name the medium,
         # and like the captioner it sometimes opens with one anyway.
-        return style_content_caption(ds, drop_style_lead_in(t))
+        result = style_content_caption(ds, drop_style_lead_in(t))
+        if mode == 'booru' and _is_anima_dataset(ds):
+            from .anima_booru import anima_character_tags
+            result = anima_character_tags(result)
+        return result
     if is_concept(ds):
         leak_re = _concept_terms_re(_get_concept_terms(ds, describe=None))
         return _enforce_concept_omission(t, leak_re, b'', (ds.concept_desc or '').strip(),
@@ -9072,9 +9152,14 @@ def _scrub_short_like_long(ds, text, mode) -> str:
         cleaner, strip = drop_identity_tags, drop_signature_tags
     else:
         cleaner, strip = drop_identity_sentences, drop_signature_sentences
-    return strip(cleaner(t, body=is_body_fidelity(ds),
-                         appearance=(opts.get('appearance') or None)) or '',
-                 opts.get('signature_tags')) or ''
+    kwargs = {'keep_count_tags': _is_anima_dataset(ds)} if mode == 'booru' else {}
+    result = strip(cleaner(t, body=is_body_fidelity(ds),
+                           appearance=_caption_appearance(ds, opts.get('appearance')),
+                           **kwargs) or '', opts.get('signature_tags')) or ''
+    if mode == 'booru' and _is_anima_dataset(ds):
+        from .anima_booru import anima_character_tags
+        result = anima_character_tags(result)
+    return result
 
 
 def derive_short_captions(user_id, dataset_id, image_ids=None, force=False, mode=None,
@@ -9153,13 +9238,20 @@ def derive_short_captions(user_id, dataset_id, image_ids=None, force=False, mode
             if img is None:      # deleted while the pass ran
                 vanished += 1
                 continue
-            short = _scrub_short_like_long(ds, gen(_shorten_prompt(ds, img.caption)), mode)
+            source_caption = img.caption
+            if not (source_caption or '').strip():
+                continue
+            short = _scrub_short_like_long(
+                ds, gen(_shorten_prompt(ds, source_caption)), mode,
+                source_caption=source_caption)
             if not short:
                 continue
             img = _live_image_row(image_id)
             if img is None:      # deleted DURING its own generation
                 vanished += 1
                 continue
+            if _is_anima_dataset(ds) and img.caption != source_caption:
+                continue  # Do not attach a short to an edited source caption.
             if _caption_write_blocked(img, force=force, spare_asserted=spare_asserted,
                                       field='caption_short'):
                 continue

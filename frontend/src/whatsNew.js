@@ -85,6 +85,42 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-26-zzzzzzz-shared-pass-reuse', date: '2026-10-26',
+    title: 'Reuse More Models',
+    blurb: 'Queued SigLIP2 indexing and watermark detection reuse loaded models. Face and Video grouping use less temporary memory while keeping the same thresholds and groups.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-26-zzzzzz-score-style-memory', date: '2026-10-26',
+    title: 'Score Without Retagging',
+    blurb: 'Score preserves PixAI receipts that prove the same image bytes. Style grouping uses less working memory and keeps the same groups and thresholds.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-26-zzzzz-pixai-resident', date: '2026-10-26',
+    title: 'Keep PixAI Ready',
+    blurb: 'Queued PixAI passes keep one model loaded across Banks. Bounded CPU preparation feeds the GPU batches while existing captions and tag-cache identities stay unchanged.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-26-zzzz-bank-pixai-cache', date: '2026-10-26',
+    title: 'Tag Once, Reuse',
+    blurb: 'Bank can cache PixAI tags for later dataset captioning. Matching images reuse raw scores, then apply the dataset omission rules. Existing captions and WD14 tags stay unchanged.',
+    to: '/bank',
+  },
+  {
+    id: '2026-10-26-zzz-anima-content-tags', date: '2026-10-26',
+    title: 'Cleaner Anima Captions',
+    blurb: 'Anima captions keep content tags, apply the displayed omission defaults and preserve subject counts in short captions. PixAI uses bounded GPU batches, checks source transparency and respects Stop between batches.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-10-26-zz-gpu-preferred-inference', date: '2026-10-26',
+    title: 'GPU Inference',
+    blurb: 'Identity, masks, OCR, text embeddings and video scores now prefer prepared CUDA runtimes. CPU fallback keeps these actions available when CUDA is unavailable or the GPU is occupied.',
+    to: '/settings/engines',
+  },
+  {
     id: '2026-10-26-yes-starting-presets-per-family', date: '2026-10-26',
     title: 'Pick the settings new datasets start with',
     blurb: 'Settings ▸ Training ▸ Defaults now has a starting preset for each dataset type of the selected family. New datasets, and datasets switched to that family before they have saved settings, start on it. Settings a dataset already has are never replaced.',

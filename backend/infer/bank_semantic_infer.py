@@ -34,6 +34,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 from _harness import _pooled_features
 from pass_resources import CACHE_SAVE_SECONDS
+from model_memo import memo
 
 
 CACHE_EVERY = 50
@@ -426,7 +427,6 @@ def main() -> int:
     }
     _phase(f'loading {contract["model_key"]} on {device.upper()} (local files only)')
     try:
-        processor = AutoProcessor.from_pretrained(contract['model_id'], **model_kwargs)
         # AutoModel, not Siglip2Model. The pinned checkpoint is a SigLIP 2 model —
         # SigLIP 2 training, SigLIP 2 weights — but the FIXED-RESOLUTION variants
         # declare `model_type: siglip` and reuse the SigLIP 1 architecture; only the
@@ -436,8 +436,13 @@ def main() -> int:
         # checkpoint, the shape in current model is [768, 768]" — a 16x16 patch
         # convolution against a linear projection, two different image front-ends.
         # The config names the class; let it.
-        model = AutoModel.from_pretrained(contract['model_id'], **model_kwargs)
-        model.to(device).eval()
+        def load_model():
+            processor = AutoProcessor.from_pretrained(contract['model_id'], **model_kwargs)
+            model = AutoModel.from_pretrained(contract['model_id'], **model_kwargs)
+            model.to(device).eval()
+            return processor, model
+
+        processor, model = memo(('siglip2', tuple(sorted(contract.items())), device), load_model)
     except Exception as exc:
         _emit({'ok': False, 'results': {},
                'error': f'SigLIP2 load failed: {type(exc).__name__}: {exc}'})

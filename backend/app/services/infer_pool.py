@@ -3,8 +3,8 @@
 The queue runs one bank at a time and every pass used to start a fresh child
 per bank — a torch or onnxruntime import plus a model load, for the same model,
 up to 322 times in a row. While a local queue lane drains (``keep_warm``), the
-three model families the handoff names (WD14 tags, Score/CLIP, Faces/
-InsightFace) run under ``backend/infer/resident.py`` instead, and the next
+prepared model families (WD14 tags, PixAI, Score/CLIP, Faces/InsightFace,
+SigLIP2 and watermark detection) run under ``backend/infer/resident.py``, and the next
 bank's pass reuses the loaded process.
 
 The drivers did not change shape. ``popen`` returns either a real
@@ -36,7 +36,8 @@ from .. import config as cfg
 logger = logging.getLogger(__name__)
 
 RESIDENT_SCRIPTS = frozenset({'wd14_infer.py', 'bank_score_infer.py',
-                              'face_embed_infer.py'})
+                              'face_embed_infer.py', 'pixai_infer.py',
+                              'bank_semantic_infer.py', 'watermark_detect_infer.py'})
 _HARNESS = str(cfg.BACKEND_DIR / 'infer' / 'resident.py')
 END_KEY = '__resident__'
 END_ERR = '[resident] end'
@@ -128,22 +129,25 @@ class _Stdout:
         self._request = request
 
     def read(self):
+        return ''.join(self)
+
+    def __iter__(self):
         request = self._request
-        lines = []
-        while True:
-            line = request.worker.out.get()
-            if line is None:
-                break
-            if END_KEY in line and line.lstrip().startswith('{'):
-                from .infer_stream import parse_result_json
-                marker = parse_result_json(line) or {}
-                if marker.get(END_KEY) == 'end':
-                    request.rc = marker.get('rc', 0)
-                    request.exiting = bool(marker.get('exiting'))
+        try:
+            while True:
+                line = request.worker.out.get()
+                if line is None:
                     break
-            lines.append(line)
-        request.out_done.set()
-        return ''.join(lines)
+                if END_KEY in line and line.lstrip().startswith('{'):
+                    from .infer_stream import parse_result_json
+                    marker = parse_result_json(line) or {}
+                    if marker.get(END_KEY) == 'end':
+                        request.rc = marker.get('rc', 0)
+                        request.exiting = bool(marker.get('exiting'))
+                        break
+                yield line
+        finally:
+            request.out_done.set()
 
 
 class _Stderr:

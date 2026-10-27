@@ -1,6 +1,6 @@
 """Person-mask generation using rembg/u2net in a dedicated interpreter,
-outside Flask's venv, like face_similarity.py. CPU onnxruntime leaves
-GPU/ComfyUI untouched.
+outside Flask's venv, like face_similarity.py. CUDA uses the exclusive GPU
+window; unavailable or occupied CUDA falls back to CPU.
 Masked training (jandordoe method) uses one mask per training image;
 ai-toolkit weights background by mask_min_value (0.1) so identity binds
 to the subject rather than the setting."""
@@ -14,6 +14,7 @@ import sys
 
 from .. import config as cfg
 from . import infer_env
+from .inference_device import preferred_device
 
 logger = logging.getLogger(__name__)
 
@@ -37,14 +38,17 @@ def generate_person_masks(image_paths, out_dir, timeout: int = 1200) -> dict:
     image_paths = [p for p in (image_paths or []) if p and os.path.isfile(p)]
     if not image_paths or not is_available():
         return {}
-    payload = json.dumps({"images": image_paths, "out_dir": out_dir})
+    python = _mask_python()
     try:
-        proc = subprocess.run(infer_env.worker_argv(_mask_python(), _SCRIPT),
-                              input=payload,
-                              capture_output=True, text=True, encoding='utf-8',
-                              errors='replace', timeout=processing_timeout(timeout),
-                              env=infer_env.worker_env(_mask_python()),
-                              creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        with preferred_device(python) as device:
+            payload = json.dumps({"images": image_paths, "out_dir": out_dir,
+                                  "device": device})
+            proc = subprocess.run(infer_env.worker_argv(python, _SCRIPT),
+                                  input=payload,
+                                  capture_output=True, text=True, encoding='utf-8',
+                                  errors='replace', timeout=processing_timeout(timeout),
+                                  env=infer_env.worker_env(python),
+                                  creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     except (subprocess.TimeoutExpired, OSError) as e:
         logger.warning('person_mask: subprocess failed: %s', e)
         return {}

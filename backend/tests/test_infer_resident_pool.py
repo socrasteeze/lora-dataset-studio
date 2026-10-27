@@ -116,6 +116,25 @@ def test_two_banks_share_one_worker_and_one_model_load(pool, fake):
     assert proc.returncode == 0
 
 
+def test_streamed_stdout_keeps_request_markers_out_of_results(pool, fake):
+    with pool.keep_warm():
+        proc = pool.popen([sys.executable, str(fake / 'wd14_infer.py')], env=_env())
+        errors = []
+        reader = threading.Thread(target=lambda: errors.extend(proc.stderr), daemon=True)
+        reader.start()
+        proc.stdin.write(json.dumps({'n': 1}))
+        proc.stdin.close()
+        lines = list(proc.stdout)
+        proc.wait()
+        reader.join(timeout=10)
+        first = json.loads(''.join(lines))
+        second, _, _ = _run(pool, fake / 'wd14_infer.py', {'n': 2})
+    assert first['pid'] == second['pid']
+    assert first['n'] == 1 and second['n'] == 2
+    assert second['loads'] == 1
+    assert not any(pool.END_KEY in line for line in lines)
+
+
 def test_a_script_outside_the_three_families_stays_one_shot(pool, fake):
     with pool.keep_warm():
         _, _, proc = _run(pool, fake / 'other_infer.py', {'n': 1})

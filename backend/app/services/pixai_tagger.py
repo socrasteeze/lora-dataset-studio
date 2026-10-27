@@ -1,8 +1,9 @@
-"""PixAI Tagger v1.0 ? booru captions for a dataset, never a bank tag column.
+"""PixAI Tagger v1.0: dataset captions and reusable, separate Bank pre-tags.
 
 A CLASSIFIER that writes the dataset caption itself when the operator picks the
 ``pixai`` backend and the caption mode is booru (the SDXL and Anima default).
-It is not WD14: that pass fills BankImage.tags and stays there. Auto reaches it
+Bank pre-tagging caches raw category maps without writing a caption or WD14 tags.
+It is not WD14: that pass fills BankImage.tags and stays there. Auto reaches PixAI
 only for an Anima booru dataset when it is installed; every other Auto pass
 remains JoyCaption, then the local LLM.
 
@@ -22,6 +23,7 @@ import logging
 import os
 import re
 import sys
+import uuid
 
 from .. import config as cfg
 from .infer_stream import run_infer_script, stderr_tail
@@ -225,7 +227,9 @@ def default_timeout(n_images: int) -> int:
 
 
 def _offline_env() -> dict:
+    from .input_budget import infer_worker_env
     env = os.environ.copy()
+    env.update(infer_worker_env())
     env['HF_HUB_OFFLINE'] = '1'
     env['TRANSFORMERS_OFFLINE'] = '1'
     env['HF_DATASETS_OFFLINE'] = '1'
@@ -233,16 +237,41 @@ def _offline_env() -> dict:
     return env
 
 
-def caption_images(image_paths, timeout=None, on_progress=None, *, force_cpu=False) -> dict:
+def caption_images(image_paths, timeout=None, on_progress=None, *, force_cpu=False,
+                   should_stop=None, use_cache=True) -> dict:
+    """Return raw categories, reusing profile-local results for identical inputs."""
+    from flask import has_app_context
+    paths = list(dict.fromkeys(p for p in image_paths if p))
+    if (not paths or (should_stop and should_stop()) or not has_app_context()
+            or missing_snapshot()):
+        return _infer_images(paths, timeout, on_progress, force_cpu=force_cpu,
+                             should_stop=should_stop)
+    from . import pixai_cache
+    def infer(todo, progress):
+        return _infer_images(todo, timeout, progress, force_cpu=force_cpu,
+                             should_stop=should_stop)
+    result = pixai_cache.caption_images(paths, infer, use_cache=use_cache,
+                                       on_progress=on_progress, should_stop=should_stop)
+    result.setdefault('model', MODEL_ID)
+    return result
+
+
+def _infer_images(image_paths, timeout=None, on_progress=None, *, force_cpu=False,
+                   should_stop=None) -> dict:
     """Tag ``image_paths`` into raw category maps. Does not format or store.
 
     Success: ``{ok, results: {path: {general, character}}, errors, model}``.
-    The pipeline's default thresholds are left alone. An empty path list is a
-    success and does not start the interpreter.
+    Category maps remain intact. Image facts and worker timing accompany them.
+    Default thresholds and precision stay intact. Empty or already-cancelled
+    passes do not start an interpreter. Stop and timeout ask the worker to exit
+    between batches before the subprocess watchdog's kill backstop.
     """
     images = [p for p in (image_paths or []) if p and os.path.isfile(p)]
     if not images:
         return {'ok': True, 'results': {}, 'errors': {}, 'model': MODEL_ID}
+    if should_stop and should_stop():
+        return {'ok': True, 'results': {}, 'errors': {}, 'model': MODEL_ID,
+                'cancelled': True}
     if missing_snapshot():
         return {'ok': False, 'error_kind': 'unavailable', 'model': MODEL_ID,
                 'error': f'PixAI Tagger weights are not in {models_dir()}'}
@@ -251,11 +280,11 @@ def caption_images(image_paths, timeout=None, on_progress=None, *, force_cpu=Fal
         return {'ok': False, 'error_kind': 'unavailable', 'model': MODEL_ID,
                 'error': 'PixAI Tagger Python is not installed '
                          f'({_managed_python()})'}
-    payload = json.dumps({
+    payload = {
         'images': images,
         'models_dir': models_dir(),
         'device': 'cpu' if force_cpu else device(),
-    })
+    }
     budget = int(timeout) if timeout else default_timeout(len(images))
 
     def _on_line(line):
@@ -263,13 +292,32 @@ def caption_images(image_paths, timeout=None, on_progress=None, *, force_cpu=Fal
         if rec and on_progress:
             on_progress(rec)
 
+    sentinel = None
     try:
+        directory = cfg.data_dir() / 'runtime'
+        directory.mkdir(parents=True, exist_ok=True)
+        sentinel = str(directory / ('pixai-stop-' + uuid.uuid4().hex))
+        payload['cancel_file'] = sentinel
+
+        def _ask_stop():
+            with open(sentinel, 'w', encoding='ascii') as stream:
+                stream.write('stop')
+
         stdout, stderr_lines, rc, timed_out = run_infer_script(
-            python, _SCRIPT, payload, budget, _on_line, env=_offline_env())
+            python, _SCRIPT, json.dumps(payload), budget, _on_line,
+            env=_offline_env(), should_stop=should_stop, on_stop=_ask_stop)
     except OSError as exc:
         logger.warning('pixai: could not start the tagger: %s', exc)
         return {'ok': False, 'error_kind': 'unavailable', 'model': MODEL_ID,
                 'error': f'could not start the tagger: {exc}'}
+    finally:
+        if sentinel:
+            try:
+                os.unlink(sentinel)
+            except FileNotFoundError:
+                pass
+            except OSError:
+                logger.warning('PixAI cancellation-file cleanup was deferred')
     if timed_out:
         return {'ok': False, 'error_kind': 'timeout', 'model': MODEL_ID,
                 'error': f'tagging timed out after {budget}s'}
@@ -294,4 +342,10 @@ def caption_images(image_paths, timeout=None, on_progress=None, *, force_cpu=Fal
     data.setdefault('model', MODEL_ID)
     data.setdefault('results', {})
     data.setdefault('errors', {})
+    stats = data.get('stats') or {}
+    if isinstance(stats, dict):
+        logger.info('PixAI inference device=%s batch_size=%s retries=%s processed=%s '
+                    'load_seconds=%s tag_seconds=%s', stats.get('device'),
+                    stats.get('batch_size'), stats.get('batch_retries'),
+                    stats.get('processed'), stats.get('load_seconds'), stats.get('seconds'))
     return data

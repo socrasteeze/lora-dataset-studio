@@ -42,7 +42,7 @@ missing capability turning the whole thing off.
 
 TWO HALVES, TWO INSTALL STORIES, ONE PASS.
   bands → PIL, in-process, free. No capability, no subprocess, no card.
-  text  → RapidOCR in a CPU subprocess (see infer/video_text_infer.py). Absent,
+  text  → RapidOCR with GPU preference and CPU fallback (see infer/video_text_infer.py). Absent,
           the pass still runs and says so.
 
 ADVISORY, AND UNMEASURED IS A STATE. The raw numbers land in metrics_json beside
@@ -258,8 +258,7 @@ def read_text_boxes(frames, *, timeout=None, should_stop=None, on_progress=None,
     # or "flag nothing" (1).
     floor = TEXT_SCORE_MIN if score_min is None else \
         min(0.95, max(0.05, float(score_min)))
-    payload = json.dumps({'frames': frames, 'score_min': floor,
-                          'cancel_file': cancel_path}) + '\n'
+    payload = {'frames': frames, 'score_min': floor, 'cancel_file': cancel_path}
 
     def _on_line(line):
         match = _PROGRESS_RE.search(line)
@@ -267,9 +266,12 @@ def read_text_boxes(frames, *, timeout=None, should_stop=None, on_progress=None,
             on_progress(int(match.group(1)), int(match.group(2)))
 
     try:
-        stdout, stderr_lines, rc, timed_out = run_infer_script(
-            python, _SCRIPT, payload, budget, on_line=_on_line,
-            should_stop=should_stop, on_stop=ask_stop)
+        from .inference_device import preferred_device
+        with preferred_device(python) as device:
+            payload['device'] = device
+            stdout, stderr_lines, rc, timed_out = run_infer_script(
+                python, _SCRIPT, json.dumps(payload) + '\n', budget, on_line=_on_line,
+                should_stop=should_stop, on_stop=ask_stop)
     except Exception as e:  # noqa: BLE001
         raise RuntimeError(f'could not start the text reader: '
                            f'{type(e).__name__}: {e}') from None

@@ -656,6 +656,44 @@ setup into a single file so you can move to a new machine — or recover from on
   `(restored)` suffix — and you get an honest final report of what was restored,
   renamed or skipped.
 
+## PixAI Pre-Tags
+
+Open a Bank, open **Passes**, then select **PixAI Pre-Tags**. The pass processes
+selected images, or kept and pending images when nothing is selected. Install
+PixAI Tagger in **Setup** if the control is unavailable. The pass uses the local
+queue and supports **Stop**. It prefers a prepared CUDA runtime.
+While the local queue drains, PixAI keeps one model loaded across Banks.
+Up to four CPU preparation workers feed bounded GPU batches. The worker exits
+when the queue drains, is cancelled or must yield the GPU. Model and device
+changes rebuild the resident pipeline. Image transforms and thresholds stay the same.
+
+Queued SigLIP2 indexing and watermark detection also reuse models across Banks
+and chunks. Streaming watermark results still save as they arrive. Queue drain,
+Stop, idle expiry and GPU contention release unused resident workers. Masks,
+OCR and inpainting already load one model per batch; they keep their existing
+batch and CPU fallback behavior. ComfyUI generation keeps its own model lifecycle.
+
+Score preserves a PixAI receipt when its stored digest proves the same image
+bytes. A changed image still invalidates the receipt. Score resumes cached
+embeddings and scores; **Rescore** explicitly recomputes them. Style grouping
+keeps its exact thresholds and partition while bounding temporary edge storage.
+
+Pre-tagging saves raw categories and confidence scores in the active profile.
+It does not replace Bank captions, WD14 filter tags, dataset captions or sidecars.
+The count beside the button records previously cached images; reuse checks the
+current image and model again. WD14 remains the Bank filtering pass.
+
+When you later caption a dataset with PixAI, matching image bytes reuse those
+scores without loading the model. The dataset still applies its own Character
+or Style rules and omission settings. Caption Lab and the PixAI half of hybrid
+captioning share this cache. A hybrid run still needs its vision-model pass.
+Existing dataset captions follow the normal skip/protection rules.
+
+Raw-preserving promotion can reuse the cache. Rotation, crop, re-encoding or
+changed model/preprocessing files require fresh inference. Cache data stays in
+the active profile; another profile computes its own results. Pre-tagging does
+not correct visual classification errors. A cached result retains those errors.
+
 ## The image bank (triage a big folder)
 
 You exported 9 000 unsorted images from Telegram (or a scraper dumped a
@@ -1718,8 +1756,10 @@ brings the likeliest images to the front; the final call stays yours.
 
 The text encoder is the other half of the selected image/text model. Loading the
 default CLIP encoder costs about **ten seconds** on the CPU; SigLIP 2 also has a
-one-time model load. The app keeps the chosen encoder warm after the first
-search, then releases it when you close the panel or after the idle window.
+one-time model load. Uncached queries prefer a prepared CUDA runtime when the
+GPU is free. CUDA workers exit after the query batch, before releasing GPU
+ownership. CPU fallback workers stay warm until the panel closes or the idle
+window expires. CUDA startup and search speed remain unmeasured.
 Every phrase is cached under that engine's model key, so CLIP and SigLIP 2 text
 vectors can never be mixed and re-typing one is free even after a restart.
 
@@ -2951,8 +2991,9 @@ bubble out of the middle of a page is not a thing.
 
 The reading is done by the same OCR engine as the Video bank's **🔳 Safe
 zone** pass (one Setup install serves both — *Burned-in text*, a small
-Apache-2.0 package that works offline). It runs on the **CPU only**, never the
-GPU, so it can scan a bank while a training run owns the card. Regular
+Apache-2.0 package that works offline). A prepared CUDA OCR interpreter uses
+the GPU under the exclusive GPU window. It falls back to CPU when CUDA is
+unavailable or the GPU is occupied, including during training. Regular
 lettering is found whatever the script — Latin, Korean, Japanese, Chinese
 dialogue, subtitles and captions are all boxes to it. **Heavily stylised
 lettering can escape it**: a calligraphic sound-effect with thick outlines is

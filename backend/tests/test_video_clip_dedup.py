@@ -54,6 +54,18 @@ def test_a_shot_with_no_vectors_has_no_similarity_to_anything():
 
 # --- grouping -------------------------------------------------------------------
 
+def test_multiple_frames_of_one_shot_keep_bridges_without_self_duplicates():
+    vectors = {
+        10: [{'vec': _vec(1, 0)}, {'vec': _vec(-1, 0)}],
+        20: [{'vec': _vec(.8, .6)}],
+        30: [{'vec': _vec(.28, .96)}],
+        40: [{'vec': _vec(-1, 0)}],
+        50: [{'vec': _vec(0, -1)}],
+    }
+    assert dedup.group_clips(vectors, .75) == [[10, 20, 30, 40]]
+    assert dedup.group_clips({10: vectors[10]}, .75) == []
+
+
 def test_shots_above_the_threshold_group_and_others_stay_out():
     store = {
         1: [{'vec': _vec(1, 0, 0)}],

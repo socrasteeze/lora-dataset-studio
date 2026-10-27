@@ -781,14 +781,15 @@ def test_the_capability_the_workspace_reads_rides_the_bank_payload(app, monkeypa
 
 # --- the worker's own contracts --------------------------------------------------------
 
-def test_the_worker_never_takes_the_card():
-    """A bank must be measurable while a training run owns the GPU — that is the
-    whole reason the text half is onnxruntime rather than the torch detector this
-    lane already ships."""
+def test_the_worker_requires_parent_gpu_permission():
+    """CPU fallback hides CUDA; only a parent-owned request enables GPU OCR."""
     src = _infer_source('video_text_infer.py')
     hide = src.index("os.environ['CUDA_VISIBLE_DEVICES'] = ''")
     assert hide < src.index('import cv2'), \
         'CUDA must be hidden before anything heavy is imported'
+    assert "want_cuda = req.get('device') == 'cuda'" in src
+    assert 'if not want_cuda:' in src
+    assert 'det_use_cuda=True, cls_use_cuda=True, rec_use_cuda=True' in src
 
 
 def test_the_probe_imports_everything_the_worker_imports():
