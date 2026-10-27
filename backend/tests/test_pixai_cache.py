@@ -109,3 +109,28 @@ def test_independent_receipt_proves_only_the_same_bytes(app):
         assert cache.proves_image('synthetic-key', 'a' * 64)
         assert not cache.proves_image('synthetic-key', 'b' * 64)
         assert not cache.proves_image('absent', 'a' * 64)
+
+
+def test_each_image_is_read_twice_not_four_times(app, monkeypatch, tmp_path):
+    """A miss is hashed for the lookup and once more before it is cached; a hit
+    for the lookup and the final check. Big Banks paid two extra full reads."""
+    import hashlib
+    source, _infer, _calls = setup_cache(monkeypatch, tmp_path)
+    reads = []
+    real = cache.content_fingerprint_path
+    monkeypatch.setattr(cache, 'content_fingerprint_path',
+                        lambda path: reads.append(path) or real(path))
+
+    def infer(paths, _progress):
+        # The worker hashes the bytes it decoded itself; that read is not ours.
+        return {'ok': True, 'results': {p: {'general': {'smile': .9}} for p in paths},
+                'image_facts': {p: {'sha256': hashlib.sha256(open(p, 'rb').read()).hexdigest()}
+                                for p in paths}, 'errors': {}}
+    with app.app_context():
+        miss = cache.caption_images([str(source)], infer)
+        assert miss['stats']['cache_misses'] == 1 and miss['cache_keys']
+        assert len(reads) == 2
+        reads.clear()
+        hit = cache.caption_images([str(source)], infer)
+        assert hit['stats']['cache_hits'] == 1 and hit['cache_keys']
+        assert len(reads) == 2

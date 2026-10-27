@@ -12625,7 +12625,7 @@ def _pixai_pool(bank_id, statuses=None, ids=None):
 
 def _pixai_tags_job(bank_id, rescan=False, statuses=None, ids=None):
     def run(job):
-        from . import pixai_cache, pixai_tagger
+        from . import pixai_tagger
         from .inference_device import preferred_device
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
@@ -12637,10 +12637,17 @@ def _pixai_tags_job(bank_id, rescan=False, statuses=None, ids=None):
         if not items:
             return
         completed = cached = failed = 0
+        why_cpu = []
         with preferred_device(pixai_tagger.pixai_python(), backend='torch',
-                              preference=pixai_tagger.device()) as device:
+                              preference=pixai_tagger.device(),
+                              on_cpu=why_cpu.append) as device:
             if device == 'cpu' and pixai_tagger.device() == 'cuda':
                 raise RuntimeError('PixAI GPU mode requires available CUDA. Check Setup and retry.')
+            # A silent CPU fallback turns a big Bank into hours of slow tagging
+            # with nothing on screen to explain it; every detail line says so.
+            label = ('PixAI on CPU (' + why_cpu[0].rstrip('.') + ')' if why_cpu
+                     else 'PixAI on CPU' if device == 'cpu' else 'PixAI')
+            bank_jobs.progress(job, detail=label + ': checking cache')
             for offset in range(0, len(items), 128):
                 if bank_jobs.cancelled(job):
                     break
@@ -12657,7 +12664,7 @@ def _pixai_tags_job(bank_id, rescan=False, statuses=None, ids=None):
                 base = offset
                 def progress(rec):
                     bank_jobs.progress(job, done=base + int(rec.get('done') or 0),
-                                       detail='PixAI: ' + (rec.get('phase') or 'tagging'))
+                                       detail=label + ': ' + (rec.get('phase') or 'tagging'))
                 result = pixai_tagger.caption_images(
                     list(by_path), force_cpu=device == 'cpu', use_cache=not rescan,
                     on_progress=progress, should_stop=lambda: bank_jobs.cancelled(job))
@@ -12666,8 +12673,9 @@ def _pixai_tags_job(bank_id, rescan=False, statuses=None, ids=None):
                     return
                 pending = {}
                 for path, rows in by_path.items():
+                    # caption_images returns a key only for bytes it just
+                    # re-verified, so the key is the proof; no third read here.
                     key = (result.get('cache_keys') or {}).get(path)
-                    expected = (result.get('image_facts', {}).get(path) or {}).get('sha256')
                     for ident, instance in rows:
                         db.session.expire_all()
                         current_bank = db.session.get(ImageBank, bank_id)
@@ -12676,8 +12684,7 @@ def _pixai_tags_job(bank_id, rescan=False, statuses=None, ids=None):
                                 or current_bank.instance_id != bank_instance):
                             return
                         if (not key or row is None or row.instance_id != instance
-                                or analysis_image_path(current_bank, row) != path
-                                or pixai_cache.fingerprint(path) != expected):
+                                or analysis_image_path(current_bank, row) != path):
                             failed += 1
                             continue
                         pending[ident] = (instance, key)
@@ -12691,7 +12698,10 @@ def _pixai_tags_job(bank_id, rescan=False, statuses=None, ids=None):
                     write_with_retry(store_receipts)
                 cached += (result.get('stats') or {}).get('cache_hits', 0)
                 bank_jobs.progress(job, done=min(offset + 128, len(items)))
-        bank_jobs.progress(job, detail=f'{completed} cached, {cached} reused, {failed} unavailable')
+        summary = f'{completed} cached, {cached} reused, {failed} unavailable'
+        if label != 'PixAI':
+            summary += ' · ' + label.replace('PixAI on', 'ran on', 1)
+        bank_jobs.progress(job, detail=summary)
     return run
 
 

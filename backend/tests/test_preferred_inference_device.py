@@ -108,3 +108,52 @@ def test_gpu_text_worker_exits_before_gpu_ownership_ends(monkeypatch, engine):
     with service._query_worker(engine):
         events.append('operation')
     assert events == ['acquire', 'stop', 'start-cuda', 'operation', 'stop', 'release']
+
+
+def test_busy_gpu_tells_the_caller_why_it_fell_back(monkeypatch):
+    from app import capabilities
+    from app.services import inference_device as service
+    monkeypatch.setattr(capabilities, '_cached_import', lambda *args: True)
+    monkeypatch.setattr(service, 'vision_window_is_owned', lambda: False)
+
+    @contextmanager
+    def busy(**kwargs):
+        raise service.GpuBusyError('training is running')
+        yield
+
+    monkeypatch.setattr(service, 'gpu_exclusive_vision_window', busy)
+    reasons = []
+    with service.preferred_device('python.exe', on_cpu=reasons.append) as device:
+        assert device == 'cpu'
+    assert reasons == ['training is running']
+
+
+def test_missing_cuda_runtime_tells_the_caller_why(monkeypatch):
+    from app import capabilities
+    from app.services import inference_device as service
+    monkeypatch.setattr(capabilities, '_cached_import', lambda *args: False)
+    reasons = []
+    with service.preferred_device('python.exe', on_cpu=reasons.append) as device:
+        assert device == 'cpu'
+    assert reasons == ['no CUDA runtime in its environment']
+
+
+@pytest.mark.parametrize('owned', [True, False])
+def test_cuda_and_chosen_cpu_report_no_fallback(monkeypatch, owned):
+    from app import capabilities
+    from app.services import inference_device as service
+    monkeypatch.setattr(capabilities, '_cached_import', lambda *args: True)
+    monkeypatch.setattr(service, 'vision_window_is_owned', lambda: owned)
+
+    @contextmanager
+    def window(**kwargs):
+        yield
+
+    monkeypatch.setattr(service, 'gpu_exclusive_vision_window', window)
+    reasons = []
+    with service.preferred_device('python.exe', on_cpu=reasons.append) as device:
+        assert device == 'cuda'
+    with service.preferred_device('python.exe', preference='cpu',
+                                  on_cpu=reasons.append) as device:
+        assert device == 'cpu'
+    assert reasons == []
