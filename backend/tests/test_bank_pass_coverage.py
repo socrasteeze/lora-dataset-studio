@@ -61,6 +61,19 @@ def test_a_finished_pass_reads_complete(app, tmp_path):
     assert cov['faces']['pending'] == 0
 
 
+def test_pixai_receipts_are_counted_separately_from_wd14_and_captions(app, tmp_path):
+    from app.services import image_bank_service as banks
+    with app.app_context():
+        bank_id = _bank(app, tmp_path, 'separate-tags', [
+            {'pixai_cache_key': 'a' * 64},
+            {'pixai_cache_key': 'b' * 64},
+        ])
+        cov = banks.bank_pass_coverage('local', [bank_id])[bank_id]
+    assert cov['pixai_tags'] == {'pending': 0, 'done': 2, 'complete': True}
+    assert cov['tags']['pending'] == 2
+    assert cov['caption']['pending'] == 2
+
+
 def test_rejected_images_do_not_keep_a_pass_pending(app, tmp_path):
     """Every pass skips rejects, so counting them would make a finished bank
     look permanently unfinished and re-queue it forever."""
@@ -74,6 +87,27 @@ def test_rejected_images_do_not_keep_a_pass_pending(app, tmp_path):
         cov = banks.bank_pass_coverage('local', [bank_id])[bank_id]
 
     assert cov['faces']['complete'] is True
+
+
+def test_hidden_folders_do_not_inflate_any_coverage_counter(app, tmp_path):
+    import json
+    from app.extensions import db
+    from app.models import BankImage, ImageBank
+    from app.services import image_bank_service as banks
+    with app.app_context():
+        bank_id = _bank(app, tmp_path, 'hidden-coverage', [
+            {'aesthetic_score': 8., 'pixai_cache_key': 'a' * 64, 'caption': 'invented'},
+            {},
+        ])
+        rows = BankImage.query.filter_by(bank_id=bank_id).order_by(BankImage.id).all()
+        rows[0].relpath = 'hiddenXaQ/0.jpg'
+        rows[1].relpath = 'hidden_a%\\1.jpg'
+        db.session.get(ImageBank, bank_id).excluded_folders = json.dumps(['hidden_a%'])
+        db.session.commit()
+        cov = banks.bank_pass_coverage('local', [bank_id])[bank_id]
+    assert cov['pixai_tags'] == {'pending': 0, 'done': 1, 'complete': True}
+    assert cov['caption'] == {'pending': 0, 'done': 1, 'complete': True}
+    assert cov['score'] == {'pending': 0, 'done': 1, 'complete': True}
 
 
 def test_the_steps_with_no_marker_are_never_called_done(app, tmp_path):
