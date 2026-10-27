@@ -164,7 +164,7 @@ function PassCoverageRow({ coverage }) {
     <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
       title={coverageSummary(coverage)}>
       {badges.map((b) => (
-        <span key={b.key} className={b.cls} title={b.title}>{b.text}</span>
+        <span key={b.key} className={b.cls} title={b.title} role="img" aria-label={b.title}>{b.text}</span>
       ))}
     </p>
   )

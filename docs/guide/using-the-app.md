@@ -682,6 +682,12 @@ Pre-tagging saves raw categories and confidence scores in the active profile.
 It does not replace Bank captions, WD14 filter tags, dataset captions or sidecars.
 The count beside the button records previously cached images; reuse checks the
 current image and model again. WD14 remains the Bank filtering pass.
+Bank cards show **PixAI** cache coverage separately from **WD14** tags and the
+caption badge. A muted PixAI label means every image in that coverage pool has
+a receipt. An amber number is the count still missing. Pre-tagging does not
+clear WD14 or caption counts because it writes neither of those fields.
+Coverage counts omit that Bank's excluded folders. Other optional passes can
+still show pending work; those badges are not a requirement to run every pass.
 
 When you later caption a dataset with PixAI, matching image bytes reuse those
 scores without loading the model. The dataset still applies its own Character

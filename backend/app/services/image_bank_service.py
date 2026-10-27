@@ -53,7 +53,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from PIL import Image, ImageOps
-from sqlalchemy import and_, case, func, or_, text, update
+from sqlalchemy import and_, case, func, or_, select, text, update
 
 from .. import config as cfg
 from ..generation_limits import improve_timeout_seconds
@@ -3532,6 +3532,7 @@ PASS_PENDING = {
     # would make an unreadable image pending forever — the same trap the
     # face_state/face_cluster note above records.
     'tags':      lambda: BankImage.tags_state.is_(None),
+    'pixai_tags': lambda: BankImage.pixai_cache_key.is_(None),
     'caption':   lambda: or_(BankImage.caption.is_(None),
                              BankImage.caption == ''),
 }
@@ -3558,13 +3559,24 @@ def bank_pass_coverage(user_id, bank_ids=None) -> dict:
             for s in PASS_PENDING]
 
     skip = _name_excluded_clause()
+    # Match each Bank's explicit hidden folders without one aggregate per Bank.
+    valid = case((func.json_valid(ImageBank.excluded_folders),
+                  ImageBank.excluded_folders), else_='[]')
+    folders = case((func.json_type(valid) == 'array', valid), else_='[]')
+    hidden = func.json_each(folders).table_valued('value', 'type').alias('coverage_hidden')
+    prefix = func.trim(func.trim(func.replace(hidden.c.value, '\\', '/')), '/')
+    hidden_row = select(1).select_from(hidden).where(
+        hidden.c.type == 'text',
+        func.lower(func.substr(_relpath_posix_col(), 1, func.length(prefix) + 1))
+        == func.lower(prefix.concat('/')),
+    ).correlate(ImageBank, BankImage).exists()
 
     def _base():
         q = (db.session.query(BankImage.bank_id,
                               func.count(BankImage.id).label('total'), *cols)
              .join(ImageBank, ImageBank.id == BankImage.bank_id)
              .filter(ImageBank.user_id == user_id)
-             .filter(BankImage.status != 'reject'))
+             .filter(BankImage.status != 'reject', ~hidden_row))
         # Excluded folder names never get processed, so they are never "left
         # to do": counting them would re-queue a finished bank forever.
         return q if skip is None else q.filter(~skip)

@@ -59,9 +59,23 @@ test('the badges follow pipeline order, not object key order', () => {
                    ['scan', 'faces', 'caption'])
 })
 
-test('every badged pass is a real pipeline step', () => {
+test('every badged pass is a real Bank operation', () => {
   // The keys are the server's step names. A typo here would silently draw
   // nothing forever, which is the failure mode hardest to notice.
-  const steps = ['scan', 'score', 'watermark', 'faces', 'framing', 'tags', 'caption']
+  const steps = ['scan', 'score', 'watermark', 'faces', 'framing', 'tags', 'pixai_tags', 'caption']
   assert.deepEqual(COVERAGE_PASSES.map((p) => p.key), steps)
+})
+
+test('PixAI cache completion does not clear WD14 or caption work', () => {
+  const coverage = {
+    pixai_tags: { pending: 0, done: 984, complete: true },
+    tags: { pending: 984, done: 0, complete: false },
+    caption: { pending: 984, done: 0, complete: false },
+  }
+  const by = Object.fromEntries(coverageBadges(coverage).map((b) => [b.key, b]))
+  assert.equal(by.pixai_tags.text, 'PixAI')
+  assert.match(by.pixai_tags.title, /cached/)
+  assert.equal(by.tags.text, '🔖 WD14 984')
+  assert.match(by.tags.title, /WD14 Tags/)
+  assert.equal(by.caption.text, '🏷️ 984')
 })

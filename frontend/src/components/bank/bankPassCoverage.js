@@ -18,15 +18,15 @@
  * then reads as "no information" rather than a confident all-clear.
  */
 
-/* Order and glyphs follow the pipeline itself, so the badges read left to right
- * in the order the passes run. Labels match the buttons the user clicks. */
+/* Pipeline passes and standalone PixAI pre-tags share the card's coverage row. */
 export const COVERAGE_PASSES = [
   { key: 'scan', mark: '🔎', label: 'Scan' },
   { key: 'score', mark: '✨', label: 'Score' },
   { key: 'watermark', mark: '🚩', label: 'Watermarks' },
   { key: 'faces', mark: '👥', label: 'Group by person' },
   { key: 'framing', mark: '📐', label: 'Framing' },
-  { key: 'tags', mark: '🔖', label: 'Tags' },
+  { key: 'tags', mark: '🔖 WD14', label: 'WD14 Tags' },
+  { key: 'pixai_tags', mark: 'PixAI', label: 'PixAI Pre-Tags' },
   { key: 'caption', mark: '🏷️', label: 'Caption' },
 ]
 
@@ -50,7 +50,9 @@ export function coverageBadges(coverage) {
         key: p.key,
         text: p.mark,
         cls: 'text-slate-500',
-        title: `${p.label} — done`,
+        title: p.key === 'pixai_tags'
+          ? 'PixAI Pre-Tags — cached; checked again when reused'
+          : `${p.label} — done`,
       })
     } else {
       out.push({

@@ -1,5 +1,53 @@
 # HANDOFF
 
+## Cached Bank caption fill (2026-10-27)
+
+Operator authorized filling missing captions across all Banks from cached PixAI
+results. Checked all 327 Banks and filled 145,581 empty captions in 315 Banks.
+No inference ran. Validation and writes used current source SHA-256, matching
+model/cache identity, normal non-rejected processing scope and folder exclusions.
+Writes rechecked row and Bank state and atomically required an empty caption.
+Captions use the existing Anima category formatter with general visual content
+and subject counts, without character-name or attribution categories. Existing
+visual traits remain because Bank captions have no Dataset-specific identity rules.
+
+The fill finished in 250.17 seconds with zero skipped writes. A database backup
+comparison found zero changes to existing nonempty captions, all other Bank image
+fields, all Dataset image fields, cache records or row membership. The live Bank
+API confirms the 984-image example now has complete caption coverage. There are
+55,007 in-scope images without reusable cache receipts, so those remain uncaptioned.
+Private backup, plan, finite operation script and receipts remain in ignored
+data/cache-caption-fill-20261027-01. No source images or sidecars were written.
+No tests ran. No new application code, build, commit or push was needed.
+
+## Bank coverage display correction (2026-10-27)
+
+Committed to main and pushed to origin on 2026-10-27, together with the PixAI
+hash-once and CPU-fallback fix (58368e772) and a rebuilt bundle. The operator asked
+why Bank card Tags/Caption counts remained after PixAI pre-tagging. Those badges
+represented WD14 and written captions; PixAI receipts were missing from the row.
+The card now includes an explicit PixAI cache badge, labels WD14 separately and
+provides accessible status labels. Caption and WD14 completion are not inferred
+from PixAI. No caption/tag pass ran as part of this correction.
+
+Coverage also failed to exclude each Bank's explicit hidden folders. A correlated
+SQLite JSON array filter now respects those prefixes in the existing grouped
+aggregate, without per-Bank count queries or wildcard interpretation of folder
+names. Global excluded-folder-name filtering remains. The 984-image example now
+reports 984 PixAI receipts and scores, zero WD14 results and zero captions.
+Live in-scope Score pending count is eight, rather than counting excluded rows.
+
+Readonly current-data query and post-restart API readback confirm these values.
+Normal activation followed an idle-work check and SQLite backup. Saved Bank
+caption/WD14/PixAI receipt fields and Dataset captions match the pre-activation
+hashes. Served entry matches the rebuilt bundle. Receipts and the prior bundle
+remain under ignored data/coverage-display-20261027-01.
+
+Ruff passes; ESLint has zero errors and 32 existing warnings. Staged build passed
+in 8.87s. Frontend/backend regressions were added but not run. No rendered probe
+ran. The operator later asked for it to be merged and pushed; the coverage
+regressions still have not been run.
+
 ## Clean delivery checkpoint (2026-10-26)
 
 Operator authorized clean delivery to origin/main. Preserve the seven existing

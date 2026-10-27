@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-27-pixai-bank-coverage', date: '2026-10-27',
+    title: 'Separate Tag Coverage',
+    blurb: 'Bank cards show cached PixAI pre-tags separately from WD14 filter tags and written captions. Coverage counts now respect each Bank\'s excluded folders.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-26-zzzzzzz-shared-pass-reuse', date: '2026-10-26',
     title: 'Reuse More Models',
     blurb: 'Queued SigLIP2 indexing and watermark detection reuse loaded models. Face and Video grouping use less temporary memory while keeping the same thresholds and groups.',
