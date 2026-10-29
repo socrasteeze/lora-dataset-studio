@@ -153,6 +153,12 @@ def _fill(bank, lane, sources=None) -> int:
                                .where(BankImage.id == row_id, spec['todo']())
                                .values(**values))
         db.session.commit()
+        if lane == 'caption':
+            from .caption_sidecar import sync_bank_caption_sidecar
+            for row_id, values in items[i:i + _CHUNK]:
+                row = db.session.get(BankImage, row_id)
+                if row is not None:
+                    sync_bank_caption_sidecar(bank, row)
     return len(updates)
 
 

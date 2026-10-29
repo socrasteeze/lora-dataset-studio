@@ -215,6 +215,10 @@ DEFAULTS = {
         # Anima Auto skips JoyCaption and calls this Ollama tag. Blank uses
         # ollama.vision_model. Other families keep JoyCaption, then the local LLM.
         'anima_auto_model': 'huihui_ai/qwen3-vl-abliterated:8b-instruct',
+        # Mirror a Bank caption into <stem>.txt next to the source image.
+        # Off leaves captions in the database only. A cleared caption never
+        # deletes an existing sidecar; tags stay in their own columns.
+        'bank_sidecar_sync': True,
     },
     # PixAI Tagger v1.0. Blank python -> data/envs/pixai. Blank models_root ->
     # data/models (folder pixai-tagger-v1.0). device: auto|cuda|cpu.

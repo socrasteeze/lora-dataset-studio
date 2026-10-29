@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-29-bank-caption-sidecars', date: '2026-10-29',
+    title: 'Bank Captions Stay Beside the Files',
+    blurb: 'When a Bank caption is written or edited, the same-stem .txt next to the image is updated to match. Clearing a caption leaves that file in place, and tags stay in their own columns. Turn it off in Settings ▸ Captioning if you want captions only in the database.',
+    to: '/settings/captioning',
+  },
+  {
     id: '2026-10-27-pixai-bank-coverage', date: '2026-10-27',
     title: 'Separate Tag Coverage',
     blurb: 'Bank cards show cached PixAI pre-tags separately from WD14 filter tags and written captions. Coverage counts now respect each Bank\'s excluded folders.',

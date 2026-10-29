@@ -139,7 +139,7 @@ The cuts are measured rather than guessed: the aesthetic and near-duplicate thre
 
 </details>
 
-Point it at a messy dump of thousands of images and triage it in place. Nothing in your folder is touched unless you explicitly ask — **Delete rejected** is the only action that removes anything from an external source folder, and it tells you where the files will go first.
+Point it at a messy dump of thousands of images and triage it in place. Source images are never rewritten. **Delete rejected** is the only action that removes anything from an external source folder, and it tells you where the files will go first. Setting or changing a Bank caption also updates a same-stem `.txt` sidecar next to the image (turn it off in Settings ▸ Captioning).
 
 **Select Banks** lets you rename, change grouping, move to another profile or delete several banks together. Profile moves preserve metadata and caches while source images stay in place. Review names before applying a batch; failed items remain available for retry. Deleting a bank preserves external source images. LDS-managed imported copies go to Trash. [Bulk bank management](docs/guide/using-the-app.md#manage-several-banks)
 
@@ -170,7 +170,7 @@ Analysis passes and **Launch all** started inside a Bank use the same **Bank Que
 | **📦 Move folder** | Move a bank's images to another disk and keep every analysis: scores, duplicate groups, faces, decisions, captions |
 | **🚀 Launch all** | Runs the whole chain end to end overnight and leaves a morning report |
 | **④ Promote · ↑ Import to bank** | Pushes a bank's keepers into a target dataset, or copies a dataset's keepers into a new bank. Both choices retain Dataset-owned captions, curation, framing, watermark and provenance. By default compatible final-file technical analysis is restored; **Start fresh** skips only reuse of prior analysis. Face/Score AI results are intentionally not reused after normalization. |
-| **The one destructive action** | Everything above leaves your files alone — 🗑 **Delete rejected** is the single bank action that touches the source folder. It sends the rejected files to the OS trash (or the app's own, or deletes them) behind a type-DELETE confirmation that first states how many files, where they go, and which other banks share that folder. It refuses outright when the folder is also a dataset's |
+| **The one destructive action** | 🗑 **Delete rejected** is the only bank action that removes source images. It sends the rejected files to the OS trash (or the app's own, or deletes them) behind a type-DELETE confirmation that first states how many files, where they go, and which other banks share that folder. It refuses outright when the folder is also a dataset's. A caption write may update a same-stem `.txt` next to the image; it never deletes a sidecar or edits the image. |
 
 *Details: [The Image bank](#the-image-bank--triage-a-giant-folder-in-place)*
 

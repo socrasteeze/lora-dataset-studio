@@ -233,6 +233,23 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
           <ResetToDefault label="Captioning backend" section="captioning" field="backend"
             config={config} configDefaults={configDefaults} setField={setField} />
         </div>
+        <label className="mt-3 flex items-start gap-2 text-sm text-content">
+          <input id="captioning-bank-sidecar-sync" type="checkbox"
+            checked={(config.captioning?.bank_sidecar_sync
+              ?? defaultValueAt(configDefaults, 'captioning', 'bank_sidecar_sync')) !== false}
+            onChange={(e) => setField('captioning', 'bank_sidecar_sync', e.target.checked)}
+            className="mt-0.5" />
+          <span>
+            <span className="font-medium">Write Bank caption files</span>
+            <span className="block text-xs text-content-muted">
+              On: a Bank caption write updates the same-stem .txt next to the image.
+              Clearing a caption leaves the file in place. Tags stay in their own
+              columns. Off: captions stay in the database only.
+            </span>
+          </span>
+        </label>
+        <ResetToDefault label="Write Bank caption files" section="captioning" field="bank_sidecar_sync"
+          config={config} configDefaults={configDefaults} setField={setField} />
       </Card>
       <Card
         title="PixAI Tagger"
