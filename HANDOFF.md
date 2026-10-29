@@ -1,5 +1,21 @@
 # HANDOFF
 
+## Bank caption sidecar sync (2026-10-29)
+
+Bank captions still live in `bank_image.caption`. A non-empty write now also
+publishes `<stem>.txt` next to the source image when
+`captioning.bank_sidecar_sync` is on (the default). The hook sits after the
+database commit on hand edit (`set_image_caption`), the caption pass
+(`_on_caption`), shared-result fill (caption lane), and the dataset-to-bank
+and bank-to-bank copy constructors. `_pixai_tags_job` and WD14 do not write
+captions. Sidecar failures are skipped and logged; they do not roll back the
+row. Clearing a caption does not delete the sidecar.
+
+Targeted tests in `backend/tests/test_caption_sidecar_writer.py` plus related
+Bank caption tests were run locally. Full qualification, both linters as a
+gate, and rendered validation were not completed. Delivery uses `[skip ci]`
+on the tip commit.
+
 ## Cached Bank caption fill (2026-10-27)
 
 Operator authorized filling missing captions across all Banks from cached PixAI

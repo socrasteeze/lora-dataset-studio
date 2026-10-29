@@ -2,8 +2,9 @@
 selections.
 
 The founding use case: "I exported 9 000 images from Telegram — now what?".
-A bank references that folder IN PLACE (no copy, the source files are never
-written to) and layers a funnel on top:
+A bank references that folder IN PLACE (no copy). Source images are never
+rewritten; a caption write may update a same-stem ``.txt`` sidecar next to
+the image (``captioning.bank_sidecar_sync``, default on). The funnel:
 
   1. inventory      — instant: walk the folder, register every image file;
   2. quality pass   — background thread, CPU/pure-PIL: sharpness, noise,
@@ -64,7 +65,7 @@ from ..models import (BankDupDistinct, BankImage, FaceDataset, FaceDatasetImage,
 from ..utils.dbbusy import write_with_retry
 from ..utils.redact import redact_tokens, redact_user_paths
 from . import (bank_curation, bank_edit_history, bank_jobs, bank_queue, bank_semantic_engine,
-               bank_transfer_metadata, bank_undo, caption_origin,
+               bank_transfer_metadata, bank_undo, caption_origin, caption_sidecar,
                dataset_activity, face_models, image_encoding, path_guard, trash)
 # The scope vocabulary is a leaf (pass_scopes.py) so face_dataset_service never
 # imports this module; the three names stay readable as banks.* for every caller.
@@ -12998,8 +12999,13 @@ def set_image_caption(user_id, bank_id, image_id, caption, *,
     # "written by you" label that would then be spared by a forced pass.
     caption_origin.stamp(row, text or None, caption_origin.ASSERTED)
     stored_origin = row.caption_origin
+    stored_caption = row.caption
+    stored_relpath = row.relpath
+    stored_id = row.id
     db.session.commit()
-    return {'caption': row.caption or '', 'caption_origin': stored_origin}
+    caption_sidecar.sync_bank_caption_sidecar(
+        bank, relpath=stored_relpath, caption=stored_caption, image_id=stored_id)
+    return {'caption': stored_caption or '', 'caption_origin': stored_origin}
 
 
 def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None,
@@ -13417,7 +13423,12 @@ def _caption_job(bank_id, ids, force, vocabulary=None, length=None, device_id=No
             # 100 000-image bank. `stamp` clears the origin on a blank caption, so
             # the stored value is what the row really carries, not what was passed.
             stored = row.caption_origin
+            stored_caption = row.caption
+            stored_relpath = row.relpath
             db.session.commit()
+            caption_sidecar.sync_bank_caption_sidecar(
+                bank, relpath=stored_relpath, caption=stored_caption,
+                image_id=image_id)
             captioned += 1
             if stored:
                 wrote[stored] = wrote.get(stored, 0) + 1
@@ -15157,6 +15168,7 @@ def _dataset_import_job(bank_id, dataset_id, src_dir, image_rows, activity_token
                     bank_id=bank_id, relpath=filename, file_size=size, **values)
                 db.session.add(copied_image)
                 db.session.flush()
+                caption_sidecar.sync_bank_caption_sidecar(bank, copied_image)
                 from .identity_learning import restore_metadata
                 restore_metadata(user_id, 'bank', bank_id, copied_image.id, row.identity_snapshot)
                 if cache_bundle and compatible:
@@ -15928,6 +15940,7 @@ def _bank_promote_job(user_id, src_bank_id, dest_bank_id, ids):
                 bank_id=dest_bank_id, relpath=r.relpath, file_size=size, **values)
             db.session.add(copied_image)
             db.session.flush()
+            caption_sidecar.sync_bank_caption_sidecar(dest, copied_image)
             from .identity_learning import restore_metadata
             restore_metadata(user_id, 'bank', dest_bank_id, copied_image.id, r.identity_snapshot)
             if preserved:

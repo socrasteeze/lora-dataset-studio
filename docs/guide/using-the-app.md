@@ -704,8 +704,9 @@ not correct visual classification errors. A cached result retains those errors.
 
 You exported 9 000 unsorted images from Telegram (or a scraper dumped a
 mountain of files) and a dataset only needs the best 30–150 of them. The
-**🗃️ Bank** tab is the triage funnel that gets you there — without ever
-touching the folder itself.
+**🗃️ Bank** tab is the triage funnel that gets you there — without moving or
+rewriting the images themselves. Setting a caption also writes a same-stem
+`.txt` sidecar next to the image (Settings ▸ Captioning).
 
 **Where things are on that screen.** A bank you open is laid out in three
 parts, and knowing which is which saves reading the rest of this section twice:
@@ -1821,6 +1822,12 @@ You can change the model between runs on the same bank. 🏷️ **Caption** neve
 rewrites anything: it only fills images that have no caption yet, so a second run
 with a different model captions the rest, not the ones already done. To redo the
 ones already done, see the next section.
+
+**The caption also lands next to the file.** A written Bank caption updates
+`<image stem>.txt` beside the source image — the same layout already used for
+dataset sidecars, without a trigger word and without WD14 tags. Clearing the
+caption in the app leaves that file in place. Turn **Write Bank caption files**
+off in Settings ▸ Captioning to keep captions in the database only.
 
 ## Redo the captions of a bank with a different model
 

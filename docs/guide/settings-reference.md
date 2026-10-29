@@ -820,6 +820,8 @@ fixed sizes on purpose.
 | `pixai_hybrid` | PixAI tags, then a 1–3 sentence local vision description on one line. Missing PixAI v1.0 weights fail with an install message. No silent fallback. Concept datasets and Bank captioning are refused. |
 | `none` | No auto-captioning — you write them yourself. |
 
+- **Write Bank caption files** → `captioning.bank_sidecar_sync`. Default **on**. When a Bank caption is set or changed (hand edit, Caption Lab keep, the caption pass, or a shared-result fill), LDS writes `<image stem>.txt` next to the source image. The file is UTF-8 without a BOM, one line, caption text only — no trigger word and no WD14 tags. Clearing a caption does not delete the sidecar. A missing image, a read-only folder, two images sharing a stem, or overlapping Bank rows with different captions are skipped and logged; the database write still stands. Off leaves captions in the database only.
+
 Bank **PixAI Pre-Tags** caches raw categories separately from captions and WD14
 tags. Dataset PixAI, Caption Lab and the PixAI part of hybrid captioning reuse
 matching image/model results inside the active profile. Dataset omission rules
@@ -1753,6 +1755,7 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `krea.base_model` | Krea 2 Edit base model file. Blank = auto-resolve a Turbo then Raw build. |
 | `krea.identity_lora` | Krea 2 Edit identity LoRA, relative to `models/loras`. |
 | `captioning.backend` | Caption backend: `auto` (prefer JoyCaption, fall back to Ollama), `joycaption`, `ollama`, or `none`. |
+| `captioning.bank_sidecar_sync` | Write a same-stem `.txt` next to a Bank image when its caption is set or changed. Default on. A cleared caption does not delete the sidecar. |
 | `training.starting_presets` | Preset id a new dataset starts on, per family and dataset type: `{family: {character|concept|style: preset id}}`. Empty means app defaults. |
 | `training.default_family` | Default model family preselected for new training runs (`zimage`, `sdxl`, `krea`, `flux`, `flux2klein`, or `anima`). |
 | `cloud.max_concurrent_runs` | Unused on this fork. A stored value does not rent a GPU. |
