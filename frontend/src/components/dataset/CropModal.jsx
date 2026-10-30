@@ -226,14 +226,25 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
     if (edges.bottom) y2 = Math.max(Math.min(H, y2 + dy), y1 + MIN_SIDE);
     let nb = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
     const ratio = lockSquare ? 1 : aspect;
-    if (ratio) {
-      // Constrain to the ratio: the dominant dragged dimension wins, the other
-      // follows; anchor on the opposite corner/edge so the grab point tracks.
-      const horiz = !!(edges.left || edges.right);
-      const vert = !!(edges.top || edges.bottom);
-      if (horiz && !vert) nb.h = nb.w / ratio;
-      else if (vert && !horiz) nb.w = nb.h * ratio;
-      else if (Math.abs(dx) >= Math.abs(dy)) nb.h = nb.w / ratio;
+    const horiz = !!(edges.left || edges.right);
+    const vert = !!(edges.top || edges.bottom);
+    if (ratio && horiz !== vert) {
+      // An edge's middle handle: the other side follows the ratio about the
+      // box's CENTRE, not from its top/left edge (which made the box spread to
+      // the right or downward). Capped by the frame; clampBox slides it inside.
+      if (horiz) {
+        nb.h = Math.min(nb.w / ratio, H); nb.w = nb.h * ratio;
+        if (edges.left) nb.x = x2 - nb.w;
+        nb.y = b0.y + b0.h / 2 - nb.h / 2;
+      } else {
+        nb.w = Math.min(nb.h * ratio, W); nb.h = nb.w / ratio;
+        if (edges.top) nb.y = y2 - nb.h;
+        nb.x = b0.x + b0.w / 2 - nb.w / 2;
+      }
+    } else if (ratio) {
+      // A corner: the dominant dragged dimension wins, the other follows;
+      // anchor on the opposite corner so the grab point tracks.
+      if (Math.abs(dx) >= Math.abs(dy)) nb.h = nb.w / ratio;
       else nb.w = nb.h * ratio;
       if (edges.left) nb.x = x2 - nb.w;
       if (edges.top) nb.y = y2 - nb.h;

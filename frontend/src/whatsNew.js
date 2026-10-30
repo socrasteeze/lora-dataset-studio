@@ -85,6 +85,19 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-30-crop-edge-handles-centered',
+    date: '2026-10-30',
+    title: 'Crop edges grow from the middle',
+    blurb: 'With a fixed ratio such as 1:1, dragging the middle handle of an edge now grows the box evenly around its centre instead of spreading it to one side.',
+  },
+  {
+    id: '2026-10-30-dataset-add-tag',
+    date: '2026-10-30',
+    title: 'Add a tag to just the images you pick',
+    blurb: 'Select images in a dataset and press 🏷️ Add tag to append one tag to their captions. Captions that already have it are left alone.',
+    to: '/datasets',
+  },
+  {
     id: '2026-10-30-cleaner-duplicate-review',
     date: '2026-10-30',
     title: 'A cleaner near-duplicate review',

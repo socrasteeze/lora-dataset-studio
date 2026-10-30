@@ -1363,6 +1363,22 @@ export function useDataset() {
     return d.affected;
   }, [currentId, refresh, toast]);
 
+  // Append one tag to the selected images' captions. Returns the number added,
+  // or null on a refusal (the selection stays for a retry).
+  const addTagToImages = useCallback(async (ids, tag) => {
+    if (!ids?.length || !tag) return 0;
+    const d = await postJson(`/api/dataset/${currentId}/captions/add-tag`, { ids, tag });
+    if (!d.ok) { toast.error(d.error || 'Unexpected error'); return null; }
+    await refresh();
+    const skipped = [
+      d.already && `${d.already} already had it`,
+      d.uncaptioned && `${d.uncaptioned} not captioned yet`,
+      d.too_long && `${d.too_long} at the caption length limit`,
+    ].filter(Boolean).join(' · ');
+    toast.success(`Added “${tag}” to ${d.added} caption(s)${skipped ? ` — ${skipped}` : ''}`);
+    return d.added;
+  }, [currentId, refresh, toast]);
+
   const cancelPending = useCallback(async () => {
     const d = await postJson(`/api/dataset/${currentId}/cancel`);
     if (d.ok && d.recovery_error) {
@@ -1838,7 +1854,7 @@ export function useDataset() {
            nonces, mirroringIds, refNonce, scoringFaceIds, recaptioningIds, create, open,
            deleteDataset, renameDataset, updateSettings, setCurrentId, setRef, addExtraRef, removeExtraRef,
            generate, importFiles, scrapeImport, resolveSmallImageRescue, improveImage, reimproveImage, improveBatch, classify, stopClassify, caption, recaption, recaptionImages,
-           setStatus, setCaption, mirrorImage, rotateImage, crop, cropRef, cropExtraRef, recropRefAuto, editReference, retryReferenceEdit, canRetryReferenceEdit, keepEditedReference, discardEditedReference, setDatasetTrainType, setDatasetFidelity, deleteImage, batchImages, replaceCaptions, writeCaptionFiles, openDatasetFolder, cancelPending, cancelCaption, regenerate, analyzeFaces, scoreFace,
+           setStatus, setCaption, mirrorImage, rotateImage, crop, cropRef, cropExtraRef, recropRefAuto, editReference, retryReferenceEdit, canRetryReferenceEdit, keepEditedReference, discardEditedReference, setDatasetTrainType, setDatasetFidelity, deleteImage, batchImages, addTagToImages, replaceCaptions, writeCaptionFiles, openDatasetFolder, cancelPending, cancelCaption, regenerate, analyzeFaces, scoreFace,
            findWatermarks, cancelWatermarkScan, findText, cancelTextScan, cleanWatermarks, cleanWatermarkImages, restoreWatermarkImage, repairImageRegion, undoImageRepair, dismissWatermarks, saveWatermarkRegions,
            purgeUnused, exportZip, exportBackup, exportZipFor, exportBackupFor, importBackup, importDatasetZip, importDatasetFolder,
            backupEverything, backupJob, downloadBackup, openBackupsFolder, dismissBackup, restoreJob, dismissRestore,

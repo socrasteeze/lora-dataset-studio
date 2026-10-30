@@ -251,7 +251,7 @@ function GridPager({ view, onGo, where }) {
 }
 
 export default function DatasetGrid({ images, datasetId, datasetInstanceId = null, onStatus, onCaption, onCrop, onDelete,
-                                      onMirror, onRegenerate, onScoreFace, scoringFaceIds, onReimprove, onView, onBatch, busy,
+                                      onMirror, onRegenerate, onScoreFace, scoringFaceIds, onReimprove, onView, onBatch, onAddTag, busy,
                                       /* Queue-lane gates (GitHub #44). `busy` is every pass and still guards
                                          every WRITE; these two are only what refuses a NEW queued job, and there
                                          are TWO of them because the launches they gate are different work:
@@ -472,6 +472,15 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
       setBulkAction(null);
     }
   };
+  // 🏷️ Add tag: one tag appended to the selected captions; the server skips
+  // captions that already hold it and images not captioned yet.
+  const addTag = async () => {
+    if (bulkBusy || bulkActionGateRef.current.active || !ids.length) return;
+    const tag = window.prompt(`Tag to add to the ${ids.length} selected image(s):`)?.trim();
+    if (!tag) return;
+    const added = await onAddTag([...ids], tag);
+    if (typeof added === 'number') setSelected(new Set());
+  };
   // Hand the whole selection to the server in ONE call. The client keeps the
   // eligibility partition (it already holds the rows, and the confirm must state
   // what will be skipped); the server re-checks it and owns the pacing.
@@ -561,6 +570,11 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
               <button type="button" disabled={curationWriteBusy} onClick={() => act('clear_caption')}
                 title="Delete the selected images' captions (the Caption button then regenerates them)"
                 className={`${batchBtn} bg-surface text-content border border-border`}>🧹 Clear captions</button>
+              {onAddTag && (
+                <button type="button" disabled={curationWriteBusy} onClick={addTag}
+                  title="Append one tag to the selected images' captions. Captions that already have it, and images not captioned yet, are left alone."
+                  className={`${batchBtn} bg-surface text-content border border-border`}>🏷️ Add tag</button>
+              )}
               {/* One button per engine that can actually run, because the two
                   passes are a CHOICE, not two qualities of the same thing:
                   Klein re-renders detail (and can move skin and colour),
