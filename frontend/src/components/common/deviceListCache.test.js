@@ -15,6 +15,7 @@ import {
   DEVICE_LIST_TTL_MS,
   clearDeviceListCache,
   fetchDeviceList,
+  lastDeviceList,
 } from './deviceListCache.js'
 
 function counter(devices = [{ id: 'local' }, { id: 'peer-1' }]) {
@@ -88,6 +89,26 @@ test('a failed lookup is not cached, so the next picker retries', async () => {
 
   assert.equal(calls.length, 2)
   assert.deepEqual(second.map((d) => d.id), ['local'])
+})
+
+test('the last list outlives the TTL so a late picker renders at once', async () => {
+  // Launch all opened a minute after the Bank's picker rendered nothing until
+  // the hub re-probed every machine; the stale list fills that gap.
+  const { fetcher } = counter()
+  assert.equal(lastDeviceList('bank-pass'), null)
+  await fetchDeviceList('bank-pass', fetcher, () => 1000)
+  assert.deepEqual(lastDeviceList('bank-pass').map((d) => d.id), ['local', 'peer-1'])
+  assert.equal(lastDeviceList('comfy'), null)
+})
+
+test('a failed lookup keeps the last good list', async () => {
+  let fail = false
+  const fetcher = () => (fail ? Promise.reject(new Error('offline'))
+    : Promise.resolve({ devices: [{ id: 'local' }] }))
+  await fetchDeviceList('comfy', fetcher, () => 1000)
+  fail = true
+  await fetchDeviceList('comfy', fetcher, () => 1000 + DEVICE_LIST_TTL_MS + 1)
+  assert.deepEqual(lastDeviceList('comfy').map((d) => d.id), ['local'])
 })
 
 test('a response with no devices key reads as an empty list, not a crash', async () => {

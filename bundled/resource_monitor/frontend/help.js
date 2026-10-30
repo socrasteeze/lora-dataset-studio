@@ -16,7 +16,7 @@ export const HELP = [
   // 🧹 The button beside that readout: the same anchor, because the guide
   // explains it in the same paragraph — what holds the memory, what the
   // button gives back, and when it refuses.
-  action('system-free-memory', '🧹 Free memory — unload what ComfyUI and the vision model keep in RAM',
+  action('system-free-memory', 'Clear VRAM — unload what ComfyUI and the vision model keep in memory',
     ['free memory', 'free ram', 'ram full', 'ram is full', 'memory full', 'out of memory',
      'clear ram', 'release memory', 'unload models', 'unload comfyui models', 'comfyui ram',
      'ram does not go down', 'memory not freed', 'vram full', 'free vram', 'clear vram',

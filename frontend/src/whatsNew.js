@@ -85,6 +85,73 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-30-cleaner-duplicate-review',
+    date: '2026-10-30',
+    title: 'A cleaner near-duplicate review',
+    blurb: 'Images no longer peek out above the title or under Done while you scroll, and the pairs sit directly in the window instead of in boxes within boxes.',
+  },
+  {
+    id: '2026-10-30-tidier-bank-and-launch',
+    date: '2026-10-30',
+    title: 'Launch All fits on one screen',
+    blurb: 'Launch All drops its intro and plan list, and puts Cancel, Queue and Launch in one row. Read-only Source is now a simple on/off button, the Bank header loses its dividers, and new datasets start on Anima with the model list in A–Z order.',
+  },
+  {
+    id: '2026-10-30-phone-dataset-library',
+    date: '2026-10-30',
+    title: 'More datasets on one phone screen',
+    blurb: 'On a phone the Datasets page drops its title and fits the controls in two rows. S, M and L show 5, 4 and 3 tiles per row; S and M show just the picture and name. Backup and Caption folder sit in the ⋯ menu.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-10-30-promote-target-model',
+    date: '2026-10-30',
+    title: 'Pick the model when you promote to a new dataset',
+    blurb: 'Promote → New dataset now asks for the target model and, for characters, face or face + body fidelity — the same choices as the Datasets page.',
+  },
+  {
+    id: '2026-10-30-clear-vram-button',
+    date: '2026-10-30',
+    title: 'A Clear VRAM button you can read',
+    blurb: 'The broom next to the machine load now says Clear VRAM. The fold button is gone, so the load line always stays on screen.',
+  },
+  {
+    id: '2026-10-30-compact-bank-passes',
+    date: '2026-10-30',
+    title: 'A tighter Bank passes panel',
+    blurb: 'Pass buttons now fit their labels, and each pass coverage tile reads on one line. Launch all shows Run On right away instead of a few seconds later.',
+  },
+  {
+    id: '2026-10-30-hide-image-sources',
+    date: '2026-10-30',
+    title: 'Hide Image Sources',
+    blurb: 'Not using Image Sources? Hide the panel from the Bank and dataset pages in Settings. Your saved jobs stay.',
+    to: '/settings/scraping',
+  },
+  {
+    id: '2026-10-30-wd14-dataset-captions',
+    date: '2026-10-30',
+    title: 'Caption with WD14',
+    blurb: 'Choose WD14 Tagger beside PixAI Tagger for local booru captions. Preview one image in Caption Lab before you apply it.',
+    to: '/datasets?section=captions&panel=generate',
+  },
+  {
+    id: '2026-10-30-global-activity', date: '2026-10-30',
+    title: 'See Work Anywhere',
+    blurb: 'The Activity button shows a count of active work and waiting Banks on every page. Open it for progress and status.',
+  },
+  {
+    id: '2026-10-30-profile-switch-reload', date: '2026-10-30',
+    title: 'Finish Profile Switches',
+    blurb: 'Profile switches reload the app when the address stays the same. The dialog no longer stays busy after the selected profile is ready.',
+  },
+  {
+    id: '2026-10-29-compact-launch-plan', date: '2026-10-29',
+    title: 'Compact Launch Plan',
+    blurb: 'The Launch all preview uses two numbered columns. The bottom help text is removed, and the action buttons wrap on narrow screens.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-29-profiles-one-port', date: '2026-10-29',
     title: 'Profiles Stay on One Address',
     blurb: 'Switching profiles restarts on the same port as Default. An installed app bound to that address keeps working, and a profile that saved another port comes back on this one.',

@@ -6,15 +6,15 @@ This is a CLASSIFIER, not a captioner. It runs SmilingWolf's WD14 ONNX model
 (~400 MB) and answers one question per image: which of ~10 000 booru tags apply,
 each with a confidence. `blonde_hair 0.98, shirt 0.91, outdoors 0.72`. It does
 not write a sentence, it has no opinion about a trigger word, and it never
-touches a caption — its output lives in its own column (BankImage.tags).
+touches a caption directly. The Bank stores its output in BankImage.tags;
+the dataset caption engine can format that output as a booru caption.
 
 That separation is the whole point. Captioning a 9 000-image dump with JoyCaption
 or an Ollama vision model costs hours of GPU time, and you have to do it BEFORE
 you can tell which images you even want to keep. This pass costs a fraction of
 that, runs on a CPU-only machine, and exists to answer the triage question — show
 me the blonde ones, drop the ones in a hat — so the expensive captioner only ever
-runs on the keepers. Captioning stays exactly what it was; this is what happens
-before it.
+runs on the keepers. The Bank Tags pass remains separate from captioning.
 
 Runs in the ML interpreter, never in-process: onnxruntime is an optional extra
 (requirements-ml.txt) and the Flask venv is not guaranteed to have it. Same
@@ -45,6 +45,15 @@ _SCRIPT = str(cfg.BACKEND_DIR / 'infer' / 'wd14_infer.py')
 # labels are treated in CLAUDE.md rule 7: it lands in user databases, so it gets
 # an alias path rather than a rename.
 MODEL_ID = 'wd-swinv2-tagger-v3'
+CONCEPT_REFUSAL = 'WD14 Tagger does not caption concept datasets.'
+PROSE_REFUSAL = (
+    'WD14 Tagger only writes booru tag captions. '
+    'Select booru mode, or use JoyCaption or the local LLM for prose.'
+)
+NOT_INSTALLED = 'WD14 Tagger is not ready. Install it in Setup > Quality tools, then retry.'
+BANK_REFUSAL = (
+    'WD14 Tagger writes booru dataset captions only. Use the Bank Tags pass for bank images.'
+)
 _HF_REPO = 'SmilingWolf/wd-swinv2-tagger-v3'
 _HF_BASE = f'https://huggingface.co/{_HF_REPO}/resolve/main'
 
@@ -276,7 +285,7 @@ def default_timeout(n_images: int) -> int:
 
 
 def tag_images(image_paths, threshold_value=None, timeout=None,
-               on_progress=None, *, force_cpu=False) -> dict:
+               on_progress=None, *, force_cpu=False, include_character=True) -> dict:
     """Tag `image_paths`. Returns a dict carrying `ok`; on failure it also carries
     a human `error` and an `error_kind` in {unavailable, failed, timeout}.
 
@@ -287,7 +296,8 @@ def tag_images(image_paths, threshold_value=None, timeout=None,
     is exactly how a broken scorer once looked like a green "0/14 done".
 
     On success: {'ok': True, 'results': {path: {tag: confidence}}, 'model': ...}.
-    The FULL model output above the threshold is returned — the caller stores all
+    Character names are included unless include_character=False.
+    The FULL selected-category model output above the threshold is returned — the caller stores all
     of it so re-thresholding later costs no inference at all.
     """
     images = [p for p in (image_paths or []) if p and os.path.isfile(p)]
@@ -297,6 +307,7 @@ def tag_images(image_paths, threshold_value=None, timeout=None,
     payload = json.dumps({
         'images': images,
         'threshold': thr,
+        'include_character': include_character,
         'models_dir': models_dir(),
         'device': 'cpu' if force_cpu else device(),
         # The child does the fetching, so it is handed the whole spec rather than

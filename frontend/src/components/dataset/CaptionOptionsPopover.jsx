@@ -29,6 +29,7 @@ export const ENGINE_OPTIONS = [
   { id: 'auto', label: 'Auto — JoyCaption, then the local LLM' },
   { id: 'joycaption', label: 'JoyCaption only' },
   { id: 'pixai', label: 'PixAI Tagger' },
+  { id: 'wd14', label: 'WD14 Tagger' },
   { id: 'pixai_hybrid', label: 'PixAI tags + VLM' },
   { id: 'ollama', label: 'Local LLM only (Ollama / LM Studio)' },
   { id: 'none', label: 'None — captioning disabled' },

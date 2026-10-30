@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { apiFetch, postJson, useToast, HelpBadge } from '@lds/plugin-sdk';
 import { OFFER_TOAST_MS, armFrom, armedUntil, consume } from './maintenanceArming';
 import {
-  POLL_MS, freeMemorySummary, machineLoadSummary, readMachineLoadPref, shouldPoll,
-  systemStatsSegments, writeMachineLoadPref,
+  POLL_MS, freeMemorySummary, machineLoadSummary, shouldPoll, systemStatsSegments,
 } from '../lib/systemStats';
 
 /* 📊 How hard the machine is working — one 11-px line, wherever it is mounted.
@@ -26,14 +25,11 @@ import {
  *  • no alerting. Numbers are emerald, amber or rose (load past 50 % / 80 % of
  *    a resource, GPU heat past 70° / 85°), and that is the entire vocabulary.
  *
- * COST. Three deliberate limits, because this is the only thing on the page
+ * COST. Two deliberate limits, because this is the only thing on the page
  * that polls forever:
  *  • only while the tab is VISIBLE (Page Visibility). A tab left open
  *    overnight in the background would otherwise ask ~17 000 times.
- *  • only while it is unfolded — the ▾ toggle stops the timer, it does not
- *    just hide the line, and the choice is remembered per mount (prefKey).
- *    The header mount starts FOLDED for the same reason: it is on every page,
- *    and a poll nobody asked for should not run on all of them.
+ *    (The ▾ fold was removed on request: it hid the line nobody wanted hidden.)
  *  • `background: true`, so a poll that fails while the server restarts never
  *    raises the "connection lost" toast. A load readout is not worth an alarm;
  *    it just stops updating until the next poll succeeds.
@@ -51,24 +47,16 @@ const TONE_CLASS = {
   hot: 'text-rose-300',
 };
 
-export default function SystemStatsReadout({
-  prefKey, defaultEnabled, testId, helpTopic,
-}) {
+export default function SystemStatsReadout({ testId, helpTopic }) {
   const toast = useToast();
-  const [enabled, setEnabled] = useState(
-    () => readMachineLoadPref(undefined, prefKey, defaultEnabled));
   const [stats, setStats] = useState(null);
   // 🧹 One release at a time: the button is disabled while the server unloads
   // and re-reads (a couple of seconds), so a double press cannot queue two.
   const [freeing, setFreeing] = useState(false);
-  // Kept in a ref so the poll loop reads the CURRENT value without being torn
-  // down and rebuilt (and re-fetching) on every visibility flicker.
-  const enabledRef = useRef(enabled);
-  enabledRef.current = enabled;
 
   const poll = useCallback(async () => {
     const visibility = typeof document !== 'undefined' ? document.visibilityState : undefined;
-    if (!shouldPoll({ enabled: enabledRef.current, visibility })) return;
+    if (!shouldPoll({ enabled: true, visibility })) return;
     try {
       const data = await apiFetch('/api/system/stats', { background: true });
       setStats(data && typeof data === 'object' ? data : null);
@@ -79,7 +67,6 @@ export default function SystemStatsReadout({
   }, []);
 
   useEffect(() => {
-    if (!enabled) return undefined;
     poll();
     const timer = setInterval(poll, POLL_MS);
     // Coming BACK to the tab refreshes immediately: the alternative is up to
@@ -90,14 +77,7 @@ export default function SystemStatsReadout({
       clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [enabled, poll]);
-
-  const toggle = () => {
-    setEnabled((v) => {
-      writeMachineLoadPref(!v, undefined, prefKey);
-      return !v;
-    });
-  };
+  }, [poll]);
 
   /* 🧹 Give the memory back. What holds it on a machine running LDS is
      ComfyUI's model cache (every model of the day, offloaded to RAM when it
@@ -143,54 +123,35 @@ export default function SystemStatsReadout({
   const segments = systemStatsSegments(stats);
 
   // Nothing measurable on this machine (a container with no card and no
-  // psutil): draw NOTHING, not an empty frame with a toggle that reveals
-  // nothing. The first poll has not answered yet in the same state, so the row
-  // simply appears when it has something to say.
-  if (enabled && !segments.length) return null;
+  // psutil): draw NOTHING, not an empty frame. The first poll has not answered
+  // yet in the same state, so the row simply appears when it has something to say.
+  if (!segments.length) return null;
 
   return (
     <span data-testid={testId}
       className="flex flex-wrap items-center gap-1.5">
-      {enabled && (
-        <span className="flex items-center gap-1.5 tabular-nums text-2xs"
-          title={machineLoadSummary(segments)}>
-          {segments.map((s) => (
-            <span key={s.key} className="flex items-center gap-1 whitespace-nowrap"
-              title={s.title}>
-              <span className="text-content-muted">{s.label}</span>
-              <span className={TONE_CLASS[s.tone] || TONE_CLASS.calm}>{s.text}</span>
-            </span>
-          ))}
-        </span>
-      )}
-      {/* 🧹 Only while the numbers are on screen — it belongs to the reading
-          it acts on, and a folded readout must not widen the header for a
-          button nobody asked for. Same 40 px target rule as ▾. */}
-      {enabled && (
-        <button type="button" onClick={freeMemory} disabled={freeing}
-          data-testid={`${testId}-free`} aria-busy={freeing} data-armed={armedKind === 'free' || undefined}
-          title={armedKind === 'free'
-            ? "Press again to interrupt LDS's render and free the memory; the render is dropped. The offer expires after a minute."
-            : "Free memory: unload the models ComfyUI keeps cached in RAM and VRAM, and the vision model LDS loaded. They reload on the next job. Refused while something is rendering or training; when the render is LDS's own, press again within a minute to interrupt it and free."}
-          aria-label={armedKind === 'free' ? "Free memory — press again to interrupt LDS's render" : 'Free memory'}
-          className={`flex h-10 items-center gap-1 rounded border px-1.5 text-2xs hover:text-content disabled:cursor-wait disabled:opacity-60 lg:h-6 lg:px-1 ${
-            armedKind === 'free' ? 'border-amber-400 bg-amber-400/15 text-amber-200' : 'border-border bg-app/40 text-content-subtle/70'}`}>
-          {freeing ? '' : '🧹'}
-          {armedKind === 'free' && <span className="whitespace-nowrap">press again</span>}
-        </button>
-      )}
-      <button type="button" onClick={toggle} aria-pressed={enabled}
-        data-testid={`${testId}-toggle`}
-        title={enabled
-          ? 'Hide the machine load readout (stops polling the server)'
-          : 'Show CPU, GPU, VRAM, RAM and temperature of the machine running LDS'}
-        aria-label={enabled ? 'Hide the machine load readout' : 'Show the machine load readout'}
-        /* 📱 40 px below `lg`, like every small control (the responsive probe
-           measures targets, not intentions): a 24-px glyph next to 11-px text
-           looks perfectly deliberate in a screenshot and is still a miss for
-           a finger. */
-        className="flex h-10 items-center rounded border border-border bg-app/40 px-1.5 text-content-subtle/70 text-2xs hover:text-content lg:h-6 lg:px-1">
-        {enabled ? '▾' : '📊'}
+      <span className="flex items-center gap-1.5 tabular-nums text-2xs"
+        title={machineLoadSummary(segments)}>
+        {segments.map((s) => (
+          <span key={s.key} className="flex items-center gap-1 whitespace-nowrap"
+            title={s.title}>
+            <span className="text-content-muted">{s.label}</span>
+            <span className={TONE_CLASS[s.tone] || TONE_CLASS.calm}>{s.text}</span>
+          </span>
+        ))}
+      </span>
+      {/* 📱 40 px below `lg`, like every small control: the responsive probe
+          measures targets, not intentions. */}
+      <button type="button" onClick={freeMemory} disabled={freeing}
+        data-testid={`${testId}-free`} aria-busy={freeing} data-armed={armedKind === 'free' || undefined}
+        title={armedKind === 'free'
+          ? "Press again to interrupt LDS's render and free the memory; the render is dropped. The offer expires after a minute."
+          : "Clear VRAM: unload the models ComfyUI keeps cached in RAM and VRAM, and the vision model LDS loaded. They reload on the next job. Refused while something is rendering or training; when the render is LDS's own, press again within a minute to interrupt it and free."}
+        aria-label={armedKind === 'free' ? "Clear VRAM — press again to interrupt LDS's render" : 'Clear VRAM'}
+        className={`flex h-10 items-center gap-1 whitespace-nowrap rounded border px-1.5 text-2xs hover:text-content disabled:cursor-wait disabled:opacity-60 lg:h-6 lg:px-1.5 ${
+          armedKind === 'free' ? 'border-amber-400 bg-amber-400/15 text-amber-200' : 'border-border bg-app/40 text-content-subtle'}`}>
+        {freeing ? 'Clearing…' : 'Clear VRAM'}
+        {armedKind === 'free' && <span className="whitespace-nowrap">· press again</span>}
       </button>
       <HelpBadge topic={helpTopic} />
     </span>

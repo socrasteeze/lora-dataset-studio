@@ -604,6 +604,8 @@ It is also the fastest way to answer "why did it do *that*": read the prompt, fi
 
 **Settings > Shared Service Access** retains the Civitai key for model downloads started in Setup. It does not enable browsing, scraping or online imports. Legacy source keys and settings remain for compatibility. Import local files or use an existing bank instead.
 
+- **Hide Image Sources** → `image_sources.hidden`. Default **off**. When on, the Image Sources panel is removed from the Bank and dataset pages. Saved source jobs, credentials and the extractor folder are kept. Reload an open Bank or dataset page after you save.
+
 ## Local tools
 
 Where you point the app at the local programs that unlock the full pipeline: **ComfyUI** (Klein generation and Test Studio), **Ollama** (the vision model behind captioning and framing) and **ai-toolkit** (training and JoyCaption). Each card has a **Test** button that tells you immediately whether the app can see the tool.
@@ -819,6 +821,7 @@ fixed sizes on purpose.
 | `joycaption` | JoyCaption only. |
 | `ollama` | Local vision model only. |
 | `pixai` | PixAI Tagger from local weights. Booru dataset captions only; refuses prose, Concept datasets and Bank captioning. Auto selects it only for an Anima booru dataset. Anima character captions keep count tags first (a lone `1girl` or `1boy` gains `solo`) and drop quality, score and rating tags. |
+| `wd14` | WD14 Tagger from local weights, using the configured WD14 threshold and device. Booru dataset captions and Caption Lab previews only. Refuses prose, Concept datasets and Bank captioning. Character datasets omit character-name tags; Style datasets may keep them. Install missing tools or weights in Setup > Quality tools. Auto never uses WD14. |
 | `pixai_hybrid` | PixAI tags, then a 1–3 sentence local vision description on one line. Missing PixAI v1.0 weights fail with an install message. No silent fallback. Concept datasets and Bank captioning are refused. |
 | `none` | No auto-captioning — you write them yourself. |
 
@@ -964,7 +967,7 @@ deleted. Head-cropping a reference is unaffected: it runs on the vision model
 
 ### Image bank triage
 
-**Read-only source** is set per bank, in the bank creation form or beside an
+**Read-only Source** is set per bank, in the bank creation form or beside an
 existing bank's name. It blocks deletion and imports into its source folder,
 while keeping curation and copies into datasets available. Existing banks
 default to off. See [Read-only bank sources](using-the-app.md#read-only-bank-sources).
@@ -1721,6 +1724,7 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `dataset_import.encoding` | How an un-cropped imported image is written: `preserve` (default; original JPG/JPEG, PNG, WebP or BMP bytes with the matching extension), or the opt-in WebP modes `standard` (q92), `high` (q100), and `lossless`. Auto head-crop is always a derived WebP. The `image_input.*` budget applies to every mode. Editable in Settings → Captioning & quality. |
 | `image_input.max_pixels` | Largest source image any lane may decode, in pixels (default `67108864` = 64 Mi-pixels; `0` = no limit). A memory budget: ~3 bytes per decoded RGB pixel, and an edit or analysis pass can hold a second copy. Read by dataset import, ZIP/scrape ingest, Bank scan and thumbnails, edits, ComfyUI staging and Ollama vision. Bank *inference workers* keep their own fixed 16 Mi-pixel guard. Editable in Settings → Captioning & quality. |
 | `image_input.max_side` | Largest side of a source image, in px (default `16384`; `0` = no limit). Separate from `max_pixels` because a wide panorama can sit inside the pixel budget and still exceed a side limit. Editable in Settings → Captioning & quality. |
+| `image_sources.hidden` | **Hide Image Sources** (default `false`). While `true`, the Bank and dataset pages do not show the Image Sources panel. Jobs, credentials and `image_sources.extractors_dir` are kept. Editable in Settings → Shared Service Access. |
 | `comfyui.api_url` | Base URL of your ComfyUI instance (default `http://127.0.0.1:8188`). |
 | `comfyui.ignored` | **Ignore ComfyUI** (default `false`). While `true`, LDS sends no request to `comfyui.api_url`, reports ComfyUI as ignored (treated as offline), and refuses local generation at once. The URL is kept. Remote backends under `cluster.backends` are not affected. Editable in Settings → Local tools. |
 | `comfyui.base_dir` | ComfyUI install directory, used to derive `output`/`input`/`models`/`loras` dirs if those aren't set explicitly. |

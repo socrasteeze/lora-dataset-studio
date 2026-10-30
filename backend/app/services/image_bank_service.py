@@ -16072,7 +16072,8 @@ def start_promote(app, user_id, bank_id, ids, dataset_id):
 # not the same as having no door.
 
 def start_new_dataset_promote(app, user_id, bank_id, ids, name, trigger_word, *,
-                              kind=None, concept_desc=None, folder_category=None):
+                              kind=None, concept_desc=None, folder_category=None,
+                              train_type=None, fidelity=None):
     """Create a dataset and promote a selection into it, in one click.
 
     Dataset kind controls caption/training semantics. Folder category defaults
@@ -16105,7 +16106,8 @@ def start_new_dataset_promote(app, user_id, bank_id, ids, name, trigger_word, *,
     if bank_jobs.running(bank_id):
         raise bank_jobs.BankJobBusy(bank_jobs.get(bank_id)['kind'])
     ds = create_dataset(user_id, name, trigger, kind=kind, concept_desc=concept_desc,
-                        folder_category=folder_category)
+                        folder_category=folder_category, train_type=train_type,
+                        fidelity=fidelity)
     try:
         # The promotion itself is the EXISTING path, untouched: same job kind,
         # same _promote_job, same _promote_rows. A second job body is where the

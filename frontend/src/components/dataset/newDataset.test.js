@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { canCreateDataset, triggerAlreadyUsed, triggerWarning } from './newDataset.js';
+import {
+  DEFAULT_TRAIN_TYPE, TRAIN_TYPE_OPTIONS, canCreateDataset, triggerAlreadyUsed, triggerWarning,
+} from './newDataset.js';
+
+test('the target model list is alphabetical and starts on Anima', () => {
+  const labels = TRAIN_TYPE_OPTIONS.map(([, label]) => label);
+  assert.deepEqual(labels, [...labels].sort((a, b) => a.localeCompare(b)));
+  assert.equal(DEFAULT_TRAIN_TYPE, 'anima');
+  assert.ok(TRAIN_TYPE_OPTIONS.some(([value]) => value === DEFAULT_TRAIN_TYPE));
+});
 
 /* ── the creation rule, per kind ───────────────────────────────────────────── */
 

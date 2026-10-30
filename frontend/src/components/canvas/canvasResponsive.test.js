@@ -263,17 +263,16 @@ test('the load readout is reachable from a phone', (t) => {
     new URL("../../../../bundled/resource_monitor/frontend/components/SystemStatsReadout.jsx", import.meta.url), 'utf8');
   assert.doesNotMatch(stats, /className="hidden items-center gap-1\.5 sm:flex"/);
   assert.match(stats, /data-testid=\{testId\}[^]{0,120}className="flex flex-wrap items-center/);
-  // The ▾ toggle still STOPS THE POLL rather than just hiding the line — this
-  // is the only thing on the page that polls forever.
-  assert.match(stats, /data-testid=\{`\$\{testId\}-toggle`\}/);
-  assert.match(stats, /shouldPoll\(\{ enabled: enabledRef\.current, visibility \}\)/);
+  // The ▾ fold was removed on request; the poll still stops on a hidden tab —
+  // this is the only thing on the page that polls forever.
+  assert.doesNotMatch(stats, /data-testid=\{`\$\{testId\}-toggle`\}/);
+  assert.match(stats, /shouldPoll\(\{ enabled: true, visibility \}\)/);
   // and the board still mounts it under the ids the probe holds on to.
   const mount = fs.readFileSync(new URL("../../../../bundled/canvas/frontend/components/canvas/CanvasSystemStats.jsx", import.meta.url), 'utf8');
   assert.match(mount, /<PluginSlot slot="resource_monitor.readout" surface="canvas"/);
   const readout = fs.readFileSync(new URL('../../../../bundled/resource_monitor/frontend/components/Readout.jsx', import.meta.url), 'utf8');
   assert.match(readout, /const canvas = surface === 'canvas'/);
   assert.match(readout, /testId=\{canvas \? 'canvas-system-stats' : 'header-system-stats'\}/);
-  assert.match(readout, /prefKey=\{canvas \? MACHINE_LOAD_PREF_KEY : HEADER_MACHINE_LOAD_PREF_KEY\}/);
   resetRegistry();
   setEnabled([]);
   t.after(() => { resetRegistry(); setEnabled([]); });

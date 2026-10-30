@@ -2073,7 +2073,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
              pushed the header to 32 % of a 360×800 fold, over the 28 % budget.
              They are mostly pass coverage, and the rail's status tiles repeat
              the undecided / kept / rejected counts. */
-          <div className="hidden min-w-0 border-t border-border pt-2 sm:block [@media(max-height:500px)]:!hidden">
+          <div className="hidden min-w-0 sm:block [@media(max-height:500px)]:!hidden">
             <BankStatsStrip loading={!counts} error={statsError || (!workspaceReady && metadataError)}
               onRetry={() => { refreshMetadata({ background: true }); refreshPayload({ background: true }) }}>
               {counterStats}
@@ -2083,7 +2083,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         {/* The decisive actions. Portrait uses equal columns and a full-width
             delete action. Desktop and short landscape retain the compact
             scrolling row. Wrapped labels can grow without clipping. */}
-        <div className="grid min-w-0 grid-cols-3 items-stretch gap-2 border-t border-border pt-2 [&>button]:h-auto [&>button]:min-w-0 [&>button]:whitespace-normal [&>button]:px-2 [&>button]:py-1.5 [&>button]:text-xs [&_svg]:shrink-0 lg:flex lg:h-12 lg:flex-nowrap lg:items-center lg:overflow-x-auto lg:overflow-y-hidden lg:[&>button]:h-8 lg:[&>button]:whitespace-nowrap lg:[&>button]:px-3 lg:[&>button]:py-0 lg:[&>button]:text-sm [scrollbar-width:thin] [@media(max-height:500px)]:ml-auto [@media(max-height:500px)]:flex [@media(max-height:500px)]:h-12 lg:[@media(max-height:500px)]:h-10 [@media(max-height:500px)]:items-center [@media(max-height:500px)]:overflow-x-auto [@media(max-height:500px)]:overflow-y-hidden [@media(max-height:500px)]:border-t-0 [@media(max-height:500px)]:pt-0 [@media(max-height:500px)]:[&>button]:h-10 lg:[@media(max-height:500px)]:[&>button]:h-8 [@media(max-height:500px)]:[&>button]:whitespace-nowrap">
+        <div className="grid min-w-0 grid-cols-3 items-stretch gap-2 [&>button]:h-auto [&>button]:min-w-0 [&>button]:whitespace-normal [&>button]:px-2 [&>button]:py-1.5 [&>button]:text-xs [&_svg]:shrink-0 lg:flex lg:h-12 lg:flex-nowrap lg:items-center lg:overflow-x-auto lg:overflow-y-hidden lg:[&>button]:h-8 lg:[&>button]:whitespace-nowrap lg:[&>button]:px-3 lg:[&>button]:py-0 lg:[&>button]:text-sm [scrollbar-width:thin] [@media(max-height:500px)]:ml-auto [@media(max-height:500px)]:flex [@media(max-height:500px)]:h-12 lg:[@media(max-height:500px)]:h-10 [@media(max-height:500px)]:items-center [@media(max-height:500px)]:overflow-x-auto [@media(max-height:500px)]:overflow-y-hidden [@media(max-height:500px)]:[&>button]:h-10 lg:[@media(max-height:500px)]:[&>button]:h-8 [@media(max-height:500px)]:[&>button]:whitespace-nowrap">
           {/* The path row above is hidden on a phone and in a short landscape
               window. Exclude folder is curation, so it stays reachable there. */}
           {excludeFolderButton('sm:hidden [@media(max-height:500px)]:!inline-flex')}

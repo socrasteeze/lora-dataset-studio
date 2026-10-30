@@ -79,7 +79,8 @@ def test_the_worker_is_told_the_device(monkeypatch, tmp_path):
 
 # --- the worker ------------------------------------------------------------------
 
-def _run_worker(monkeypatch, capsys, tmp_path, device, available, active):
+def _run_worker(monkeypatch, capsys, tmp_path, device, available, active, *,
+                tag_sample=False, include_character=None):
     """Run wd14_infer.main() with a fake onnxruntime whose session reports
     `active` as its first provider. Returns (last JSON line, providers asked)."""
     asked = {}
@@ -98,6 +99,10 @@ def _run_worker(monkeypatch, capsys, tmp_path, device, available, active):
         def get_outputs(self):
             return [types.SimpleNamespace(name='out')]
 
+        def run(self, *_args):
+            import numpy as np
+            return [np.array([[0.9, 0.8, 0.7]])]
+
     ort = types.ModuleType('onnxruntime')
     ort.get_available_providers = lambda: list(available)
     ort.SessionOptions = lambda: types.SimpleNamespace(add_session_config_entry=lambda *_: None)
@@ -106,15 +111,23 @@ def _run_worker(monkeypatch, capsys, tmp_path, device, available, active):
     monkeypatch.setitem(sys.modules, 'cv2', types.ModuleType('cv2'))
     models = tmp_path / 'models'
     models.mkdir()
-    (models / 'selected_tags.csv').write_text('tag_id,name,category,count\n1,solo,0,1\n',
-                                              encoding='utf-8')
+    (models / 'selected_tags.csv').write_text(
+        'tag_id,name,category,count\n1,solo,0,1\n'
+        '2,invented_character,4,1\n3,general,9,1\n', encoding='utf-8')
     if str(INFER) not in sys.path:
         sys.path.insert(0, str(INFER))
     spec = importlib.util.spec_from_file_location('wd14_infer_device_test', INFER / 'wd14_infer.py')
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    monkeypatch.setattr(sys, 'stdin', io.StringIO(json.dumps(
-        {'images': [], 'models_dir': str(models), 'model_files': {}, 'device': device})))
+    payload = {'images': ['sample.webp'] if tag_sample else [],
+               'models_dir': str(models), 'model_files': {}, 'device': device}
+    if include_character is not None:
+        payload['include_character'] = include_character
+    if tag_sample:
+        import numpy as np
+        monkeypatch.setattr(module, '_loaded_batches',
+                            lambda *a: [[('sample.webp', np.zeros((2, 2, 3)), None)]])
+    monkeypatch.setattr(sys, 'stdin', io.StringIO(json.dumps(payload)))
     module.main()
     lines = [ln for ln in capsys.readouterr().out.splitlines() if ln.startswith('{')]
     return json.loads(lines[-1]), asked.get('providers')
@@ -147,3 +160,15 @@ def test_worker_auto_keeps_the_cpu_fallback(monkeypatch, capsys, tmp_path):
     out, providers = _run_worker(monkeypatch, capsys, tmp_path, 'auto', [CPU], CPU)
     assert out['ok'] is True
     assert providers == [CPU]
+
+
+@pytest.mark.parametrize('include_character', [None, True, False])
+def test_worker_filters_character_names_only_when_requested(monkeypatch, capsys, tmp_path,
+                                                           include_character):
+    out, _ = _run_worker(monkeypatch, capsys, tmp_path, 'cpu', [CPU], CPU,
+                         tag_sample=True, include_character=include_character)
+    scores = out['results']['sample.webp']
+    assert scores['solo'] == 0.9
+    assert ('invented_character' in scores) is (include_character is not False)
+    assert 'general' not in scores
+    assert out['ratings']['sample.webp']['general'] == 0.7

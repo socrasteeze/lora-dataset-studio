@@ -110,7 +110,7 @@ def _own_running():
         return ('unknown', None)
 
 
-_OFFER = (' Press 🧹 Free memory again within a minute to interrupt that render and free the '
+_OFFER = (' Press Clear VRAM again within a minute to interrupt that render and free the '
           'memory; the render is dropped.')
 _UNMAPPED = ("ComfyUI is rendering a job of LDS's own whose id was lost; it cannot be interrupted "
              'from here. Resolve it from the recovery banner, or wait for it to finish.')
@@ -162,7 +162,7 @@ def _interrupt_and_wait(job, *, wait_seconds=INTERRUPT_WAIT_SECONDS):
         if time.monotonic() >= deadline:
             raise MemoryReleaseBusy('ComfyUI was asked to stop the render but has not let go yet - '
                                     'a render that pages can take a minute or two to notice. '
-                                    'Press 🧹 Free memory again in a moment to ask once more.',
+                                    'Press Clear VRAM again in a moment to ask once more.',
                                     can_interrupt=True, job_id=job.job_id)
         time.sleep(1)
 

@@ -18,6 +18,23 @@ from app.config import save_config
 from app.services import wd14_tagger as w
 
 
+@pytest.mark.parametrize('include_character', [True, False])
+def test_dataset_character_filter_reaches_the_worker(monkeypatch, tmp_path, include_character):
+    path = tmp_path / 'sample.webp'
+    path.write_bytes(b'invented-image-bytes')
+    seen = {}
+
+    def run(_python, _script, payload, _budget, _progress):
+        seen.update(json.loads(payload))
+        return json.dumps({'ok': True, 'results': {}}), [], 0, False
+
+    monkeypatch.setattr(w, 'run_python', lambda: 'synthetic-python')
+    monkeypatch.setattr(w, 'run_infer_script', run)
+    w.tag_images([str(path)], threshold_value=0.42, include_character=include_character)
+    assert seen['include_character'] is include_character
+    assert seen['threshold'] == 0.42
+
+
 # --- tags_text: whole-tag matching ---------------------------------------------
 
 def test_tags_text_wraps_in_sentinel_commas():

@@ -47,7 +47,6 @@ export default function LaunchAllDialog({
   // there is nobody to send it to (LOCAL_ONLY_PASSES).
   const [deviceId, setDeviceId] = useState(() => loadSavedDeviceId('bank-pass'))
   const [device, setDevice] = useState(null)
-  const remote = deviceId && deviceId !== 'local'
   // A heavy pass is "ready" when its tool is installed on the machine that will
   // RUN it. Which machine that is, the picker decides — so the verdict follows
   // the PEER's own capability report when one is picked, and this machine's
@@ -167,19 +166,14 @@ export default function LaunchAllDialog({
   }
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Launch all"
+    <div role="dialog" aria-modal="true" aria-label="Launch All"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) dismiss() }}>
       <div ref={cardRef}
         className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-surface-overlay p-5 shadow-2xl space-y-4">
-        <div>
-          <h2 className="flex items-center gap-2 text-base font-bold text-content"><Rocket aria-hidden="true" className="h-4 w-4" /> Launch all</h2>
-          <p className="mt-1 text-sm text-content-muted">
-            Chain the whole triage in one go — start it, walk away, come back to a
-            cleaned bank. Each pass runs in order; you can Stop it any time, and a
-            pass whose tool isn't installed is skipped (never fails the run).
-          </p>
-        </div>
+        {/* No intro paragraph and no "What will run" list: the ticked boxes ARE
+            the plan, and dropping both lets the dialog fit without scrolling. */}
+        <h2 className="flex items-center gap-2 text-base font-bold text-content"><Rocket aria-hidden="true" className="h-4 w-4" /> Launch All</h2>
 
         {blockedSteps.length > 0 && (
           <p className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
@@ -262,41 +256,13 @@ export default function LaunchAllDialog({
           ))}
         </ul>
 
-        <div className="lds-section py-3 text-sm">
-          <p className="font-semibold text-content">What will run</p>
-          {manyBanks && (
-            <label className="mt-1 flex items-start gap-1.5 text-sm text-content">
-              <input type="checkbox" checked={skipCompleted} className="mt-0.5"
-                onChange={(e) => setSkipCompleted(e.target.checked)} />
-              <span>
-                Skip finished passes
-              </span>
-            </label>
-          )}
-          {nRun === 0 ? (
-            <p className="text-content-muted">
-              {blockedSteps.length > 0
-                ? 'Nothing left to run on that machine — pick another one, or tick a pass it can do.'
-                : 'Nothing selected yet — pick at least one pass.'}
-            </p>
-          ) : (
-            <ol className="mt-1 list-decimal pl-5 text-content-muted space-y-0.5">
-              {plan.map((s) => (
-                <li key={s.key} className={s.willSkip ? 'line-through opacity-60' : ''}>
-                  {s.label}
-                  {s.key === 'auto_reject' && !s.willSkip && (
-                    <span className="text-content-subtle">
-                      {' '}({[...rejectFlags].length
-                        ? [...rejectFlags].join(', ')
-                        : 'no flags'}{resolveDups ? ' + duplicates' : ''})
-                    </span>
-                  )}
-                  {s.willSkip && <span className="text-amber-300"> — skipped</span>}
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
+        {manyBanks && (
+          <label className="flex items-start gap-1.5 text-sm text-content">
+            <input type="checkbox" checked={skipCompleted} className="mt-0.5"
+              onChange={(e) => setSkipCompleted(e.target.checked)} />
+            <span>Skip finished passes</span>
+          </label>
+        )}
 
         {/* The refusal, right above the button that produced it — the passes you
             ticked are still ticked. shrink-0 keeps it from being squashed to a
@@ -314,39 +280,26 @@ export default function LaunchAllDialog({
           </div>
         )}
 
-        {/* Self-hides when this install has no compute peers. The note names
-            exactly which passes travel and which never do — a picker that
-            silently applies to less than it implies is worse than none. */}
-        <div className="flex flex-wrap items-center gap-2">
-          <DevicePicker value={deviceId} onChange={setDeviceId} onDevice={setDevice}
-            kind="bank-pass" className="text-2xs" />
-          {remote && (
-            <span className="text-2xs text-content-subtle">
-              ✨ Score, 👥 Group by person, 🚩 Watermarks, 📐 Framing and 🏷️ Captions
-              can run there — each one only if that machine reports the stack for
-              it; the ones it can&apos;t do are greyed out above.
-              🔎 Scan, ✕ Auto-reject and ✂ Same shot always run here: they read
-              this machine&apos;s database and embeddings cache.
-            </span>
-          )}
-        </div>
+        <DevicePicker value={deviceId} onChange={setDeviceId} onDevice={setDevice}
+          kind="bank-pass" showLabel={false} className="w-full [&>select]:max-w-none [&>select]:flex-1" />
 
-        <div className="flex justify-end gap-2">
+        <div className={`grid gap-2 ${onQueue ? 'grid-cols-3' : 'grid-cols-2'}`}>
           <button type="button" onClick={dismiss} disabled={busy}
-            className="rounded-md border border-border px-3 py-1.5 text-sm text-content-muted hover:text-content hover:bg-surface-raised disabled:opacity-50">
+            className="min-h-10 rounded-md border border-border px-2 py-1.5 text-sm text-content-muted hover:text-content hover:bg-surface-raised disabled:opacity-50 lg:min-h-0">
             Cancel
           </button>
           {onQueue && (
             <button type="button" onClick={queue} disabled={nRun === 0}
-              title="Line this bank up to run when the ones ahead of it finish — never fails for a busy GPU."
-              className="rounded-md border border-border bg-surface-raised px-4 py-1.5 text-sm font-semibold text-content hover:bg-surface disabled:opacity-50">
-              ➕ Add to queue
+              title="Add to queue: line this bank up to run when the ones ahead of it finish — never fails for a busy GPU."
+              className="min-h-10 rounded-md border border-border bg-surface-raised px-2 py-1.5 text-sm font-semibold text-content hover:bg-surface disabled:opacity-50 lg:min-h-0">
+              Queue
             </button>
           )}
           <button type="button" onClick={launch} disabled={busy || nRun === 0}
-            className="rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-50">
+            title={nRun ? `Launch ${nRun} pass${nRun > 1 ? 'es' : ''} now${nRun === nSent ? '' : ` (${nSent - nRun} recorded as skipped)`}` : 'Tick at least one pass'}
+            className="min-h-10 whitespace-nowrap rounded-md bg-gradient-primary px-2 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-50 lg:min-h-0">
             <Rocket aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{busy ? 'Starting'
-              : `Launch${nRun ? ` ${nRun === nSent ? nRun : `${nRun} of ${nSent}`} pass${nSent > 1 ? 'es' : ''}` : ''}`}
+              : `Launch${nRun ? ` ${nRun === nSent ? nRun : `${nRun} of ${nSent}`}` : ''}`}
           </button>
         </div>
       </div>

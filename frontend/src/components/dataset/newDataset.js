@@ -23,6 +23,20 @@
 
 import { normalizeKindLabel } from './datasetKindSwitch.js';
 
+/** Target models a new dataset can start on, shared by the Datasets form and
+ *  ⬆ Promote → New dataset so the two lists cannot drift. [value, label],
+ *  alphabetical by label. DEFAULT_TRAIN_TYPE is what both forms start on. */
+export const TRAIN_TYPE_OPTIONS = [
+  ['anima', 'Anima (prose or booru tags)'],
+  ['flux', 'FLUX.1 (prose captions)'],
+  ['flux2klein', 'FLUX.2 Klein (prose captions)'],
+  ['krea', 'Krea 2 (prose captions)'],
+  ['qwenimage21', 'Qwen-Image 2.1 (prose captions)'],
+  ['sdxl', 'SDXL (booru-tag captions)'],
+  ['zimage', 'Z-Image (prose captions)'],
+];
+export const DEFAULT_TRAIN_TYPE = 'anima';
+
 /** May a dataset be created from these fields? Strict boolean.
  *
  *  The inline version evaluated to `''` for a blank name (`name.trim() && …`).

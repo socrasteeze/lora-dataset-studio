@@ -1008,7 +1008,7 @@ def dual_captions_enabled(ds) -> bool:
 # All three are OVERRIDES of the global captioning defaults: an empty value means
 # "follow the global default" (captioning.backend / ollama.vision_model), so a
 # dataset that never touched the popover behaves byte-for-byte as before.
-_CAPTION_BACKENDS = ('auto', 'joycaption', 'ollama', 'pixai', 'pixai_hybrid', 'none')
+_CAPTION_BACKENDS = ('auto', 'joycaption', 'ollama', 'pixai', 'wd14', 'pixai_hybrid', 'none')
 # Extra instructions are APPENDED to the built caption prompt (never replace it),
 # so the kind rules (identity/concept/style omission) and the post-filter cleaners
 # stay in force — a bounded length keeps a runaway paste out of every prompt.
@@ -1261,6 +1261,7 @@ CAPTION_WRITER_JOYCAPTION = 'joycaption'          # JoyCaption's own words
 CAPTION_WRITER_OLLAMA = 'ollama'                  # written by the Ollama vision model
 CAPTION_WRITER_REFINED = 'joycaption_refined'     # a JoyCaption draft rewritten by Ollama
 CAPTION_WRITER_PIXAI = 'pixai'                      # PixAI Tagger booru tags
+CAPTION_WRITER_WD14 = 'wd14'                     # WD14 Tagger booru tags
 CAPTION_WRITER_PIXAI_HYBRID = 'pixai_hybrid'        # PixAI tags plus a short VLM line
 # Stored nowhere and read by the UI as keys — treat them like catalog labels: adding
 # one is free, renaming one breaks the caller that reads it.
@@ -7907,6 +7908,9 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
       - 'joycaption' -> Joy drafts only + mechanical scrub (no Qwen calls);
       - 'ollama'     -> Joy skipped, every image direct-Qwen + enforcement;
       - 'auto'       -> Joy drafts refined by Qwen, no-Joy images direct-Qwen, all enforced."""
+    if (backend or '').strip().lower() == 'wd14':
+        from .wd14_tagger import CONCEPT_REFUSAL
+        raise RuntimeError(CONCEPT_REFUSAL)
     if (backend or '').strip().lower() in ('pixai', 'pixai_hybrid'):
         from .pixai_tagger import CONCEPT_REFUSAL
         raise RuntimeError(CONCEPT_REFUSAL)
@@ -8132,6 +8136,108 @@ def _clean_caption_result(ds, text, cleaner):
     """Anima omission rules must not restore the rejected draft when cleanup is empty."""
     cleaned = cleaner(text)
     return cleaned if cleaned or _is_anima_dataset(ds) else text
+
+
+def _wd14_caption_refusal(ds, mode=None):
+    from . import pixai_tagger, wd14_tagger
+    if (getattr(ds, 'kind', None) or '').strip().lower() == 'concept':
+        return wd14_tagger.CONCEPT_REFUSAL
+    if pixai_tagger.resolved_mode(getattr(ds, 'train_type', None), mode) != 'booru':
+        return wd14_tagger.PROSE_REFUSAL
+    if wd14_tagger.missing_model_files() or not wd14_tagger.is_available():
+        return wd14_tagger.NOT_INSTALLED
+    return wd14_tagger.gpu_refusal()
+
+
+def _preview_wd14_caption(ds, img, path, cleaner):
+    """One-image Caption Lab result. Writes nothing. Refuses prose and concepts."""
+    from . import pixai_tagger, wd14_tagger
+    refusal = _wd14_caption_refusal(ds)
+    if refusal:
+        raise RuntimeError(refusal)
+    started = time.perf_counter()
+    batch = wd14_tagger.tag_images(
+        [path], threshold_value=wd14_tagger.threshold(),
+        include_character=pixai_tagger.include_character_tags(getattr(ds, 'kind', None)))
+    if not batch.get('ok'):
+        raise RuntimeError(batch.get('error') or 'WD14 Tagger failed')
+    cap = pixai_tagger.booru_caption(
+        {'general': (batch.get('results') or {}).get(path)}, include_character=False)
+    if cap:
+        cap = cleaner(cap)
+        if cap:
+            cap = _cap_caption(_with_camera_pose_phrase(img, cap))
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    return {'caption': cap or '', 'chars': len(cap or ''),
+            'duration_ms': duration_ms, 'cancelled': False,
+            'model': wd14_tagger.MODEL_ID}
+
+
+def _store_wd14_dataset_captions(ds, todo, *, token, dataset_id, force,
+                                 spare_asserted, cleaner, report, outcome):
+    """Write WD14 booru tags as dataset captions. The caller already refused
+    concept datasets and prose mode. Auto never reaches this function."""
+    from . import pixai_tagger, wd14_tagger
+    if dataset_activity.cancel_requested(dataset_id):
+        return 0
+
+    def _on_progress(rec):
+        if not rec:
+            return
+        kwargs = {}
+        if rec.get('done') is not None:
+            kwargs['done'] = rec['done']
+        phase = rec.get('phase')
+        if phase:
+            kwargs['detail'] = f'WD14 Tagger: {phase}'
+        dataset_activity.progress(token, **kwargs)
+
+    dataset_activity.progress(
+        token, detail=f'Loading WD14 Tagger and captioning {len(todo)} image(s)...')
+    batch = wd14_tagger.tag_images(
+        [path for _image_id, path in todo], on_progress=_on_progress,
+        threshold_value=wd14_tagger.threshold(),
+        include_character=pixai_tagger.include_character_tags(getattr(ds, 'kind', None)))
+    if not batch.get('ok'):
+        raise RuntimeError(batch.get('error') or 'WD14 Tagger failed')
+    raw_results = batch.get('results') or {}
+    errors = batch.get('errors') or {}
+    n = vanished = spared = 0
+    still = []
+    for image_id, path in todo:
+        if dataset_activity.cancel_requested(dataset_id):
+            break
+        cap = pixai_tagger.booru_caption(
+            {'general': raw_results.get(path)}, include_character=False)
+        if not cap:
+            still.append((image_id, path))
+            errors.setdefault(path, 'No caption content remains after category filtering.')
+            continue
+        img = _live_image_row(image_id)
+        if img is None:
+            vanished += 1
+            continue
+        if _caption_write_blocked(img, force=force, spare_asserted=spare_asserted):
+            spared += 1
+            continue
+        cleaned = cleaner(cap)
+        if not cleaned:
+            still.append((image_id, path))
+            errors[path] = 'No caption content remains after the omission rules.'
+            continue
+        caption_origin.stamp(
+            img, _cap_caption(_with_camera_pose_phrase(img, cleaned)),
+            caption_origin.WD14)
+        db.session.commit()
+        n += 1
+        _writer(report, CAPTION_WRITER_WD14)
+    if report is not None:
+        report['model'] = wd14_tagger.MODEL_ID
+    if still:
+        dataset_activity.bump(token, len(still))
+        _record_caption_skips(outcome, still, errors)
+    dataset_activity.progress(token, done=n + vanished + spared + len(still))
+    return n
 
 
 def _store_pixai_dataset_captions(ds, todo, *, token, dataset_id, force,
@@ -8421,6 +8527,10 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None, 
     backend = (opts.get('backend') or cfg.get('captioning.backend') or 'auto').lower()
     if backend == 'none':
         raise RuntimeError('No captioning backend configured')
+    if backend == 'wd14':
+        refusal = _wd14_caption_refusal(ds, mode)
+        if refusal:
+            raise RuntimeError(refusal)
     if backend == 'auto' and _anima_auto_pixai(ds, mode):
         backend = 'pixai'
     if backend in ('pixai', 'pixai_hybrid'):
@@ -8519,6 +8629,14 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None, 
         # LATER Ollama failure reports BOTH reasons instead of only the Ollama one —
         # otherwise a user whose JoyCaption is silently unavailable debugs blind (issue #6).
         joycaption_note = ''
+        if backend == 'wd14':
+            n = _store_wd14_dataset_captions(
+                ds, todo, token=token, dataset_id=dataset_id, force=force,
+                spare_asserted=spare_asserted, cleaner=cleaner, report=report,
+                outcome=outcome)
+            logger.info('captioning finished: dataset=%s backend=wd14 captioned=%s '
+                        'elapsed=%.1fs', dataset_id, n, time.monotonic() - started)
+            return n
         if backend == 'pixai':
             n = _store_pixai_dataset_captions(
                 ds, todo, token=token, dataset_id=dataset_id, force=force,
@@ -8756,6 +8874,9 @@ def caption_paths(paths, *, prompt=None, backend=None, ollama_model=None,
     backend = (backend or cfg.get('captioning.backend') or 'auto').lower()
     if backend == 'none':
         raise RuntimeError('No captioning backend configured')
+    if backend == 'wd14':
+        from .wd14_tagger import BANK_REFUSAL
+        raise RuntimeError(BANK_REFUSAL)
     if backend in ('pixai', 'pixai_hybrid'):
         from .pixai_tagger import BANK_REFUSAL, HYBRID_BANK_REFUSAL
         raise RuntimeError(HYBRID_BANK_REFUSAL if backend == 'pixai_hybrid' else BANK_REFUSAL)
@@ -9004,6 +9125,8 @@ def preview_caption(user_id, dataset_id, image_id, *, backend=None,
     resolved_backend = str(resolved_backend).strip().lower()
     if resolved_backend == 'auto' and _anima_auto_pixai(ds, None):
         resolved_backend = 'pixai'
+    if resolved_backend == 'wd14':
+        return _preview_wd14_caption(ds, img, path, cleaner)
     if resolved_backend == 'pixai':
         return _preview_pixai_caption(ds, img, path, cleaner)
     if resolved_backend == 'pixai_hybrid':

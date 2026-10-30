@@ -60,15 +60,6 @@ test('the device the picker resolved reaches the dialog, not just its id', () =>
   assert.match(src, /onDevice=\{setDevice\}/);
 });
 
-test('the steps that never travel are NOT given the peer escape', () => {
-  // scan / auto_reject are unconditionally true; semantic_dedup follows Score's
-  // verdict because it consumes Score's embeddings, which a remote run brings
-  // home. None of the three may claim a peer runs them.
-  const note = src.slice(src.indexOf('can run there'));
-  assert.match(note, /Scan.*Auto-reject.*Same shot always run here/s,
-    'the note must name the passes that never travel, not only the ones that do');
-});
-
 test('the button cannot understate what config() sends', () => {
   // config() posts [...steps] — every picked step, including ones that will be
   // skipped, because the backend records those in pipeline_report and that is
@@ -80,13 +71,8 @@ test('the button cannot understate what config() sends', () => {
     'the button shows only the runnable count while sending more');
 });
 
-test('the note names all five travelling passes', () => {
-  const at = src.indexOf('can run there');
-  assert.ok(at > 0, 'the remote note is gone');
-  const note = src.slice(at - 400);
-  for (const label of ['Score', 'Group by person', 'Watermarks', 'Framing', 'Captions']) {
-    assert.ok(note.includes(label), `the note omits ${label}`);
-  }
-  // …and stops promising they all run there regardless of what that machine is.
-  assert.match(note.slice(0, 600), /only if that machine reports the stack/);
+test('the device picker remains without the bottom help text', () => {
+  assert.match(src, /<DevicePicker value=\{deviceId\} onChange=\{setDeviceId\} onDevice=\{setDevice\}/);
+  assert.doesNotMatch(src, /can run there/);
+  assert.doesNotMatch(src, /Same shot always run here/);
 });

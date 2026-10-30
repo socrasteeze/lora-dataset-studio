@@ -45,6 +45,7 @@ export const CAPTION_WRITERS = [
     solo: 'Drafted by JoyCaption, rewritten by the local LLM vision model.' },
   { key: 'ollama', short: 'Local LLM', solo: 'Written by the local LLM vision model.' },
   { key: 'pixai', short: 'PixAI Tagger', solo: 'Written by PixAI Tagger.' },
+  { key: 'wd14', short: 'WD14 Tagger', solo: 'Written by WD14 Tagger.' },
   { key: 'pixai_hybrid', short: 'PixAI + VLM',
     solo: 'Written by PixAI Tagger and the local LLM vision model.' },
 ];
@@ -55,6 +56,7 @@ export const CAPTION_ENGINE_WHY =
   'The Auto backend uses JoyCaption first and falls back to the local LLM vision model, '
   + 'and the two write in different styles. An Anima dataset skips JoyCaption and uses the '
   + 'configured Qwen3-VL model. PixAI Tagger and PixAI tags + VLM are separate choices; Auto does not use them. '
+  + 'WD14 Tagger writes booru dataset captions only. Auto never uses WD14. '
   + 'Pick one engine in ⚙️ Options to keep a '
   + 'single voice across a dataset.';
 

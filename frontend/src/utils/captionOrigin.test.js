@@ -12,7 +12,7 @@ import {
    alias would silently stop matching rows that already exist. */
 test('stored caption origins keep their keys, including PixAI', () => {
   assert.deepEqual(CAPTION_ORIGINS.map((o) => o.key),
-                   ['asserted', 'joycaption', 'ollama', 'pixai', 'pixai_hybrid']);
+                   ['asserted', 'joycaption', 'ollama', 'pixai', 'wd14', 'pixai_hybrid']);
   for (const o of CAPTION_ORIGINS) {
     assert.equal(typeof o.chip, 'string');
     assert.ok(o.chip.length, o.key);
@@ -26,6 +26,7 @@ test('a human-written caption is never folded into the two engines', () => {
   assert.equal(captionIsAsserted('joycaption'), false);
   assert.equal(captionIsAsserted('ollama'), false);
   assert.equal(captionIsAsserted('pixai'), false);
+  assert.equal(captionIsAsserted('wd14'), false);
   assert.equal(captionIsAsserted(null), false);
   // …and its wording says WHO, not "manual" — the distinction the forced pass acts on.
   assert.match(captionOriginInfo('asserted').short, /you/i);
@@ -35,6 +36,13 @@ test('PixAI captions have a known origin with the tagger label', () => {
   const info = captionOriginInfo('pixai');
   assert.equal(info.known, true);
   assert.equal(info.chip, 'PixAI Tagger');
+  assert.match(info.title, /local weights/);
+});
+
+test('WD14 captions have a known origin with the tagger label', () => {
+  const info = captionOriginInfo('wd14');
+  assert.equal(info.known, true);
+  assert.equal(info.chip, 'WD14 Tagger');
   assert.match(info.title, /local weights/);
 });
 

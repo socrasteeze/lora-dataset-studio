@@ -55,7 +55,8 @@ _V3_KREA_REF_BOOST = 0.25
 _V3_KREA_STEPS = 8
 
 DEFAULTS = {
-    'image_sources': {'extractors_dir': ''},
+    # hidden: removes the Image Sources panel from the Bank and dataset pages.
+    'image_sources': {'extractors_dir': '', 'hidden': False},
     'plugins': {'enabled': {}},
     # host: '127.0.0.1' = this machine only ; '0.0.0.0' = reachable from the LAN
     # (phone, tablet, another PC) — the Settings "Server" card's LAN toggle just
@@ -211,7 +212,7 @@ DEFAULTS = {
                 'enabled': ['klein', 'krea'],
                 'known': []},
     'captioning': {
-        'backend': 'auto',  # auto|joycaption|ollama|pixai|pixai_hybrid|none
+        'backend': 'auto',  # auto|joycaption|ollama|pixai|wd14|pixai_hybrid|none
         # Anima Auto skips JoyCaption and calls this Ollama tag. Blank uses
         # ollama.vision_model. Other families keep JoyCaption, then the local LLM.
         'anima_auto_model': 'huihui_ai/qwen3-vl-abliterated:8b-instruct',

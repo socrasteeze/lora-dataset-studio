@@ -15,7 +15,7 @@
  * progress phrasing and summaries come from utils/fullBackup (pure, tested).
  */
 import { useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Download, FolderOpen, Loader2, Package, RefreshCw, Save } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Download, FolderOpen, Loader2, Package, RefreshCw, Save, Tags } from 'lucide-react';
 import { HelpBadge } from '../../help/HelpMode';
 import { btnClass } from '../common/controls';
 import {
@@ -147,7 +147,7 @@ function RestoreOverlay({ job, onDismiss }) {
 
 const MENU_ITEM = 'w-full flex items-center gap-2 text-left px-2.5 py-1.5 rounded-md text-sm text-content hover:bg-surface-raised disabled:opacity-40';
 
-export default function FullBackupControls({ backup, onRestore }) {
+export default function FullBackupControls({ backup, onRestore, onCaptionFolder }) {
   const [includeLoras, setIncludeLoras] = useState(false);
   const menuRef = useRef(null);
   const restoreRef = useRef(null);
@@ -174,7 +174,7 @@ export default function FullBackupControls({ backup, onRestore }) {
           <span className="hidden sm:inline">{running ? 'Backing up' : 'Backup'}</span>
           <span aria-hidden className="text-content-subtle">⋯</span>
         </summary>
-        <div className="absolute right-0 top-full mt-1 z-20 w-80 rounded-lg border border-border bg-surface-overlay shadow-xl p-1.5 flex flex-col gap-0.5">
+        <div className="absolute right-0 top-full mt-1 z-20 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-surface-overlay shadow-xl p-1.5 flex flex-col gap-0.5">
           {backup && (
             <>
               <button type="button" disabled={running}
@@ -203,6 +203,15 @@ export default function FullBackupControls({ backup, onRestore }) {
               className={MENU_ITEM}>
               <span className="whitespace-nowrap inline-flex items-center gap-1.5"><Package aria-hidden="true" className="h-4 w-4" /> Import backup</span>
               <span className="ml-auto shrink-0 text-content-subtle text-2xs">.zip archive</span>
+            </button>
+          )}
+          {/* Phone only: the library toolbar has no room for its own button. */}
+          {onCaptionFolder && (
+            <button type="button"
+              onClick={() => { closeMenu(); onCaptionFolder(); }}
+              title="Write Anima booru tag captions for a folder LDS did not build, into a separate output folder"
+              className={`${MENU_ITEM} sm:hidden`}>
+              <span className="whitespace-nowrap inline-flex items-center gap-1.5"><Tags aria-hidden="true" className="h-4 w-4" /> Caption folder</span>
             </button>
           )}
         </div>

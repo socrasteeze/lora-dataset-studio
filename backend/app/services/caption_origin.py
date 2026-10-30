@@ -12,7 +12,7 @@ the SAME tables, so a reader who knows one knows this one:
   * ``ASSERTED`` ('asserted') is ``BankImage.face_cluster_origin``'s value, with
     the same meaning and the same consequence — a human declared this, so the
     pass SKIPS the row instead of overwriting the user's word.
-  * ``ENGINES`` ('joycaption' | 'ollama' | 'pixai' | 'pixai_hybrid') is ``BankImage.watermark_source``'s
+  * ``ENGINES`` ('joycaption' | 'ollama' | 'pixai' | 'wd14' | 'pixai_hybrid') is ``BankImage.watermark_source``'s
     idea: record WHICH engine decided, because a bank is captioned over weeks
     and can hold both (the 'auto' backend even writes with both engines inside a
     single run).
@@ -44,8 +44,9 @@ ASSERTED = 'asserted'
 JOYCAPTION = 'joycaption'
 OLLAMA = 'ollama'
 PIXAI = 'pixai'
+WD14 = 'wd14'
 PIXAI_HYBRID = 'pixai_hybrid'
-ENGINES = (JOYCAPTION, OLLAMA, PIXAI, PIXAI_HYBRID)
+ENGINES = (JOYCAPTION, OLLAMA, PIXAI, WD14, PIXAI_HYBRID)
 
 VALUES = (ASSERTED,) + ENGINES
 

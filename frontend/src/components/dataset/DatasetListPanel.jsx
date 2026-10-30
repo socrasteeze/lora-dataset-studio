@@ -9,7 +9,7 @@ import ExternalRecaptionDialog from './ExternalRecaptionDialog.jsx';
 import { Button, Chip, Input, btnClass, btnShape, fieldClass } from '../common/Controls.jsx';
 import Pagination from '../common/Pagination.jsx';
 import { HelpBadge } from '../../help/HelpMode';
-import { canCreateDataset } from './newDataset';
+import { DEFAULT_TRAIN_TYPE, TRAIN_TYPE_OPTIONS, canCreateDataset } from './newDataset';
 import FolderCategoryFields from './FolderCategoryFields.jsx';
 import { categoryForKind } from '../common/folderNaming.js';
 import { useUnsavedWork } from '../../hooks/useUnsavedWork';
@@ -80,10 +80,11 @@ const TILE_SIZE_TITLE = {
   M: 'Medium tiles (default)',
   L: 'Large tiles — big reference previews',
 };
+// Phone (below sm): 5 / 4 / 3 tiles per row, S and M as compact tiles.
 const GRID_COLS = {
-  S: 'grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
-  M: 'grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4',
-  L: 'grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3',
+  S: 'grid grid-cols-5 gap-1 sm:gap-1.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
+  M: 'grid grid-cols-4 gap-1.5 sm:gap-2.5 sm:grid-cols-3 xl:grid-cols-4',
+  L: 'grid grid-cols-3 gap-2 sm:gap-2.5 sm:grid-cols-2 xl:grid-cols-3',
 };
 
 // Kind filter chips — only rendered when at least two kinds coexist in the
@@ -118,8 +119,12 @@ function promptRename(onRename, d) {
 }
 
 /** Photo-first tile: the reference face IS the identity — lead with it. */
-function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBackup, showPreviews }) {
+function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBackup, showPreviews, compact = false }) {
   const canExportZip = (d.images_kept ?? 0) > 0;
+  // compact: S and M on a phone pack 5 / 4 tiles per row, too narrow for
+  // anything but the thumbnail and the name. The rest returns from sm up and
+  // stays reachable inside the dataset. Literal classes: Tailwind scans text.
+  const phoneHidden = compact ? 'hidden sm:block' : '';
   return (
     <div className="library-card group relative overflow-hidden rounded-xl border border-border bg-surface transition-colors hover:border-primary/40">
       <button type="button" onClick={() => onOpen(d.id)}
@@ -139,35 +144,35 @@ function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBacku
           )}
           {d.kind === 'concept' && (
             <span className="absolute left-1.5 top-1.5 rounded border border-fuchsia-400/40 bg-black/75 px-1.5 py-px text-2xs font-semibold uppercase text-fuchsia-300 inline-flex items-center gap-1">
-              <Lightbulb aria-hidden="true" className="h-2.5 w-2.5" /> Concept
+              <Lightbulb aria-hidden="true" className="h-2.5 w-2.5" /> <span className={phoneHidden}>Concept</span>
             </span>
           )}
           {d.kind === 'style' && (
             <span className="absolute left-1.5 top-1.5 rounded border border-cyan-400/40 bg-black/75 px-1.5 py-px text-2xs font-semibold uppercase text-cyan-300 inline-flex items-center gap-1">
-              <Palette aria-hidden="true" className="h-2.5 w-2.5" /> Style
+              <Palette aria-hidden="true" className="h-2.5 w-2.5" /> <span className={phoneHidden}>Style</span>
             </span>
           )}
         </div>
-        <div className="flex flex-col gap-0.5 p-2.5">
+        <div className={`flex flex-col gap-0.5 ${compact ? 'p-1.5 sm:p-2.5' : 'p-2.5'}`}>
           <span className="flex items-center gap-1.5 min-w-0">
-            <span className="truncate text-sm font-semibold text-content">{d.name}</span>
+            <span className={`truncate font-semibold text-content ${compact ? 'text-2xs sm:text-sm' : 'text-sm'}`}>{d.name}</span>
             {(d.trained_families || []).map((f) => {
               const [lbl, cls] = familyBadge(f);
               return (
-                <span key={f} className={`shrink-0 rounded border px-1.5 py-px text-2xs font-semibold uppercase ${cls}`}
+                <span key={f} className={`shrink-0 rounded border px-1.5 py-px text-2xs font-semibold uppercase ${cls} ${compact ? 'hidden sm:inline' : ''}`}
                   title={`A ${lbl} LoRA has been trained from this dataset`}>
                   {lbl}
                 </span>
               );
             })}
           </span>
-          <span className={`truncate text-2xs ${d.kind === 'style' ? 'text-cyan-300' : 'font-mono text-indigo-300'}`}>
+          <span className={`truncate text-2xs ${d.kind === 'style' ? 'text-cyan-300' : 'font-mono text-indigo-300'} ${phoneHidden}`}>
             {d.kind === 'style' ? 'always-on · no activation trigger' : (d.trigger_word || '—')}
           </span>
-          <span className="text-2xs text-content-subtle">{tileStats(d)}</span>
+          <span className={`text-2xs text-content-subtle ${phoneHidden}`}>{tileStats(d)}</span>
         </div>
       </button>
-      <div className="library-card__actions grid grid-cols-2 gap-1.5 border-t border-border px-2 py-2">
+      <div className={`library-card__actions grid-cols-2 gap-1.5 border-t border-border px-2 py-2 ${compact ? 'hidden sm:grid' : 'grid'}`}>
         <button type="button"
           onClick={() => onExportZip?.(d.id)}
           disabled={!canExportZip}
@@ -186,7 +191,7 @@ function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBacku
           <Save aria-hidden="true" className="h-3 w-3" /> Backup
         </button>
       </div>
-      <div className="library-card__actions absolute right-1.5 top-1.5 flex gap-1">
+      <div className={`library-card__actions absolute right-1.5 top-1.5 gap-1 ${compact ? 'hidden sm:flex' : 'flex'}`}>
         {onRename && (
           <button type="button" onClick={() => promptRename(onRename, d)}
             title="Rename this dataset" aria-label={`Rename the dataset ${d.name}`}
@@ -224,8 +229,8 @@ function NewDatasetForm({ onCreate, onClose }) {
   const [destinationReady, setDestinationReady] = useState(false);
   // The target model selected at creation sets the caption format immediately (SDXL = booru,
   // otherwise prose) and the menu group. It remains editable in the training panel. Default:
-  // Z-Image, the app's default type.
-  const [trainType, setTrainType] = useState('zimage');
+  // Anima (DEFAULT_TRAIN_TYPE, shared with Promote).
+  const [trainType, setTrainType] = useState(DEFAULT_TRAIN_TYPE);
   // Concept only: what the captioner must OMIT from every caption so the concept binds to the
   // trigger, the inverse of a character LoRA. Required for concepts.
   const [conceptDesc, setConceptDesc] = useState('');
@@ -243,16 +248,9 @@ function NewDatasetForm({ onCreate, onClose }) {
   // it. Same behaviour, now tested.
   const canCreate = destinationReady && canCreateDataset({ name, trigger, kind, conceptDesc });
   return (
-    <div id="new-dataset-form" className="mx-auto flex w-full max-w-4xl flex-col gap-2 rounded-xl border border-border bg-surface p-3">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-content font-semibold text-sm flex items-center gap-2">
-          <Plus aria-hidden="true" className="h-4 w-4" /> New dataset
-        </h2>
-        {onClose && (
-          <button type="button" onClick={onClose} aria-label="Close the new-dataset form"
-            className="rounded px-1.5 text-content-subtle hover:text-content"><X aria-hidden="true" className="h-4 w-4" /></button>
-        )}
-      </div>
+    /* No card of its own: it opens in the page flow under the toolbar, whose
+       New dataset / Close button already names and closes it. */
+    <section id="new-dataset-form" aria-label="New dataset" className="flex w-full flex-col gap-2">
       {creators.length > 0 && (
         <div className="flex flex-wrap gap-1.5" aria-label="Dataset media">
           {[{ key: 'images', label: 'Images' }, ...creators.map((item) => ({
@@ -334,13 +332,7 @@ function NewDatasetForm({ onCreate, onClose }) {
         Target model <span className="text-content-subtle normal-case">— sets the caption style &amp; groups the menu (changeable later)</span>
         <select value={trainType} onChange={(e) => setTrainType(e.target.value)}
           className={fieldClass()}>
-          <option value="zimage">Z-Image (prose captions)</option>
-          <option value="sdxl">SDXL (booru-tag captions)</option>
-          <option value="krea">Krea 2 (prose captions)</option>
-          <option value="flux">FLUX.1 (prose captions)</option>
-          <option value="flux2klein">FLUX.2 Klein (prose captions)</option>
-          <option value="anima">Anima (prose or booru tags)</option>
-          <option value="qwenimage21">Qwen-Image 2.1 (prose captions)</option>
+          {TRAIN_TYPE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
       </label>
       {/*
@@ -394,7 +386,7 @@ function NewDatasetForm({ onCreate, onClose }) {
         </button>
       </div>
       </>)}
-    </div>
+    </section>
   );
 }
 
@@ -503,9 +495,14 @@ export default function DatasetListPanel({
          * relative z-30 creates a stacking context; otherwise the Backup menu panel's z-20 would
          * remain trapped below the tiles.
          */}
+        {/* Phone (below sm): no title; row 1 = New dataset | search | ⋯ (Backup
+            menu, which also holds Caption folder); row 2 = kind switcher |
+            previews | size, spread across the row. `order-*` reorders only on
+            the phone and `sm:contents` dissolves the row-2 wrapper from sm up,
+            so the desktop toolbar is unchanged. */}
         <div className="relative z-30 flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-semibold text-content flex items-center gap-2">Datasets<HelpBadge topic="page-datasets" /></h1>
-          {!empty && <span className="text-sm text-content-subtle">{datasets.length}</span>}
+          <h1 className="sr-only text-xl font-semibold text-content items-center gap-2 sm:not-sr-only sm:flex">Datasets<HelpBadge topic="page-datasets" /></h1>
+          {!empty && <span className="hidden text-sm text-content-subtle sm:inline">{datasets.length}</span>}
           <Button
             variant="primary"
             size="md"
@@ -522,10 +519,12 @@ export default function DatasetListPanel({
           </Button>
           {/* Back up everything, its include-LoRAs option and Import backup
               all live in ONE Backup menu. New dataset stays out of it. */}
-          <FullBackupControls backup={backup} onRestore={onRestore} />
+          <div className="order-2 flex items-center gap-2 sm:order-none">
+            <FullBackupControls backup={backup} onRestore={onRestore} onCaptionFolder={() => setRecaptioning(true)} />
+          </div>
           {/* Not a dataset action: it captions a folder LDS did not build, so it
               lives on the library, beside Backup, and needs no open dataset. */}
-          <Button size="md" onClick={() => setRecaptioning(true)}
+          <Button size="md" onClick={() => setRecaptioning(true)} className="hidden sm:inline-flex"
             title="Write Anima booru tag captions for a folder LDS did not build, into a separate output folder">
             <Tags aria-hidden="true" className="h-4 w-4" /> Caption folder
           </Button>
@@ -538,35 +537,40 @@ export default function DatasetListPanel({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Find a dataset"
                 aria-label="Find a dataset"
-                className="min-w-[9rem] flex-1 sm:max-w-xs"
+                className="order-1 min-w-0 flex-1 sm:order-none sm:min-w-[9rem] sm:max-w-xs"
               />
-              {kinds.length >= 2 && (
-                <div role="group" aria-label="Filter by dataset kind" className="flex flex-wrap items-center gap-1">
-                  {['all', ...kinds].map((k) => {
-                    const KindIcon = KIND_ICONS[k];
-                    return (
-                      <Chip key={k} size="md" pressed={kindFilter === k} onClick={() => setKindFilter(k)}>
-                        {k === 'all' ? 'All' : (
-                          <span className="inline-flex items-center gap-1"><KindIcon aria-hidden="true" className="h-3 w-3" />{KIND_CHIPS[k]}</span>
-                        )}
-                      </Chip>
-                    );
-                  })}
-                </div>
-              )}
-              <Chip
-                size="md"
-                pressed={showPreviews}
-                onClick={() => setShowPreviews((visible) => !visible)}
-                title={showPreviews ? 'Hide image previews' : 'Show image previews'}
-              >
-                {showPreviews
-                  ? <ImageIcon aria-hidden="true" className="h-3.5 w-3.5" />
-                  : <LayoutGrid aria-hidden="true" className="h-3.5 w-3.5" />}
-                <span className="hidden sm:inline">{showPreviews ? 'Hide previews' : 'Show previews'}</span>
-                <span className="sr-only">Image previews {showPreviews ? 'shown' : 'hidden'}</span>
-              </Chip>
-              <TileSizeControl size={tileSize} onChange={setTileSize} titles={TILE_SIZE_TITLE} />
+              <div className="order-3 flex w-full items-center justify-between gap-2 sm:contents">
+                {kinds.length >= 2 && (
+                  <div role="group" aria-label="Filter by dataset kind" className="flex min-w-0 flex-1 items-center gap-1 sm:flex-none sm:flex-wrap">
+                    {['all', ...kinds].map((k) => {
+                      const KindIcon = KIND_ICONS[k];
+                      return (
+                        <Chip key={k} size="md" pressed={kindFilter === k} onClick={() => setKindFilter(k)}
+                          className="min-w-0 flex-1 !px-1 !text-xs sm:flex-none sm:!px-3 sm:!text-sm">
+                          {k === 'all' ? 'All' : (
+                            <span className="inline-flex min-w-0 items-center gap-1"><KindIcon aria-hidden="true" className="hidden h-3 w-3 sm:block" /><span className="truncate">{KIND_CHIPS[k]}</span></span>
+                          )}
+                        </Chip>
+                      );
+                    })}
+                  </div>
+                )}
+                <Chip
+                  size="md"
+                  pressed={showPreviews}
+                  onClick={() => setShowPreviews((visible) => !visible)}
+                  title={showPreviews ? 'Hide image previews' : 'Show image previews'}
+                >
+                  {showPreviews
+                    ? <ImageIcon aria-hidden="true" className="h-3.5 w-3.5" />
+                    : <LayoutGrid aria-hidden="true" className="h-3.5 w-3.5" />}
+                  <span className="hidden sm:inline">{showPreviews ? 'Hide previews' : 'Show previews'}</span>
+                  <span className="sr-only">Image previews {showPreviews ? 'shown' : 'hidden'}</span>
+                </Chip>
+                {/* The grid glyph is dropped on the phone: the row needs the room. */}
+                <TileSizeControl size={tileSize} onChange={setTileSize} titles={TILE_SIZE_TITLE}
+                  className="[&>svg]:hidden sm:[&>svg]:block" />
+              </div>
             </>
           )}
         </div>
@@ -617,7 +621,7 @@ export default function DatasetListPanel({
                     {items.map((d) => (
                       <DatasetTile key={d.id} d={d} onOpen={onOpen} onDelete={onDelete} onRename={onRename}
                         onExportZip={onExportZip} onExportBackup={onExportBackup}
-                        showPreviews={showPreviews} />
+                        showPreviews={showPreviews} compact={tileSize !== 'L'} />
                     ))}
                   </div>
                 )}
