@@ -37,8 +37,8 @@ def test_creating_a_profile_defaults_to_lan_without_copying_settings(profiles_ap
     settings = json.loads(Path(row['paths']['LDS_CONFIG']).read_text())
     assert set(settings) == {'server'}
     assert settings['server']['host'] == (bound_host if bound_host == '192.0.2.9' else '0.0.0.0')
-    assert settings['server']['require_token'] is True
-    assert len(settings['server']['access_token']) >= 24
+    assert settings['server']['require_token'] is False
+    assert not settings['server'].get('access_token')
     assert Path(row['paths']['LDS_ENV']).read_bytes() == b''
     assert store.selected() == 'default'
 
@@ -163,15 +163,16 @@ def test_profile_switch_defaults_legacy_lan_and_rolls_back(profiles_app, monkeyp
     if outcome == 'scheduled':
         assert response.status_code == 200
         assert saved['server']['host'] == '0.0.0.0'
-        assert saved['server']['require_token'] is True
-        access_token = saved['server']['access_token']
-        assert access_token != 'example-source-token'
+        assert saved['server']['require_token'] is False
+        query = parse_qs(urlsplit(response.get_json()['destination']).query)
         if token:
-            assert access_token == token
+            assert saved['server']['access_token'] == token
+            assert query.get('token') == [token]
         else:
-            assert len(access_token) >= 24
+            assert not saved['server'].get('access_token')
+            assert 'token' not in query
+        assert saved['server'].get('access_token') != 'example-source-token'
         assert saved['example'] == settings['example']
-        assert parse_qs(urlsplit(response.get_json()['destination']).query)['token'] == [access_token]
         assert not released
     else:
         assert response.status_code == 409

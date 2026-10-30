@@ -91,6 +91,12 @@ export const WHATS_NEW = [
     to: '/settings/server',
   },
   {
+    id: '2026-10-29-no-access-token', date: '2026-10-29',
+    title: 'Open from your phone without a token',
+    blurb: 'A phone on your LAN or Tailscale opens the app with no access token. Turn Require an access token on in Settings when you want one. A public internet address still asks for a token.',
+    to: '/settings/server',
+  },
+  {
     id: '2026-10-27-pixai-bank-coverage', date: '2026-10-27',
     title: 'Separate Tag Coverage',
     blurb: 'Bank cards show cached PixAI pre-tags separately from WD14 filter tags and written captions. Coverage counts now respect each Bank\'s excluded folders.',

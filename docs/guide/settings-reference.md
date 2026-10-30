@@ -106,8 +106,9 @@ lets you create another profile without leaving the app. Enter its name and
 choose **Create Profile**, then **Switch Profile** to open it.
 
 New profiles have separate databases, settings, credentials, plugin data,
-datasets, caches and training storage. LAN access defaults to on for new profiles,
-with a required independent access token. The popup preserves an existing network
+datasets, caches and training storage. LAN access defaults to on for new profiles.
+The access token stays off unless you turn **Require an access token** on for
+that profile. The popup preserves an existing network
 bind address; a local-only bind becomes `0.0.0.0` for the new profile.
 Complete Setup for each new profile. Tool installations and model
 weights may be shared. The active profile name appears below the Studio title.
@@ -119,8 +120,8 @@ selected profile in the same browser tab. Switching does not stop jobs or
 cancel queues. Switching to an older local-only profile
 enables LAN access automatically. No extra checkbox or retry is required.
 Studio uses the running server's network bind address, or `0.0.0.0` when the
-current bind is local-only. It requires the target profile's own access token,
-preserves an existing target token or creates an independent one. No other
+current bind is local-only. Switching does not turn the access token on. A
+profile that already requires a token keeps that setting and its token. No other
 settings or credentials are copied. Busy work blocks the change before any
 settings change. If restart scheduling fails, Studio restores the target's
 previous settings.
@@ -1450,7 +1451,7 @@ How the app binds and who can reach it. **These are the settings that need a res
 
 - **Port** → `server.port`. The port the app listens on. Default **`5050`**. Change it if something else owns the port (on macOS, port 5000 is taken by AirPlay Receiver).
 - **Available on the local network** — a toggle that flips the bind host between `127.0.0.1` (this machine only, the default) and `0.0.0.0` (reachable from your LAN — phone, tablet, another PC). The token and phone controls below only appear once this is on.
-- **Require an access token** → `server.require_token`. Default **off** — a home LAN is treated as trusted, so LAN access is open and there's no token to type on a phone. Turn it **on** to demand a token from remote devices; requests from localhost never need one.
+- **Require an access token** → `server.require_token`. Default **off** — a home LAN is treated as trusted, so LAN access is open and there's no token to type on a phone. Turn it **on** to demand a token from remote devices; requests from localhost never need one. Creating a profile, or switching a local-only profile onto the LAN, leaves this off.
   When `LDS_PUBLIC=1` this is **forced on and locked** — the switch is disabled with that reason shown, and a public bind is served with the gate on unless `LDS_ALLOW_UNAUTHENTICATED=1` is set (see the environment variables above).
 - **Access token** → `server.access_token`. Shown only when the token gate is on: a read-only field with **Generate new token** and **Copy**. It's persisted, so it survives restarts. Open `http://<machine>:<port>/?token=<token>` once from the remote device and a signed session cookie takes over.
 - **Open it on your phone** — a card with a scannable **QR code** and copyable URLs built from this machine's real LAN IP (and Tailscale IP, if present). No guessing which address to type.
@@ -1708,7 +1709,7 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 |---|---|
 | `server.host` | Interface the Flask server binds to (default `127.0.0.1`, local-only). |
 | `server.port` | Port the server listens on (default `5050`). |
-| `server.require_token` | On a non-loopback bind, require remote clients to present an access token (default `false` — a trusted LAN needs none). Toggle and token also live in Settings → Server & access. Overridden to always-on by `LDS_PUBLIC=1`. |
+| `server.require_token` | On a non-loopback bind, require remote clients to present an access token (default `false` — a trusted LAN needs none). New profiles and LAN switches leave it off. Toggle and token also live in Settings → Server & access. Overridden to always-on by `LDS_PUBLIC=1`. |
 | `console.level` | What the start.bat / run.py terminal narrates from the activity log: `off` (silent), `events` (default — one line per state change), `heartbeat` (plus a line per running job every `console.heartbeat_seconds`), `all` (plus progress ticks, throttled to at most one per job per second). Same events the 📋 Activity panel shows. Overridable by `LDS_CONSOLE`. Config.json only — no Settings UI. |
 | `console.heartbeat_seconds` | Interval for heartbeat lines when `console.level` is `heartbeat` or `all` (default `30`, clamped 5–600). |
 | `diagnostics.db_trace_seconds` | Seconds a database write may be held before the log reports which thread is holding it and what opened it. `0` (default) = off. The database allows one writer at a time, so a background pass that holds it too long makes everything else — a ✓ on an image, a second machine's check-in — fail with "the database is busy". This is how you find out which pass. Turn it on only while investigating; it costs nothing when off but adds a log line per slow write when on. Overridable by `LDS_DB_TRACE`. Config.json only — no Settings UI. |
