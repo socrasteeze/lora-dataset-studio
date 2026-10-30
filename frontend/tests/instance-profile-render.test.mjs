@@ -23,12 +23,13 @@ test('owned training paths remain readable but cannot be edited', () => {
   assert.match(html, /value="\/example\/profile\/output"/);
 });
 
-test('profile ports stay fixed while local-network access remains editable', () => {
+test('the server field shows the shared profile port', () => {
   const html = render(ServerSection, {
-    config: { server: { host: '127.0.0.1', port: 5050 } },
-    runtime: { profile: { port: 5051 } }, setField() {}, configDefaults: {},
+    config: { server: { host: '127.0.0.1', port: 5051 } },
+    runtime: { profile: { port: 5050 } }, setField() {}, configDefaults: {},
   });
-  assert.match(html, /id="server-port"[^>]*readonly=""[^>]*value="5051"/i);
+  assert.match(html, /id="server-port"[^>]*readonly=""[^>]*value="5050"/i);
+  assert.match(html, /Every profile uses this port/);
   assert.doesNotMatch(html, /server-bind-managed-note/);
   assert.match(html, /Available on the local network/);
 });

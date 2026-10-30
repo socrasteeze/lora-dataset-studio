@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-29-profiles-one-port', date: '2026-10-29',
+    title: 'Profiles Stay on One Address',
+    blurb: 'Switching profiles restarts on the same port as Default. An installed app bound to that address keeps working, and a profile that saved another port comes back on this one.',
+    to: '/settings/server',
+  },
+  {
     id: '2026-10-27-pixai-bank-coverage', date: '2026-10-27',
     title: 'Separate Tag Coverage',
     blurb: 'Bank cards show cached PixAI pre-tags separately from WD14 filter tags and written captions. Coverage counts now respect each Bank\'s excluded folders.',

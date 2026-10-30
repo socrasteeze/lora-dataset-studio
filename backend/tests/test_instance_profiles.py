@@ -45,15 +45,18 @@ def test_default_preserves_explicit_legacy_paths_and_environment(tmp_path):
     assert child['HF_TOKEN'] == 'synthetic-token'
 
 
-def test_default_retains_the_previously_bound_port_for_browser_storage(store):
+def test_a_recorded_lock_port_does_not_move_the_shared_address(store):
     data = store.root / 'data'
     data.mkdir()
     (data / 'server.lock').write_text(json.dumps({
         'pid': 424242, 'host': '127.0.0.1', 'port': 5051,
     }), encoding='utf-8')
+    (store.root / 'config.json').write_text('{"server": {"port": 5100}}', encoding='utf-8')
     store.environ['LDS_PORT'] = '5050'
-    assert store.get('default')['port'] == 5051
-    assert store.create('Example')['port'] != 5051
+    assert store.get('default')['port'] == 5050
+    created = store.create('Example')
+    assert created['port'] == 5050
+    assert store.browser_url('default') == 'http://127.0.0.1:5050/'
 
 
 def test_new_profiles_start_empty_and_do_not_inherit_secrets(store):
@@ -62,14 +65,14 @@ def test_new_profiles_start_empty_and_do_not_inherit_secrets(store):
     one = store.create('Example One')
     two = store.create('Example Two')
     assert one['id'] != two['id']
-    assert one['port'] != two['port'] != store.get('default')['port']
+    assert one['port'] == two['port'] == store.get('default')['port'] == 5050
     tokens = set()
     for row in (one, two):
         environment = store.child_environment(row['id'])
         assert all(key not in environment for key in profiles.SECRET_KEYS)
         assert 'LDS_ALLOW_SECOND_INSTANCE' not in environment
         assert environment['LDS_AUTO_PORT'] == '0'
-        assert environment['LDS_PROFILE_PORT'] == str(row['port'])
+        assert environment['LDS_PORT'] == environment['LDS_PROFILE_PORT'] == '5050'
         assert 'LDS_BIND_MANAGED' not in environment
         settings = json.loads(Path(environment['LDS_CONFIG']).read_text(encoding='utf-8'))
         assert set(settings) == {'server'}
@@ -249,14 +252,36 @@ def test_profile_gate_precedes_every_application_import():
                for statement in tree.body[:app_import] for node in ast.walk(statement))
 
 
-def test_browser_reopen_uses_the_bound_address_and_that_profiles_token(store, monkeypatch):
+def test_browser_reopen_uses_the_shared_port_and_that_profiles_token(store, monkeypatch):
     import single_instance
     row = store.create('Example')
     Path(row['paths']['LDS_CONFIG']).write_text(json.dumps({
-        'server': {'access_token': 'synthetic token'},
+        'server': {'access_token': 'synthetic token', 'port': 5200},
     }), encoding='utf-8')
     monkeypatch.setattr(single_instance, 'read_lock', lambda _data: {'host': '0.0.0.0', 'port': 5200})
-    assert store.browser_url(row['id']) == 'http://127.0.0.1:5200/?token=synthetic+token'
+    assert store.browser_url(row['id']) == 'http://127.0.0.1:5050/?token=synthetic+token'
+
+
+def test_legacy_recorded_port_migrates_without_removing_profile_data(store):
+    (store.root / 'config.json').write_text('{"server": {"port": 5050}}', encoding='utf-8')
+    named = store.create('Example')
+    marker = Path(named['paths']['LDS_DATA_DIR']) / 'keep.txt'
+    marker.write_text('kept', encoding='utf-8')
+    document = json.loads(store.registry.read_text(encoding='utf-8'))
+    for row in document['profiles']:
+        row['port'] = 5051
+    store.registry.write_text(json.dumps(document), encoding='utf-8')
+    reloaded = profiles.ProfileStore(home=store.home, root=store.root, environ={})
+    rows = reloaded.profiles()
+    assert [row['port'] for row in rows] == [5050, 5050]
+    assert [row['id'] for row in rows] == [row['id'] for row in document['profiles']]
+    assert marker.read_text(encoding='utf-8') == 'kept'
+    saved = json.loads(reloaded.registry.read_text(encoding='utf-8'))
+    assert [row['port'] for row in saved['profiles']] == [5050, 5050]
+    assert [row['paths'] for row in saved['profiles']] == [row['paths'] for row in document['profiles']]
+    environment = reloaded.child_environment(named['id'])
+    assert environment['LDS_PORT'] == environment['LDS_PROFILE_PORT'] == '5050'
+    assert environment['LDS_DATA_DIR'] == named['paths']['LDS_DATA_DIR']
 
 
 def test_settings_report_the_active_profile_and_owned_training_paths(app, client, monkeypatch):

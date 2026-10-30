@@ -32,6 +32,7 @@ def test_creating_a_profile_defaults_to_lan_without_copying_settings(profiles_ap
     app.config['LDS_BOUND_HOST'] = bound_host
     result = app.test_client().post('/api/profiles', json={'name': 'Example'}).get_json()
     assert result['ok']
+    assert result['profile']['port'] == store.get('default')['port']
     row = store.get(result['profile']['id'])
     settings = json.loads(Path(row['paths']['LDS_CONFIG']).read_text())
     assert set(settings) == {'server'}
@@ -76,7 +77,11 @@ def test_switch_records_the_target_before_scheduling_restart(profiles_app, monke
     response = app.test_client().post('/api/profiles/switch', json={'profile_id': target['id']},
                                       environ_overrides={'REMOTE_ADDR': remote})
     assert response.status_code == 200
-    assert response.get_json()['profile_id'] == target['id']
+    payload = response.get_json()
+    assert payload['profile_id'] == target['id']
+    assert payload['port'] == store.shared_port()
+    from urllib.parse import urlsplit
+    assert urlsplit(payload['destination']).port == payload['port']
     assert seen == [({'source': 'default', 'target': target['id']}, {'block_during_update': True})]
     assert store.selected() == 'default'
     response.close()

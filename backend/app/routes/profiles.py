@@ -102,7 +102,7 @@ def switch_profile():
             store.check_other_work(target['id'])
             with store.enable_lan(target['id'], _profile_lan_host()) if needs_lan else nullcontext():
                 # The target keeps its own credential for the first request
-                # at its port, including default LAN access for older profiles.
+                # on the shared port, including default LAN access for older profiles.
                 destination = store.browser_url(target['id'])
                 store.request_switch(source, target['id'])
                 requested = True

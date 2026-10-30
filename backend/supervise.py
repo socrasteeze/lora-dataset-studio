@@ -34,8 +34,32 @@ CLEAN_EXIT = 0
 RESTART_EXIT = 75          # the launcher's "relaunch me" signal
 CONTROL_C_EXIT = 3221225786   # 0xC000013A, Windows STATUS_CONTROL_C_EXIT
 RELAUNCH_DELAY = 2.0       # let the port free before binding it again
+PORT_RELEASE_TIMEOUT = 60.0
+PORT_RELEASE_INTERVAL = 0.2
 HEALTHY_UPTIME = 60.0      # served this long => the next death is a fresh one
 MAX_RAPID_RESTARTS = 5     # consecutive deaths with no healthy uptime
+
+
+def wait_until_port_free(port, *, host='127.0.0.1', timeout=PORT_RELEASE_TIMEOUT,
+                         interval=PORT_RELEASE_INTERVAL, sleep=time.sleep,
+                         now=time.monotonic, probe=None):
+    """Wait until ``port`` accepts a bind.
+
+    A profile switch exits the old process and starts the next one on the same
+    port. Process exit does not mean the socket is free yet. Returns False when
+    the wait expires; the next launch still uses this port and does not slide.
+    """
+    if probe is None:
+        from port_utils import can_bind
+        probe = can_bind
+    port = int(port)
+    deadline = now() + timeout
+    while True:
+        if probe(host, port):
+            return True
+        if now() >= deadline:
+            return False
+        sleep(interval)
 
 
 def run_backend(python, script, *, env=None, spawn=None):
@@ -68,16 +92,25 @@ def console_notice(message, *, stream=None):
         pass
 
 
-def backend_launcher(python, script, *, env=None, spawn=None):
+def backend_launcher(python, script, *, env=None, spawn=None, wait_for_port=None):
     """Build the ``run_once`` callable ``supervise`` drives.
 
     Carries the one piece of state a relaunch must not repeat: opening a browser
     tab. The first launch may open one; every relaunch after it stays silent.
+    After a profile switch, the next launch waits until the shared port can be
+    bound. The delay in ``supervise`` runs first; this wait is the last check
+    before the new process binds.
     """
     initial = dict(os.environ if env is None else env)
     state = dict(initial)
+    if wait_for_port is None:
+        wait_for_port = wait_until_port_free
+    release_port = {'value': None}
 
     def once():
+        if release_port['value'] is not None:
+            wait_for_port(int(release_port['value']))
+            release_port['value'] = None
         code = run_backend(python, script, env=state, spawn=spawn)
         if code == RESTART_EXIT:
             from instance_profiles import ProfileStore
@@ -88,6 +121,7 @@ def backend_launcher(python, script, *, env=None, spawn=None):
                 state.clear()
                 state.update(store.child_environment(target))
                 state['LDS_NO_BROWSER'] = '1'
+                release_port['value'] = state.get('LDS_PORT')
         state['LDS_OPEN_BROWSER'] = '0'
         return code
 
