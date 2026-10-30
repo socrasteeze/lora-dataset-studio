@@ -66,7 +66,6 @@ def test_new_profiles_start_empty_and_do_not_inherit_secrets(store):
     two = store.create('Example Two')
     assert one['id'] != two['id']
     assert one['port'] == two['port'] == store.get('default')['port'] == 5050
-    tokens = set()
     for row in (one, two):
         environment = store.child_environment(row['id'])
         assert all(key not in environment for key in profiles.SECRET_KEYS)
@@ -77,15 +76,37 @@ def test_new_profiles_start_empty_and_do_not_inherit_secrets(store):
         settings = json.loads(Path(environment['LDS_CONFIG']).read_text(encoding='utf-8'))
         assert set(settings) == {'server'}
         assert settings['server']['host'] == '0.0.0.0'
-        assert settings['server']['require_token'] is True
-        token = settings['server']['access_token']
-        assert len(token) >= 24
-        assert token != 'synthetic-secret'
-        tokens.add(token)
+        assert settings['server']['require_token'] is False
+        assert not settings['server'].get('access_token')
         assert Path(environment['LDS_ENV']).read_bytes() == b''
         assert all(Path(environment[key]).is_dir() for key in (
             'LDS_DATA_DIR', 'LDS_PLUGINS_DIR', 'LDS_EXTENSIONS_DIR'))
-    assert len(tokens) == 2
+
+
+def test_a_new_profile_mints_a_token_only_when_require_token_is_on(store):
+    opted = store.create('Locked', config={'server': {'require_token': True}})
+    settings = json.loads(Path(opted['paths']['LDS_CONFIG']).read_text(encoding='utf-8'))
+    assert settings['server']['require_token'] is True
+    assert len(settings['server']['access_token']) >= 24
+
+
+def test_enable_lan_leaves_the_token_gate_off(store):
+    row = store.create('Example')
+    with store.enable_lan(row['id'], '0.0.0.0'):
+        settings = json.loads(Path(row['paths']['LDS_CONFIG']).read_text(encoding='utf-8'))
+    assert settings['server']['host'] == '0.0.0.0'
+    assert settings['server']['require_token'] is False
+    assert not settings['server'].get('access_token')
+
+
+def test_enable_lan_keeps_an_opted_in_token(store):
+    row = store.create('Example', config={'server': {'host': '127.0.0.1', 'require_token': True}})
+    before = json.loads(Path(row['paths']['LDS_CONFIG']).read_text(encoding='utf-8'))
+    with store.enable_lan(row['id'], '192.0.2.9'):
+        settings = json.loads(Path(row['paths']['LDS_CONFIG']).read_text(encoding='utf-8'))
+    assert settings['server']['host'] == '192.0.2.9'
+    assert settings['server']['require_token'] is True
+    assert settings['server']['access_token'] == before['server']['access_token']
 
 
 def test_selection_defaults_to_the_current_install_and_survives_store_reopen(store):

@@ -33,6 +33,13 @@ def test_remote_client_allowed_by_default_no_token(client):
     assert client.get('/api/health', environ_base=REMOTE).status_code == 200
 
 
+def test_a_saved_token_does_not_engage_the_gate(client):
+    """require_token off stays open even when a token is already stored."""
+    client.put('/api/settings', json={'config': {'server': {
+        'require_token': False, 'access_token': 'present-but-not-required'}}})
+    assert client.get('/api/health', environ_base=REMOTE).status_code == 200
+
+
 def test_remote_client_blocked_when_token_required_but_none_configured(client):
     _require_token(client)
     r = client.get('/api/health', environ_base=REMOTE)

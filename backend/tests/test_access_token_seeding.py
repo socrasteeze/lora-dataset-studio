@@ -72,6 +72,18 @@ def test_loopback_bind_seeds_nothing(app, monkeypatch):
     assert 'LDS_ACCESS_TOKEN' not in os.environ
 
 
+def test_opt_in_require_token_seeds_a_token(app, monkeypatch):
+    """The Settings switch is the opt-in. A LAN bind then gets a token at boot."""
+    monkeypatch.delenv('LDS_PUBLIC', raising=False)
+    monkeypatch.delenv('LDS_ACCESS_TOKEN', raising=False)
+    from app import config as cfg
+    with app.app_context():
+        cfg.save_config({'server': {'require_token': True, 'access_token': ''}})
+        token = netguard.ensure_access_token('0.0.0.0')
+    assert token
+    assert os.environ['LDS_ACCESS_TOKEN'] == token
+
+
 def test_trusted_lan_default_still_seeds_nothing(app, monkeypatch):
     """Not public, require_token off -> unchanged trusted-LAN behaviour."""
     monkeypatch.delenv('LDS_PUBLIC', raising=False)

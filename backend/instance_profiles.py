@@ -259,9 +259,9 @@ class ProfileStore:
             base.mkdir(parents=True)
             for key in ('LDS_DATA_DIR', 'LDS_PLUGINS_DIR', 'LDS_EXTENSIONS_DIR'):
                 Path(paths[key]).mkdir()
-            server = {'host': '0.0.0.0', 'require_token': True,
+            server = {'host': '0.0.0.0', 'require_token': False,
                       **(config or {}).get('server', {})}
-            if not server.get('access_token'):
+            if server.get('require_token') and not server.get('access_token'):
                 server['access_token'] = secrets.token_urlsafe(24)
             settings = {**(config or {}), 'server': server}
             Path(paths['LDS_CONFIG']).write_text(json.dumps(settings) + '\n', encoding='utf-8')
@@ -289,12 +289,19 @@ class ProfileStore:
 
     @contextmanager
     def enable_lan(self, ident, host):
-        """Keep default LAN access only when the switch is scheduled."""
+        """Point a loopback profile at ``host`` for this switch.
+
+        The token gate stays off unless that profile already opted in.
+        """
         path = Path(self.get(ident)['paths']['LDS_CONFIG'])
         original = json.loads(path.read_text(encoding='utf-8'))
         server = dict(original.get('server', {}))
-        server.update(host=host, require_token=True,
-                      access_token=server.get('access_token') or secrets.token_urlsafe(24))
+        server['host'] = host
+        if server.get('require_token'):
+            if not server.get('access_token'):
+                server['access_token'] = secrets.token_urlsafe(24)
+        else:
+            server['require_token'] = False
         _write_json(path, {**original, 'server': server})
         try:
             yield

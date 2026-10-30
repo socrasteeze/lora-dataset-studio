@@ -45,7 +45,7 @@ def create_profile():
     if not isinstance(data, dict):
         return jsonify(error='Send a JSON object.'), 400
     try:
-        # LAN access defaults on with an independent credential. Preserve an
+        # LAN access defaults on. The access token stays off. Preserve an
         # existing network bind without copying source settings or secrets.
         row = ProfileStore().create(data.get('name'), config={
             'server': {'host': _profile_lan_host()}})
@@ -101,8 +101,8 @@ def switch_profile():
         with FileLease(store.home / 'transition.lock'):
             store.check_other_work(target['id'])
             with store.enable_lan(target['id'], _profile_lan_host()) if needs_lan else nullcontext():
-                # The target keeps its own credential for the first request
-                # on the shared port, including default LAN access for older profiles.
+                # The target opens on the shared port. Enabling LAN does not
+                # turn its access token on.
                 destination = store.browser_url(target['id'])
                 store.request_switch(source, target['id'])
                 requested = True
