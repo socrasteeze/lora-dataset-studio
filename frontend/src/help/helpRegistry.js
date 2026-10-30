@@ -1509,7 +1509,7 @@ const TOPICS = [
      'dlss5nr', 'bridge missing', 'model missing', 'forwarder', '165 mb', 'sha256',
      'pinned release', 'ComfyUI-DLSS5-NR', 'nvidia driver', 'ngx', 'optical flow',
      'nvofapi64', 'windows only', 'no linux', 'no container', 'rtx 50', 'rtx 40']),
-  action('system-free-memory', '🧹 Free memory — unload what ComfyUI and the vision model keep in RAM',
+  action('system-free-memory', 'Clear VRAM — unload what ComfyUI and the vision model keep in memory',
     ['free memory', 'free ram', 'ram full', 'ram is full', 'memory full', 'out of memory',
      'clear ram', 'release memory', 'unload models', 'unload comfyui models', 'comfyui ram',
      'ram does not go down', 'memory not freed', 'vram full', 'free vram', 'clear vram',
@@ -2059,6 +2059,8 @@ const TOPICS = [
   // scraping — only the download credential that still has a Settings field
   setting('CIVITAI_API_KEY', 'scraping', 'CIVITAI_API_KEY', 'Civitai API key',
     ['civitai', 'api key', 'download', 'setup', 'key']),
+  setting('image_sources.hidden', 'scraping', 'image-sources-hidden', 'Hide Image Sources',
+    ['image sources', 'hide', 'remove', 'panel', 'booru', 'bank', 'dataset']),
   // local-tools
   setting('comfyui.api_url', 'local-tools', 'comfyui-api-url', 'ComfyUI API URL',
     ['comfyui', 'api', 'url', 'klein', 'studio', 'local']),
@@ -2149,7 +2151,7 @@ const TOPICS = [
      'panorama', 'wide', 'too large', 'rejects images', '8192', '16384', 'no limit',
      'unlimited', 'oversized', 'caption', 'captioning', 'joycaption']),
   setting('captioning.backend', 'captioning', 'captioning-backend', 'Captioning backend',
-    ['caption', 'captioning', 'backend', 'joycaption', 'ollama', 'auto', 'pixai', 'pixai tagger',
+    ['caption', 'captioning', 'backend', 'joycaption', 'ollama', 'auto', 'pixai', 'pixai tagger', 'wd14', 'wd14 tagger',
      'pixai tags', 'qwen', 'qwen3-vl', 'anima']),
   setting('pixai.device', 'captioning', 'pixai-device', 'PixAI Tagger device',
     ['pixai', 'pixai tagger', 'device', 'gpu', 'cuda', 'cpu', 'booru', 'anima']),
@@ -2833,14 +2835,14 @@ const TOPICS = [
      'flip', 'bank', 'crop'],
     '/datasets', 'using-the-app', 'rotate-a-sideways-image'),
   action('action-caption-generate', 'Generate captions',
-    ['caption', 'generate', 'joycaption', 'ollama', 'pixai', 'pixai tagger', 'text',
+    ['caption', 'generate', 'joycaption', 'ollama', 'pixai', 'pixai tagger', 'wd14', 'wd14 tagger', 'text',
      // Caption STYLE lives on this control: the prose/booru selector next to the
      // button. Anima accepts both forms, so a user searching "booru" or "anima"
      // must land here rather than conclude the app only does one of them.
      'prose', 'booru', 'tags', 'style', 'anima', 'hybrid'],
     '/datasets?section=captions&panel=generate', 'dataset-guide', '3-captions-the-make-or-break-step'),
   action('action-caption-options', 'Caption method options',
-    ['caption', 'options', 'engine', 'model', 'ollama', 'pixai', 'pixai tagger', 'pull', 'instructions', 'prompt',
+    ['caption', 'options', 'engine', 'model', 'ollama', 'pixai', 'pixai tagger', 'wd14', 'wd14 tagger', 'pull', 'instructions', 'prompt',
      'method', 'vocabulary', 'explicit', 'clinical', 'nsfw', 'abliterated', 'uncensored'],
     '/datasets?section=captions&panel=generate', 'dataset-guide', '3-captions-the-make-or-break-step'),
   // DIVERGENCE 10 — hand-ported from upstream's help/topics/actions.js.

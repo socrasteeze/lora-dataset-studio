@@ -37,6 +37,7 @@ const captioningOptions = (llm) => [
   { id: 'auto', label: 'Auto (best available)' },
   { id: 'joycaption', label: 'JoyCaption' },
   { id: 'pixai', label: 'PixAI Tagger' },
+  { id: 'wd14', label: 'WD14 Tagger' },
   { id: 'pixai_hybrid', label: 'PixAI tags + VLM' },
   { id: 'ollama', label: `${llm} vision` },
   { id: 'none', label: 'None' },

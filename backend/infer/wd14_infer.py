@@ -301,7 +301,9 @@ def main() -> int:
 
     cats_arr = np.asarray(cats)
     rating_idx = np.nonzero(cats_arr == _CAT_RATING)[0].tolist()
-    taggable = np.isin(cats_arr, (_CAT_GENERAL, _CAT_CHARACTER))
+    categories = ((_CAT_GENERAL, _CAT_CHARACTER) if payload.get('include_character', True)
+                  else (_CAT_GENERAL,))
+    taggable = np.isin(cats_arr, categories)
     results, ratings, errors = {}, {}, {}
     total = len(images)
     _phase('tagging')

@@ -102,9 +102,11 @@ export default function BankOverview({ payload, compact = false }) {
               <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3">
                 {model.passes.map((pass) => (
                   <li key={pass.key} className="rounded-md border border-border bg-surface-raised px-2 py-1.5">
-                    <span className="block text-2xs text-content-muted">{pass.label}</span>
-                    <span className={`block text-2xs tabular-nums ${pass.value == null ? 'text-amber-300/90' : 'text-content'}`}>
-                      {pass.text}
+                    <span className="flex flex-wrap items-baseline justify-between gap-x-2 text-2xs">
+                      <span className="text-content-muted">{pass.label}</span>
+                      <span className={`tabular-nums ${pass.value == null ? 'text-amber-300/90' : 'text-content'}`}>
+                        {pass.text}
+                      </span>
                     </span>
                     {pass.percent != null && (
                       <span className="mt-1 block h-1 overflow-hidden rounded-full bg-surface" aria-hidden="true">

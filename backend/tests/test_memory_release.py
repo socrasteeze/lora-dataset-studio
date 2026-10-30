@@ -170,7 +170,7 @@ def test_a_render_of_our_own_is_refused_once_with_the_offer_to_interrupt(app, le
         with pytest.raises(mr.MemoryReleaseBusy) as e:
             mr.free_memory(settle_seconds=0)
     assert e.value.can_interrupt is True and e.value.job_id == 'job-own'
-    assert 'ComfyUI is rendering' in str(e.value) and 'Press 🧹 Free memory again' in str(e.value)
+    assert 'ComfyUI is rendering' in str(e.value) and 'Press Clear VRAM again' in str(e.value)
     assert own_render['interrupts'] == 0 and levers['calls'] == []
 
 
@@ -367,7 +367,7 @@ def test_the_route_carries_the_offer_and_the_second_press(client, app, levers, o
     assert r.status_code == 409
     body = r.get_json()
     assert body['can_interrupt'] is True and body['job_id'] == 'job-own'
-    assert 'Press 🧹 Free memory again' in body['error']
+    assert 'Press Clear VRAM again' in body['error']
     r = client.post('/api/system/free-memory', json={'interrupt': 'yes'})
     assert r.status_code == 400 and own_render['interrupts'] == 0
     r = client.post('/api/system/free-memory', json={'interrupt': True, 'job_id': 7})

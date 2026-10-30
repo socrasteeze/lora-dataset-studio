@@ -42,6 +42,7 @@ export default function ImageSourcesPanel({ datasetId, datasetName, banks = [], 
   const [newScanOpen, setNewScanOpen] = useState(false)
   const [previewId, setPreviewId] = useState(null)
   const [confirmClear, setConfirmClear] = useState(false)
+  const [hidden, setHidden] = useState(null)
   const generation = useRef(0)
   const fetching = useRef(false)
   const changing = useRef(false)
@@ -142,6 +143,15 @@ export default function ImageSourcesPanel({ datasetId, datasetName, banks = [], 
     catch { /* The form remains available when storage is unavailable. */ }
   }, [scope, provider, url, tags, name, limit, target, engine, media, extractor])
 
+  // Settings > Shared Service Access can hide this panel. A failed read shows it.
+  useEffect(() => {
+    let live = true
+    apiFetch('/api/settings', { background: true })
+      .then((data) => { if (live) setHidden(data.config?.image_sources?.hidden === true) })
+      .catch(() => { if (live) setHidden(false) })
+    return () => { live = false }
+  }, [])
+
   useEffect(() => { setCredentials(emptyCredentials()); setConfirmClear(false) }, [credentialSource])
   useEffect(() => { setPreviewId(null) }, [jobId, offset, filter])
 
@@ -176,6 +186,8 @@ export default function ImageSourcesPanel({ datasetId, datasetName, banks = [], 
   const run = (action, body = {}) => perform(async () => {
     await postJson(`/api/image-sources/jobs/${jobId}/${action}`, body)
   })
+
+  if (hidden !== false) return null
 
   return (
     <>

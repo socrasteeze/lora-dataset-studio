@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { apiFetch, postJson } from '../../api/fetchClient'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
 import { hasUnsavedWork, useUnsavedWork } from '../../hooks/useUnsavedWork'
+import { isSameDocument } from '../../utils/sameDocument'
 import { bankSelectionKey, successfulBulkKeys } from '../bank/bankBulk.js'
 import { createBankMoveBatch, runBankMoveBatch } from '../bank/bankProfileMove.js'
 import { Button, Input } from './Controls.jsx'
@@ -105,7 +106,15 @@ export default function ProfileDialog({ onClose, bank = null, banks = null, onMo
         const value = await apiFetch(ready.toString(), {
           background: true, signal: controller.signal, credentials: 'omit', cache: 'no-store',
         })
-        if (value.id === profileId) { window.location.assign(url); return }
+        if (value.id === profileId) {
+          if (isSameDocument(url, window.location.href)) {
+            window.location.hash = new URL(url).hash
+            window.location.reload()
+          } else {
+            window.location.assign(url)
+          }
+          return
+        }
       } catch { /* The selected backend is still restarting. */ }
       finally { clearTimeout(timeout) }
     }

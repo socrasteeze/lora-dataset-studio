@@ -47,25 +47,30 @@ export default function PipelineReport({ report, onDismiss }) {
   return (
     <div className="rounded-lg border border-border bg-surface-raised">
       <div className="flex items-center gap-2 px-3 py-2">
+        {/* One line at any width: the label truncates instead of wrapping into
+            a fixed-height button, and the date moves into the details below sm. */}
         <Button type="button" size="md" variant="ghost" onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="min-w-0 justify-start font-semibold text-content">
-          <span aria-hidden>{icon}</span>
-          Last Launch-all run — {covered}/{total} passes ran
-          {redone > 0 && (
-            <span className="text-content-subtle">({redone} re-run since)</span>
-          )}
-          {stopped && <span className="text-content-subtle">(stopped)</span>}
-          {attentionLabel && <span className="text-amber-300">· {attentionLabel}</span>}
-          <span aria-hidden className="text-content-subtle">{open ? '▾' : '▸'}</span>
+          className="min-w-0 flex-1 justify-start overflow-hidden font-semibold text-content">
+          <span aria-hidden className="shrink-0">{icon}</span>
+          <span className="min-w-0 truncate">
+            Last Launch-all run — {covered}/{total} passes ran
+            {redone > 0 && (
+              <span className="text-content-subtle"> ({redone} re-run since)</span>
+            )}
+            {stopped && <span className="text-content-subtle"> (stopped)</span>}
+            {attentionLabel && <span className="text-amber-300"> · {attentionLabel}</span>}
+          </span>
+          <span aria-hidden className="shrink-0 text-content-subtle">{open ? '▾' : '▸'}</span>
         </Button>
-        <span className="ml-auto text-xs text-content-subtle">{fmtWhen(report.finished_at)}</span>
+        <span className="hidden shrink-0 whitespace-nowrap text-xs text-content-subtle sm:inline">{fmtWhen(report.finished_at)}</span>
         {onDismiss && (
           <IconButton size="md" label="Dismiss the report" onClick={onDismiss}>✕</IconButton>
         )}
       </div>
       {open && (
-        <div className="border-t border-border px-3 py-2 space-y-2">
+        <div className="px-3 pb-2 space-y-2">
+          <p className="text-xs text-content-subtle sm:hidden">{fmtWhen(report.finished_at)}</p>
           <ul className="space-y-1">
             {report.steps.map((s, i) => {
               const view = stepView(s)
@@ -80,7 +85,7 @@ export default function PipelineReport({ report, onDismiss }) {
               )
             })}
           </ul>
-          <p className="border-t border-border pt-2 text-xs text-content-subtle">
+          <p className="text-xs text-content-subtle">
             {c.total ?? 0} images · {c.scanned ?? 0} scanned · {c.reject ?? 0} rejected
             {c.scored ? ` · ${c.scored} scored` : ''}
             {c.semantic_indexed ? ` · ${c.semantic_indexed} semantic-ready` : ''}

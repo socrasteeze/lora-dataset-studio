@@ -3,7 +3,7 @@
 A CLASSIFIER that writes the dataset caption itself when the operator picks the
 ``pixai`` backend and the caption mode is booru (the SDXL and Anima default).
 Bank pre-tagging caches raw category maps without writing a caption or WD14 tags.
-It is not WD14: that pass fills BankImage.tags and stays there. Auto reaches PixAI
+The Bank WD14 Tags pass fills BankImage.tags separately. Auto reaches PixAI
 only for an Anima booru dataset when it is installed; every other Auto pass
 remains JoyCaption, then the local LLM.
 

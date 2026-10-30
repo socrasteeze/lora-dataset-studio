@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../../api/fetchClient'
 import { devicePartialLabel } from './devicePartialLabel.js'
-import { fetchDeviceList } from './deviceListCache.js'
+import { fetchDeviceList, lastDeviceList } from './deviceListCache.js'
 import { saveDeviceId } from './deviceMemory.js'
 import { Select } from './Controls.jsx'
 
@@ -15,8 +15,8 @@ export { loadSavedDeviceId, saveDeviceId } from './deviceMemory.js'
  * Compact select: "Run on" — only renders when Primary has at least one peer
  * (or always when `always` is set). Value is a device id (`local` or uuid).
  */
-export default function DevicePicker({ value, onChange, onDevice, kind = 'comfy', className = '', always = false, size = 'md' }) {
-  const [devices, setDevices] = useState(null)
+export default function DevicePicker({ value, onChange, onDevice, kind = 'comfy', className = '', always = false, size = 'md', showLabel = true }) {
+  const [devices, setDevices] = useState(() => lastDeviceList(kind))
 
   useEffect(() => {
     let cancelled = false
@@ -74,7 +74,7 @@ export default function DevicePicker({ value, onChange, onDevice, kind = 'comfy'
 
   return (
     <label className={`inline-flex min-w-0 items-center gap-2 ${size === 'sm' ? 'text-xs' : 'text-sm'} text-content ${className}`}>
-      <span className="text-content-muted whitespace-nowrap">Run On</span>
+      {showLabel && <span className="text-content-muted whitespace-nowrap">Run On</span>}
       <Select size={size}
         value={current}
         onChange={(e) => {

@@ -270,6 +270,19 @@ def test_the_route_answers_202_with_the_new_id(app, client, source):
         assert FaceDatasetImage.query.filter_by(dataset_id=body['id']).count() == 2
 
 
+def test_the_route_keeps_the_chosen_target_model_and_fidelity(app, client, source):
+    bank_id, _folder, ids = source
+    r = client.post(f'/api/bank/{bank_id}/promote-to-new-dataset',
+                    json={'name': 'Emma', 'trigger_word': 'zchar_emma', 'image_ids': ids,
+                          'train_type': 'sdxl', 'fidelity': 'body'})
+    assert r.status_code == 202
+    with app.app_context():
+        from app.extensions import db
+        from app.models import FaceDataset
+        ds = db.session.get(FaceDataset, r.get_json()['id'])
+        assert (ds.train_type, ds.fidelity) == ('sdxl', 'body')
+
+
 @pytest.mark.parametrize('payload', [
     {'trigger_word': 'zchar_emma'},
     {'name': 'Emma'},

@@ -40,9 +40,11 @@ test('the S/M/L control is the shared segmented component, in both grids', () =>
 })
 
 test('S, M and L are tile grids, and a page is grouped after it is sliced', () => {
-  assert.match(panel, /S: 'grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'/)
-  assert.match(panel, /M: 'grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4'/)
-  assert.match(panel, /L: 'grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3'/)
+  // Phone: 5 / 4 / 3 per row (S and M compact); sm and up unchanged.
+  assert.match(panel, /S: 'grid grid-cols-5 gap-1 sm:gap-1.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'/)
+  assert.match(panel, /M: 'grid grid-cols-4 gap-1.5 sm:gap-2.5 sm:grid-cols-3 xl:grid-cols-4'/)
+  assert.match(panel, /L: 'grid grid-cols-3 gap-2 sm:gap-2.5 sm:grid-cols-2 xl:grid-cols-3'/)
+  assert.match(panel, /compact=\{tileSize !== 'L'\}/)
   assert.match(panel, /<DatasetTile /)
   assert.doesNotMatch(panel, /function DatasetRow/)
   assert.match(panel, /groupDatasets\(paged\.items\)/)

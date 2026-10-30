@@ -1138,15 +1138,15 @@ The tag vocabulary retries a failed read twice. If it remains unavailable, choos
 
 ## Read-only bank sources
 
-Enable **Read-only source** when creating an Image bank, or use the same
-checkbox beside an existing bank's name. This is useful for a NAS or a folder
+Turn on **Read-only Source** when creating an Image bank, or use the same
+toggle beside an existing bank's name. This is useful for a NAS or a folder
 of original photos: **Delete rejected from disk** and **Image Sources** imports
 into the source folder are refused by the server, even from an old browser tab.
 Banks whose source folders overlap a protected bank are also blocked from
 deleting or adding source files. **One bank per subfolder** does not set
 protection; enable it on each new bank afterwards. Adding a folder that is
-already a bank with **Read-only source** ticked turns protection on for that
-bank; adding it unticked never turns protection off.
+already a bank with **Read-only Source** on turns protection on for that
+bank; adding it with the toggle off never turns protection off.
 
 You can still browse, scan, keep/reject, caption, crop or improve working copies,
 and **Promote** images into datasets or new banks. These operations leave the
@@ -4790,27 +4790,24 @@ front. It answers the one question the board could not: whether a run that
 shows no new pictures is working or wedged. Every number carries a colour:
 green below 50 % of its resource, amber 50-80 %, red past 80 % (for the
 temperature: amber from 70°, red from 85°, the band where a GPU starts
-throttling); **▾** folds the readout away and stops the polling with it, and
-the choice is remembered. It is a glance, not a monitor: there is no history,
+throttling). It is a glance, not a monitor: there is no history,
 no graph and no per-process breakdown. On a machine with no NVIDIA card (or
 with `nvidia-smi` unavailable) the GPU, VRAM and
 temperature numbers are simply absent rather than shown as zeros. On a phone
 the readout rides in the board's **⋯** shelf rather than the toolbar.
 
-The same readout is available on *every* page: the **📊** button at the right
-of the top bar (in the menu panel, on a phone) unfolds an identical line next
-to the navigation, so you can watch a training or a generation work from the
+The same readout is on *every* page: an identical line sits next to the
+navigation in the top bar (in the menu panel, on a phone), so you can watch a training or a generation work from the
 Test Studio, the Bank or a dataset without keeping Task Manager — or a ComfyUI
-resource monitor — open. It starts folded, polls only while it is unfolded and
-the tab is visible, and remembers your choice separately from the board's.
+resource monitor — open. It polls only while the tab is visible.
 
-**🧹 Free memory.** Beside the unfolded numbers sits a broom, for the case the
+**Clear VRAM.** Beside the numbers sits a **Clear VRAM** button, for the case the
 readout keeps showing: RAM full and not coming down while nothing runs. Two
 things hold it. ComfyUI keeps every model it loaded in the session cached in
 system RAM once it leaves the card (measured: 34 GB on an idle ComfyUI after
 a day of Krea, Klein and video models) and never lets go on its own; the
 vision model LDS loaded for captioning stays warm so a batch does not reload
-it per image. **🧹** asks ComfyUI to unload and free (`/free`, the same lever
+it per image. **Clear VRAM** asks ComfyUI to unload and free (`/free`, the same lever
 LDS pulls before a training) and releases the vision model LDS itself loaded,
 then reads the machine again and says what actually came back — "Freed 32 GB
 of RAM · RAM now 12/48 GB · VRAM 16 → 0.9 GB". The models reload on the next
@@ -4819,7 +4816,7 @@ while ComfyUI's queue is not empty or a training runs — unloading under a job
 would only make that job reload everything — and a model another tool loaded
 into Ollama or LM Studio is never touched (that is the fence's rule; the
 Ollama-fence dialog is where a consented eviction lives). When the job on the
-card is a render of LDS's own, the refusal says so and **🧹** pressed again
+card is a render of LDS's own, the refusal says so and **Clear VRAM** pressed again
 within a minute interrupts that render (it is dropped, as a cancel would) and
 frees; a job that is not LDS's, a training and the Live channel keep refusing.
 The second press is bound to the render the refusal named: if another one is

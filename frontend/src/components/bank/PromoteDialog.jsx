@@ -5,7 +5,7 @@ import {
   PROMOTE_DESTINATIONS, canStartPromote, promoteButtonLabel, promoteSummary,
   weightNotice,
 } from './bankPromote.js'
-import { triggerWarning } from '../dataset/newDataset.js'
+import { DEFAULT_TRAIN_TYPE, TRAIN_TYPE_OPTIONS, triggerWarning } from '../dataset/newDataset.js'
 import FolderCategoryFields from '../dataset/FolderCategoryFields.jsx'
 import { categoryForKind } from '../common/folderNaming.js'
 import { settingsLinkHref } from '../common/settingsLinkHref'
@@ -42,6 +42,9 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
   const [newDsName, setNewDsName] = useState(sourceBankName || '')
   const [newDsTrigger, setNewDsTrigger] = useState('')
   const [newDsKind, setNewDsKind] = useState('character')
+  // Same defaults as the Datasets page form: Anima, face fidelity.
+  const [newDsTrainType, setNewDsTrainType] = useState(DEFAULT_TRAIN_TYPE)
+  const [newDsFidelity, setNewDsFidelity] = useState('face')
   const [conceptDesc, setConceptDesc] = useState('')
   const [folderCategory, setFolderCategory] = useState(null)
   const [destinationReady, setDestinationReady] = useState(false)
@@ -106,6 +109,8 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
           name: newDsName.trim(),
           trigger_word: newDsKind === 'style' ? '' : newDsTrigger.trim(),
           kind: newDsKind, concept_desc: conceptDesc.trim(),
+          train_type: newDsTrainType,
+          ...(newDsKind === 'character' ? { fidelity: newDsFidelity } : {}),
           folder_category: folderCategory || categoryForKind(newDsKind),
           image_ids: useSelection ? selectedIds : [],
           ...(collectionId != null ? { collection_id: collectionId } : {}),
@@ -192,6 +197,18 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
                 <option value="character">Character</option><option value="concept">Concept</option><option value="style">Style</option>
               </select>
             </label>
+            <label className="flex flex-col gap-1 text-sm">Target Model
+              <select value={newDsTrainType} onChange={(event) => setNewDsTrainType(event.target.value)} disabled={busy}
+                className="min-h-10 rounded border border-border bg-surface-raised px-2 text-content">
+                {TRAIN_TYPE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+            {newDsKind === 'character' && <label className="flex flex-col gap-1 text-sm">Fidelity
+              <select value={newDsFidelity} onChange={(event) => setNewDsFidelity(event.target.value)} disabled={busy}
+                className="min-h-10 rounded border border-border bg-surface-raised px-2 text-content">
+                <option value="face">Face</option><option value="body">Face + body</option>
+              </select>
+            </label>}
             {newDsKind === 'concept' && <label className="flex flex-col gap-1 text-sm sm:col-span-2">Concept Description
               <textarea value={conceptDesc} maxLength={500} onChange={(event) => setConceptDesc(event.target.value)}
                 className="min-h-10 rounded border border-border bg-surface-raised p-2 text-content" />
@@ -216,7 +233,7 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
                 </p>
               )}
             </div>}
-            <p className="text-xs text-content-subtle sm:col-span-2">Dataset type controls captions and import. Folder category only labels the folder.</p>
+            <p className="text-xs text-content-subtle sm:col-span-2">Dataset type controls captions and import. Target model sets the caption style; it and fidelity can be changed later. Folder category only labels the folder.</p>
           </div>
         ) : toBank ? (
           <div>

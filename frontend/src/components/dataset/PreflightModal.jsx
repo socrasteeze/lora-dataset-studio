@@ -72,14 +72,17 @@ export default function PreflightModal({ report, datasetId, ds, onResolve, revie
          promise the launch is awaiting — was invisible. */
       className="fixed inset-0 z-[9992] bg-black/80 flex items-center justify-center p-3"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}>
-      <div className={`w-full ${reviewOnly ? 'max-w-5xl' : 'max-w-2xl'} max-h-[90vh] overflow-y-auto rounded-xl border border-amber-400/40 bg-app p-4 flex flex-col gap-3`}>
-        <div className="sticky top-0 z-10 flex items-start gap-2 bg-app py-2">
+      {/* Only the body scrolls. A scrolling card with sticky header/footer let
+          content show through its own padding above and below them. */}
+      <div className={`w-full ${reviewOnly ? 'max-w-5xl' : 'max-w-2xl'} max-h-[90vh] overflow-hidden rounded-xl border border-amber-400/40 bg-app flex flex-col`}>
+        <div className="flex shrink-0 items-start gap-2 px-4 py-3">
           <span className="text-amber-300 font-semibold text-sm">
             <span aria-hidden>⚠</span> {reviewOnly ? 'Near Duplicates' : 'Before Training'}
           </span>
           <Button type="button" size="sm" noShrink onClick={close} disabled={!!pending}
             className="ml-auto" aria-label={reviewOnly ? 'Close' : 'Cancel'}>✕</Button>
         </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-3 flex flex-col gap-3">
         {/* Summary — the aggregate message, kept verbatim. */}
         {warnings.length > 0 && (
           <ul className="m-0 pl-4 flex flex-col gap-1 text-content-muted text-xs list-disc">
@@ -89,7 +92,7 @@ export default function PreflightModal({ report, datasetId, ds, onResolve, revie
 
         {/* WHICH captions leak — edit in place (saves when you click away). */}
         {leaks.length > 0 && (
-          <div className="rounded-lg border border-amber-400/30 bg-amber-500/5 p-2.5 flex flex-col gap-2">
+          <div className="flex flex-col gap-2">
             <span className="text-amber-300 text-xs font-semibold">
               Captions describing the identity ({leaks.length}) — remove the face / hair words
             </span>
@@ -108,7 +111,7 @@ export default function PreflightModal({ report, datasetId, ds, onResolve, revie
 
         {/* WHICH pairs are near-duplicate — reject one of each. */}
         {dups.length > 0 && (
-          <div className="rounded-lg border border-amber-400/30 bg-amber-500/5 p-2.5 flex flex-col gap-2">
+          <div className="flex flex-col gap-5">
             <span className="text-amber-300 text-xs font-semibold">
               Near-duplicate pairs ({dups.length}). Reject one copy or keep both.
             </span>
@@ -120,7 +123,7 @@ export default function PreflightModal({ report, datasetId, ds, onResolve, revie
               const keptBoth = approved[pairKey(p)] && !unkept;
               const resolved = keptBoth || unkept;
               return (
-                <div key={i} role="group" aria-label={`Pair ${i + 1}`} className={`space-y-3 rounded-lg border border-border p-3 ${resolved ? 'opacity-60' : ''}`}>
+                <div key={i} role="group" aria-label={`Pair ${i + 1}`} className={`space-y-3 ${resolved ? 'opacity-60' : ''}`}>
                   <p className="m-0 text-sm font-semibold text-content">Pair {i + 1}</p>
                   <div className="grid grid-cols-2 gap-3">
                     {[p.a, p.b].map((im, copy) => (
@@ -155,7 +158,8 @@ export default function PreflightModal({ report, datasetId, ds, onResolve, revie
         )}
 
         {error && <p role="alert" className="m-0 text-sm text-red-300">{error}</p>}
-        <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-border bg-app py-2">
+        </div>
+        <div className="flex shrink-0 items-center gap-2 px-4 py-3">
           <Button type="button" onClick={close} disabled={!!pending}>
             {reviewOnly ? 'Done' : 'Cancel'}
           </Button>

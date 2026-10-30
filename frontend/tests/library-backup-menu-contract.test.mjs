@@ -35,7 +35,9 @@ test('Import backup moved into the same menu, and New dataset stayed out of it',
   assert.doesNotMatch(panel, /New dataset/)
   const code = list.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
   assert.match(code, /New dataset/)
-  assert.match(list, /<FullBackupControls backup=\{backup\} onRestore=\{onRestore\} \/>/)
+  assert.match(list, /<FullBackupControls backup=\{backup\} onRestore=\{onRestore\} onCaptionFolder=\{\(\) => setRecaptioning\(true\)\} \/>/)
+  // Caption folder joins the menu on the phone only; its own button stays from sm up.
+  assert.match(menuPanel(), /className=\{`\$\{MENU_ITEM\} sm:hidden`\}/)
 })
 
 test('a running backup stays visible with the menu closed', () => {

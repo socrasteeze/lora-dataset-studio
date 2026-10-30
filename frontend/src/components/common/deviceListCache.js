@@ -19,10 +19,20 @@
 export const DEVICE_LIST_TTL_MS = 4000
 
 const entries = new Map()
+// The last list that ARRIVED, per kind, kept past the TTL. A picker mounted
+// after the TTL (opening Launch all a minute later) shows it at once instead of
+// rendering nothing until the hub finishes re-probing every machine.
+const lastLists = new Map()
 
 /** Test seam: drop everything so one test cannot see another's list. */
 export function clearDeviceListCache() {
   entries.clear()
+  lastLists.clear()
+}
+
+/** The last successfully fetched list for a kind, or null. Never fetches. */
+export function lastDeviceList(kind) {
+  return lastLists.get(kind || 'comfy') || null
 }
 
 /**
@@ -38,7 +48,11 @@ export function fetchDeviceList(kind, fetcher, now = Date.now) {
     return hit.promise
   }
   const promise = fetcher(`/api/cluster/devices?kind=${encodeURIComponent(key)}`)
-    .then((d) => (d && d.devices) || [])
+    .then((d) => {
+      const list = (d && d.devices) || []
+      lastLists.set(key, list)
+      return list
+    })
     .catch(() => {
       // Drop a failed lookup so the next mount retries instead of being served
       // an empty list for the whole TTL.

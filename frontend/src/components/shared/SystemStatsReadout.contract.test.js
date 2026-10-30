@@ -29,7 +29,7 @@ test('the armed state is visible on the button for the life of the offer, and th
   assert.match(src, /setTimeout\(\(\) => setArmedKind\(null\), Math\.max\(0, armedUntil\(armedKind\) - Date\.now\(\)\)\)/);
   assert.match(src, /data-armed=\{armedKind === 'free' \|\| undefined\}/);
   assert.match(src, /press again<\/span>/);
-  assert.match(src, /aria-label=\{armedKind === 'free' \? "Free memory — press again to interrupt LDS's render" : 'Free memory'\}/);
+  assert.match(src, /aria-label=\{armedKind === 'free' \? "Clear VRAM — press again to interrupt LDS's render" : 'Clear VRAM'\}/);
   assert.match(src, /\(d\?\.interrupted \? 'The render was interrupted as asked\. ' : ''\) \+ freeMemorySummary\(d\)/);
   assert.match(src, /err\?\.body\?\.can_interrupt \? OFFER_TOAST_MS : undefined/);
 });

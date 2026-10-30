@@ -32,6 +32,8 @@ const CloudRunsPage = lazyPage(() => import('./pages/CloudRunsPage'))
 const GalleryPage = lazyPage(() => import('./pages/GalleryPage'))
 import { recommendedMet } from './hooks/useSetupSteps'
 import { usePeerActivity } from './hooks/usePeerActivity'
+import { useGlobalActivity } from './hooks/useGlobalActivity'
+import { activityHeadline } from './utils/activityLog'
 import { isPeerWorking, peerChipLabel, peerChipTitle, peerTabTitle } from './utils/peerActivity'
 const PluginsPage = lazyPage(() => import('./pages/PluginsPage'))
 const PluginSettingsPage = lazyPage(() => import('./pages/PluginSettingsPage'))
@@ -74,21 +76,25 @@ const menuItemClass = ({ isActive }) =>
     isActive ? 'bg-surface-raised text-content' : 'text-content-muted hover:text-content hover:bg-surface-raised'
   }`
 
-/** 📋 in the header: opens the app-wide activity panel.
- *
- *  Deliberately always available and always silent. It carries no badge and no
- *  count — a header that lights up whenever anything is running would be lit
- *  most of the time, and the panel exists to answer a question the user chooses
- *  to ask ("is it stuck?"), not to interrupt them with an answer they didn't. */
-function ActivityButton() {
+/** 📋 opens the activity panel; its badge shows work across all pages.
+ *  NavBar shares one snapshot between the desktop and mobile buttons. */
+function ActivityButton({ snapshot }) {
   const [open, setOpen] = useState(false)
+  const headline = activityHeadline(snapshot)
+  const count = (snapshot?.running?.length || 0) + (snapshot?.bank_queue?.items?.length || 0)
+  const tone = { ok: 'bg-emerald-400 text-black', warn: 'bg-amber-300 text-black', error: 'bg-rose-400 text-black' }
   return (
     <>
       <button type="button" onClick={() => setOpen(true)}
-        title="What the app is doing right now — running passes, the queue, and a live log"
-        aria-label="Activity"
-        className="rounded-md p-2 text-content-muted hover:text-content hover:bg-surface-raised">
+        title={headline.text}
+        aria-label={`Activity: ${headline.text}`}
+        className="relative rounded-md p-2 text-content-muted hover:text-content hover:bg-surface-raised">
         <span aria-hidden className="block text-xl leading-none">📋</span>
+        {count > 0 && (
+          <span aria-hidden className={`absolute -right-1 -top-1 min-w-4 rounded-full px-1 text-2xs font-bold leading-4 ${tone[headline.tone]}`}>
+            {count}
+          </span>
+        )}
       </button>
       {open && <ActivityPanel onClose={() => setOpen(false)} />}
     </>
@@ -118,7 +124,7 @@ function HelpModeToggle({ onToggle }) {
 /* 🖥 The peer's "I am working for a Primary" chip.
    Renders nothing on a standalone/Primary install and nothing on an idle peer:
    a header lit whenever the app COULD work would be lit permanently, which is
-   the same as off (see ActivityButton's note above).
+   the same as off.
 
    PRESENTATIONAL on purpose — it is mounted TWICE (the desktop nav and the
    mobile cluster are both always in the DOM, one merely hidden by CSS), so it
@@ -145,6 +151,7 @@ function NavBar() {
   const { caps } = useCapabilities()
   // ONE poller for the peer flag, shared by both chip mount points below.
   const peerActivity = usePeerActivity()
+  const globalActivity = useGlobalActivity()
   const peerWorking = isPeerWorking(peerActivity)
   // Nothing else manages document.title (it is static in index.html), so this
   // owns it: capture the original ONCE and always put it back, including on
@@ -339,14 +346,14 @@ function NavBar() {
               )}
             </HeaderMenu>
             <PeerWorkingChip activity={peerActivity} />
-            <ActivityButton />
+            <ActivityButton snapshot={globalActivity} />
             <WhatsNewButton />
           </div>
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-1 md:hidden">
           {/* Same chip; its label collapses to the dot + 🖥 below sm. */}
           <PeerWorkingChip activity={peerActivity} />
-          <ActivityButton />
+          <ActivityButton snapshot={globalActivity} />
           <WhatsNewButton />
           <button type="button" onClick={() => setOpen((v) => !v)}
             aria-expanded={open} aria-label={open ? 'Close navigation menu' : 'Open navigation menu'}

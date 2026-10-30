@@ -1620,8 +1620,8 @@ def bank_promote_to_bank(bank_id):
 def bank_promote_to_new_dataset(bank_id):
     """⬆ Promote's THIRD destination: create the dataset AND promote into it.
 
-    Accepts the same kind and folder category as new image Datasets. Model and
-    fidelity retain the creation defaults and remain editable in Dataset settings.
+    Accepts the same kind, folder category, target model and fidelity as new
+    image Datasets; an omitted model or fidelity keeps the creation default.
 
     Like /promote-to-bank this cannot use the shared _start envelope, because it
     has to hand back the new id. 409 while another pass runs on the SOURCE bank,
@@ -1632,7 +1632,8 @@ def bank_promote_to_new_dataset(bank_id):
         new_id = banks.start_new_dataset_promote(
             _app(), LOCAL_USER, bank_id, _promotion_ids(bank_id, data) or [],
             data.get('name'), data.get('trigger_word'), kind=data.get('kind'),
-            concept_desc=data.get('concept_desc'), folder_category=data.get('folder_category'))
+            concept_desc=data.get('concept_desc'), folder_category=data.get('folder_category'),
+            train_type=data.get('train_type'), fidelity=data.get('fidelity'))
     except bank_jobs.BankJobBusy as e:
         return _busy(e)
     except ValueError as e:

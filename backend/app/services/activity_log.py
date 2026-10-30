@@ -37,6 +37,7 @@ WHAT IT IS NOT
   wrapped so a logging bug can never take down the pass it is describing —
   the one thing worse than no visibility is visibility that breaks the work.
 """
+import json
 import threading
 import time
 from collections import deque
@@ -131,7 +132,6 @@ def snapshot(user_id) -> dict:
     will move again in two seconds look identical, and only the age tells them
     apart. The UI decides what counts as worrying; this reports the number.
     """
-    from ..job_queue import queue_manager
     from . import bank_jobs, bank_queue, dataset_activity
     now = time.time()
     running = []
@@ -221,6 +221,98 @@ def snapshot(user_id) -> dict:
     except Exception:      # noqa: BLE001
         pass
 
+    # --- local training ------------------------------------------------------
+    try:
+        from .lora_training import _pid_alive_with_birth
+        if _pid_alive_with_birth(_system_state('training_pid', now),
+                                 _system_state('training_pid_create_time', now)) is True:
+            running.append({
+                'kind': 'training', 'label': 'Local Training', 'what': 'training',
+                'done': None, 'total': None, 'detail': None,
+                'started_at': None, 'stale_seconds': None,
+            })
+    except Exception:      # noqa: BLE001
+        pass
+
+    # --- Image Sources -------------------------------------------------------
+    try:
+        from ..models import ImageSourceJob
+        states = ImageSourceJob.query.filter(
+            ImageSourceJob.state.in_(('queued', 'running')),
+        ).with_entities(ImageSourceJob.state).all()
+        if states:
+            queued = sum(state == 'queued' for (state,) in states)
+            running.append({
+                'kind': 'image_sources', 'label': 'Image Sources', 'what': 'acquisition',
+                'done': None, 'total': None,
+                'detail': f'{len(states) - queued} running, {queued} queued',
+                'started_at': None, 'stale_seconds': None,
+            })
+    except Exception:      # noqa: BLE001
+        pass
+
+    # --- reference edits -----------------------------------------------------
+    try:
+        from . import reference_edit_jobs
+        candidates = sum(candidate.get('status') == 'running'
+                         for job in list(reference_edit_jobs._jobs.values())
+                         for candidate in list(job.get('candidates', {}).values()))
+        if candidates:
+            running.append({
+                'kind': 'reference_edit', 'label': 'Reference Edits', 'what': 'editing',
+                'done': None, 'total': None, 'detail': f'{candidates} running',
+                'started_at': None, 'stale_seconds': None,
+            })
+    except Exception:      # noqa: BLE001
+        pass
+
+    # --- installers and plugin scripts --------------------------------------
+    try:
+        from .. import setup_installer
+        from ..plugins import environment
+        if (any(run.get('state') in ('running', 'queued')
+                for run in list(setup_installer._runs.values()))
+                or setup_installer._pip_current is not None or setup_installer._pip_queue
+                or any(list(environment._RUNNING.values()))):
+            running.append({
+                'kind': 'installation', 'label': 'Setup & Plugins', 'what': 'installation or script',
+                'done': None, 'total': None, 'detail': None,
+                'started_at': None, 'stale_seconds': None,
+            })
+    except Exception:      # noqa: BLE001
+        pass
+
+    # --- Ollama download -----------------------------------------------------
+    try:
+        from . import ollama_control
+        pull = ollama_control._pull
+        if pull and pull.get('state') == 'running':
+            running.append({
+                'kind': 'ollama_pull', 'label': 'Ollama', 'what': 'model download',
+                'done': None, 'total': None,
+                'detail': f"{pull['progress']}%" if pull.get('progress') is not None else None,
+                'started_at': None, 'stale_seconds': None,
+            })
+    except Exception:      # noqa: BLE001
+        pass
+
+    # --- video Auto continuation --------------------------------------------
+    try:
+        from flask import current_app
+        runner = current_app.extensions.get('video_auto_continue')
+        if runner is not None:
+            record = runner.record or {}
+            state = record.get('state') or {}
+            # status() can reconcile and write the journal; this poll only reads.
+            if runner._busy() or state.get('enabled') or record.get('pending'):
+                running.append({
+                    'kind': 'video_auto_continue', 'label': 'Video Auto', 'what': 'continuation',
+                    'done': None, 'total': None, 'detail': state.get('phase'),
+                    'started_at': None, 'stale_seconds': None,
+                })
+    except Exception:      # noqa: BLE001
+        pass
+
     # --- the GPU gate, named ------------------------------------------------
     # In the panel this is the line that explains a refusal, so it is reported
     # whether or not anything is running — a flag with nothing behind it is the
@@ -228,7 +320,7 @@ def snapshot(user_id) -> dict:
     gpu = {}
     try:
         for key in ('training_in_progress', 'vision_in_progress'):
-            gpu[key] = bool(queue_manager._get_system_state(key))
+            gpu[key] = bool(_system_state(key, now))
     except Exception:      # noqa: BLE001
         gpu = {}
 
@@ -239,6 +331,19 @@ def snapshot(user_id) -> dict:
 
     return {'running': running, 'gpu_flags': gpu, 'bank_queue': queue,
             'now': now}
+
+
+def _system_state(key, now):
+    """Read state without the queue getter's expired-row deletion."""
+    from ..models import SystemState
+    row = SystemState.query.filter_by(key=key).first()
+    if row is None or row.value is None:
+        return None
+    payload = json.loads(row.value)
+    expires = payload.get('exp')
+    if expires is not None and now >= expires:
+        return None
+    return payload.get('v')
 
 
 def _age(bank_jobs, bank_id, now):

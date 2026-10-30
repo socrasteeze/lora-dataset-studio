@@ -83,7 +83,7 @@ export default function BankPassesPanel({
         {/* Analysis passes — individual, quieter than the primary actions. */}
         <div className="space-y-1.5">
           <GroupLabel>Analysis passes</GroupLabel>
-          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 [&>button]:h-12 [&>button]:min-w-0 [&>button]:px-2 [&>button]:text-xs [&>button]:leading-tight">
+          <div className="flex flex-wrap items-center gap-1.5">
             {/* Every button OPENS ITS WINDOW instead of firing. The window is where
                 the scope, the counts, the settings the calculation really reads and
                 the things it does NOT decide finally have room to be said — and

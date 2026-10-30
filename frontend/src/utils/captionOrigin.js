@@ -75,6 +75,12 @@ export const CAPTION_ORIGINS = [
     title: 'Booru dataset caption written by PixAI Tagger from local weights.',
   },
   {
+    key: 'wd14',
+    chip: 'WD14 Tagger',
+    short: 'Written by WD14 Tagger',
+    title: 'Booru dataset caption written by WD14 Tagger from local weights.',
+  },
+  {
     key: 'pixai_hybrid',
     chip: 'PixAI + VLM',
     short: 'Written by PixAI Tagger and the local LLM',

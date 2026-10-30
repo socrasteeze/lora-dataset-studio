@@ -838,11 +838,8 @@ export default function BankPage() {
         {/* basis-full: its own row inside the wrapping flex form, so the sentence
             never squeezes the fields — including at 400 px. */}
         {/* One bank per subfolder does not carry protection; set it per bank after the split. */}
-        {!splitMode && <div className="basis-full space-y-1">
+        {!splitMode && <div className="basis-full">
           <BankReadOnlyToggle checked={readOnly} onChange={setReadOnly} disabled={creating} />
-          <p className="text-xs text-content-subtle">
-            Protect a NAS or original photo folder from deletion and new imports. You can still triage and copy images into datasets.
-          </p>
         </div>}
         {folderNotice && (
           <p id="bank-folder-notice" role="alert"
