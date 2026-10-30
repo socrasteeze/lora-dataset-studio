@@ -74,8 +74,63 @@ class ProfileStore:
                          or self.root / '.lds-profiles').resolve()
         self.registry = self.home / 'profiles.json'
 
+    def shared_port(self):
+        """One listen port for every profile.
+
+        LDS_PORT is the address the running app is already bound to. Otherwise
+        the Default profile's server.port, otherwise 5050. A port stored on a
+        named profile is never used.
+        """
+        raw = self.environ.get('LDS_PORT')
+        if raw in (None, ''):
+            raw = self._default_server_port()
+        if raw in (None, ''):
+            raw = 5050
+        try:
+            port = int(raw)
+            if not 1 <= port <= 65535:
+                raise ValueError('invalid port')
+        except (ValueError, TypeError) as exc:
+            raise ProfileError('The current server port is invalid. Repair it before creating profiles.') from exc
+        return port
+
+    def _default_config_path(self):
+        if self.registry.exists():
+            try:
+                document = json.loads(self.registry.read_text(encoding='utf-8'))
+                for row in document.get('profiles') or []:
+                    if isinstance(row, dict) and row.get('id') == 'default':
+                        config = Path(row['paths']['LDS_CONFIG'])
+                        if config.is_absolute():
+                            return config
+            except (OSError, ValueError, KeyError, TypeError):
+                pass
+        return Path(self.environ.get('LDS_CONFIG') or self.root / 'config.json')
+
+    def _default_server_port(self):
+        try:
+            server = json.loads(self._default_config_path().read_text(encoding='utf-8')).get('server') or {}
+        except FileNotFoundError:
+            return None
+        except (OSError, ValueError, AttributeError) as exc:
+            raise ProfileError('The current settings could not be read. Repair them before creating profiles.') from exc
+        return server.get('port')
+
+    @contextmanager
+    def _registry_lease(self):
+        # FileLease is not reentrant. profiles() rewrites a legacy port while
+        # create() and select() already hold this lock.
+        if getattr(self, '_registry_locked', False):
+            yield
+            return
+        with FileLease(self.home / 'registry.lock'):
+            self._registry_locked = True
+            try:
+                yield
+            finally:
+                self._registry_locked = False
+
     def _default(self):
-        from single_instance import read_lock
         data = Path(self.environ.get('LDS_DATA_DIR') or self.root / 'data').resolve()
         paths = dict(zip(PATH_KEYS, (
             data, Path(self.environ.get('LDS_CONFIG') or self.root / 'config.json').resolve(),
@@ -83,25 +138,30 @@ class ProfileStore:
             Path(self.environ.get('LDS_PLUGINS_DIR') or data / 'plugins').resolve(),
             Path(self.environ.get('LDS_EXTENSIONS_DIR') or self.root / 'backend' / 'extensions').resolve(),
         )))
-        recorded = read_lock(data)
-        port = recorded['port'] if recorded else self.environ.get('LDS_PORT')
-        if not port:
-            try:
-                port = json.loads(paths['LDS_CONFIG'].read_text(encoding='utf-8')).get('server', {}).get('port')
-            except FileNotFoundError:
-                pass
-            except (OSError, ValueError, AttributeError) as exc:
-                raise ProfileError('The current settings could not be read. Repair them before creating profiles.') from exc
-        try:
-            port = int(port or 5050)
-            if not 1 <= port <= 65535:
-                raise ValueError('invalid port')
-        except (ValueError, TypeError) as exc:
-            raise ProfileError('The current server port is invalid. Repair it before creating profiles.') from exc
-        return {'id': 'default', 'name': 'Default', 'port': port,
+        return {'id': 'default', 'name': 'Default', 'port': self.shared_port(),
                 'paths': {key: str(value) for key, value in paths.items()}}
 
     def profiles(self):
+        rows = self._read_rows()
+        port = self.shared_port()
+        if (self.registry.exists() and any(row['port'] != port for row in rows)
+                and not getattr(self, '_registry_locked', False)):
+            self._persist_shared_port(port)
+        return [dict(row, port=port) for row in rows]
+
+    def _persist_shared_port(self, port):
+        """Rewrite recorded ports in place. Profile directories stay untouched."""
+        try:
+            with self._registry_lease():
+                rows = self._read_rows()
+                if not self.registry.exists() or all(row['port'] == port for row in rows):
+                    return
+                _write_json(self.registry, {
+                    'version': 1, 'profiles': [dict(row, port=port) for row in rows]})
+        except ProfileError:
+            return
+
+    def _read_rows(self):
         if not self.registry.exists():
             return [self._default()]
         try:
@@ -109,13 +169,16 @@ class ProfileStore:
             rows = document['profiles']
             if document['version'] != 1 or not isinstance(rows, list) or not rows:
                 raise ValueError('invalid registry')
-            ids, ports = set(), set()
+            ids = set()
             for row in rows:
                 ident = row['id']
                 if ident != 'default' and not re.fullmatch(r'[0-9a-f]{32}', ident):
                     raise ValueError('invalid identity')
-                if ident in ids or row['port'] in ports or not 1 <= row['port'] <= 65535:
-                    raise ValueError('duplicate identity or port')
+                if ident in ids:
+                    raise ValueError('duplicate identity')
+                if (isinstance(row.get('port'), bool) or not isinstance(row.get('port'), int)
+                        or not 1 <= row['port'] <= 65535):
+                    raise ValueError('invalid port')
                 if not isinstance(row['name'], str) or not row['name'].strip():
                     raise ValueError('invalid name')
                 for key in PATH_KEYS:
@@ -124,7 +187,6 @@ class ProfileStore:
                 if ident != 'default' and row['paths'] != self._named_paths(ident):
                     raise ValueError('changed profile paths')
                 ids.add(ident)
-                ports.add(row['port'])
             if 'default' not in ids:
                 raise ValueError('missing default')
             return rows
@@ -157,7 +219,7 @@ class ProfileStore:
 
     def select(self, ident):
         self.get(ident)
-        with FileLease(self.home / 'registry.lock'):
+        with self._registry_lease():
             if not self.registry.exists():
                 _write_json(self.registry, {'version': 1, 'profiles': self.profiles()})
             _write_json(self.home / 'selected.json', {'id': ident})
@@ -186,14 +248,11 @@ class ProfileStore:
         name = str(name or '').strip()
         if not name or len(name) > 60 or any(ord(char) < 32 for char in name):
             raise ProfileError('Enter a profile name of 1 to 60 characters.')
-        with FileLease(self.home / 'registry.lock'):
+        with self._registry_lease():
             rows = self.profiles()
             if any(row['name'].casefold() == name.casefold() for row in rows):
                 raise ProfileError('That profile name is already in use.')
-            used = {row['port'] for row in rows}
-            port = next((value for value in range(5051, 65536) if value not in used), None)
-            if port is None:
-                raise ProfileError('No profile port is available.')
+            port = self.shared_port()
             ident = uuid.uuid4().hex
             paths = self._named_paths(ident)
             base = Path(paths['LDS_DATA_DIR']).parent
@@ -219,9 +278,10 @@ class ProfileStore:
             for key in SECRET_KEYS:
                 environment.pop(key, None)
         environment.update(profile['paths'])
+        port = str(self.shared_port())
         environment.update(LDS_PROFILES_HOME=str(self.home), LDS_PROFILE_ID=ident,
-                           LDS_PROFILE_NAME=profile['name'], LDS_PORT=str(profile['port']),
-                           LDS_AUTO_PORT='0', LDS_PROFILE_PORT=str(profile['port']))
+                           LDS_PROFILE_NAME=profile['name'], LDS_PORT=port,
+                           LDS_AUTO_PORT='0', LDS_PROFILE_PORT=port)
         environment.pop('LDS_ALLOW_SECOND_INSTANCE', None)
         environment.pop('LDS_SUPERVISOR', None)
         environment.pop('LDS_RESTART_MODE', None)
@@ -248,7 +308,7 @@ class ProfileStore:
         recorded = read_lock(row['paths']['LDS_DATA_DIR'])
         host = _probe_host(recorded['host']) if recorded else '127.0.0.1'
         host = f'[{host}]' if ':' in host and not host.startswith('[') else host
-        port = recorded['port'] if recorded else row['port']
+        port = self.shared_port()
         try:
             settings = json.loads(Path(row['paths']['LDS_CONFIG']).read_text(encoding='utf-8'))
             token = settings.get('server', {}).get('access_token')

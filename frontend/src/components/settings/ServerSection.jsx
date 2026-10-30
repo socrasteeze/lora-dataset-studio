@@ -186,7 +186,7 @@ export default function ServerSection({ config, setField, runtime, handleSave, c
         {/* The shipped port is 5050 and nothing on this screen said so — a user
             who typed 8080 to test something had no way back to the value
             start.bat binds by default. */}
-        {profilePort && <p className="mt-1 text-xs text-content-muted">The profile launcher owns this port.</p>}
+        {profilePort && <p className="mt-1 text-xs text-content-muted">Every profile uses this port.</p>}
         {!bindManaged && !profilePort && (
           <ResetToDefault label="Port" section="server" field="port"
             config={config} configDefaults={configDefaults} setField={setField} />

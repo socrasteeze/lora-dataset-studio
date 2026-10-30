@@ -114,9 +114,9 @@ weights may be shared. The active profile name appears below the Studio title.
 
 Only one profile can run per installation. Save or discard open edits and finish
 or clear work queues before switching. The popup refuses a switch while work
-still needs the server. It then restarts Studio and opens the selected profile
-in the same browser tab after that profile answers at its own port. Switching
-does not stop jobs or cancel queues. Switching to an older local-only profile
+still needs the server. It then restarts Studio on the same port and opens the
+selected profile in the same browser tab. Switching does not stop jobs or
+cancel queues. Switching to an older local-only profile
 enables LAN access automatically. No extra checkbox or retry is required.
 Studio uses the running server's network bind address, or `0.0.0.0` when the
 current bind is local-only. It requires the target profile's own access token,
@@ -128,8 +128,8 @@ An explicit local-only `LDS_HOST` override still requires a host-side change.
 
 A live server, surviving training fence, unresolved generation or queued Bank
 work blocks another profile. Reopen the original profile to recover or clear
-that work. Other browser tabs keep their local drafts on their original
-profile's port.
+that work. Other browser tabs stay on this same address. Each profile still
+has its own database and settings.
 
 Named profiles own their training export, output and generated-job directories.
 Their dataset/output overrides in **Local Tools** are read-only. Deployed LoRAs
@@ -139,11 +139,12 @@ original paths and can still find its existing checkpoints.
 
 The private profile registry and named instance files live under `.lds-profiles/`
 beside the installation. The registry captures Default's existing environment
-overrides on the first managed launch. Profile ports are fixed by the
-launcher to keep browser storage separate. If a port is occupied, close the
-conflicting service before retrying; Studio does not silently move to another port.
-LAN access and token controls remain editable in **Server & Access**. Only the
-profile's port is fixed by the launcher.
+overrides on the first managed launch. Every profile serves on the configured
+server port (normally 5050). Switching profiles restarts on that same port.
+A profile that saved a different port comes back on this one; its files stay
+in place. If the port is occupied, close the conflicting service before
+retrying; Studio does not silently move to another port.
+LAN access and token controls remain editable in **Server & Access**.
 
 After installing this change, fully stop Studio and run `start.bat` again so
 the supervisor can switch profiles. Restarting only the backend under an old

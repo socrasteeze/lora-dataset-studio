@@ -16,6 +16,8 @@ between the three ways the backend can end, because they need opposite answers:
   * anything else -> it died. Relaunch, but not forever: a backend that crashes
                 at boot must not become an infinite respawn loop.
 """
+import json
+
 import supervise
 
 
@@ -143,25 +145,61 @@ def test_the_child_is_told_the_supervisor_owns_the_relaunch():
 def test_profile_switch_changes_the_next_child_after_the_old_child_exits(tmp_path):
     from instance_profiles import ProfileStore
     store = ProfileStore(root=tmp_path, environ={})
+    (store.root / 'config.json').write_text('{"server": {"port": 5050}}', encoding='utf-8')
     target = store.create('Example')
+    document = json.loads((store.home / 'profiles.json').read_text(encoding='utf-8'))
+    document['profiles'][1]['port'] = 5051
+    (store.home / 'profiles.json').write_text(json.dumps(document), encoding='utf-8')
     store.request_switch('default', target['id'])
     launches = []
+    order = []
 
     def spawn(_command, env):
         launches.append(dict(env))
+        order.append('spawn')
         return 75 if len(launches) == 1 else 0
+
+    def wait_for_port(port):
+        order.append(('wait', port))
 
     launcher = supervise.backend_launcher('py.exe', 'run.py', env={
         'LDS_PROFILES_HOME': str(store.home), 'LDS_PROFILE_ID': 'default',
-        'HF_TOKEN': 'synthetic-token'}, spawn=spawn)
+        'LDS_PORT': '5050', 'HF_TOKEN': 'synthetic-token'}, spawn=spawn,
+        wait_for_port=wait_for_port)
     assert launcher() == 75
     assert launcher() == 0
+    assert order == ['spawn', ('wait', 5050), 'spawn']
     assert launches[0]['LDS_PROFILE_ID'] == 'default'
+    assert launches[0]['LDS_PORT'] == '5050'
     assert launches[1]['LDS_PROFILE_ID'] == target['id']
+    assert launches[1]['LDS_PORT'] == launches[1]['LDS_PROFILE_PORT'] == '5050'
+    assert launches[1]['LDS_AUTO_PORT'] == '0'
     assert launches[1]['LDS_DATA_DIR'] == target['paths']['LDS_DATA_DIR']
     assert launches[1]['LDS_NO_BROWSER'] == '1'
     assert 'HF_TOKEN' not in launches[1]
     assert store.selected() == target['id']
+
+
+def test_port_release_wait_retries_until_the_shared_port_is_free():
+    calls = []
+
+    def probe(_host, port):
+        calls.append(port)
+        return len(calls) >= 3
+
+    times = iter((0.0, 0.0, 0.2, 0.4))
+    sleeps = []
+    assert supervise.wait_until_port_free(
+        '5050', probe=probe, sleep=sleeps.append, now=lambda: next(times)) is True
+    assert calls == [5050, 5050, 5050]
+    assert sleeps == [supervise.PORT_RELEASE_INTERVAL, supervise.PORT_RELEASE_INTERVAL]
+
+
+def test_port_release_wait_stops_at_the_timeout_without_sliding():
+    times = iter((0.0, 61.0))
+    assert supervise.wait_until_port_free(
+        5050, probe=lambda _host, _port: False, sleep=lambda _seconds: None,
+        now=lambda: next(times)) is False
 
 
 def test_a_crash_is_announced_rather_than_papered_over():
