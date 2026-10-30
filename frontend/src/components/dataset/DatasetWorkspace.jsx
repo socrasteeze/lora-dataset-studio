@@ -1406,7 +1406,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                      closing the lightbox must not leave you on a page that no
                      longer holds the image you were looking at. */
                   viewingImageId={viewImg?.id ?? null}
-                  onBatch={ds.batchImages} busy={ds.busy}
+                  onBatch={ds.batchImages} onAddTag={ds.addTagToImages} busy={ds.busy}
                   improveBusy={ds.improveBusy} generateBusy={ds.generationBusy} curationBusy={ds.curationBusy}
                   onBulkBusyChange={setGridBulkBusy}
                   onSelectionChange={onGridSelectionChange}

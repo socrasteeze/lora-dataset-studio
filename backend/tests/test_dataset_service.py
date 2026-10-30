@@ -216,6 +216,33 @@ def test_batch_keep_and_clear_caption(app):
         assert svc.db.session.get(FaceDatasetImage, ids[0]).caption is None
 
 
+def test_add_tag_touches_only_the_selected_captioned_images(app):
+    import pytest
+    from app.services import caption_origin
+    from app.services import face_dataset_service as svc
+    from app.models import FaceDatasetImage
+    from app.config import LOCAL_USER
+    with app.app_context():
+        ds = svc.create_dataset(LOCAL_USER, 'Tg', 'tg')
+        ids = _seed_images(svc, ds.id, n=4)
+        rows = [svc.db.session.get(FaceDatasetImage, i) for i in ids]
+        rows[0].caption = 'red dress, standing'
+        rows[1].caption = 'blue coat, Hooded'
+        rows[3].caption = 'not selected'
+        svc.db.session.commit()
+        counts = svc.add_tag_to_captions(LOCAL_USER, ds.id, ids[:3], ' hooded ')
+        assert counts == {'added': 1, 'already': 1, 'uncaptioned': 1, 'too_long': 0}
+        first = svc.db.session.get(FaceDatasetImage, ids[0])
+        assert first.caption == 'red dress, standing, hooded'
+        assert first.caption_origin == caption_origin.ASSERTED
+        assert svc.db.session.get(FaceDatasetImage, ids[1]).caption == 'blue coat, Hooded'
+        assert svc.db.session.get(FaceDatasetImage, ids[2]).caption is None
+        assert svc.db.session.get(FaceDatasetImage, ids[3]).caption == 'not selected'
+        for bad in ('', ' , ', 'a, b'):
+            with pytest.raises(ValueError):
+                svc.add_tag_to_captions(LOCAL_USER, ds.id, ids, bad)
+
+
 def test_batch_delete_removes_rows_and_files(app):
     import os
     from app.services import face_dataset_service as svc

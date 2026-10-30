@@ -207,6 +207,14 @@ captioning rules and a few guards change with the dataset kind.
 11. **Export** — at any point, **Export ZIP** gives you the curated, captioned
     set as a standard ai-toolkit dataset. Nothing is locked in.
 
+## Add a tag to selected images
+
+Select images in the dataset grid, then choose **🏷️ Add tag** in the selection
+bar and type one tag. It is appended to the end of each selected caption.
+Captions that already contain the tag are left alone, and so are images that
+are not captioned yet — caption them first, then add the tag. The change counts
+as your own edit, so a later forced caption pass does not overwrite it.
+
 ## Write caption TXT
 
 Open **Captions → Caption Tools**. Review **Trigger Word**, which starts with

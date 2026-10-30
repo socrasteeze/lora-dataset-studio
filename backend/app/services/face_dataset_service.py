@@ -4487,6 +4487,52 @@ def replace_in_captions(user_id, dataset_id, find, replace, mode='text'):
     return changed
 
 
+@_serialize_dataset_ingest
+def add_tag_to_captions(user_id, dataset_id, image_ids, tag):
+    """Append one tag to the captions of SELECTED images (the grid's multi-select).
+
+    A caption already holding the tag as a whole comma-separated entry (trimmed,
+    case-insensitive) is left alone. An image with no caption yet is skipped,
+    not seeded with the tag: a one-tag caption would make every later caption
+    pass treat it as done. Like find/replace this is the user's edit, so changed
+    rows are stamped ASSERTED. Ids outside this dataset are ignored.
+
+    Returns {'added', 'already', 'uncaptioned', 'too_long'} counts."""
+    tag = (tag or '').strip().strip(',').strip() if isinstance(tag, str) else ''
+    if not tag:
+        raise ValueError('tag is required')
+    if ',' in tag or len(tag) > 200:
+        raise ValueError('enter one tag (no commas, at most 200 characters)')
+    ds = get_dataset(user_id, dataset_id)
+    counts = {'added': 0, 'already': 0, 'uncaptioned': 0, 'too_long': 0}
+    if not ds:
+        return counts
+    ids = normalize_batch_image_ids(image_ids)
+    rows = []
+    for i0 in range(0, len(ids), 500):
+        rows.extend(FaceDatasetImage.query
+                    .filter_by(dataset_id=dataset_id)
+                    .filter(FaceDatasetImage.id.in_(ids[i0:i0 + 500])).all())
+    for img in rows:
+        old = (img.caption or '').strip()
+        if not old:
+            counts['uncaptioned'] += 1
+            continue
+        if tag.lower() in {t.strip().lower() for t in old.split(',')}:
+            counts['already'] += 1
+            continue
+        new = _cap_caption(f"{old.rstrip(' ,.')}, {tag}")
+        if not new.endswith(tag):
+            # The length cap left no room: change nothing rather than trim it.
+            counts['too_long'] += 1
+            continue
+        caption_origin.stamp(img, new, caption_origin.ASSERTED)
+        counts['added'] += 1
+    if counts['added']:
+        db.session.commit()
+    return counts
+
+
 # Batch curation (multi-select in the grid). 'pending' = reset the triage state.
 BATCH_ACTIONS = ('keep', 'reject', 'pending', 'delete', 'clear_caption')
 BATCH_MAX_IMAGES = 10_000

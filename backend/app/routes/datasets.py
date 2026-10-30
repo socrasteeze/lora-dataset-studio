@@ -2238,6 +2238,24 @@ def dataset_captions_replace(dataset_id):
     return jsonify({'ok': True, 'changed': n})
 
 
+@bp.post('/dataset/<int:dataset_id>/captions/add-tag')
+def dataset_captions_add_tag(dataset_id):
+    """Append one tag to the SELECTED images' captions.
+    Body: {ids: [int, ...], tag: str}. Answers added/already/uncaptioned/too_long counts."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'JSON body must be an object'}), 400
+    if not svc.get_dataset(LOCAL_USER, dataset_id):
+        return jsonify({'error': 'not found'}), 404
+    try:
+        counts = svc.add_tag_to_captions(LOCAL_USER, dataset_id, data.get('ids'), data.get('tag'))
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return _map_error(e)
+    return jsonify({'ok': True, **counts})
+
+
 @bp.post('/dataset/<int:dataset_id>/captions/write-files')
 def dataset_captions_write_files(dataset_id):
     """Write kohya-style same-stem .txt captions NEXT TO the kept images in the
