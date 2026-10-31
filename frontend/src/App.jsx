@@ -63,7 +63,10 @@ import { activityLabel } from './utils/trainingActivity'
 // clipped the What's-new button off the right edge. Nothing is hidden — the
 // items simply breathe less until there is room for it.
 const NAV_ITEM_BASE =
-  'px-2 lg:px-3 py-1.5 rounded-md text-left text-sm font-medium whitespace-nowrap no-underline transition-colors'
+  'flex min-h-10 items-center px-2 lg:min-h-0 lg:px-3 py-1.5 rounded-md text-left text-sm font-medium whitespace-nowrap no-underline transition-colors'
+// The phone panel's buttons (Profiles, Restart Studio) read like its links:
+// same muted colour and hover, not the browser's brighter button default.
+const NAV_BUTTON = `${NAV_ITEM_BASE} text-content-muted hover:text-content hover:bg-surface-raised`
 const navItemClass = ({ isActive }) =>
   `${NAV_ITEM_BASE} ${
     isActive ? 'bg-surface-raised text-content' : 'text-content-muted hover:text-content hover:bg-surface-raised'
@@ -315,8 +318,8 @@ function NavBar() {
         </span>
       </NavLink>
       <NavLink to="/settings" className={navItemClass} onClick={() => setOpen(false)}>Settings</NavLink>
-      <button type="button" className={NAV_ITEM_BASE} onClick={() => { setOpen(false); setProfilesOpen(true) }}>Profiles</button>
-      <button type="button" className={NAV_ITEM_BASE} disabled={restarting}
+      <button type="button" className={NAV_BUTTON} onClick={() => { setOpen(false); setProfilesOpen(true) }}>Profiles</button>
+      <button type="button" className={NAV_BUTTON} disabled={restarting}
         onClick={() => { setOpen(false); restartStudio() }}>{restarting ? 'Restarting…' : 'Restart Studio'}</button>
       <NavLink to="/plugins" className={navItemClass} onClick={() => setOpen(false)}>Plugins</NavLink>
       <NavLink to="/help" className={navItemClass} onClick={() => setOpen(false)}>Help</NavLink>
