@@ -6,7 +6,8 @@ import { Archive, Dumbbell, FlaskConical, FolderOpen, Images, Menu, Settings, X 
 import { JobsProvider } from './context/JobsContext'
 import { ToastProvider, useToast } from './components/common/Toast'
 import { CapabilitiesProvider, useCapabilities } from './context/CapabilitiesContext'
-import { setToastRef } from './api/fetchClient'
+import { postJson, setToastRef } from './api/fetchClient'
+import { waitForRelaunchedServer } from './utils/serverRestart'
 import ErrorBoundary from './components/common/ErrorBoundary'
 import { WhatsNewButton, WhatsNewModal } from './components/common/WhatsNew'
 import ActivityPanel from './components/common/ActivityPanel'
@@ -196,8 +197,39 @@ function NavBar() {
   // POLLS, and this is the only thing in the header that would.
   const desktopNav = useMediaQuery('(min-width: 768px)')
   const headerRef = useRef(null)
+  const toast = useToast()
+  const [restarting, setRestarting] = useState(false)
+  // ↻ Restart Studio — the same /api/settings/restart as Settings › Server,
+  // then reload once the NEW process answers.
+  const restartStudio = async () => {
+    if (restarting || !window.confirm('Restart Studio? Anything running now is stopped.')) return
+    setRestarting(true)
+    try {
+      await postJson('/api/settings/restart', {})
+      toast.info('Restarting Studio…')
+      if (await waitForRelaunchedServer({ timeoutMs: 2 * 60 * 1000 })) { window.location.reload(); return }
+      toast.error('Studio did not come back within 2 minutes. Check the launcher window.')
+    } catch (e) {
+      toast.error(e.message || 'Restart failed')
+    }
+    setRestarting(false)
+  }
+  // The phone panel's height, in px, from the header's measured bottom. The CSS
+  // fallback (100dvh - 100%) left the iOS home-screen app with a half-height
+  // panel whose last items (Settings, Profiles…) only scrolled inside it.
+  const [navMaxHeight, setNavMaxHeight] = useState(null)
   useFocusTrap(headerRef, open && !desktopNav)
   useEffect(() => { setOpen(false) }, [path, desktopNav])
+  useEffect(() => {
+    if (!open || desktopNav) return undefined
+    const measure = () => {
+      const bottom = headerRef.current?.getBoundingClientRect().bottom
+      if (bottom != null) setNavMaxHeight(Math.max(0, window.innerHeight - bottom))
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [open, desktopNav])
   useEffect(() => {
     if (!open || desktopNav) return undefined
     const overflow = document.body.style.overflow
@@ -283,6 +315,8 @@ function NavBar() {
       </NavLink>
       <NavLink to="/settings" className={navItemClass} onClick={() => setOpen(false)}>Settings</NavLink>
       <button type="button" className={NAV_ITEM_BASE} onClick={() => { setOpen(false); setProfilesOpen(true) }}>Profiles</button>
+      <button type="button" className={NAV_ITEM_BASE} disabled={restarting}
+        onClick={() => { setOpen(false); restartStudio() }}>{restarting ? 'Restarting…' : 'Restart Studio'}</button>
       <NavLink to="/plugins" className={navItemClass} onClick={() => setOpen(false)}>Plugins</NavLink>
       <NavLink to="/help" className={navItemClass} onClick={() => setOpen(false)}>Help</NavLink>
       <HelpModeToggle onToggle={() => setOpen(false)} />
@@ -341,6 +375,8 @@ function NavBar() {
                   <NavLink to="/settings" role="menuitem" className={menuItemClass} onClick={close}>Settings</NavLink>
                   <button type="button" role="menuitem" className={MENU_ITEM_BASE}
                     onClick={() => { close(); setProfilesOpen(true) }}>Profiles</button>
+                  <button type="button" role="menuitem" className={MENU_ITEM_BASE} disabled={restarting}
+                    onClick={() => { close(); restartStudio() }}>{restarting ? 'Restarting…' : 'Restart Studio'}</button>
                   <NavLink to="/plugins" role="menuitem" className={menuItemClass} onClick={close}>Plugins</NavLink>
                 </>
               )}
@@ -367,6 +403,7 @@ function NavBar() {
       </div>
       {open && (
         <nav id="mobile-navigation" aria-label="Main navigation (mobile)"
+          style={navMaxHeight != null ? { maxHeight: `${navMaxHeight}px` } : undefined}
           className="app-mobile-nav absolute inset-x-0 top-full flex flex-col gap-1 overflow-y-auto overscroll-contain border-t border-border bg-surface-overlay px-4 py-2 shadow-lg md:hidden">
           {mobileLinks}
           {/* Mounted only while the panel is open, so a phone pays for the

@@ -85,6 +85,18 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-31-restart-studio-menu',
+    date: '2026-10-31',
+    title: 'Restart Studio from the menu',
+    blurb: 'The ⚙ menu (☰ on a phone) now has Restart Studio. The page reloads by itself once Studio is back.',
+  },
+  {
+    id: '2026-10-31-phone-menu-full-height',
+    date: '2026-10-31',
+    title: 'Profiles is back in the phone menu',
+    blurb: 'On the iPhone home-screen app the menu stopped halfway and hid Settings, Profiles, Plugins and Help. It now uses the whole screen height.',
+  },
+  {
     id: '2026-10-30-crop-edge-handles-centered',
     date: '2026-10-30',
     title: 'Crop edges grow from the middle',
