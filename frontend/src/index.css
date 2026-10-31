@@ -227,7 +227,9 @@
 .app-header-shell > a { letter-spacing: -0.025em; }
 /* Keep long plugin menus inside the visible viewport below the sticky bar. */
 .app-mobile-nav {
-  max-height: calc(100dvh - 100%);
+  /* The header's height, not a percentage: iOS resolved `100%` against a
+     different box and cut the panel short. App.jsx sets the exact px inline. */
+  max-height: calc(100dvh - var(--app-header-h));
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
 .app-mobile-nav > * { flex-shrink: 0; }
