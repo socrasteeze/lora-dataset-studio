@@ -1031,3 +1031,45 @@ def encode_query(text: str, engine='clip'):
         _remember_query(_siglip2_memory, key, vec)
         _save_siglip2_disk_cache()
     return vec, False
+
+
+def encode_queries(texts):
+    """[vector] for many CLIP queries, L2-normed float32, in order.
+
+    Every cache miss goes through ONE worker start. encode_query per text costs a
+    full worker start each on CUDA (the worker is released after every call), so
+    the medium pass's 30 prototype phrases took ~17 minutes on a cold cache.
+    Raises TextEncodeError like encode_query."""
+    import numpy as np
+    keys = []
+    for text in texts:
+        limit_error = query_limit_error(text)
+        if limit_error:
+            raise TextEncodeError(limit_error)
+        key = normalize_query(text)
+        if not key:
+            raise TextEncodeError('empty query')
+        keys.append(key)
+    with _lock:
+        _load_disk_cache()
+        found = {k: _memory[k] for k in keys if k in _memory}
+    missing = list(dict.fromkeys(k for k in keys if k not in found))
+    if missing:
+        reason = unavailable_reason()
+        if reason:
+            raise TextEncodeError(reason)
+        fresh = {}
+        for key, vec in zip(missing, _encode_uncached(missing)):
+            vec = np.asarray(vec, dtype='float32')
+            if vec.shape != (_CLIP_TEXT_DIMENSION,) or not np.isfinite(vec).all():
+                raise TextEncodeError('the CLIP text encoder returned an invalid vector')
+            norm = float(np.linalg.norm(vec))
+            if not np.isfinite(norm) or norm <= 0:
+                raise TextEncodeError('the CLIP text encoder returned an empty vector')
+            fresh[key] = vec / norm
+        with _lock:
+            for key, vec in fresh.items():
+                _remember_query(_memory, key, vec)
+            _save_disk_cache()
+        found.update(fresh)
+    return [np.asarray(found[k], dtype='float32') for k in keys]

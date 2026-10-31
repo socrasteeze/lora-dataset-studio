@@ -214,15 +214,17 @@ def test_medium_prototypes_and_job_remain_exact_legacy_clip(
 
     prototype_calls = []
 
-    # Intentionally accepts no engine kwarg: Medium is CLIP-owned forever.
-    def encode_clip_only(text):
-        prototype_calls.append(text)
-        return _emb(1.0), True
+    # Intentionally accepts no engine kwarg: Medium is CLIP-owned forever. And
+    # every phrase arrives in ONE batch: one encoder start, not one per phrase.
+    def encode_clip_only(texts):
+        prototype_calls.append(list(texts))
+        return [_emb(1.0) for _ in texts]
 
-    monkeypatch.setattr(clip_text_encoder, 'encode_query', encode_clip_only)
+    monkeypatch.setattr(clip_text_encoder, 'encode_queries', encode_clip_only)
     names, matrix = banks._medium_prototype_matrix()
     assert names == list(banks.MEDIUM_PROTOTYPES)
-    assert len(prototype_calls) == sum(map(len, banks.MEDIUM_PROTOTYPES.values()))
+    assert len(prototype_calls) == 1
+    assert len(prototype_calls[0]) == sum(map(len, banks.MEDIUM_PROTOTYPES.values()))
     assert matrix.shape == (len(names), 768)
 
     score_loads = []
