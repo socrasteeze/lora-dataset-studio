@@ -280,7 +280,9 @@ class ProfileStore:
         environment.update(profile['paths'])
         # Downloaded model weights and the managed tool environments live in
         # the Default profile's data dir and are shared by every profile.
-        environment['LDS_SHARED_DATA_DIR'] = self._default()['paths']['LDS_DATA_DIR']
+        # get(), not _default(): under a named profile the environment's
+        # LDS_DATA_DIR is that profile's own, and the registry holds the Default.
+        environment['LDS_SHARED_DATA_DIR'] = self.get('default')['paths']['LDS_DATA_DIR']
         port = str(self.shared_port())
         environment.update(LDS_PROFILES_HOME=str(self.home), LDS_PROFILE_ID=ident,
                            LDS_PROFILE_NAME=profile['name'], LDS_PORT=port,
