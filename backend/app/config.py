@@ -24,9 +24,22 @@ def shared_data_dir() -> Path:
     profile's (LDS_SHARED_DATA_DIR, set by the profile launcher), else this one's.
     Weights and tool environments are machine-wide; a new profile should not
     download them again."""
-    d = Path(os.environ.get('LDS_SHARED_DATA_DIR') or _data_dir())
+    d = Path(os.environ.get('LDS_SHARED_DATA_DIR') or _registered_default_data_dir() or _data_dir())
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+def _registered_default_data_dir():
+    """The Default profile's data dir from the profile registry, for a named
+    profile whose launcher predates LDS_SHARED_DATA_DIR (a plain restart keeps
+    the supervisor's old environment). None outside a named profile."""
+    home = os.environ.get('LDS_PROFILES_HOME')
+    if not home or os.environ.get('LDS_PROFILE_ID', 'default') == 'default':
+        return None
+    try:
+        rows = json.loads((Path(home) / 'profiles.json').read_text(encoding='utf-8')).get('profiles', [])
+        return next((row['paths']['LDS_DATA_DIR'] for row in rows if row.get('id') == 'default'), None)
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
 
 def models_dir() -> Path:
     """Downloaded model weights, shared by every profile."""
