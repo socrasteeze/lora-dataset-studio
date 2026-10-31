@@ -57,4 +57,25 @@ def test_a_blank_tool_python_falls_back_to_the_shared_managed_env(profile):
 def test_without_the_launcher_variable_the_shared_dir_is_this_profiles_own(tmp_path, monkeypatch):
     monkeypatch.setenv('LDS_DATA_DIR', str(tmp_path / 'data'))
     monkeypatch.delenv('LDS_SHARED_DATA_DIR', raising=False)
+    monkeypatch.delenv('LDS_PROFILES_HOME', raising=False)
     assert cfg.shared_data_dir() == cfg.data_dir()
+
+
+def test_a_named_profile_reads_the_default_data_dir_from_the_registry(tmp_path, monkeypatch):
+    # A supervisor started before LDS_SHARED_DATA_DIR existed keeps its old
+    # environment across a plain restart; the registry still names the Default.
+    home = tmp_path / 'profiles'
+    home.mkdir()
+    (home / 'profiles.json').write_text(json.dumps({'version': 1, 'profiles': [
+        {'id': 'default', 'name': 'Default', 'port': 5050,
+         'paths': {'LDS_DATA_DIR': str(tmp_path / 'default-data')}},
+        {'id': 'abc', 'name': 'Named', 'port': 5050,
+         'paths': {'LDS_DATA_DIR': str(tmp_path / 'named-data')}},
+    ]}), encoding='utf-8')
+    monkeypatch.setenv('LDS_DATA_DIR', str(tmp_path / 'named-data'))
+    monkeypatch.setenv('LDS_PROFILES_HOME', str(home))
+    monkeypatch.setenv('LDS_PROFILE_ID', 'abc')
+    monkeypatch.delenv('LDS_SHARED_DATA_DIR', raising=False)
+    assert cfg.shared_data_dir() == tmp_path / 'default-data'
+    monkeypatch.setenv('LDS_PROFILE_ID', 'default')
+    assert cfg.shared_data_dir() == tmp_path / 'named-data'
