@@ -45,6 +45,14 @@ def test_default_preserves_explicit_legacy_paths_and_environment(tmp_path):
     assert child['HF_TOKEN'] == 'synthetic-token'
 
 
+def test_every_profile_shares_the_default_data_dir_for_models_and_envs(store):
+    named = store.create('Example')
+    default_data = store.get('default')['paths']['LDS_DATA_DIR']
+    assert store.child_environment(named['id'])['LDS_SHARED_DATA_DIR'] == default_data
+    assert store.child_environment('default')['LDS_SHARED_DATA_DIR'] == default_data
+    assert named['paths']['LDS_DATA_DIR'] != default_data
+
+
 def test_a_recorded_lock_port_does_not_move_the_shared_address(store):
     data = store.root / 'data'
     data.mkdir()

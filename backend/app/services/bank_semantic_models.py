@@ -44,7 +44,7 @@ def semantic_python() -> str:
 
 def models_root() -> Path:
     configured = str(cfg.get('bank_semantic.models_root') or '').strip()
-    return Path(configured) if configured else cfg.data_dir() / 'models' / 'bank_semantic'
+    return Path(configured) if configured else cfg.models_dir() / 'bank_semantic'
 
 
 def snapshot_dir(root=None) -> Path:

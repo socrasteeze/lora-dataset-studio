@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-31-profiles-share-models',
+    date: '2026-10-31',
+    title: 'Profiles share installed tools and models',
+    blurb: 'A new profile no longer downloads WD14, PixAI, scoring or watermark tools again: every profile uses the ones the Default profile installed.',
+  },
+  {
     id: '2026-10-31-restart-studio-menu',
     date: '2026-10-31',
     title: 'Restart Studio from the menu',

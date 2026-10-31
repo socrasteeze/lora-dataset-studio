@@ -185,7 +185,7 @@ def models_root() -> str | None:
     if root:
         return root
     try:
-        return str(cfg.data_dir() / 'models' / 'watermark_detect')
+        return str(cfg.models_dir() / 'watermark_detect')
     except OSError:      # a data-dir hiccup is not a reason to fail a scan
         return None
 

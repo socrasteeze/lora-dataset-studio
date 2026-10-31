@@ -70,7 +70,7 @@ def models_root() -> str:
     if configured:
         return configured
     try:
-        managed = str(cfg.data_dir() / 'models' / 'insightface')
+        managed = str(cfg.models_dir() / 'insightface')
     except OSError:
         # data_dir() creates the folder on demand and can fail (permissions, a
         # full disk, a volume that went away). watermark_detect answers None

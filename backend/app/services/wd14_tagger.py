@@ -146,7 +146,7 @@ def candidate_pythons() -> list[str]:
              cfg.get('face_scoring.python'), cfg.get('bank_scoring.python')]
     envs = []
     try:
-        root = cfg.data_dir() / 'envs'
+        root = cfg.envs_dir()
         for env in sorted(root.iterdir()) if root.is_dir() else []:
             for rel in (('Scripts', 'python.exe'), ('bin', 'python')):
                 envs.append(str(env.joinpath(*rel)))
@@ -193,7 +193,7 @@ def models_dir() -> str:
     root = (cfg.get('wd14.models_root') or '').strip()
     if root:
         return os.path.join(root, 'wd14')
-    return str(cfg.data_dir() / 'models' / 'wd14')
+    return str(cfg.models_dir() / 'wd14')
 
 
 def model_path(name: str) -> str:
