@@ -1075,7 +1075,11 @@ def create_app(config_object=None):
         # The csrf_token cookie is (re)planted by the after_request hook below —
         # which covers '/' AND every /api response — so a SPA session can no longer
         # outlive its token (see _refresh_csrf_cookie for the full rationale).
-        return send_from_directory(FRONTEND_DIST, 'index.html')
+        # no-store: the shell names hashed assets, so a cached copy pins a phone
+        # (the iOS home-screen app above all) to an old build after a rebuild.
+        response = send_from_directory(FRONTEND_DIST, 'index.html')
+        response.headers['Cache-Control'] = 'no-store'
+        return response
 
     @app.get('/assets/<path:filename>')
     def assets(filename):
