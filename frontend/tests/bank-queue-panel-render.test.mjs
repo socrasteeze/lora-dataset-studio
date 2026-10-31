@@ -107,6 +107,22 @@ test('a failed workspace job names the pass and offers Retry without Clear Waiti
   assert.doesNotMatch(out, />Stop Running</)
 })
 
+test('a running Launch all shows its live progress instead of the word "Launch all"', () => {
+  const out = html([item(1, 'running', { progress: {
+    step: 'score', step_index: 1, step_count: 7, done: 40, total: 160, eta_seconds: 300 } })])
+  assert.match(out, /Step 2\/7 · ✨ Score pass · 40 \/ 160 · ~5 min left/)
+  assert.doesNotMatch(out, /Launch all/)
+  assert.match(out, /width:25%/)
+})
+
+test('a step with no count names what it is doing, and draws no bar', () => {
+  const out = html([item(1, 'running', { progress: {
+    step: 'medium', step_index: 0, step_count: 1, done: 0, total: 0,
+    detail: 'medium pass — encoding prototypes' } })])
+  assert.match(out, /Medium pass · medium pass — encoding prototypes/)
+  assert.doesNotMatch(out, /width:/)
+})
+
 test('the workspace shows pending jobs and allows cancellation before they start', () => {
   const out = renderToStaticMarkup(createElement(BankQueuedJob, {
     entry: { state: 'pending', position: 2, operation: 'score' }, onCancel: noop, onRetry: noop,

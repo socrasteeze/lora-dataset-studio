@@ -89,7 +89,7 @@ def dataset_folder_conflict(folder, *, datasets_root=None) -> dict | None:
         from ..models import FaceDataset, VideoDataset
 
         try:
-            roots = [cfg.dataset_images_root()]
+            roots = [cfg.dataset_images_root(create=False)]
         except OSError:
             roots = []
         for kind in ('datasets', 'video_datasets'):

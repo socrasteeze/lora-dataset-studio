@@ -212,7 +212,7 @@ def check_disk_space() -> dict:
     from flask import has_app_context
     from ..models import FaceDataset
 
-    roots = {str(cfg.dataset_images_root())}
+    roots = {str(cfg.dataset_images_root(create=False))}
     if has_app_context():
         from .dataset_storage import dataset_path
         roots.update(dataset_path(row.id) for row in FaceDataset.query.filter(

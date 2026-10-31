@@ -1707,10 +1707,14 @@ def new_dataset_images_root() -> Path:
     return creation_root('datasets') or dataset_images_root()
 
 
-def dataset_images_root() -> Path:
+def dataset_images_root(create=True) -> Path:
+    """The legacy datasets root (`paths.dataset_images_root`). Read-only callers
+    pass create=False: with an installation destination set, new Datasets go
+    elsewhere, and resolving a path used to recreate this folder empty."""
     p = get('paths.dataset_images_root') or ''
     root = Path(p) if p else _data_dir() / 'datasets'
-    root.mkdir(parents=True, exist_ok=True)
+    if create:
+        root.mkdir(parents=True, exist_ok=True)
     return root
 
 def dataset_thumbs_root(create=False) -> Path:

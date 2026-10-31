@@ -63,7 +63,8 @@ def _hf_home() -> Path | None:
 _DEFS = (
     {'key': 'datasets', 'label': 'Dataset images',
      'section': 'paths', 'field': 'dataset_images_root',
-     'resolve': cfg.dataset_images_root,
+     # Listing and sizing must not recreate an unused legacy folder.
+     'resolve': lambda: cfg.dataset_images_root(create=False),
      'holds': 'Legacy dataset images, captions and masks. New media uses the installation policy when configured.'},
     {'key': 'banks', 'label': 'Image banks (working data)',
      'section': None, 'field': None,
