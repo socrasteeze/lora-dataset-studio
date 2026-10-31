@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { captionStepNote } from './pipelineVerdict.js'
-import { reportHeadline, stepView } from './pipelineReportView.js'
+import { reportHeadline, splitStepNote, stepView } from './pipelineReportView.js'
 import { Button, IconButton } from '../common/Controls.jsx'
 
 /** The morning-after summary of the last "Launch all" run — one row per
@@ -74,12 +74,18 @@ export default function PipelineReport({ report, onDismiss }) {
           <ul className="space-y-1">
             {report.steps.map((s, i) => {
               const view = stepView(s)
+              const note = splitStepNote(view.note)
+              // A finished pass reads quietly; colour is kept for what needs a look.
+              const tone = s.status === 'done' && !view.attention ? 'text-content-muted' : view.cls
               return (
                 <li key={`${s.step}-${i}`} className="flex items-start gap-2 text-sm">
                   <span aria-hidden>{view.icon}</span>
                   <span className="min-w-0">
                     <span className="font-medium text-content">{STEP_LABEL[s.step] || s.step}</span>
-                    {view.note && <span className={view.cls}> — {view.note}</span>}
+                    {note.summary && <span className={tone}> · {note.summary}</span>}
+                    {note.advice && (
+                      <span className="block text-xs text-amber-300" title={note.adviceFull}>⚠ {note.advice}</span>
+                    )}
                   </span>
                 </li>
               )

@@ -1,7 +1,22 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-import { isSuperseded, reportHeadline, STATUS_STYLE, stepView } from './pipelineReportView.js';
+import { isSuperseded, reportHeadline, splitStepNote, STATUS_STYLE, stepView } from './pipelineReportView.js';
+
+test('a run-on step note becomes a short result plus one advice line', () => {
+  const note = splitStepNote('scored 40 image(s), 1 style group holds 40 of 40 images — the threshold (0.6) '
+    + 'is too permissive to separate anything — retune it in 🎚 Filter thresholds ▸ style_threshold '
+    + 'and re-run · 🎨 Medium: 40 classified');
+  assert.equal(note.summary, 'scored 40 images, 1 style group holds 40 of 40 images · 🎨 Medium: 40 classified');
+  assert.equal(note.advice, 'Threshold too loose · adjust style_threshold');
+  assert.match(note.adviceFull, /too permissive/);
+});
+
+test('the status word is dropped, since the row icon already says it', () => {
+  assert.equal(splitStepNote('done — 12 duplicate group(s)').summary, '12 duplicate group(s)');
+  assert.equal(splitStepNote('cancelled — 9 classified so far').summary, '9 classified so far');
+  assert.deepEqual(splitStepNote(''), { summary: '', advice: '', adviceFull: '' });
+});
 
 const cancelled = (step, extra = {}) => ({
   step, status: 'cancelled', reason: 'cancelled before it ran', ...extra,
