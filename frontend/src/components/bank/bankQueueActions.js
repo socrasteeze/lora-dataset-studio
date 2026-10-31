@@ -52,3 +52,31 @@ export function removeQueuedConfirm(queue, nameOf, bankId) {
   if (!item || item.state !== 'running') return null
   return stopRunningConfirm(queue, nameOf, [item])
 }
+
+/* Live progress for a running queue row, so the panel answers "how far is it?"
+   without opening the bank. `progress` is the server's {step, step_index,
+   step_count, done, total, detail, eta_seconds}; `labelOf` names a pass kind. */
+export function queueProgressLine(progress, labelOf) {
+  if (!progress) return ''
+  const parts = []
+  const count = Number(progress.step_count)
+  const index = Number(progress.step_index)
+  if (count > 1 && Number.isFinite(index)) parts.push(`Step ${index + 1}/${count}`)
+  const pass = progress.step ? labelOf(progress.step) : ''
+  if (pass) parts.push(pass)
+  const done = Number(progress.done)
+  const total = Number(progress.total)
+  if (total > 0 && Number.isFinite(done)) parts.push(`${done} / ${total}`)
+  else if (progress.detail) parts.push(String(progress.detail))
+  const eta = Number(progress.eta_seconds)
+  if (eta > 0) parts.push(eta < 60 ? 'under a minute left' : `~${Math.round(eta / 60)} min left`)
+  return parts.join(' · ')
+}
+
+/** 0–100 through the current step, or null when the step has no count. */
+export function queueProgressPercent(progress) {
+  const done = Number(progress?.done)
+  const total = Number(progress?.total)
+  if (!(total > 0) || !Number.isFinite(done)) return null
+  return Math.max(0, Math.min(100, (done / total) * 100))
+}

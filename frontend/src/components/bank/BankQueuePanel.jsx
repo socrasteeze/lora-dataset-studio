@@ -1,6 +1,17 @@
 import { HelpBadge } from '../../help/HelpMode'
 import { jobLabel } from './bankPassRun.js'
-import { runningItems, waitingItems } from './bankQueueActions.js'
+import { queueProgressLine, queueProgressPercent, runningItems, waitingItems } from './bankQueueActions.js'
+
+/* The thin bar under a running row; nothing when the step has no count. */
+function ProgressBar({ progress }) {
+  const pct = queueProgressPercent(progress)
+  if (pct == null) return null
+  return (
+    <span aria-hidden="true" className="col-start-2 h-1 overflow-hidden rounded-full bg-surface-raised sm:col-end-5">
+      <span className="block h-full rounded-full bg-emerald-400" style={{ width: `${pct}%` }} />
+    </span>
+  )
+}
 
 /** The cross-bank job queue: which bank is running now and what is lined
  * up behind it. Drains one bank at a time per machine (never a busy-GPU 503), so
@@ -62,9 +73,12 @@ export default function BankQueuePanel({ queue, nameOf, onCancel, onRetry, onCle
           {active.map((job) => <li key={`${job.bank_id}:${job.started_at}`} className={ROW} data-queue-row="active" data-bank-id={job.bank_id}>
             <span data-queue-cell="name" className={NAME}>{nameOf(job.bank_id)}</span>
             <div className={JOB_STATUS}>
-              <span data-queue-cell="job" className={JOB}>{jobLabel(job.kind)}</span>
+              <span data-queue-cell="job" className={JOB}>
+                {[jobLabel(job.kind), queueProgressLine(job.progress, jobLabel)].filter(Boolean).join(' · ')}
+              </span>
               <span data-queue-cell="status" className={`${STATUS} bg-emerald-500/15 text-emerald-300`}>Running</span>
             </div>
+            <ProgressBar progress={job.progress} />
             {job.device_label && <span data-queue-private className={`${DETAILS} [overflow-wrap:anywhere] text-xs text-content-muted`}>on {job.device_label}</span>}
             <button type="button" onClick={() => onStopDirect(job.bank_id)}
               aria-label={`Stop ${nameOf(job.bank_id)}`}
@@ -78,7 +92,13 @@ export default function BankQueuePanel({ queue, nameOf, onCancel, onRetry, onCle
             <span className="col-start-1 row-start-1 self-start text-right text-content-subtle sm:self-center">{it.position}.</span>
             <span data-queue-cell="name" className={NAME}>{nameOf(it.bank_id)}</span>
             <span className={JOB_STATUS}>
-              <span data-queue-cell="job" className={JOB}>{jobLabel(it.operation || 'pipeline')}</span>
+              {/* A Launch-all run says nothing by its name; while it runs the
+                  cell shows where it is instead. Single passes keep their label. */}
+              <span data-queue-cell="job" className={JOB}>
+                {[it.operation && it.operation !== 'pipeline' ? jobLabel(it.operation) : '',
+                  it.state === 'running' ? queueProgressLine(it.progress, jobLabel) : '']
+                  .filter(Boolean).join(' · ')}
+              </span>
               {it.state === 'running' ? (
                 <span data-queue-cell="status" className={`${STATUS} bg-emerald-500/15 text-emerald-300`}>Running</span>
               ) : it.state === 'failed' ? (
@@ -95,6 +115,7 @@ export default function BankQueuePanel({ queue, nameOf, onCancel, onRetry, onCle
               data-queue-cell="control" className={`${CONTROL} text-content-subtle group-hover:text-content hover:text-rose-300 focus-visible:text-rose-300`}>
               ✕
             </button>
+            {it.state === 'running' && <ProgressBar progress={it.progress} />}
             {/* Which machine, and why it hasn't started. The snapshot has
                   published both all along and this panel dropped them: twelve
                   banks queued to a peer looked byte-identical to twelve local

@@ -822,6 +822,19 @@ def clear(pending_only=False) -> int:
     return n
 
 
+def _progress(job):
+    """The few fields of a bank_jobs snapshot the queue row shows, or None."""
+    if not job or job.get('finished'):
+        return None
+    pipeline = job.get('pipeline') or {}
+    return {'kind': job.get('kind'), 'detail': job.get('detail'),
+            'done': job.get('done'), 'total': job.get('total'),
+            'eta_seconds': job.get('eta_seconds'),
+            'step': pipeline.get('current'),
+            'step_index': pipeline.get('index'),
+            'step_count': pipeline.get('total_steps')}
+
+
 def snapshot() -> dict:
     """{running_bank_id, items:[{bank_id, state, position, steps, reject_flags,
     resolve_dups, enqueued_at, device_id, waiting_for}]} — position is 1-based
@@ -843,9 +856,15 @@ def snapshot() -> dict:
                   'waiting_for': e.get('waiting_for')}
                  for i, e in enumerate(_queue)]
         running = [e['bank_id'] for e in _queue if e['state'] == 'running']
+    # Live progress for each running row, so the panel can show it without
+    # opening the bank. Read after releasing _lock: bank_jobs has its own.
+    for item in items:
+        if item['state'] == 'running':
+            item['progress'] = _progress(bank_jobs.get(item['bank_id']))
     # Direct passes are already executing. Show them without pretending they
     # are durable queued pipelines or changing pending-entry cancellation.
-    active = [{**job, 'direct': True, 'state': 'running'} for job in active
+    active = [{**job, 'direct': True, 'state': 'running',
+               'progress': _progress(bank_jobs.get(job['bank_id']))} for job in active
               if not any(bank_id in running for bank_id in job['bank_ids'])]
     # running_bank_id stays for every existing reader, but it can only name one
     # bank and there are now as many as there are machines — so publish the list

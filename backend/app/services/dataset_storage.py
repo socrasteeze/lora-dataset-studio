@@ -18,7 +18,7 @@ def dataset_path(dataset_id: int) -> str:
     from flask import has_app_context
 
     dataset = db.session.get(FaceDataset, int(dataset_id)) if has_app_context() else None
-    root = Path(dataset.storage_root) if dataset and dataset.storage_root else cfg.dataset_images_root()
+    root = Path(dataset.storage_root) if dataset and dataset.storage_root else cfg.dataset_images_root(create=False)
     if dataset and dataset.storage_root:
         if dataset.storage_basename:
             from ..creation_destinations import folder_number

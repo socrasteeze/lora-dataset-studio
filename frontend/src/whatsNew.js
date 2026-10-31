@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-31-bank-queue-progress',
+    date: '2026-10-31',
+    title: 'See Bank Queue progress at a glance',
+    blurb: 'A running bank in the queue now shows its step, count and time left with a progress bar, so you no longer have to open it. The empty legacy datasets folder also stops reappearing once new datasets go to your installation destination.',
+  },
+  {
     id: '2026-10-31-profiles-share-models',
     date: '2026-10-31',
     title: 'Profiles share installed tools and models',
