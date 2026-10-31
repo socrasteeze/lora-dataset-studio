@@ -12782,8 +12782,11 @@ def _medium_prototype_matrix():
     import numpy as np
     from . import clip_text_encoder
     names, rows = [], []
+    # One batch for every phrase: one encoder start instead of one per phrase.
+    phrases_all = [p for phrases in MEDIUM_PROTOTYPES.values() for p in phrases]
+    vec_by_phrase = dict(zip(phrases_all, clip_text_encoder.encode_queries(phrases_all)))
     for name, phrases in MEDIUM_PROTOTYPES.items():
-        vecs = [clip_text_encoder.encode_query(p)[0] for p in phrases]
+        vecs = [vec_by_phrase[p] for p in phrases]
         m = np.mean(np.stack(vecs).astype('float32'), axis=0)
         rows.append(m / (float(np.linalg.norm(m)) + 1e-8))
         names.append(name)
