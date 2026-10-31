@@ -95,7 +95,8 @@ export default function SetupStart({ onTools, onRecheck, scanned = false, detect
     finally { setBusy(false) }
   }
   function recheck() { setRevision(value => value + 1); onRecheck?.() }
-  function changeGoal() { saveSetupJourney(null); setParams({}, { replace: true }); setError('') }
+  // Back to the menu itself: a bare /setup opens the tools overview.
+  function changeGoal() { saveSetupJourney(null); setParams({ step: 'welcome' }, { replace: true }); setError('') }
 
   return <div className="mx-auto max-w-2xl space-y-4" data-probe-reading="setup-start"
     data-probe-content="setup" data-probe-setup={checking ? 'checking' : 'ready'}>

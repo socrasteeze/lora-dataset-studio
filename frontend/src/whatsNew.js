@@ -120,6 +120,14 @@ export const WHATS_NEW = [
     blurb: 'Pick a profile and Studio restarts faster and comes back on the same screen. Buttons that wait on setup checks appear sooner, and large banks open faster after a restart.',
   },
   {
+    id: '2026-11-07-setup-opens-on-tools',
+    date: '2026-11-07',
+    title: 'Setup opens on your tools',
+    blurb: 'Setup now opens on the overview of your tools: what is ready, what is missing, and Downloads & Repair. '
+      + 'Guided Setup by goal is one click away.',
+    to: '/setup',
+  },
+  {
     id: '2026-11-01-faster-keep-reject', date: '2026-11-01',
     title: 'Keep and Reject respond right away',
     blurb: 'On a large bank, the grid no longer waits for every counter to recalculate after a decision. Prev and Next now fill the row, and changing page returns you to the top.',
