@@ -63,7 +63,7 @@ import { activityLabel } from './utils/trainingActivity'
 // clipped the What's-new button off the right edge. Nothing is hidden — the
 // items simply breathe less until there is room for it.
 const NAV_ITEM_BASE =
-  'px-2 lg:px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap no-underline transition-colors'
+  'px-2 lg:px-3 py-1.5 rounded-md text-left text-sm font-medium whitespace-nowrap no-underline transition-colors'
 const navItemClass = ({ isActive }) =>
   `${NAV_ITEM_BASE} ${
     isActive ? 'bg-surface-raised text-content' : 'text-content-muted hover:text-content hover:bg-surface-raised'
@@ -214,17 +214,18 @@ function NavBar() {
     }
     setRestarting(false)
   }
-  // The phone panel's height, in px, from the header's measured bottom. The CSS
-  // fallback (100dvh - 100%) left the iOS home-screen app with a half-height
-  // panel whose last items (Settings, Profiles…) only scrolled inside it.
-  const [navMaxHeight, setNavMaxHeight] = useState(null)
+  // Where the phone panel starts, in px: the header's measured bottom. The
+  // panel is position:fixed from there to the bottom of the screen, so its
+  // height never depends on innerHeight or 100dvh — both of which left the
+  // iOS home-screen app with a half-height panel that hid Settings, Profiles…
+  const [navTop, setNavTop] = useState(null)
   useFocusTrap(headerRef, open && !desktopNav)
   useEffect(() => { setOpen(false) }, [path, desktopNav])
   useEffect(() => {
     if (!open || desktopNav) return undefined
     const measure = () => {
       const bottom = headerRef.current?.getBoundingClientRect().bottom
-      if (bottom != null) setNavMaxHeight(Math.max(0, window.innerHeight - bottom))
+      if (bottom != null) setNavTop(Math.max(0, bottom))
     }
     measure()
     window.addEventListener('resize', measure)
@@ -403,8 +404,8 @@ function NavBar() {
       </div>
       {open && (
         <nav id="mobile-navigation" aria-label="Main navigation (mobile)"
-          style={navMaxHeight != null ? { maxHeight: `${navMaxHeight}px` } : undefined}
-          className="app-mobile-nav absolute inset-x-0 top-full flex flex-col gap-1 overflow-y-auto overscroll-contain border-t border-border bg-surface-overlay px-4 py-2 shadow-lg md:hidden">
+          style={{ top: navTop != null ? `${navTop}px` : 'var(--app-header-h)' }}
+          className="app-mobile-nav fixed inset-x-0 bottom-0 flex flex-col gap-1 overflow-y-auto overscroll-contain border-t border-border bg-surface-overlay px-4 py-2 shadow-lg md:hidden">
           {mobileLinks}
           {/* Mounted only while the panel is open, so a phone pays for the
               poll exactly while someone is looking at the answer. */}
