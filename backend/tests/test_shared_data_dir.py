@@ -21,6 +21,7 @@ def profile(tmp_path, monkeypatch):
     monkeypatch.setenv('LDS_DATA_DIR', str(own))
     monkeypatch.setenv('LDS_SHARED_DATA_DIR', str(shared))
     monkeypatch.setenv('LDS_CONFIG', str(settings))
+    monkeypatch.delenv('LDS_PROFILES_HOME', raising=False)
     monkeypatch.setattr(cfg, '_cache', None)
     yield shared, own
     monkeypatch.setattr(cfg, '_cache', None)

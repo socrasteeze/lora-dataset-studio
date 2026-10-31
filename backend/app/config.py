@@ -21,10 +21,12 @@ def data_dir() -> Path:
 
 def shared_data_dir() -> Path:
     """The data dir whose `models/` and `envs/` EVERY profile uses: the Default
-    profile's (LDS_SHARED_DATA_DIR, set by the profile launcher), else this one's.
+    profile's (from the profile registry, else LDS_SHARED_DATA_DIR set by the
+    launcher), else this one's.
     Weights and tool environments are machine-wide; a new profile should not
     download them again."""
-    d = Path(os.environ.get('LDS_SHARED_DATA_DIR') or _registered_default_data_dir() or _data_dir())
+    # The registry first: it is the one record of the Default profile's paths.
+    d = Path(_registered_default_data_dir() or os.environ.get('LDS_SHARED_DATA_DIR') or _data_dir())
     d.mkdir(parents=True, exist_ok=True)
     return d
 
