@@ -21,7 +21,7 @@ import { flagCandidateLabel, launchRejectNote } from './autoRejectReadiness.js'
  * isn't installed is skipped (with a reason) at run time, never failing the launch.
  *
  * Defaults: scan plus the ready passes without defaultOff are pre-checked.
- * Auto-reject, watermark scanning and captioning stay OFF.
+ * Auto-reject, watermark scanning, framing and captioning stay OFF.
  * Rejection needs an explicit choice; captioning adds GPU work that a triage
  * run may not need. When selected,
  * auto-reject defaults to duplicate "keep best" only. The quality flags stay

@@ -56,6 +56,29 @@ export function stepView(step) {
   }
 }
 
+/* The server's step note is one run-on sentence: status, result, diagnosis and
+   instructions joined by " — " and " · ". The row already shows the status as
+   an icon, so split the rest: the result stays on the row, a threshold warning
+   becomes one short advice line, and the full text rides in its tooltip. */
+const STATUS_WORDS = new Set(['done', 'cancelled', 'skipped'])
+const ADVICE = /threshold|retune|re-run|too permissive|too strict/i
+
+export function splitStepNote(note) {
+  const parts = String(note || '').split(/\s+[—·]\s+/).map((p) => p.trim()).filter(Boolean)
+  const summary = []
+  const advice = []
+  for (const part of parts) {
+    if (STATUS_WORDS.has(part.toLowerCase())) continue
+    ;(ADVICE.test(part) ? advice : summary).push(part)
+  }
+  const setting = advice.join(' ').match(/\b([a-z]+_threshold)\b/)
+  return {
+    summary: summary.join(' · ').replace(/\b(\d+) image\(s\)/g, (_, n) => `${n} image${n === '1' ? '' : 's'}`),
+    advice: advice.length ? `Threshold too loose${setting ? ` · adjust ${setting[1]}` : ''}` : '',
+    adviceFull: advice.join(' — '),
+  }
+}
+
 /** The banner's headline. `stopped` drives the 🛑: it survives only while a step
     that never ran is still waiting for someone to run it. */
 export function reportHeadline(report) {

@@ -59,6 +59,8 @@ export const STEP_COPY = {
   framing: {
     label: 'Classify framing', needs: 'Vision model',
     desc: 'GPU · face / bust / body / back.',
+    // Off by default: a slow vision pass, usually run on its own when needed.
+    defaultOff: true,
   },
   tags: {
     label: '🔖 Tags', needs: 'Image tagging (WD14)',

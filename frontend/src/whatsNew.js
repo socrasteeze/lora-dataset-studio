@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-31-tidier-launch-report',
+    date: '2026-10-31',
+    title: 'A Launch All report you can skim',
+    blurb: 'Each pass in the last-run report shows its result in one short line, and threshold warnings get their own line instead of a paragraph. Classify framing now starts unticked in Launch All.',
+  },
+  {
     id: '2026-10-31-bank-queue-progress',
     date: '2026-10-31',
     title: 'See Bank Queue progress at a glance',

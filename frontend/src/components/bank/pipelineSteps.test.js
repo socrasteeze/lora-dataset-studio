@@ -53,18 +53,20 @@ test('every step carries its own prerequisite name, or none', () => {
   assert.equal('needs' in byKey.auto_reject, false);
 });
 
-test('auto-reject, watermark scanning and captioning start unticked, other ready passes start ticked', () => {
+test('auto-reject, watermarks, framing and captioning start unticked, other ready passes start ticked', () => {
   // Caption is the slowest by a wide margin and the one people most often run
-  // separately. An overnight Launch-all must not quietly commit to it.
+  // separately. An overnight Launch-all must not quietly commit to it. Framing
+  // is a slow vision pass too, usually run on its own.
   const steps = buildSteps(FALLBACK_ORDER);
   const ready = Object.fromEntries(steps.map((s) => [s.key, true]));
   const checked = defaultChecked(steps, ready);
   assert.equal(checked.has('caption'), false);
   assert.equal(checked.has('auto_reject'), false);
   assert.equal(checked.has('watermark'), false);
+  assert.equal(checked.has('framing'), false);
   assert.equal(checked.has('scan'), true);
   assert.equal(checked.has('score'), true);
-  assert.equal(checked.size, steps.length - 3);
+  assert.equal(checked.size, steps.length - 4);
 });
 
 test('a step whose tool is not ready does not start ticked', () => {
