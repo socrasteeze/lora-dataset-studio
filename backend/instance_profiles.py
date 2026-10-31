@@ -278,6 +278,9 @@ class ProfileStore:
             for key in SECRET_KEYS:
                 environment.pop(key, None)
         environment.update(profile['paths'])
+        # Downloaded model weights and the managed tool environments live in
+        # the Default profile's data dir and are shared by every profile.
+        environment['LDS_SHARED_DATA_DIR'] = self._default()['paths']['LDS_DATA_DIR']
         port = str(self.shared_port())
         environment.update(LDS_PROFILES_HOME=str(self.home), LDS_PROFILE_ID=ident,
                            LDS_PROFILE_NAME=profile['name'], LDS_PORT=port,

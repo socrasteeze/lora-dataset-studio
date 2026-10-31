@@ -72,7 +72,7 @@ def models_dir() -> str:
     that parent, and the folder name stays ``pixai-tagger-v1.0``.
     """
     root = (cfg.get('pixai.models_root') or '').strip()
-    parent = root or str(cfg.data_dir() / 'models')
+    parent = root or str(cfg.models_dir())
     return os.path.join(parent, FOLDER_NAME)
 
 
@@ -81,7 +81,7 @@ def _norm(path: str) -> str:
 
 
 def _managed_python() -> str:
-    env = cfg.data_dir() / 'envs' / 'pixai'
+    env = cfg.envs_dir() / 'pixai'
     folder = 'Scripts' if os.name == 'nt' else 'bin'
     exe = 'python.exe' if os.name == 'nt' else 'python'
     return str(env / folder / exe)

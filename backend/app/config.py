@@ -19,6 +19,23 @@ def data_dir() -> Path:
     d.mkdir(parents=True, exist_ok=True)
     return d
 
+def shared_data_dir() -> Path:
+    """The data dir whose `models/` and `envs/` EVERY profile uses: the Default
+    profile's (LDS_SHARED_DATA_DIR, set by the profile launcher), else this one's.
+    Weights and tool environments are machine-wide; a new profile should not
+    download them again."""
+    d = Path(os.environ.get('LDS_SHARED_DATA_DIR') or _data_dir())
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+def models_dir() -> Path:
+    """Downloaded model weights, shared by every profile."""
+    return shared_data_dir() / 'models'
+
+def envs_dir() -> Path:
+    """App-managed tool Python environments, shared by every profile."""
+    return shared_data_dir() / 'envs'
+
 def _config_path() -> Path:
     return Path(os.environ.get('LDS_CONFIG', str(REPO_ROOT / 'config.json')))
 
@@ -1468,12 +1485,29 @@ def save_config(partial: dict, *, plugin_id=None) -> dict:
         _cache = None
     return load_config()
 
+# A blank `<tool>.python` answers with the shared managed environment Setup
+# builds for that tool, when it exists: a named profile that never ran Setup
+# still finds the Default profile's installs. A configured path always wins.
+MANAGED_PYTHON_ENVS = {
+    'face_scoring.python': 'quality', 'masks.python': 'quality', 'wd14.python': 'quality',
+    'video_text.python': 'quality', 'watermark.python': 'watermark',
+    'bank_scoring.python': 'bank_scoring', 'pixai.python': 'pixai',
+}
+
+def managed_python(env_name: str):
+    """The shared managed env's interpreter, or None when it is not built."""
+    exe = (envs_dir() / env_name / ('Scripts' if os.name == 'nt' else 'bin')
+           / ('python.exe' if os.name == 'nt' else 'python'))
+    return str(exe) if exe.is_file() else None
+
 def get(dotted: str, default=None):
     node = load_config()
     for part in dotted.split('.'):
         if not isinstance(node, dict) or part not in node:
             return default
         node = node[part]
+    if dotted in MANAGED_PYTHON_ENVS and not str(node or '').strip():
+        return managed_python(MANAGED_PYTHON_ENVS[dotted]) or node
     return node
 
 def is_configured() -> bool:

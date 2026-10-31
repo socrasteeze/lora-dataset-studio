@@ -110,8 +110,12 @@ datasets, caches and training storage. LAN access defaults to on for new profile
 The access token stays off unless you turn **Require an access token** on for
 that profile. The popup preserves an existing network
 bind address; a local-only bind becomes `0.0.0.0` for the new profile.
-Complete Setup for each new profile. Tool installations and model
-weights may be shared. The active profile name appears below the Studio title.
+Tool environments and downloaded model weights (Quality tools, WD14, PixAI,
+SigLIP 2, the watermark detector) are shared by every profile: they live in
+the Default profile's data folder, and a profile whose interpreter settings
+are blank uses them without running Setup again. A `*.python` or
+`*.models_root` setting you fill in for a profile still wins for that
+profile. The active profile name appears below the Studio title.
 
 Only one profile can run per installation. Save or discard open edits and finish
 or clear work queues before switching. The popup refuses a switch while work

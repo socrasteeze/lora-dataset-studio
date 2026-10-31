@@ -1677,7 +1677,7 @@ def _ensure_modern_pip(action, python) -> None:
 
 
 def _quality_env_dir():
-    return cfg.data_dir() / 'envs' / 'quality'
+    return cfg.envs_dir() / 'quality'
 
 
 def _ensure_managed_ml_env(action, env_dir) -> str:
@@ -1728,7 +1728,7 @@ def _ensure_managed_ml_env(action, env_dir) -> str:
 def _watermark_env_dir():
     """The app-managed watermark venv directory (deterministic, under the data dir), so
     a re-click resolves the SAME venv — idempotent build/repair, never a duplicate."""
-    return cfg.data_dir() / 'envs' / 'watermark'
+    return cfg.envs_dir() / 'watermark'
 
 
 def _venv_python(env_dir) -> str:
@@ -1935,7 +1935,7 @@ def _run_watermark_inpaint(action) -> int:
 # version-touchy, so it lives in its OWN app-managed venv rather than the Flask
 # venv — same isolation and one-click build/repair as the watermark venv.
 def _bank_scoring_env_dir():
-    return cfg.data_dir() / 'envs' / 'bank_scoring'
+    return cfg.envs_dir() / 'bank_scoring'
 
 
 def _bank_scoring_env_python() -> str:
@@ -2185,7 +2185,7 @@ def _run_ml_capability(action) -> int:
 
 
 def _pixai_env_dir():
-    return cfg.data_dir() / 'envs' / 'pixai'
+    return cfg.envs_dir() / 'pixai'
 
 
 def _run_pixai(action) -> int:
