@@ -46,7 +46,8 @@
     ]
   },
   "captioning": {
-    "backend": "auto"
+    "backend": "auto",
+    "bank_sidecar_sync": true
   },
   "pixai": {
     "python": "",

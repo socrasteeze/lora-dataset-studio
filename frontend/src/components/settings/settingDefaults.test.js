@@ -167,6 +167,7 @@ const COVERED = [
   ['CaptioningSection.jsx', 'image_input', 'max_pixels'],
   ['CaptioningSection.jsx', 'image_input', 'max_side'],
   ['CaptioningSection.jsx', 'captioning', 'backend'],
+  ['CaptioningSection.jsx', 'captioning', 'bank_sidecar_sync'],
   ['CaptioningSection.jsx', 'watermark', 'device'],
   ['CaptioningSection.jsx', 'face_scoring', 'green'],
   ['CaptioningSection.jsx', 'face_scoring', 'orange'],

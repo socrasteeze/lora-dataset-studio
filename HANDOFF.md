@@ -1,5 +1,38 @@
 # HANDOFF
 
+## Clean delivery checkpoint (2026-11-01)
+
+Operator authorized merging all branches into main and a clean push to
+origin/main. `origin/main` (Quick set, Krea defaults) and
+`upstream-review/2026-10-31` (partial port of c3db464d1) are merged. The
+2026-10-29 Bank caption sidecar work came in as its source commit only, without
+its trailer or stale bundle, and the bundle was rebuilt once for the whole merge.
+
+That sidecar source predates Read-only Source. The merge adds a
+`source_write_block` check, so a protected bank, or one overlapping a protected
+bank, writes no sidecar. Sync stays default on and starts with the next restart.
+
+No tests ran, including the new read-only regression and the sidecar suite on the
+merged code. The backend was not restarted, so the running app keeps its old
+Python code while serving the new bundle until a normal restart. Local branches
+and `origin/cursor/bank-caption-sidecars-8b19` were left in place.
+
+## Bank caption sidecar sync (2026-10-29)
+
+Bank captions still live in `bank_image.caption`. A non-empty write now also
+publishes `<stem>.txt` next to the source image when
+`captioning.bank_sidecar_sync` is on (the default). The hook sits after the
+database commit on hand edit (`set_image_caption`), the caption pass
+(`_on_caption`), shared-result fill (caption lane), and the dataset-to-bank
+and bank-to-bank copy constructors. `_pixai_tags_job` and WD14 do not write
+captions. Sidecar failures are skipped and logged; they do not roll back the
+row. Clearing a caption does not delete the sidecar.
+
+Targeted tests in `backend/tests/test_caption_sidecar_writer.py` plus related
+Bank caption tests were run locally. Full qualification, both linters as a
+gate, and rendered validation were not completed. Delivery uses `[skip ci]`
+on the tip commit.
+
 ## Cached Bank caption fill (2026-10-27)
 
 Operator authorized filling missing captions across all Banks from cached PixAI
