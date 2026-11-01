@@ -36,7 +36,7 @@ import { Button, Input, Select, btnClass, controlHeight, fieldClass } from '../c
 import { Chip, FILTER_ACTIVE, FILTER_HOVER, FILTER_IDLE, FilterGroup, GroupLabel } from './BankAtoms.jsx'
 import { facetMenuState, matchingTagOptions } from './bankTagFacets.js'
 import { FLAG_HINT, FLAG_LABEL, ORIGIN_BUCKETS } from './bankFacets.js'
-import { foldedCount } from './bankLayout.js'
+import { TILE_SHAPES, foldedCount } from './bankLayout.js'
 import { angleTitle, mediumTitle } from './bankMedium.js'
 import { assertionFor, folderMarker, scanOffer, suggestionFor } from './folderPerson.js'
 
@@ -159,7 +159,7 @@ export default function BankFilterRail({
   shownAngles, angleCounts, angleState,
   live, setPassOpen,
   thresholdsOpen, setThresholdsOpen, connection, refreshPayload, refreshImages, onRunPass,
-  sortGroups, setSort, tileSize, setTileSize,
+  sortGroups, setSort, tileSize, setTileSize, tileShape, setTileShape,
   moreOpen, setMoreOpen, isDrawer, onClose, onBrowseStyles,
   tagFiltersShown, tagGroups, wd14Tags, toggleFacetTag, selectFacetTags, clearWd14Tags,
   tagFacetError, retryTagFacets,
@@ -707,6 +707,15 @@ export default function BankFilterRail({
         <Button size="sm" noShrink className={FILTER_HOVER} onClick={() => setTileSize((s) => (s === 'M' ? 'S' : 'M'))}>
           {tileSize === 'M' ? 'Small Tiles' : 'Medium Tiles'}
         </Button>
+      </div>
+      <div role="group" aria-label="Thumbnail shape" className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-content-muted">Shape</span>
+        {TILE_SHAPES.map((s) => (
+          <Chip key={s.id} active={tileShape === s.id} onClick={() => setTileShape(s.id)}
+            title={`Show thumbnails as ${s.id}, with the whole image visible`}>
+            {s.id}
+          </Chip>
+        ))}
       </div>
 
       {/* 🏷️ The selection's caption tags — ONE mount now. The old screen carried

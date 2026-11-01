@@ -9,7 +9,7 @@ import { useState } from 'react';
 
 export function useReviewLightbox({
   bankId, filter, filterParams, fetchAllIds, showSelected, selected,
-  selectedOrder, setPage, toast, refreshPayload, refreshImages,
+  selectedOrder, setPage, toast, refreshPayload, refreshPayloadSoon, refreshImages,
 }) {
   // ▶ Review — the fast-triage lightbox. `review` holds the SNAPSHOT of ids it
   // walks ({ids, startId}); null when closed. Snapshotting at open is the whole
@@ -41,8 +41,9 @@ export function useReviewLightbox({
 
   // One decision landed in the lightbox — refresh the header counters so
   // kept/rejected/undecided track the run live. The grid is refreshed once, on
-  // close, so its tiles don't shuffle around behind the lightbox.
-  const onReviewDecided = () => { refreshPayload() }
+  // close, so its tiles don't shuffle around behind the lightbox. Coalesced: one
+  // slow payload per click would stack up on the server during a fast run.
+  const onReviewDecided = () => { refreshPayloadSoon() }
   // A turn made in ▶ Review must already be right on the tile behind it: the
   // grid is only refetched on close, and a tile still lying sideways would read
   // as "it didn't take".

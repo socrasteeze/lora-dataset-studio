@@ -227,25 +227,23 @@ function AutoTriageBar({ images, allImages, datasetId, faceThresholds, onBatch, 
    the Bank grid's (← Prev · "1–500 of 6211" · Next →), because it is the same
    gesture on the same kind of surface. Rendered ABOVE and BELOW the grid: a full
    page is tens of thousands of pixels tall, and a bottom-only pager would mean
-   scrolling all the way back up to move on. Buttons are min-h-11 (44 px) so the
-   whole thing is usable with a thumb at 400 px, where the row wraps. */
+   scrolling all the way back up to move on. Buttons share the row's width at
+   min-h-11 (44 px), so the whole thing is usable with a thumb at 400 px. */
 function GridPager({ view, onGo, where }) {
   if (!view.paged) return null;
-  const btn = 'min-h-11 rounded-lg border border-border bg-surface px-3 py-1 '
+  const btn = 'min-h-11 flex-1 rounded-lg border border-border bg-surface px-3 py-1 '
     + 'text-content font-semibold disabled:opacity-40 hover:bg-surface-raised';
   return (
     <nav aria-label={`Image grid pages (${where})`}
-      className="flex flex-wrap items-center gap-2 text-xs">
+      className="flex items-center gap-2 text-xs">
       <button type="button" disabled={view.page === 0} onClick={() => onGo(view.page - 1)}
         className={btn}>← Prev</button>
+      <span className="shrink-0 text-center tabular-nums">
+        <span className="block text-content-muted">{view.from}–{view.to} of {view.total}</span>
+        <span className="block text-content-subtle">page {view.page + 1}/{view.pages}</span>
+      </span>
       <button type="button" disabled={view.page >= view.pages - 1} onClick={() => onGo(view.page + 1)}
         className={btn}>Next →</button>
-      <span className="text-content-muted tabular-nums">
-        {view.from}–{view.to} of {view.total}
-      </span>
-      <span className="text-content-subtle tabular-nums">
-        page {view.page + 1}/{view.pages}
-      </span>
     </nav>
   );
 }

@@ -17,9 +17,10 @@ import { editBadge, imageVersionQuery } from './bankEdits.js'
 import { detailSummary } from './bankProvenance.js'
 import { captionChips } from './bankTags.js'
 import { capTileBadges, tileBadges } from './bankTileBadges.js'
+import { tileShapeFrame } from './bankLayout.js'
 import { captionIsAsserted, captionOriginInfo, captionOriginTooltipLine } from '../../utils/captionOrigin.js'
 
-export default function Tile({ img, bankId, selected, onToggle, onReview, onTags }) {
+export default function Tile({ img, bankId, selected, shape, onToggle, onReview, onTags }) {
   // The chips this image would actually offer. Computed HERE rather than asked of
   // the caption's mere existence: a caption of nothing but stop words ("a photo of
   // her") yields zero chips, and `img.caption && …` would have offered the button
@@ -63,20 +64,19 @@ export default function Tile({ img, bankId, selected, onToggle, onReview, onTags
           + (img.caption
             ? `\n${captionOriginTooltipLine(img.caption, img.caption_origin)}: ${img.caption}`
             : '')}
-        className="block aspect-[3/4] w-full">
+        className={`block ${tileShapeFrame(shape)} w-full`}>
         {/* ?r=/?e= are cache busters, not parameters the server reads: the thumb
             route answers with max-age=3600, so a turned OR edited image would keep
             showing its old pixels for an hour and read as "the button did nothing".
             ?e= carries the edit GENERATION, so a second crop of the same image
             moves the URL too — see bankEdits.imageVersionQuery.
-            3:4 portrait: bank photos are typically people, and a short
-            landscape crop cut the body off. Width comes from the grid; S vs M
-            is column count, not a second height. Landscape shots stay
-            centre-cropped (object-cover), not squashed. */}
+            The frame is the chosen shape (3:4 by default). Width comes from the
+            grid; S vs M is column count, not a second height. The whole image
+            always shows (object-contain), neither cropped nor squashed. */}
         <img src={`/api/bank/${bankId}/thumb/${img.id}${imageVersionQuery(img)}`}
           alt={[img.name, img.rotation ? `rotated ${img.rotation}°` : null,
             edited ? edited.label : null].filter(Boolean).join(' — ')} loading="lazy"
-          className="h-full w-full object-cover" />
+          className="h-full w-full object-contain" />
       </button>
       {selected && (
         <>

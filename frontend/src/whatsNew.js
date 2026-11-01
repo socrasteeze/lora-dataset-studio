@@ -85,6 +85,18 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-01-bank-thumbnail-shapes', date: '2026-11-01',
+    title: 'See whole images in the Bank grid',
+    blurb: 'Choose 3:4, 4:3 or 1:1 thumbnails next to the sort menu. Every shape shows the entire image instead of cropping it, and your choice is remembered.',
+    to: '/bank',
+  },
+  {
+    id: '2026-11-01-faster-keep-reject', date: '2026-11-01',
+    title: 'Keep and Reject respond right away',
+    blurb: 'On a large bank, the grid no longer waits for every counter to recalculate after a decision. Prev and Next now fill the row, and changing page returns you to the top.',
+    to: '/bank',
+  },
+  {
     id: '2026-11-01-exclude-folder-deleted', date: '2026-11-01',
     title: 'Deleted folders no longer block Exclude folder',
     blurb: 'If you hid a folder and later deleted it, ticking any other folder in Exclude folder failed with a "no folder" error. Saving now works and forgets the deleted folder.',

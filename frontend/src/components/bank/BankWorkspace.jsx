@@ -58,9 +58,10 @@ import {
 } from './bankFacets.js'
 // Structure B's own logic — rail folding, facet groups, the passes panel.
 import {
-  FOLD_KEYS, bankPaneHeight, loadDismissedReport, loadFold, loadRailOpen, passesButtonLabel,
-  railIsColumn, saveDismissedReport, saveFold, saveRailOpen,
+  FOLD_KEYS, bankPaneHeight, loadDismissedReport, loadFold, loadRailOpen, loadTileShape,
+  passesButtonLabel, railIsColumn, saveDismissedReport, saveFold, saveRailOpen, saveTileShape,
 } from './bankLayout.js'
+import { coalescedRun } from './bankCoalescedRun.js'
 import { mergeWorkspacePayload } from './bankWorkspaceLoading.js'
 import PromoteDialog from './PromoteDialog'
 import DeleteRejectedDialog from './DeleteRejectedDialog'
@@ -370,6 +371,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const [showSelected, setShowSelected] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [tileSize, setTileSize] = useState('M')
+  const [tileShape, setTileShapeState] = useState(() => loadTileShape())
+  const setTileShape = (id) => setTileShapeState(saveTileShape(id))
+  const mainRef = useRef(null)
   // Which machine runs a pass clicked on its own. Its own remembered value, not
   // the inpaint picker's — both render on this screen and one key for both let
   // a ComfyUI backend picked for Klein decide where a bank pass ran.
@@ -554,6 +558,14 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       else payloadPendingRef.current.delete(bankId)
     }
   }, [bankId, onGone, toast, refreshRuntime])
+
+  // One stable runner: refreshPayload's identity can change between renders, and
+  // rebuilding the runner then would cancel a refresh that a click just scheduled.
+  const refreshPayloadRef = useRef(refreshPayload)
+  useEffect(() => { refreshPayloadRef.current = refreshPayload }, [refreshPayload])
+  const refreshPayloadSoon = useMemo(
+    () => coalescedRun(() => refreshPayloadRef.current({ background: true })), [])
+  useEffect(() => () => refreshPayloadSoon.cancel(), [refreshPayloadSoon])
 
   const filterParams = useCallback((f) => {
     const params = {}
@@ -1013,7 +1025,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [excludeText])
   const goto = (off) => {
-    refreshImages(filter, off).then((ok) => { if (ok) setOffset(off) })
+    refreshImages(filter, off).then((ok) => {
+      if (!ok) return
+      setOffset(off)
+      // The grid scrolls inside <main> beside an open rail, and with the page otherwise.
+      mainRef.current?.scrollTo({ top: 0 })
+      window.scrollTo({ top: 0 })
+    })
   }
 
   /* `onRefusal` is for a caller that OWNS a surface for the refusal — today the
@@ -1040,7 +1058,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     } catch { return null }
   }
 
-  const act = async (fn, okMsg, { onRefusal } = {}) => {
+  const act = async (fn, okMsg, { onRefusal, payloadLater } = {}) => {
     try {
       const d = await fn()
       if (d?.queued) {
@@ -1051,7 +1069,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       } else if (okMsg) toast.success(okMsg)
       // Adopt the cheap queue/activity state before refreshing the dashboard.
       await adoptActivity()
-      await Promise.all([refreshPayload(), refreshImages()])
+      if (payloadLater) {
+        refreshPayloadSoon()
+        await refreshImages()
+      } else {
+        await Promise.all([refreshPayload(), refreshImages()])
+      }
       return d
     } catch (e) {
       // ONE bank, ONE background job: every action here can be refused because
@@ -1342,8 +1365,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
 
   const batchStatus = async (ids, status) => {
     if (!ids.length) return
+    // The grid answers in milliseconds; the full payload took 11 s on a 35 000-image
+    // bank, and waiting for it left the selection on screen after every click.
     const result = await act(() => postJson(`/api/bank/${bankId}/images/status`, { ids, status }),
-      `${ids.length} image(s) → ${status}`)
+      `${ids.length} image(s) → ${status}`, { payloadLater: true })
     if (!result || result.ok === false) return
     setSelected(new Set())
     // The selection is gone, so its view has nothing left to show — return to the grid.
@@ -1419,7 +1444,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     onReviewEdited, closeReview,
   } = useReviewLightbox({
     bankId, filter, filterParams, fetchAllIds, showSelected, selected,
-    selectedOrder, setPage, toast, refreshPayload, refreshImages,
+    selectedOrder, setPage, toast, refreshPayload, refreshPayloadSoon, refreshImages,
   })
 
   const openComparison = async (options = {}) => {
@@ -2240,6 +2265,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 null)}
               sortGroups={sortGroups} setSort={setSort}
               tileSize={tileSize} setTileSize={setTileSize}
+              tileShape={tileShape} setTileShape={setTileShape}
               moreOpen={moreOpen} setMoreOpen={setMoreOpen}
               isDrawer={!railIsColumnNow} onClose={closeRail}
               onBrowseStyles={() => setStyleBrowserOpen(true)}
@@ -2267,7 +2293,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
 
         {/* ── The grid, full height ── with everything that acts on a SELECTION
             directly above it, where the effect of the click is visible. */}
-        <main className={`min-w-0 space-y-3 ${railOpen && railIsColumnNow
+        <main ref={mainRef} className={`min-w-0 space-y-3 ${railOpen && railIsColumnNow
           ? 'lg:min-h-0 lg:h-[var(--bank-pane-height)] lg:overflow-y-auto lg:[scrollbar-gutter:stable]' : ''}`}>
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" className={`${FILTER_HOVER} ${CONTROL_DISABLED}`}
@@ -2839,7 +2865,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               ? 'grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 2xl:grid-cols-10'
               : 'grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 2xl:grid-cols-8'}`}>
               {page.images.map((img) => (
-                <Tile key={img.id} img={img} bankId={bankId}
+                <Tile key={img.id} img={img} bankId={bankId} shape={tileShape}
                   selected={selected.has(img.id)}
                   onReview={() => openReview(img.id)}
                   onTags={() => openTagPicker(img)}
@@ -2861,13 +2887,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             {page.total > PAGE_SIZE && (
               <nav className="flex items-center gap-3 text-sm" aria-label="Grid pages">
                 <button type="button" disabled={offset === 0} onClick={() => goto(Math.max(0, offset - PAGE_SIZE))}
-                  className="rounded-md border border-border px-2 py-1 text-content disabled:opacity-40">← Prev</button>
-                <span className="text-content-muted">
+                  className="min-h-11 flex-1 rounded-md border border-border px-2 py-1 text-content disabled:opacity-40">← Prev</button>
+                <span className="shrink-0 tabular-nums text-content-muted">
                   {offset + 1}–{Math.min(offset + PAGE_SIZE, page.total)} of {page.total}
                 </span>
                 <button type="button" disabled={offset + PAGE_SIZE >= page.total}
                   onClick={() => goto(offset + PAGE_SIZE)}
-                  className="rounded-md border border-border px-2 py-1 text-content disabled:opacity-40">Next →</button>
+                  className="min-h-11 flex-1 rounded-md border border-border px-2 py-1 text-content disabled:opacity-40">Next →</button>
               </nav>
             )}
             </>

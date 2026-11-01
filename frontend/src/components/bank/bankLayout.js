@@ -87,6 +87,36 @@ export function saveRailOpen(open, store = defaultStore()) {
   return !!open;
 }
 
+/* ── Thumbnail shape ────────────────────────────────────────────────────────
+   Every shape letterboxes (object-contain), so the whole image stays visible.
+   A screen preference like the rail, not stored per bank. `id` is persisted:
+   never rename one. */
+export const TILE_SHAPES = [
+  { id: '3:4', frame: 'aspect-[3/4]' },
+  { id: '4:3', frame: 'aspect-[4/3]' },
+  { id: '1:1', frame: 'aspect-square' },
+];
+export const TILE_SHAPE_STORAGE_KEY = 'lds.bank.tileShape';
+
+export function tileShapeFrame(id) {
+  return (TILE_SHAPES.find((s) => s.id === id) || TILE_SHAPES[0]).frame;
+}
+
+export function loadTileShape(store = defaultStore()) {
+  try {
+    const raw = store?.getItem(TILE_SHAPE_STORAGE_KEY);
+    if (TILE_SHAPES.some((s) => s.id === raw)) return raw;
+  } catch { /* fall through to the default */ }
+  return TILE_SHAPES[0].id;
+}
+
+export function saveTileShape(id, store = defaultStore()) {
+  try {
+    store?.setItem(TILE_SHAPE_STORAGE_KEY, id);
+  } catch { /* private mode / quota — the session still has the right state */ }
+  return id;
+}
+
 /* ── Remembered folds ───────────────────────────────────────────────────────
    Which Bank blocks the user left open or closed. Before this they reset on
    every visit, and the defaults put the first image below the fold at
