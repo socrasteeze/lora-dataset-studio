@@ -87,6 +87,7 @@ Four ways to fill a dataset, and one choice at creation that rewires everything 
 | :-- | :-- |
 | **Character / Concept / Style** | One choice at creation rewires captioning, masking and step-scaling — it isn't just a label |
 | **✨ Generate from references** | A local Klein/ComfyUI model, each request wrapped in identity-preservation instructions (this fork is local-only for generation) |
+| **Quick set** | One or two pictures become a new dataset: a MiniMax H3 orbit, a Qwen 2.1 (or Krea 2) reinforce pass, an identity cull, and captions with view tags. It always creates a new dataset. The variation catalog, Klein/Krea fan-out, and the Qwen 2511 camera lane stay under their existing controls |
 | **Variation catalog** | Character sets fan out expression / angle / lighting / framing / outfit / background without you writing a single prompt |
 | **📥 Import your own** | Drag photos in — full frame for Concept/Style, optional auto head-crop for Character |
 | **✏️ Edit the prompt, regenerate** | Every generated tile reopens its exact prompt inline and re-renders through the same engine, identity guard included |

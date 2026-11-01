@@ -312,6 +312,9 @@ const TOPICS = [
     app: { route: '/datasets?section=studio' } },
 
   // ---- Page-level topics (kind 'page') -----------------------------------
+  action('quick-set', 'Quick Set',
+    ['quick set', 'orbit', 'turntable', 'qwen 2.1', 'krea 2', 'turbo', 'new dataset'],
+    '/datasets', 'using-the-app', 'quick-set'),
   { id: 'page-datasets', kind: 'page', title: 'Datasets library',
     keywords: ['datasets', 'library', 'tiles', 'browse', 'home', 'filter', 'kind'],
     guide: { chapter: 'getting-started', anchor: 'around-the-app' },

@@ -73,7 +73,7 @@ SECRET_KEYS = ('HF_TOKEN', 'VAST_API_KEY',
 # config.json, so a changed DEFAULTS value alone would never reach it. This
 # marker lets us distinguish that one-time profile migration from settings the
 # user changes after the new profile is available.
-KREA_CALIBRATION_VERSION = 4
+KREA_CALIBRATION_VERSION = 5
 _LEGACY_KREA_GROUNDING_PX = 1024.0
 _LEGACY_KREA_REF_BOOST = 4.0
 _PREVIOUS_KREA_GROUNDING_PX = 512.0
@@ -81,10 +81,14 @@ _PREVIOUS_KREA_REF_BOOST = 1.0
 _PREVIOUS_KREA_STEPS = 10
 # v3 shipped 512 / 0.25 / 8 — a pair that matched NEITHER calibrated profile
 # (v1 = 1024/4.0, v2 = 512/1.0): the reference pull had drifted to a quarter of
-# v2's. v4 returns to the identity-first pair; see _migrate_krea_calibration.
+# v2's. v4 returned to 1024 / 4.0 / 12. v5 keeps that grounding and moves the
+# pull to 2.0 and the step count to 8. See _migrate_krea_pose_profile.
 _V3_KREA_GROUNDING_PX = 512.0
 _V3_KREA_REF_BOOST = 0.25
 _V3_KREA_STEPS = 8
+_V4_KREA_GROUNDING_PX = 1024.0
+_V4_KREA_REF_BOOST = 4.0
+_V4_KREA_STEPS = 12
 
 DEFAULTS = {
     # hidden: removes the Image Sources panel from the Bank and dataset pages.
@@ -972,13 +976,15 @@ DEFAULTS = {
         # Internal marker for the calibrated dataset-restaging defaults below.
         # It is intentionally not a user-facing setting.
         'calibration_version': KREA_CALIBRATION_VERSION,
-        # Blank = auto-resolve a Krea 2 base under any 'krea'-named model folder,
-        # preferring a Turbo then a Raw build. Set it to a filename to pin one.
+        # Blank = auto-resolve. The resolver prefers the canonical Turbo file
+        # Setup installs, then any other Turbo build, then a Raw build.
+        # Set it to a filename to pin one.
         'base_model': '',
-        # The edit LoRA the whole engine hangs on. Not found under this name ->
-        # the resolver scans the loras roots for a krea2_identity_edit* file, so a
-        # renamed download still works.
-        'identity_lora': 'krea/krea2_identity_edit_v1_2.safetensors',
+        # Preferred identity-edit LoRA. Not found under this name -> the
+        # resolver scans the loras roots for any krea2_identity_edit* file, so
+        # the older download and a renamed file still work. A saved config that
+        # still holds the previous shipped name is not treated as a pin.
+        'identity_lora': 'krea/krea2_identity_edit_v2.safetensors',
         # Optional always-on generation LoRAs, as NAMED presets (mirrors
         # klein.generation_lora_presets — the mechanism is @waltm's idea). Pure
         # user data: [{name, loras: [{file, strength}]}], empty by default, and
@@ -996,20 +1002,21 @@ DEFAULTS = {
         # reference is shown to the vision text-encoder at. LOW = follows the
         # PROMPT (more variety, weaker likeness); HIGH = RESEMBLES the reference
         # (stronger likeness, but it starts copying the pose and the outfit you
-        # asked it to change). 1024 is the v4 profile: identity first. It pairs
-        # with ref_boost 4.0 — these two are ALWAYS shipped together, and the
-        # 512/0.25 of v3 matched neither calibrated pair.
+        # asked it to change). 1024 stays the identity-first grounding. It ships
+        # with ref_boost 2.0 (v5). v4 shipped this same grounding with ref_boost
+        # 4.0; only that exact stored triple is rewritten.
         'grounding_px': 1024,
-        # 12 = the value the v4 benchmark actually ran at (v3 shipped 8, the
-        # pack reference workflow's own). cfg is pinned at 1.0 in code
-        # (guidance-distilled model) and is deliberately NOT a setting.
-        'steps': 12,
+        # 8 = the few-step count the Turbo graph is built for (cfg 1.0,
+        # euler/simple — the pack reference workflow's own, and the v3 default).
+        # v4 shipped 12, the count that calibration run used. cfg is pinned at
+        # 1.0 in code (guidance-distilled model) and is deliberately NOT a setting.
+        'steps': 8,
         'identity_lora_strength': 1.0,
         # How hard the source latent is pushed back into the model each step.
-        # 4.0 = the fidelity value the engine's own v1.2 notes give for strong
-        # face likeness, and the measured winner. See _migrate_krea_calibration
-        # for what that measurement does and does not establish.
-        'ref_boost': 4.0,
+        # 2.0 is the v5 pull, paired with grounding 1024. v4 shipped 4.0.
+        # See _migrate_krea_pose_profile: an untouched v4 triple moves here, and
+        # a value the user changed does not.
+        'ref_boost': 2.0,
     },
     # The ✨ Upscale & improve pass — which engine runs it. Its own namespace
     # rather than a key under `klein`, because the whole point of the setting is
@@ -1072,6 +1079,37 @@ DEFAULTS = {
         # step count instead (qwen_camera_helper.STEPS_WITHOUT_SPEED_LORA);
         # speed is the only thing this file buys.
         'speed_lora': '',
+    },
+    # Quick set — one orbit, one edit pass, one new dataset. Blank model slots
+    # mean "find the canonical file, then a narrow token". A value you change
+    # and that is not on disk is a stop, not a silent swap.
+    'quick_set': {
+        'engine': 'qwen21',
+        'turbo': True,
+        'target_count': 30,
+        'sample_frames': 45,
+        'blur_min': 8.0,
+        'hash_distance': 6,
+        'unet': 'qwen21/qwen_image_2.1_int8_convrot.safetensors',
+        'text_encoder': '',
+        'vae': 'texture_fix_vae_for_qwen_image_2.1_bf16.safetensors',
+        'detail_lora': 'qwen2.1-detail-fix-2.0.safetensors',
+        'detail_strength': 1.0,
+        'turbo_lora': 'qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors',
+        'turbo_strength': 1.0,
+        'turbo_sigmas': ('1.0, 0.978453, 0.95418, 0.926626, 0.89508, '
+                         '0.845148, 0.704534, 0.414568, 0.0'),
+        'turbo_cfg': 1.0,
+        'steps': 25,
+        'cfg': 4.0,
+        'sampler': 'euler',
+        'scheduler': 'simple',
+        'clip_type': 'qwen_image',
+        'max_megapixels': 2.0,
+        'long_side': 1536,
+        'h3_frames': 124,
+        'h3_megapixels': 1.0,
+        'h3_accel': '',
     },
     # SeedVR2 — the FIDELITY upscaler (services/seedvr2_helper.py, issue #32 by
     # SurpassHR). Not a generation engine: it restores detail and leaves the
@@ -1240,12 +1278,17 @@ def _number_is(value, expected):
 def _migrate_krea_pose_profile(conf: dict, stored: dict, incoming: dict | None = None) -> dict:
     """Apply calibrated Krea pose defaults only to untouched old profiles.
 
-    ``config.json`` overrides ``DEFAULTS``. The first Krea profile saved
-    1024 / 4.0; calibration v2 then saved
-    512 / 1.0 / 10.  Both are reference-dominated for diverse dataset poses. Only
-    those exact shipped profiles are upgraded. Any other value is an intentional
-    choice. An explicit save of a calibration knob is also intentional and gets
-    the marker rather than being rewritten.
+    ``config.json`` overrides ``DEFAULTS``. Untouched shipped profiles are
+    upgraded to the current defaults:
+
+      * v1 (no marker, or version < 2): grounding 1024, ref_boost 4.0, steps 10
+      * v2: 512 / 1.0 / 10
+      * v3: 512 / 0.25 / 8
+      * v4: 1024 / 4.0 / 12
+
+    Any other value is an intentional choice and is left alone. An explicit
+    save of a calibration knob is also intentional and gets the marker rather
+    than being rewritten.
     """
     stored_krea = (stored or {}).get('krea')
     krea = conf.get('krea')
@@ -1279,23 +1322,25 @@ def _migrate_krea_pose_profile(conf: dict, stored: dict, incoming: dict | None =
         and _number_is(stored_krea.get('ref_boost'), _PREVIOUS_KREA_REF_BOOST)
         and _number_is(stored_krea.get('steps', _PREVIOUS_KREA_STEPS),
                        _PREVIOUS_KREA_STEPS))
-    # v3 shipped 512 / 0.25 / 8 and v4 goes back to the identity-first pair
-    # 1024 / 4.0 / 12. What that rests on, stated plainly because it walks back a
-    # default this project moved away from TWICE on purpose: a benchmark on ONE
-    # reference, four scored images per profile, where 1024/4.0 led by +0.17 face
-    # similarity on bust framing with no overlap between the runs — and did so at
-    # a LOWER reference pull, so the extra likeness was not bought by recopying
-    # the pose. The face-framing cards were dominated by seed noise (0.26 spread
-    # between two images of the SAME profile) and measured nothing; body framings
-    # produced no score at all. It is a deliberate product choice, not a proven
-    # optimum. Whoever reconsiders it should widen the evidence to a second face
-    # before trusting the number.
+    # v3 shipped 512 / 0.25 / 8. v4 shipped 1024 / 4.0 / 12. The rewrite below
+    # copies the CURRENT defaults (v5: 1024 / 2.0 / 8), so an untouched older
+    # profile lands on v5 rather than on the intermediate profile it skipped.
+    # v4's 1024/4.0 pair rested on a benchmark on ONE reference, four scored
+    # images per profile, where it led by +0.17 face similarity on bust framing
+    # with no overlap between the runs, at a LOWER reference pull. Face-framing
+    # cards were seed noise; body framings produced no score. It was a product
+    # choice, not a proven optimum.
     is_v3_default = (
         stored_version == 3
         and _number_is(stored_krea.get('grounding_px'), _V3_KREA_GROUNDING_PX)
         and _number_is(stored_krea.get('ref_boost'), _V3_KREA_REF_BOOST)
         and _number_is(stored_krea.get('steps', _V3_KREA_STEPS), _V3_KREA_STEPS))
-    if is_v1_default or is_v2_default or is_v3_default:
+    is_v4_default = (
+        stored_version == 4
+        and _number_is(stored_krea.get('grounding_px'), _V4_KREA_GROUNDING_PX)
+        and _number_is(stored_krea.get('ref_boost'), _V4_KREA_REF_BOOST)
+        and _number_is(stored_krea.get('steps', _V4_KREA_STEPS), _V4_KREA_STEPS))
+    if is_v1_default or is_v2_default or is_v3_default or is_v4_default:
         krea['grounding_px'] = DEFAULTS['krea']['grounding_px']
         krea['ref_boost'] = DEFAULTS['krea']['ref_boost']
         krea['steps'] = DEFAULTS['krea']['steps']

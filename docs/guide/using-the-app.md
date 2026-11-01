@@ -146,6 +146,25 @@ captioning rules and a few guards change with the dataset kind.
 
 ---
 
+## Quick set
+
+Quick set builds a new character dataset from one or two pictures. It renders a
+slow 360-degree orbit with MiniMax H3, keeps a spread of sharp frames, and
+reinforces each one with Qwen 2.1 (the default) or Krea 2. Turbo is on for
+Qwen 2.1. Turning Turbo off uses 25 steps, CFG 4, and the simple scheduler.
+That off path is untested.
+
+Open it from **Quick Set** on the Datasets page, or from Add images inside a
+dataset. The run always creates a new dataset. A name that already exists is
+refused. The trigger word is stored on the dataset and is not written into the
+captions. Captions gain a view tag from the orbit position (front, side, back,
+and the quarters between them) and a crop tag (full body, medium shot, or
+close-up).
+
+The job shows each stage and the frames as they finish. Stop ends the run
+before a dataset is saved. Model file names live under `quick_set` in
+`config.json`. See the settings reference.
+
 ## The character walkthrough (reference photo → trained LoRA)
 
 1. **Create the dataset** — Datasets → New. Pick **Character**, name it, set a

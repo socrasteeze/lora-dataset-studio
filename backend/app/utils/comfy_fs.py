@@ -510,7 +510,8 @@ _STAGED_INPUT_RE = re.compile(
     r'^(?:edit_source|edit_ref\d+|krea_source|camera_source|seedvr2_source)'
     r'_[0-9a-f]{8}_'
     r'|^(?:krea_ref_b|wmklein_(?:crop|frame|mask))_[0-9a-f]{8}\.png$'
-    r'|^lds_vstudio_[0-9a-f]{10}\.png$')
+    r'|^lds_vstudio_[0-9a-f]{10}\.png$'
+    r'|^lds_vref_[0-9a-f]{32}\.png$')
 
 # Old orphan copies are collected after 48 h. Local queue depth and render
 # deadlines are configurable: a live job can wait longer, even indefinitely.

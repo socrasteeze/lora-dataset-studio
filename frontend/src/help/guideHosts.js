@@ -14,6 +14,7 @@ export const CORE_GUIDE_ANCHORS = {
     "assign-identities",
     "undo-a-folder-group",
     "image-sources",
+    "quick-set",
     "the-character-walkthrough-reference-photo-trained-lora",
     "write-caption-txt",
     "review-training-duplicates",
@@ -209,6 +210,7 @@ export const CORE_GUIDE_ANCHORS = {
     "maintenance",
     "usage-statistics",
     "per-dataset-settings",
+    "quick-set",
     "config-file-only-settings",
     "config-json-key-reference-all-keys",
     "new-media-destinations"

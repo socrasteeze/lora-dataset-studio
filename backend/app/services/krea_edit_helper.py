@@ -22,7 +22,7 @@ THE GRAPH (validated against /object_info on a live install)
     UNETLoader -> LoraLoaderModelOnly(identity edit LoRA) -> Krea2EditModelPatch -> KSampler
     LoadImage  -> VAEEncode -> source_latent  ^                positive: Krea2EditGroundedEncode(prompt, image)
                                                               negative: Krea2EditGroundedEncode('',     image)
-    CLIPLoader(qwen3-vl 4B, type='krea2') · VAELoader(qwen image vae) · EmptySD3LatentImage
+    CLIPLoader(qwen3-vl 4B, type='krea2') · VAELoader(texture-fix VAE, else qwen image vae) · EmptySD3LatentImage
 
 An OPTIONAL second reference joins the patch as `source_image_b` and both
 encodes as `image_b` — the pack's only `_b` slot, and it wants a DIFFERENT
@@ -66,7 +66,9 @@ one moment that became an architecture decision for weeks):
     look for: `diffusion_models/krea2_turbo_fp8_scaled.safetensors` (13.1 GB),
     `text_encoders/qwen3vl_4b_fp8_scaled.safetensors` (5.2 GB) and
     `vae/qwen_image_vae.safetensors` (254 MB). Measured: anonymous HTTP 200 on
-    each, no token, `gated=false`.
+    each, no token, `gated=false`. The VAE resolver prefers
+    `texture_fix_vae_for_qwen_image_1_and_krea_2_bf16.safetensors` when that
+    file is already on disk; `qwen_image_vae` stays the downloadable fallback.
   * The identity LoRA (Civitai 2761113) also downloaded anonymously on that date
     — 307 to a signed CDN URL, then real safetensors bytes, no API key.
   * The node pack declares `dependencies = []`, so installing it is a clone, not
@@ -126,7 +128,7 @@ KREA_ASSETS = {
     },
     'krea_identity_lora': {
         'kind': 'Krea 2 Identity Edit LoRA',
-        'path': 'models/loras/krea/krea2_identity_edit_v1_2.safetensors',
+        'path': 'models/loras/krea/krea2_identity_edit_v2.safetensors',
         'source': 'https://civitai.com/models/2761113',
     },
     'krea_text_encoder': {
@@ -134,6 +136,8 @@ KREA_ASSETS = {
         'path': 'models/text_encoders/qwen3vl_4b_fp8_scaled.safetensors',
         'source': 'https://huggingface.co/Comfy-Org/Krea-2/tree/main/text_encoders',
     },
+    # Downloadable fallback. resolve_krea_vae prefers the texture-fix VAE when
+    # that file is already present; this path is what Setup still fetches.
     'krea_vae': {
         'kind': 'Qwen Image VAE',
         'path': 'models/vae/qwen_image_vae.safetensors',
@@ -371,10 +375,30 @@ def resolve_krea_text_encoder():
         ('qwen3vl_4b', 'qwen3_vl_4b', 'qwen3-vl-4b'))
 
 
+# Preferred VAE. The token keeps the "1_and_krea_2" tail on purpose: a shorter
+# "texture_fix" or "texture_fix_vae_for_qwen_image" match also hits Qwen-Image
+# 2.1's texture_fix_vae_for_qwen_image_2.1_* file, which is a different VAE.
+KREA_TEXTURE_FIX_VAE = 'texture_fix_vae_for_qwen_image_1_and_krea_2_bf16.safetensors'
+_KREA_TEXTURE_FIX_VAE_TOKENS = ('texture_fix_vae_for_qwen_image_1_and_krea_2',)
+
+
 def resolve_krea_vae():
-    """`vae_name` for the VAELoader — canonical qwen_image_vae.safetensors, else a
-    narrow qwen-image-vae token match. Never flux2-vae (Klein's). Any depth, like
-    the text encoder above."""
+    """`vae_name` for the VAELoader.
+
+    Prefer the Krea texture-fix VAE: the canonical
+    ``texture_fix_vae_for_qwen_image_1_and_krea_2_bf16.safetensors`` at any depth
+    under the vae roots, else a narrow token match on
+    ``texture_fix_vae_for_qwen_image_1_and_krea_2``. That token does not match
+    Qwen-Image 2.1's ``texture_fix_vae_for_qwen_image_2.1_*``.
+
+    When no texture-fix file is present, fall back to the existing
+    qwen_image_vae resolution (canonical name, then a narrow qwen-image-vae
+    token) so an install without the texture-fix file still runs. Never
+    flux2-vae (Klein's)."""
+    texture = comfy_model_paths.find_model_by_name(
+        'vae', KREA_TEXTURE_FIX_VAE, _KREA_TEXTURE_FIX_VAE_TOKENS)
+    if texture:
+        return texture
     return comfy_model_paths.find_model_by_name(
         'vae', 'qwen_image_vae.safetensors',
         ('qwen_image_vae', 'qwen-image-vae', 'qwenimage_vae'))
@@ -386,6 +410,9 @@ def resolve_krea_vae():
 # a rename ('...v1_2' -> '...v1.2') must not make the engine look uninstalled.
 _IDENTITY_LORA_TOKENS = ('krea2_identity_edit', 'krea2-identity-edit',
                          'krea2_identity', 'identity_edit')
+# The filename DEFAULTS used to ship. A saved config that still holds it did
+# not choose a file, so a missing v2 must still scan for any krea2_identity_edit*.
+_PREVIOUS_SHIPPED_IDENTITY_LORA = 'krea/krea2_identity_edit_v1_2.safetensors'
 
 
 def _lora_abs(rel_name):
@@ -610,14 +637,18 @@ def _is_user_pin(key: str) -> bool:
 
     The distinction is not pedantry, it is the difference between a helpful
     refusal and a bricked install. `krea.base_model` defaults to '' — any value
-    is a choice. `krea.identity_lora` defaults to the canonical DOWNLOAD name, so
-    every install on earth has it "set" while nobody typed it; treating that as a
-    pin would turn the renamed-download recovery into a hard stop for everyone.
+    is a choice. `krea.identity_lora` defaults to the v2 download name, and a
+    saved config may still hold the previous shipped name. Neither was typed;
+    treating either as a pin would turn the renamed-download recovery into a
+    hard stop for everyone.
     Klein's consistency LoRA has exactly the same shape (see
     klein_edit_helper.klein_pin_gaps)."""
     section, _, field = key.partition('.')
     raw = str(cfg.get(key) or '').strip()
     if not raw:
+        return False
+    if (key == 'krea.identity_lora'
+            and raw.replace('\\', '/') == _PREVIOUS_SHIPPED_IDENTITY_LORA):
         return False
     shipped = str((cfg.DEFAULTS.get(section) or {}).get(field, '') or '').strip()
     return raw != shipped

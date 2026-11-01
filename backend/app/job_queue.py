@@ -720,6 +720,11 @@ def _dispatch_completion(job, filename, failed):
         except Exception:
             logger.exception('job_queue: plugin %s completion failed for %s', plugin_id, job.job_id)
         return
+    if md.get('is_quick_set'):
+        # Quick set polls the queue row itself and writes the dataset at the end.
+        # Drop the staged inputs here; the output file stays for that poll.
+        _drop_staged_inputs(md)
+        return
     if md.get('is_live') or md.get('is_video_test'):
         return  # These historical kinds have no core owner any more.
     _drop_staged_inputs(md)
