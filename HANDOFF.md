@@ -1,5 +1,17 @@
 # HANDOFF
 
+## History rewrite (2026-11-01)
+
+Operator authorized a history rewrite and force-push to remove personal
+information. All 1,048 fork-only commits were rewritten, so every fork hash in
+this file and in `docs/history` written before this entry is stale. Commits shared
+with upstream keep their hashes, and the merge base with upstream/v2 is unchanged.
+Removed: personal commit identities, AI trailers on fork commits, and one peer
+address in an old `NOTE.md`. Refs and release tags were moved, and the release
+workflow did not fire. Other clones must re-clone. GitHub's read-only pull request
+refs still hold old commits until GitHub support purges them. The old-to-new hash
+map and a pre-rewrite backup stay outside the repo on the operator's machine.
+
 ## Clean delivery checkpoint (2026-11-01)
 
 Operator authorized merging all branches into main and a clean push to
