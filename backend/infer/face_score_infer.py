@@ -5,7 +5,8 @@ request device=cuda only inside the exclusive GPU window (shared
 capabilities.resolve_face_device).
 stdin: {ref: path, images: [paths], models_root: path|null}.
 stdout: one JSON line {ref_ok: bool, results: {path: {state, sim?, det,
-bbox_frac, yaw, zoomed}}}. Logs go to stderr.
+bbox_frac, bbox, yaw, zoomed}}}. bbox is x, y, w, h as fractions of the
+frame. Logs go to stderr.
 Three-state gating with empirically validated padding and zoom rescue."""
 from __future__ import annotations
 import json, os, sys
@@ -253,6 +254,11 @@ def main() -> int:
                                            interpolation=cv2.INTER_CUBIC)))
             scale = 2.0
         if f is None: return {"state": "no_face"}
+        # Source-pixel box as fractions of the original frame. Cropping uses this.
+        # A later zoom looks at the head only and must not replace the location.
+        bx1, by1, bx2, by2 = (float(v) / scale for v in f.bbox)
+        bbox = [round(bx1 / w, 4), round(by1 / h, 4),
+                round(max(0.0, bx2 - bx1) / w, 4), round(max(0.0, by2 - by1) / h, 4)]
         # copyMakeBorder ADDS pixels without rescaling them, so a padded face
         # keeps its pixel size; only the AREA FRACTION has to be divided back by
         # the padded/original ratio to stay a fraction of the original image.
@@ -278,6 +284,7 @@ def main() -> int:
                     bbox_frac = float((z.bbox[2]-z.bbox[0]) * (z.bbox[3]-z.bbox[1])
                                       / (w * h))
         return {"state": state, "det": round(det, 3), "bbox_frac": round(bbox_frac, 4),
+                "bbox": bbox,
                 "yaw": None if yaw != yaw else round(yaw, 1), "zoomed": zoomed,
                 "_emb": f.normed_embedding}
 

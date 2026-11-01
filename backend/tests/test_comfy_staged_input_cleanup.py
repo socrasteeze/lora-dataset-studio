@@ -190,6 +190,7 @@ def test_every_klein_staged_input_is_collectable(tmp_path, name):
     'camera_source_0a1b2c3d_shot.png',   # 📷 camera angles
     'seedvr2_source_0a1b2c3d_shot.png',  # SeedVR2 upscale
     'lds_vstudio_0a1b2c3d4e.png',        # the Video Studio's staged frames
+    'lds_vref_' + ('ab' * 16) + '.png',  # H3 reference orbit
 ])
 def test_the_lanes_that_were_missing_are_collectable_too(tmp_path, name):
     """Four lanes minted names the sweep did not recognise. Precise per-job

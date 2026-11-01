@@ -10,7 +10,7 @@ def register_blueprints(app, csrf):
     # here: their bundled plugins register those blueprints. Flask refuses a
     # second registration under the same name. The legacy modules remain for
     # compatibility imports while callers migrate to the owning plugin.
-    for name in ('settings', 'datasets', 'training', 'studio', 'setup',
+    for name in ('settings', 'datasets', 'training', 'studio', 'setup', 'quick_set',
                  'setup_state', 'ollama', 'local_llm', 'backup', 'bank',
                  'system', 'cluster', 'profiles', 'identities',
                  'extensions', 'image_sources'):

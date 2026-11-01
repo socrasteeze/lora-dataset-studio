@@ -22,7 +22,8 @@ import { faceAnalysisState, faceAnalysisLabel } from './faceScoringGate.js';
 import DatasetGrid from './DatasetGrid';
 import { IdentityFilter, IdentityUndo } from '../shared/IdentityTools.jsx';
 import { apiFetch as identityFetch } from '../../api/fetchClient.js';
-import { Chip, Select } from '../common/Controls.jsx';
+import { Button, Chip, Select } from '../common/Controls.jsx';
+import QuickSetDialog from './QuickSetDialog.jsx';
 import { datasetBusyReason } from './datasetBusyReason.js';
 import KleinModelSetting from '../shared/KleinModelSetting';
 import KleinCleanOptions from '../shared/KleinCleanOptions';
@@ -276,6 +277,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
   const [identityIds, setIdentityIds] = useState(null);
   const [identityError, setIdentityError] = useState('');
   const [identityVersion, setIdentityVersion] = useState(0);
+  const [quickSet, setQuickSet] = useState(false);
   const identityDatasetId = ds.data?.id;
   const identityScope = ds.data?.instance_id;
   const identityRevision = ds.data?.identity_revision;
@@ -1430,7 +1432,14 @@ export default function DatasetWorkspace({ ds, onBack }) {
             <div id="ds-add-import" tabIndex={-1} className="scroll-mt-20">
               <ImportDropzone key={d.id} onImport={(f, o) => ds.importFiles(f, o)}
                 busy={importBusy} visionBusy={visionImportBusy} cropOption={!isConceptual} />
+              <Button size="md" className="mt-2 min-h-10 w-full sm:w-auto" onClick={() => setQuickSet(true)}>
+                Quick Set
+              </Button>
             </div>
+            {quickSet && (
+              <QuickSetDialog onClose={() => setQuickSet(false)} onOpen={ds.open}
+                suggestedTrigger={d.trigger_word || ''} />
+            )}
             {bankImport}
             {scrapeLink}
             {!isConceptual && (

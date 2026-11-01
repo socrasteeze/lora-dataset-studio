@@ -1549,6 +1549,36 @@ Separate from everything above: these live **per dataset**, in the **⚙ Dataset
 
   You can also edit the very same suffixes **inline in the generation panel** (the collapsible *✨ Prompt suffixes* row under the shot picker), which is handy for tuning them **per batch** without opening this modal — both surfaces read and write the one dataset value, and an edit made there is saved the moment you press **Generate**.
 
+## Quick set
+
+These keys live under `quick_set` in `config.json`. The dialog sets the engine,
+the Turbo switch, and the count for one run. The model names below are the
+defaults the resolvers look up: the canonical file first, then a narrow token
+match across the ComfyUI model roots. A value you change to a file that is not
+on disk stops the run. Clearing it back to the default scans again.
+
+| Key | Default | Role |
+|---|---|---|
+| `quick_set.engine` | `qwen21` | `qwen21` or `krea2`. The dialog can override one run. |
+| `quick_set.turbo` | `true` | Qwen 2.1 Turbo LoRA, euler, CFG 1, and the fixed sigma list. Off is 25 steps, CFG 4, simple scheduler, and is untested. |
+| `quick_set.target_count` | `30` | How many scored images the new dataset keeps. |
+| `quick_set.sample_frames` | `45` | Frames taken evenly from the orbit before blur and duplicate cuts. |
+| `quick_set.blur_min` | `8` | Laplacian variance below which a frame is dropped. |
+| `quick_set.hash_distance` | `6` | Perceptual-hash distance at or below which a later frame is a duplicate. |
+| `quick_set.unet` | `qwen21/qwen_image_2.1_int8_convrot.safetensors` | Qwen-Image 2.1 UNet. |
+| `quick_set.text_encoder` | *(empty)* | Empty scans for a `qwen3vl_8b` text encoder. |
+| `quick_set.vae` | `texture_fix_vae_for_qwen_image_2.1_bf16.safetensors` | Qwen-Image 2.1 texture-fix VAE. |
+| `quick_set.detail_lora` | `qwen2.1-detail-fix-2.0.safetensors` | Detail LoRA at `detail_strength` (default 1). |
+| `quick_set.turbo_lora` | `qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors` | Turbo LoRA at `turbo_strength` (default 1). |
+| `quick_set.turbo_sigmas` | `1.0, 0.978453, 0.95418, 0.926626, 0.89508, 0.845148, 0.704534, 0.414568, 0.0` | Manual sigmas for Turbo on. |
+| `quick_set.h3_frames` | `124` | Orbit length. H3 snaps this to a legal frame count. |
+| `quick_set.h3_megapixels` | `1` | Orbit canvas size. |
+| `quick_set.h3_accel` | *(empty)* | Empty uses the dense H3 reference base. `ref8` or `ref4` selects a reference acceleration the video lane already knows. |
+| `quick_set.max_megapixels` | `2` | Cap on each reinforced still. Portrait frames land at 1024×1536. |
+| `quick_set.long_side` | `1536` | Long side before the megapixel cap. |
+
+Krea 2 uses the existing `krea` settings, not this block.
+
 ## Config-file-only settings
 
 These have no UI control — they're for advanced users editing `config.json` by hand (copy `config.example.json` to `config.json` first). Most people never touch them; the defaults are tuned. Values below are the shipped defaults.

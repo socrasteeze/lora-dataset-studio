@@ -6,6 +6,7 @@ import ShotIllustration from './ShotIllustration';
 import TileSizeControl from '../shared/TileSizeControl';
 import FullBackupControls from './FullBackupControls';
 import ExternalRecaptionDialog from './ExternalRecaptionDialog.jsx';
+import QuickSetDialog from './QuickSetDialog.jsx';
 import { Button, Chip, Input, btnClass, btnShape, fieldClass } from '../common/Controls.jsx';
 import Pagination from '../common/Pagination.jsx';
 import { HelpBadge } from '../../help/HelpMode';
@@ -422,6 +423,7 @@ export default function DatasetListPanel({
   // is the only meaningful action.
   const [creating, setCreating] = useState(false);
   const [recaptioning, setRecaptioning] = useState(false);
+  const [quickSet, setQuickSet] = useState(false);
   const [query, setQuery] = useState('');
   // Kind chip filter — transient (see KIND_CHIPS): reset on every page load.
   const [kindFilter, setKindFilter] = useState('all');
@@ -517,6 +519,7 @@ export default function DatasetListPanel({
               ? <><X aria-hidden="true" className="h-4 w-4" /> Close</>
               : <><Plus aria-hidden="true" className="h-4 w-4" /> New dataset</>}
           </Button>
+          <Button size="md" className="min-h-10" onClick={() => setQuickSet(true)}>Quick Set</Button>
           {/* Back up everything, its include-LoRAs option and Import backup
               all live in ONE Backup menu. New dataset stays out of it. */}
           <div className="order-2 flex items-center gap-2 sm:order-none">
@@ -577,6 +580,7 @@ export default function DatasetListPanel({
       </div>
 
       {recaptioning && <ExternalRecaptionDialog onClose={() => setRecaptioning(false)} />}
+      {quickSet && <QuickSetDialog onClose={() => setQuickSet(false)} onOpen={onOpen} />}
 
       {formOpen && (
         <NewDatasetForm onCreate={onCreate}

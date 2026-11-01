@@ -1080,6 +1080,37 @@ DEFAULTS = {
         # speed is the only thing this file buys.
         'speed_lora': '',
     },
+    # Quick set — one orbit, one edit pass, one new dataset. Blank model slots
+    # mean "find the canonical file, then a narrow token". A value you change
+    # and that is not on disk is a stop, not a silent swap.
+    'quick_set': {
+        'engine': 'qwen21',
+        'turbo': True,
+        'target_count': 30,
+        'sample_frames': 45,
+        'blur_min': 8.0,
+        'hash_distance': 6,
+        'unet': 'qwen21/qwen_image_2.1_int8_convrot.safetensors',
+        'text_encoder': '',
+        'vae': 'texture_fix_vae_for_qwen_image_2.1_bf16.safetensors',
+        'detail_lora': 'qwen2.1-detail-fix-2.0.safetensors',
+        'detail_strength': 1.0,
+        'turbo_lora': 'qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors',
+        'turbo_strength': 1.0,
+        'turbo_sigmas': ('1.0, 0.978453, 0.95418, 0.926626, 0.89508, '
+                         '0.845148, 0.704534, 0.414568, 0.0'),
+        'turbo_cfg': 1.0,
+        'steps': 25,
+        'cfg': 4.0,
+        'sampler': 'euler',
+        'scheduler': 'simple',
+        'clip_type': 'qwen_image',
+        'max_megapixels': 2.0,
+        'long_side': 1536,
+        'h3_frames': 124,
+        'h3_megapixels': 1.0,
+        'h3_accel': '',
+    },
     # SeedVR2 — the FIDELITY upscaler (services/seedvr2_helper.py, issue #32 by
     # SurpassHR). Not a generation engine: it restores detail and leaves the
     # content alone, which is the opposite trade from Klein's ✨ improve. Same
