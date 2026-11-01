@@ -14141,7 +14141,13 @@ def set_excluded_folders(user_id, bank_id, excluded) -> dict | None:
     bank = get_bank(user_id, bank_id)
     if not bank:
         return None
-    cleaned = _normalize_excluded(excluded, _known_folders(_bank_relpaths(bank_id)))
+    known = _known_folders(_bank_relpaths(bank_id))
+    if isinstance(excluded, list):
+        # A hidden folder that was later deleted has no row left to uncheck, yet
+        # the picker sends it back with every save. Forget it instead of refusing.
+        stale = set(_excluded_prefixes(bank_id)) - known
+        excluded = [item for item in excluded if _clean_folder_token(item) not in stale]
+    cleaned = _normalize_excluded(excluded, known)
     bank.excluded_folders = _json.dumps(cleaned) if cleaned else None
     db.session.commit()
     return folder_exclusion_payload(user_id, bank_id)

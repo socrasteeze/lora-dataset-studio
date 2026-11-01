@@ -124,6 +124,21 @@ def test_a_longer_sibling_name_does_not_split_a_folder_from_its_children(client)
     ]
 
 
+def test_a_hidden_folder_that_was_deleted_does_not_block_a_save(client, tmp_path, app):
+    bank_id, _src = _bank(client, tmp_path)
+    with app.app_context():
+        from app.extensions import db
+        from app.models import ImageBank
+        db.session.get(ImageBank, bank_id).excluded_folders = '["bob", "gone"]'
+        db.session.commit()
+    # Checking bob again sends back the rest of the list, deleted folder included.
+    saved = client.put(f'/api/bank/{bank_id}/folder-exclusions',
+                       json={'excluded': ['gone']})
+    assert saved.status_code == 200, saved.get_json()
+    assert saved.get_json()['excluded'] == []
+    assert 'bob/c.jpg' in _rels(client, bank_id)
+
+
 def test_a_folder_that_is_not_in_the_bank_is_refused(client, tmp_path):
     bank_id, _src = _bank(client, tmp_path)
     missing = client.put(f'/api/bank/{bank_id}/folder-exclusions',
