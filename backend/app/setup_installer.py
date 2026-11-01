@@ -32,6 +32,8 @@ thread and expose their live state for polling. Actions:
   krea_model         -> the Krea 2 Turbo base into <ComfyUI>/models/diffusion_models/krea/
   krea_text_encoder  -> qwen3vl_4b_fp8_scaled into <ComfyUI>/models/text_encoders/
   krea_vae           -> qwen_image_vae into <ComfyUI>/models/vae/
+                        (the downloadable fallback; the engine prefers a
+                        texture-fix VAE already on disk — see resolve_krea_vae)
   krea_identity_lora -> the Krea 2 Identity Edit LoRA (Civitai) into
                         <ComfyUI>/models/loras/krea/
   krea_nodes         -> git clone (ZIP fallback) the comfyui-krea2edit custom-node pack
@@ -159,6 +161,11 @@ _KREA_DOWNLOADS = {
         'license_url': 'https://huggingface.co/Comfy-Org/Krea-2',
     },
     'krea_vae': {
+        # Stays qwen_image_vae on purpose. resolve_krea_vae prefers
+        # texture_fix_vae_for_qwen_image_1_and_krea_2* when that file is already
+        # present, and falls back to this download when it is not. The camera
+        # lane shares this same file; do not point the button at the texture-fix
+        # VAE.
         'url': 'https://huggingface.co/Comfy-Org/Krea-2/resolve/main/vae/qwen_image_vae.safetensors',
         'dest': ('vae', 'qwen_image_vae.safetensors'),
         'min_free_gb': 1, 'gated': False, 'min_bytes': 8 * 1024 ** 2,
@@ -172,8 +179,11 @@ _KREA_DOWNLOADS = {
     # asserts: measured open on 2026-07-27 from one IP, and Civitai gates parts
     # of its catalogue (NSFW, early access, creator restrictions) with rules that
     # have changed before and vary by country. So: try without a key, send one
-    # when it exists, and turn a 401/403 into instructions. The filename matches
-    # the krea.identity_lora default so the resolver finds it by canonical name.
+    # when it exists, and turn a 401/403 into instructions. This is the older
+    # download name. The shipped krea.identity_lora default is the v2 file;
+    # when that name is absent, resolve_krea_identity_lora still accepts this
+    # krea2_identity_edit* file. The URL stays this model — the bytes are not
+    # renamed to v2.
     'krea_identity_lora': {
         'url': 'https://civitai.com/api/download/models/3139172',
         'dest': ('loras', 'krea', 'krea2_identity_edit_v1_2.safetensors'),

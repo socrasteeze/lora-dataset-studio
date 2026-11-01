@@ -173,14 +173,20 @@ def test_an_explicit_base_model_setting_wins_and_a_stale_one_STOPS(krea):
 
 
 def test_the_shipped_identity_lora_name_is_not_a_user_pin(krea):
-    """`krea.identity_lora` defaults to the canonical DOWNLOAD name, so every
-    install has it "set" while nobody typed it. Treating that as a pin would turn
-    the renamed-download recovery into a hard stop for everyone — the refusal is
-    for values a user actually chose."""
+    """`krea.identity_lora` defaults to the v2 download name, so every install
+    has it "set" while nobody typed it. The previous shipped name is the same
+    kind of value. Treating either as a pin would turn the renamed-download
+    recovery into a hard stop — the refusal is for values a user actually chose."""
     keh, base, config = krea
     loras = base / 'models' / 'loras' / 'krea'
     # The default name is absent, the renamed file is there: still found, no gap.
     _write(loras / 'krea2_identity_edit_v12_renamed.safetensors')
+    name, path = keh.resolve_krea_identity_lora()
+    assert name and name.endswith('krea2_identity_edit_v12_renamed.safetensors')
+    assert keh.krea_pin_gaps() == []
+    # A saved config that still holds the previous shipped name is not a pin.
+    config.save_config({'krea': {
+        'identity_lora': 'krea/krea2_identity_edit_v1_2.safetensors'}})
     name, path = keh.resolve_krea_identity_lora()
     assert name and name.endswith('krea2_identity_edit_v12_renamed.safetensors')
     assert keh.krea_pin_gaps() == []
@@ -213,6 +219,40 @@ def test_the_vae_never_matches_kleins(krea):
     assert keh.resolve_krea_vae() == 'qwen_image_vae.safetensors'
 
 
+def test_the_texture_fix_vae_is_preferred_over_qwen_image_vae(krea):
+    """Canonical texture-fix name, at any depth, beats qwen_image_vae and is
+    never Klein's flux2-vae."""
+    keh, base, _ = krea
+    vae = base / 'models' / 'vae'
+    _write(vae / 'qwen_image_vae.safetensors')
+    _write(vae / 'flux2-vae.safetensors')
+    _write(vae / 'krea' / 'texture_fix_vae_for_qwen_image_1_and_krea_2_bf16.safetensors')
+    assert keh.resolve_krea_vae() == os.path.join(
+        'krea', 'texture_fix_vae_for_qwen_image_1_and_krea_2_bf16.safetensors')
+
+
+def test_a_qwen_image_2_1_texture_fix_vae_is_not_the_krea_vae(krea):
+    """The token keeps the Krea 2 tail. Qwen-Image 2.1's
+    texture_fix_vae_for_qwen_image_2.1_* file must not match, and with no Krea
+    texture-fix file the resolver falls back to qwen_image_vae."""
+    keh, base, _ = krea
+    vae = base / 'models' / 'vae'
+    _write(vae / 'texture_fix_vae_for_qwen_image_2.1_bf16.safetensors')
+    assert keh.resolve_krea_vae() is None
+    _write(vae / 'qwen_image_vae.safetensors')
+    assert keh.resolve_krea_vae() == 'qwen_image_vae.safetensors'
+
+
+def test_the_texture_fix_token_matches_a_renamed_krea_file(krea):
+    keh, base, _ = krea
+    vae = base / 'models' / 'vae'
+    _write(vae / 'texture_fix_vae_for_qwen_image_2.1_bf16.safetensors')
+    _write(vae / 'qwen_image_vae.safetensors')
+    _write(vae / 'alt' / 'texture_fix_vae_for_qwen_image_1_and_krea_2_fp32.safetensors')
+    assert keh.resolve_krea_vae() == os.path.join(
+        'alt', 'texture_fix_vae_for_qwen_image_1_and_krea_2_fp32.safetensors')
+
+
 def test_the_encoder_and_vae_are_found_in_subfolders(krea):
     """Same fix as the Klein slots (the reported bug): a user who files the
     family's encoder in a subfolder — mirroring the qwen/ and krea/ layouts the
@@ -236,10 +276,10 @@ def test_the_identity_lora_is_found_even_when_renamed_or_moved(krea):
     rel, path = keh.resolve_krea_identity_lora()
     assert rel == os.path.join('edits', 'krea2_identity_edit_v1.3.safetensors')
     assert os.path.isfile(path)
-    # The canonical location wins once it exists.
-    _write(loras / 'krea' / 'krea2_identity_edit_v1_2.safetensors')
+    # The shipped v2 name wins once it exists, even if an older file is also there.
+    _write(loras / 'krea' / 'krea2_identity_edit_v2.safetensors')
     rel, _ = keh.resolve_krea_identity_lora()
-    assert rel == os.path.join('krea', 'krea2_identity_edit_v1_2.safetensors')
+    assert rel == os.path.join('krea', 'krea2_identity_edit_v2.safetensors')
 
 
 def test_extra_model_paths_roots_are_searched_like_comfyui_does(krea, tmp_path):
@@ -598,11 +638,12 @@ def test_no_loader_value_is_ever_hardcoded_in_the_graph_builder():
 
 def test_grounding_is_clamped_and_snapped_and_junk_degrades_to_the_default(krea):
     keh, _base, config = krea
-    # The v4 identity-first pair — grounding and pull always ship together.
+    # v5: grounding stays 1024, the pull ships at 2.0.
     assert config.get('krea.grounding_px') == 1024
-    assert config.get('krea.ref_boost') == 4.0
+    assert config.get('krea.ref_boost') == 2.0
+    assert config.get('krea.steps') == 8
     assert keh.grounding_px() == 1024
-    assert keh._ref_boost() == 4.0
+    assert keh._ref_boost() == 2.0
     config.save_config({'krea': {'grounding_px': 700}})
     assert keh.grounding_px() == 704, 'snapped to the 64px patch grid'
     config.save_config({'krea': {'grounding_px': 99999}})
