@@ -2594,8 +2594,8 @@ Three things each control tells you that a bare number cannot:
   distance* is a distance in hash bits — **raise** it to catch more
   near-duplicates. *Semantic duplicate similarity* is a similarity — **lower**
   it to catch more. They sit side by side and they move opposite ways, so each
-  field spells its own direction out in a sentence under the input. The longer
-  hint, and when the change takes effect, sit on that sentence's title.
+  input's tooltip spells out its own direction, the longer hint, and when the
+  change takes effect. Touch screens show no tooltip.
 - **When it takes effect.** Eight of them re-sort the bank the moment you save,
   because the scan stores raw measurements and the verdicts are recomputed on
   every read — no rescan, ever. The other four are baked into stored groups by a

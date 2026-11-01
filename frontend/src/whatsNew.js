@@ -85,6 +85,16 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-01-exclude-folder-deleted', date: '2026-11-01',
+    title: 'Deleted folders no longer block Exclude folder',
+    blurb: 'If you hid a folder and later deleted it, ticking any other folder in Exclude folder failed with a "no folder" error. Saving now works and forgets the deleted folder.',
+  },
+  {
+    id: '2026-11-01-cleaner-bank-thresholds', date: '2026-11-01',
+    title: 'A cleaner thresholds panel',
+    blurb: 'The Bank thresholds panel drops its help text, so each field is just its name, its number and its buttons. Hover a number box to see which way catches more images.',
+  },
+  {
     id: '2026-11-01-bank-caption-sidecars', date: '2026-11-01',
     title: 'Bank Captions Stay Beside the Files',
     blurb: 'When a Bank caption is written or edited, the same-stem .txt next to the image is updated to match. Clearing a caption leaves that file in place, and tags stay in their own columns. Turn it off in Settings ▸ Captioning if you want captions only in the database.',

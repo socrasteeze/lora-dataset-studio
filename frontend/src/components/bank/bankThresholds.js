@@ -36,7 +36,7 @@
    directions. A UI that does not say so out loud will get set backwards, and
    backwards looks exactly like "it did nothing". So every field carries the ONE
    unambiguous fact — which way makes this filter catch MORE images — and the
-   panel prints it as a sentence next to the input, not as a hidden tooltip.
+   panel keeps it in the input's tooltip and its screen-reader description.
 
    Pure functions and data, no JSX, so `node --test` can execute this file
    (it parses .js, not .jsx). The panel itself is BankThresholdsPanel.jsx. */
@@ -53,16 +53,11 @@ export const BANK_SECTION = 'bank';
    folded when the parent panel opens, so the user expands only the question
    they need and the panel stays readable at 400 px. */
 export const THRESHOLD_GROUPS = [
-  { id: 'quality', label: 'Image quality', defaultOpen: false,
-    blurb: 'Is the picture technically good enough to train on?' },
-  { id: 'duplicates', label: 'Duplicates', defaultOpen: false,
-    blurb: 'Have I already got this shot?' },
-  { id: 'resolution', label: 'Size & framing', defaultOpen: false,
-    blurb: 'Is there enough real picture in the file?' },
-  { id: 'content', label: 'Content', defaultOpen: false,
-    blurb: 'Is it the right person, and is it worth keeping?' },
-  { id: 'style', label: 'Style', defaultOpen: false,
-    blurb: 'How close must two images look to count as the same style?' },
+  { id: 'quality', label: 'Image quality', defaultOpen: false },
+  { id: 'duplicates', label: 'Duplicates', defaultOpen: false },
+  { id: 'resolution', label: 'Size & framing', defaultOpen: false },
+  { id: 'content', label: 'Content', defaultOpen: false },
+  { id: 'style', label: 'Style', defaultOpen: false },
 ];
 
 /* When a change takes effect. The Bank recomputes verdicts from PERSISTED raw

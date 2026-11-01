@@ -83,7 +83,6 @@ function Group({ group, open, onToggle, customised, children }) {
       </button>
       {open && (
         <div id={panelId} className="space-y-3 border-t border-border px-3 py-3">
-          <p className="text-xs text-content-subtle">{group.blurb}</p>
           {/* ONE column below ~640 px. Twelve numeric fields two-abreast on a
               400 px phone is precisely the layout that stops being readable.
               On a wide window the rail is still a narrow column, so a field
@@ -133,8 +132,8 @@ function RerunButton({ rerun, field, activity, offline, phase, outcome, onRun })
     : outcome?.tone === 'warn' ? 'text-amber-300' : 'text-emerald-300'
   return (
     <div className="mt-1 space-y-1">
-      {/* flex-wrap, and the explanation on its OWN line: at 400 px the label,
-          the note and a progress sentence cannot share a row. */}
+      {/* The explanation sits on its OWN line: at 400 px the label and a
+          progress sentence cannot share a row. */}
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" className={SMALL_BTN} onClick={onRun}
           disabled={state.disabled}
@@ -144,7 +143,6 @@ function RerunButton({ rerun, field, activity, offline, phase, outcome, onRun })
           title={why || rerun.note}>
           {label}
         </button>
-        <span className="text-2xs text-content-subtle">{rerun.note}</span>
       </div>
       {why && <p id={reasonId} className="text-2xs text-amber-300"><span aria-hidden>⏳ </span>{why}</p>}
       {outcome && (
@@ -377,19 +375,13 @@ export default function BankThresholdsPanel({
                   // of being announced again on every nudge of the value.
                   aria-describedby={`bank-th-${t.field}-hint bank-th-${t.field}-effect`}
                   aria-invalid={invalid || undefined}
+                  title={`${directionHint(t)}. ${t.hint} ${APPLIES[t.applies]}`}
                   onChange={(e) => setField(BANK_SECTION, t.field, coerceValue(t, e.target.value))}
                   className={`${INPUT} ${invalid ? 'border-rose-400' : ''}`}
                 />
-                <p id={`bank-th-${t.field}-hint`}
-                  className="mt-1 text-xs font-medium text-content-muted"
-                  title={`${t.hint} ${APPLIES[t.applies]}`}>
-                  {directionHint(t)}
-                  {invalid && (
-                    <span className="mt-0.5 block font-normal text-rose-300">
-                      Enter a number{t.min !== undefined && t.max !== undefined
-                        ? ` between ${t.min} and ${t.max}` : ''}.
-                    </span>
-                  )}
+                <p id={`bank-th-${t.field}-hint`} className={invalid ? 'mt-1 text-xs text-rose-300' : undefined}>
+                  {invalid && <>Enter a number{t.min !== undefined && t.max !== undefined
+                    ? ` between ${t.min} and ${t.max}` : ''}.</>}
                 </p>
                 {/* The effect readout. Visually a live number; for assistive tech
                     it is a stable sentence reachable from the input, so nudging a

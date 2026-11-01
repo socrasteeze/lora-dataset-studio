@@ -162,10 +162,13 @@ test('the direction of every threshold matches what the backend does with it', (
   }
 });
 
-test('the panel prints the direction as visible text, not only a tooltip', () => {
-  assert.match(panel, /directionHint\(t\)/);
-  // ...and it is rendered, not just passed to a title=.
-  assert.doesNotMatch(panel, /title=\{directionHint\(t\)\}/);
+test('the panel keeps the direction in the tooltip and the screen-reader description', () => {
+  assert.match(panel, /title=\{`\$\{directionHint\(t\)\}\./);
+  assert.match(panel, /directionSummary\(t\)/);
+  // The help text stays off the panel itself.
+  assert.doesNotMatch(panel, /\{directionHint\(t\)\}\s*\n/);
+  assert.doesNotMatch(panel, /\{rerun\.note\}/);
+  assert.doesNotMatch(panel, /group\.blurb/);
 });
 
 // ---------------------------------------------------------------------------
