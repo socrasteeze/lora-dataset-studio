@@ -85,6 +85,19 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-31-huggingface-error-settings',
+    date: '2026-10-31',
+    title: 'Fix Hugging Face access errors from the failed run',
+    blurb: 'A Hugging Face access error in Training now offers a read-token creation link and a field to save it without leaving the run. '
+      + 'Links also open the model’s access page and the exact token setting.',
+  },
+  {
+    id: '2026-10-31-error-setting-shortcuts',
+    date: '2026-10-31',
+    title: 'Open the relevant setting directly from a warning',
+    blurb: 'Warnings about AI Toolkit, ComfyUI, local prompt models and quality thresholds now link to their exact settings.',
+  },
+  {
     id: '2026-10-31-tidier-launch-report',
     date: '2026-10-31',
     title: 'A Launch All report you can skim',

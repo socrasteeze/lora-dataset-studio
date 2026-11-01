@@ -40,6 +40,7 @@
    `config_defaults`, never from a number typed into the frontend. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { apiFetch, postJson, putJson } from '../../api/fetchClient'
+import SettingsLink from '../common/SettingsLink'
 import { useToast } from '../common/Toast'
 import { btnClass, controlHeight, fieldClass } from '../common/Controls.jsx'
 import ResetToDefault from '../settings/ResetToDefault.jsx'
@@ -183,7 +184,7 @@ export default function BankThresholdsPanel({
       setConfigDefaults(d.config_defaults || null)
       setLoadError(null)
     } catch {
-      setLoadError('Could not load the thresholds — Settings ▸ Captioning & quality still edits them.')
+      setLoadError('Could not load the thresholds here. You can also edit them in Settings.')
     }
   }, [])
 
@@ -328,7 +329,10 @@ export default function BankThresholdsPanel({
   }, [dirty, edits, configDefaults, toast, onSaved])
 
   if (loadError) {
-    return <p className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-amber-300">{loadError}</p>
+    return <p className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-amber-300">
+      {loadError}{' '}
+      <SettingsLink section="captioning" focus="bank-quality-thresholds" tone="warning">Open quality thresholds</SettingsLink>
+    </p>
   }
   if (!saved) {
     return <p className="text-xs text-content-subtle">Loading thresholds</p>
