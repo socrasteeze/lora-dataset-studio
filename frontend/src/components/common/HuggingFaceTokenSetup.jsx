@@ -42,7 +42,7 @@ export default function HuggingFaceTokenSetup() {
     {saved ? 'Token saved. You can retry the run.' : 'A Hugging Face token is already configured. Retry training to check access.'}
   </p>
   if (tokenPresence !== 'missing') return <p className="m-0 mt-2 text-content-muted">
-    {tokenPresence === 'loading' ? 'Checking Hugging Face token settings…' : 'Open the token settings above to check the saved token.'}
+    {tokenPresence === 'loading' ? 'Checking Hugging Face token settings' : 'Open the token settings above to check the saved token.'}
   </p>
 
   return (
@@ -59,13 +59,13 @@ export default function HuggingFaceTokenSetup() {
         <div className="min-w-0 flex-[1_1_12rem]">
           <label htmlFor={inputId} className="mb-1 block font-medium">Hugging Face token</label>
           <input id={inputId} type="password" autoComplete="off" spellCheck={false}
-            value={token} disabled={saving} placeholder="hf_…"
+            value={token} disabled={saving} placeholder="hf_"
             onChange={(event) => { setToken(event.target.value); setError('') }}
             className="min-h-10 w-full rounded border border-border bg-app px-2 py-1.5 text-sm text-content" />
         </div>
         <button type="submit" disabled={saving || !token.trim()}
           className="min-h-10 rounded border border-amber-400/40 bg-amber-500/10 px-3 py-1.5 font-semibold text-amber-100 hover:bg-amber-500/20 disabled:opacity-50">
-          {saving ? 'Saving…' : 'Save token'}
+          {saving ? 'Saving' : 'Save token'}
         </button>
       </form>
       {error && <p role="alert" className="m-0 text-rose-300">{error}</p>}
