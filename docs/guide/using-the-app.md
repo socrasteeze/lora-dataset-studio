@@ -517,7 +517,7 @@ to the captions instead.
 **Datasets ▸ Caption folder** writes Anima character booru tags for a folder of
 images that LDS did not build. You do not need a dataset for it. Each caption is
 one line: your trigger word, then the tags, for example
-`trigger, 1girl, solo, …`.
+`trigger, 1girl, solo, ...`.
 
 1. **Source folder**: the folder that holds the images. Only the images directly
    inside it are captioned; subfolders are not read.

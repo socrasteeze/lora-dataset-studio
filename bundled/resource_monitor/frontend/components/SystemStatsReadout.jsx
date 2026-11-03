@@ -150,7 +150,7 @@ export default function SystemStatsReadout({ testId, helpTopic }) {
         aria-label={armedKind === 'free' ? "Clear VRAM — press again to interrupt LDS's render" : 'Clear VRAM'}
         className={`flex h-10 items-center gap-1 whitespace-nowrap rounded border px-1.5 text-2xs hover:text-content disabled:cursor-wait disabled:opacity-60 lg:h-6 lg:px-1.5 ${
           armedKind === 'free' ? 'border-amber-400 bg-amber-400/15 text-amber-200' : 'border-border bg-app/40 text-content-subtle'}`}>
-        {freeing ? 'Clearing…' : 'Clear VRAM'}
+        {freeing ? 'Clearing' : 'Clear VRAM'}
         {armedKind === 'free' && <span className="whitespace-nowrap">· press again</span>}
       </button>
       <HelpBadge topic={helpTopic} />

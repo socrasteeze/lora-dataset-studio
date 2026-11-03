@@ -850,7 +850,7 @@ existing captions change only when you re-caption.
 
 **Recaption an external folder** → `POST /api/captions/external-recaption` with
 `{source, output, trigger, signature_tags?}`. Captions every image directly inside
-`source` as an Anima character tag line (`<trigger>, 1girl, solo, …`) and writes one
+`source` as an Anima character tag line (`<trigger>, 1girl, solo, ...`) and writes one
 `.txt` per image into `output`. It refuses `output` equal to `source`, and it never
 copies or moves an image. Omitting `signature_tags` applies the suggested list.
 
