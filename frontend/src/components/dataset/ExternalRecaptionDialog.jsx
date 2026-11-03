@@ -57,7 +57,7 @@ export default function ExternalRecaptionDialog({ onClose }) {
           <HelpBadge topic="external-folder-recaption" />
         </h2>
         <p className="text-sm text-content-muted">
-          Writes Anima character booru tags (<code>trigger, 1girl, solo, …</code>) for
+          Writes Anima character booru tags (<code>trigger, 1girl, solo, ...</code>) for
           each image directly inside a folder LDS did not build.
         </p>
         <p className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">

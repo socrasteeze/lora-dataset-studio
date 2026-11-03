@@ -85,15 +85,15 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
-    id: '2026-11-01-bank-thumbnail-shapes', date: '2026-11-01',
-    title: 'See whole images in the Bank grid',
-    blurb: 'Choose 3:4, 4:3 or 1:1 thumbnails next to the sort menu. Every shape shows the entire image instead of cropping it, and your choice is remembered.',
-    to: '/bank',
-  },
-  {
     id: '2026-11-01-faster-keep-reject', date: '2026-11-01',
     title: 'Keep and Reject respond right away',
     blurb: 'On a large bank, the grid no longer waits for every counter to recalculate after a decision. Prev and Next now fill the row, and changing page returns you to the top.',
+    to: '/bank',
+  },
+  {
+    id: '2026-11-01-bank-thumbnail-shapes', date: '2026-11-01',
+    title: 'See whole images in the Bank grid',
+    blurb: 'Choose 3:4, 4:3 or 1:1 thumbnails next to the sort menu. Every shape shows the entire image instead of cropping it, and your choice is remembered.',
     to: '/bank',
   },
   {
@@ -393,7 +393,7 @@ export const WHATS_NEW = [
   {
     id: '2026-10-25-external-folder-recaption', date: '2026-10-25',
     title: 'Caption a folder you built outside LDS',
-    blurb: 'Datasets ▸ Caption folder writes Anima character booru tags (your trigger, then 1girl, solo, …) for a folder of images LDS did not build. Captions go only to a separate output folder; the images are never copied, moved or captioned in place. Name the signature traits to keep out of the captions, or leave the field empty and the suggested list is applied and shown. Each tag appears once per line, and a summary file named after the output folder holds your trigger with the shared traits, ready to use as a default prompt.',
+    blurb: 'Datasets ▸ Caption folder writes Anima character booru tags (your trigger, then 1girl, solo and so on) for a folder of images LDS did not build. Captions go only to a separate output folder; the images are never copied, moved or captioned in place. Name the signature traits to keep out of the captions, or leave the field empty and the suggested list is applied and shown. Each tag appears once per line, and a summary file named after the output folder holds your trigger with the shared traits, ready to use as a default prompt.',
   },
   {
     id: '2026-10-25-anima-booru-signatures', date: '2026-10-25',

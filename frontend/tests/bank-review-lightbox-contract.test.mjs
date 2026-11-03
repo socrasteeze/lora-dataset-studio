@@ -107,7 +107,7 @@ test('the tile click still (de)selects — review is its own ▶ hit target', ()
 })
 
 test('header counters follow the run and the grid refreshes on close', () => {
-  assert.match(workspace, /const onReviewDecided = \(\) => \{ refreshPayload\(\) \}/)
+  assert.match(workspace, /const onReviewDecided = \(\) => \{ refreshPayloadSoon\(\) \}/)
   assert.match(workspace, /const closeReview = \(\) => \{ setReview\(null\); refreshPayload\(\); refreshImages\(\) \}/)
 })
 

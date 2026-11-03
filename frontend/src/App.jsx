@@ -209,7 +209,7 @@ function NavBar() {
     setRestarting(true)
     try {
       await postJson('/api/settings/restart', {})
-      toast.info('Restarting Studio…')
+      toast.info('Restarting Studio')
       if (await waitForRelaunchedServer({ timeoutMs: 2 * 60 * 1000 })) { window.location.reload(); return }
       toast.error('Studio did not come back within 2 minutes. Check the launcher window.')
     } catch (e) {
@@ -320,7 +320,7 @@ function NavBar() {
       <NavLink to="/settings" className={navItemClass} onClick={() => setOpen(false)}>Settings</NavLink>
       <button type="button" className={NAV_BUTTON} onClick={() => { setOpen(false); setProfilesOpen(true) }}>Profiles</button>
       <button type="button" className={NAV_BUTTON} disabled={restarting}
-        onClick={() => { setOpen(false); restartStudio() }}>{restarting ? 'Restarting…' : 'Restart Studio'}</button>
+        onClick={() => { setOpen(false); restartStudio() }}>{restarting ? 'Restarting' : 'Restart Studio'}</button>
       <NavLink to="/plugins" className={navItemClass} onClick={() => setOpen(false)}>Plugins</NavLink>
       <NavLink to="/help" className={navItemClass} onClick={() => setOpen(false)}>Help</NavLink>
       <HelpModeToggle onToggle={() => setOpen(false)} />
@@ -380,7 +380,7 @@ function NavBar() {
                   <button type="button" role="menuitem" className={MENU_ITEM_BASE}
                     onClick={() => { close(); setProfilesOpen(true) }}>Profiles</button>
                   <button type="button" role="menuitem" className={MENU_ITEM_BASE} disabled={restarting}
-                    onClick={() => { close(); restartStudio() }}>{restarting ? 'Restarting…' : 'Restart Studio'}</button>
+                    onClick={() => { close(); restartStudio() }}>{restarting ? 'Restarting' : 'Restart Studio'}</button>
                   <NavLink to="/plugins" role="menuitem" className={menuItemClass} onClick={close}>Plugins</NavLink>
                 </>
               )}

@@ -235,7 +235,7 @@ function GridPager({ view, onGo, where }) {
     + 'text-content font-semibold disabled:opacity-40 hover:bg-surface-raised';
   return (
     <nav aria-label={`Image grid pages (${where})`}
-      className="flex items-center gap-2 text-xs">
+      className="flex flex-wrap items-center gap-2 text-xs">
       <button type="button" disabled={view.page === 0} onClick={() => onGo(view.page - 1)}
         className={btn}>← Prev</button>
       <span className="shrink-0 text-center tabular-nums">
