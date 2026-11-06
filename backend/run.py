@@ -168,6 +168,11 @@ def _announce_when_ready(host, port, token=None, open_browser=False, timeout=180
 if __name__ == '__main__':
     host = os.environ.get('LDS_HOST') or cfg_get('server.host')
     requested_port = int(os.environ.get('LDS_PORT') or cfg_get('server.port'))
+    from app import netguard
+    access_token = netguard.ensure_access_token(host)
+    if netguard.local_token_required() and access_token:
+        print('\n[LDS] Local access requires an access token.')
+        print(f"[LDS] Open with:  {netguard.local_browser_url('/', access_token)}\n")
     # One data folder, one server — checked BEFORE the port slide below, which
     # is exactly how a double-launch used to become a second server on :5051
     # sharing the first one's database (private in-memory job registries, a
@@ -181,7 +186,7 @@ if __name__ == '__main__':
         # The double-click case: the person wanted the app on screen, and it
         # exists already — open THAT one instead of printing at them. This no
         # longer waits for LDS_OPEN_BROWSER=1, which start.bat never sets.
-        open_existing(instance_url(running))
+        open_existing(netguard.local_browser_url(instance_url(running), access_token))
         sys.exit(0)
     # Another copy of the app (any checkout or data folder) on the requested
     # port: sliding to the next port would put a second session on the desktop.
@@ -201,9 +206,7 @@ if __name__ == '__main__':
               flush=True)
     os.environ['LDS_PORT'] = str(port)
     is_lan = host not in ('127.0.0.1', 'localhost', '::1')
-    from app import netguard
-    access_token = netguard.ensure_access_token(host)
-    if access_token:
+    if access_token and not netguard.local_token_required():
         why = ('LDS_PUBLIC=1 -> this bind is reachable from the internet'
                if netguard.public_bind() else f'server.host={host} reachable from the network')
         print(f"\n[LDS] {why} -> access token REQUIRED.")
@@ -211,7 +214,7 @@ if __name__ == '__main__':
         if not netguard.public_bind():
             print("[LDS] (turn the token off in Settings -> Server to open the LAN without one)")
         print()
-    elif is_lan:
+    elif is_lan and not access_token:
         print(f"\n[LDS] server.host={host} reachable from the network (no token — trusted-LAN mode).")
         print(f"[LDS] Open from another device:  http://<this-machine>:{port}/\n")
     # Snapshot of what's ACTUALLY bound, for the Settings "Server" card: config.json
