@@ -8,13 +8,40 @@ from contextvars import ContextVar
 
 from flask import has_app_context
 
-from .job_queue import GPU_ARBITER_LOCK, queue_manager
+from .job_queue import (GPU_ARBITER_LOCK, HOLD_COMFYUI_RECOVERY, HOLD_TRAINING, HOLD_VISION,
+                        queue_manager)
 
 logger = logging.getLogger(__name__)
 
+# Work queued or running in ComfyUI. Not one of job_queue's HOLD_* keys: those
+# say why the ComfyUI worker itself stands still, and ComfyUI is not held by
+# its own queue.
+HOLD_GENERATION = 'generation'
+
+# The GPU owners that end on their own. A refusal because one of them holds the
+# card is a reason to wait for it, not a failure of the request itself.
+TRANSIENT_HOLDS = frozenset({HOLD_TRAINING, HOLD_VISION, HOLD_GENERATION})
+
+# Who is in the way, as a noun phrase for "waiting for {x}".
+_HOLD_WAIT_LABELS = {
+    HOLD_TRAINING: 'a LoRA training',
+    HOLD_VISION: 'a vision pass',
+    HOLD_GENERATION: 'an image generation in ComfyUI',
+    HOLD_COMFYUI_RECOVERY: 'a paused ComfyUI job to be recovered',
+}
+
+
+def wait_label(hold) -> str:
+    return _HOLD_WAIT_LABELS.get(hold, 'another task')
+
 
 class GpuBusyError(RuntimeError):
-    pass
+    def __init__(self, *args, hold=None):
+        super().__init__(*args)
+        # WHICH owner refused, when the GPU is merely in use (TRANSIENT_HOLDS).
+        # None for the refusals that are not a wait: a ComfyUI recovery, a
+        # state that could not be read, a release ComfyUI did not confirm.
+        self.hold = hold
 
 
 # Floor for the TTL-re-arm heartbeat interval (module-level so tests can shrink
