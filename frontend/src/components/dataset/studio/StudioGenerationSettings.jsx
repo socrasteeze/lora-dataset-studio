@@ -237,6 +237,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
             ? (STUDIO_ASPECTS.find((a) => a.key === aspect)?.ratio || 'square')
             : 'square'}
           maxLongSide={family === 'sdxl' ? 1024 : undefined}
+          maxPixels={capabilities?.max_pixels}
           multiplier={resolutionMultiplier} onMultiplierChange={setResolutionMultiplier} />
         <span className="normal-case tracking-normal text-2xs text-content-muted/70 -mt-0.5">
           {aspectPicker
