@@ -21,8 +21,8 @@ active in the live application. No live dataset or GPU workload was used as a fi
       Folder navigation has matching widths, with Go beside the path field.
 - [x] All dataset kinds share progress guidance. Imports no longer require a
       generation reference. Add Images prioritizes imports and folds generation.
-- [x] Phone image formats are checked before upload by content. HEIC/HEIF passes
-      to the server, which converts it on arrival (`heif_decoder.py`); actual JPEG
+- [x] Phone image formats are checked before upload by content. HEIC/HEIF and AVIF
+      pass to the server, which converts them on arrival; actual JPEG
       bytes remain accepted despite stale HEIC labels.
 - [x] Clipboard failures explain manual copying. Newly typed secrets have Show/Hide.
 - [x] AGENTS.md is canonical; CLAUDE.md remains a compatibility entry point.

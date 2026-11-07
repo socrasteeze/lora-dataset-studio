@@ -18,7 +18,7 @@ export default function ImportQueuePanel({ queue }) {
     </p>
     {total > 0 && !complete && <progress className="my-2 w-full" value={done} max={total} aria-label="Import progress" />}
     {!complete && <p className="text-xs text-content-muted">Pending photos are stored in this browser for recovery. Keep LDS open to upload. Reload, then choose Resume if interrupted. Cancelling removes local copies.</p>}
-    {failed > 0 && <p className="text-sm text-amber-300">{failed} file(s) were refused. Use JPEG, PNG, WebP, BMP or HEIC. Resize a larger file, or raise the Image size budget in Settings. Then import corrected files.</p>}
+    {failed > 0 && <p className="text-sm text-amber-300">{failed} file(s) were refused. Use JPEG, PNG, WebP, BMP, HEIC or AVIF. Resize a larger file, or raise the Image size budget in Settings. Then import corrected files.</p>}
     {failed > 0 && <ul aria-label="Refused files" className="max-h-32 overflow-auto text-xs text-amber-300">
       {session.items.filter((item) => item.result?.failed).map((item) => <li key={item.key}>{item.name}</li>)}
     </ul>}
