@@ -120,6 +120,13 @@ export const WHATS_NEW = [
     blurb: 'Pick a profile and Studio restarts faster and comes back on the same screen. Buttons that wait on setup checks appear sooner, and large banks open faster after a restart.',
   },
   {
+    id: '2026-11-07-zzzzz-krea-negative-prompt',
+    date: '2026-11-07',
+    title: 'A negative prompt for Krea test runs above CFG 1',
+    blurb: 'The Test Studio offered no negative prompt for Krea, even on a Raw base that samples at CFG 4, where it changes the image. '
+      + 'The Negative section now appears as soon as a Krea run uses a CFG above 1. At CFG 1 the sampler ignores it.',
+  },
+  {
     id: '2026-11-07-zzzz-bank-heic-avif',
     date: '2026-11-07',
     title: 'Your Bank shows HEIC and AVIF photos too',
