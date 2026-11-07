@@ -778,7 +778,10 @@ The funnel itself:
 1. **Create a bank** — give it a name and paste the folder path. The app
    inventories every image in place (subfolders included). Nothing is copied,
    nothing is modified; rejecting an image is a reversible status, never a file
-   deletion. Open **Subfolders** between Browse and Create to choose which
+   deletion. HEIC/HEIF photos and AVIF images are inventoried too: the browser and
+   the analysis passes cannot read them, so the app keeps a lossless PNG copy of
+   each in its own data folder (never in yours), made the first time it is shown or
+   analysed and replaced when the file changes. Open **Subfolders** between Browse and Create to choose which
    subfolders to include. Leave **Separate Banks** off to keep one named bank
    rooted at the selected parent. Unchecked folders stay hidden from that bank's
    grid, counts, curation and passes across rescans. Their files stay on disk;
