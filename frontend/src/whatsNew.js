@@ -120,6 +120,12 @@ export const WHATS_NEW = [
     blurb: 'Pick a profile and Studio restarts faster and comes back on the same screen. Buttons that wait on setup checks appear sooner, and large banks open faster after a restart.',
   },
   {
+    id: '2026-10-19-zz-studio-trigger-as-trained', date: '2026-10-19',
+    title: 'Test Studio sends the trigger your LoRA learned',
+    blurb: 'A trigger typed with spaces, like "Double pen", trains as "Double_pen", and the Studio used to send the typed words, which the LoRA never learned. It now sends the trigger recorded in each LoRA file, in every model family, and respells the typed one in your prompt.',
+    to: '/studio',
+  },
+  {
     id: '2026-11-07-z-plugin-repair-damaged-files',
     date: '2026-11-07',
     title: 'Repairing a plugin environment replaces damaged files',
