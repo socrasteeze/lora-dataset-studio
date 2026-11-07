@@ -120,6 +120,14 @@ export const WHATS_NEW = [
     blurb: 'Pick a profile and Studio restarts faster and comes back on the same screen. Buttons that wait on setup checks appear sooner, and large banks open faster after a restart.',
   },
   {
+    id: '2026-11-07-z-local-token-settings-card',
+    date: '2026-11-07',
+    title: 'Local token protection shows up in Settings',
+    blurb: 'With LDS_REQUIRE_LOCAL_TOKEN=1, Server & access now shows your access token, puts it in the phone links and the QR code, '
+      + 'and keeps the switch locked on. A new token works as soon as you save.',
+    to: '/settings/server',
+  },
+  {
     id: '2026-11-07-z-regenerate-keeps-its-source',
     date: '2026-11-07',
     title: 'Regenerate no longer remakes a camera view from the wrong picture',
