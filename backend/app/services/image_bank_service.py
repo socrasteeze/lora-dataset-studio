@@ -991,15 +991,28 @@ def _walk_image_relpaths(folder, *, onerror=None, root_only=False):
     differently spelled keys."""
     folder = os.path.normpath(folder)
     cut = len(folder) + (0 if folder.endswith(os.sep) else 1)
+    exts = _inventoried_exts()
     for root, dirs, files in os.walk(folder, onerror=onerror):
         if root_only:
             dirs[:] = []
         head = root[cut:]
         for f in files:
-            if f.lower().endswith(IMG_EXTS):
+            if f.lower().endswith(exts):
                 yield (head + os.sep + f) if head else f
 
 
+def _inventoried_exts() -> tuple[str, ...]:
+    """`IMG_EXTS` minus the formats this process cannot decode. Without pi-heif (a
+    platform it publishes no wheel for) a HEIC row would be one nothing can show
+    or analyse, so the walk leaves those files out, as it did before HEIC."""
+    from PIL import features
+    from . import heif_decoder
+    skip = set()
+    if not heif_decoder.register():
+        skip.update(('.heic', '.heif'))
+    if not features.check('avif'):
+        skip.add('.avif')
+    return tuple(ext for ext in IMG_EXTS if ext not in skip)
 def bank_for_source(user_id, folder, *, root_only=False) -> ImageBank | None:
     """The user's existing bank rooted at ``folder``, or None.
 
