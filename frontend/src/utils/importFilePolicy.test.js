@@ -2,16 +2,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { inspectImportFiles } from './importFilePolicy.js';
 
-test('a HEIC file is refused before upload with conversion guidance', async () => {
+test('a HEIC file goes to the server, which converts it on arrival', async () => {
   const file = new File(['\x00\x00\x00\x18ftypheic'], 'photo.HEIC', { type: 'image/heic' });
   const result = await inspectImportFiles([file]);
-  assert.equal(result.accepted.length, 0);
-  assert.match(result.refused[0].reason, /export as JPEG or PNG/);
+  assert.deepEqual(result.accepted, [file]);
+  assert.equal(result.refused.length, 0);
 });
 
-test('renaming HEIF to JPEG does not bypass format inspection', async () => {
+test('HEIF bytes under a JPEG name are recognized by content', async () => {
   const file = new File(['\x00\x00\x00\x18ftypmif1'], 'photo.jpg', { type: 'image/jpeg' });
-  assert.match((await inspectImportFiles([file])).refused[0].reason, /HEIC\/HEIF/);
+  assert.deepEqual((await inspectImportFiles([file])).accepted, [file]);
+});
+
+test('a HEIC label on other bytes is refused with the format list', async () => {
+  const file = new File(['unreadable'], 'photo.heic', { type: 'image/heic' });
+  const result = await inspectImportFiles([file]);
+  assert.equal(result.accepted.length, 0);
+  assert.match(result.refused[0].reason, /JPEG, PNG, WebP, BMP or HEIC/);
 });
 
 test('a phone-converted JPEG is accepted even when its old HEIC label remains', async () => {

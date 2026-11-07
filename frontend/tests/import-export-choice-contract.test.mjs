@@ -72,10 +72,10 @@ test('manual import reports every refused file and keeps the size budget actiona
   const panel = src('components/dataset/ImportQueuePanel.jsx');
   const policy = src('utils/importFilePolicy.js');
   assert.match(panel, /items.filter\(\(item\) => item.result\?\.failed\)/);
-  assert.match(panel, /JPEG, PNG, WebP or BMP/);
+  assert.match(panel, /JPEG, PNG, WebP, BMP or HEIC/);
   assert.match(panel, /Image size budget/);
   assert.match(panel, /Resize a larger file, or raise/);
-  assert.match(policy, /HEIC\/HEIF: export as JPEG or PNG/);
+  assert.match(policy, /select JPEG, PNG, WebP, BMP or HEIC/);
   assert.match(datasetHook, /const importFiles = importQueue.start/);
 });
 // --- the setting exists, is resettable, is documented -----------------------

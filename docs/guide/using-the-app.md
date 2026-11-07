@@ -5370,8 +5370,8 @@ addresses and a QR code. A phone controls the host; it does not run the trainer.
    for the current request. Cancel Remaining removes pending browser copies and
    does not remove images already imported. Recovery is local to this browser
    and origin. Clearing browser data removes pending uploads.
-5. Use JPEG, PNG, WebP or BMP. HEIC/HEIF files are identified before upload; export
-   JPEG or PNG copies first. LDS does not convert HEIC/HEIF. Unsupported files are
+5. Use JPEG, PNG, WebP, BMP or HEIC. A HEIC or HEIF photo is converted on arrival;
+   the default mode stores it as a lossless PNG. Unsupported files are
    listed while supported files can continue. If browser storage cannot hold the
    selection, choose a smaller selection or import from a host folder.
 6. Curate with large tiles or the lightbox, then review captions. Dataset Progress

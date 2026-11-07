@@ -111,6 +111,12 @@ def pin_static_mime_types():
 
 pin_static_mime_types()
 
+# HEIC/HEIF photos decode in THIS process, where images enter the app, for the
+# same reason as above: every entry point is covered without having to remember.
+# Pillow's plugin registry is process-wide and nothing resets it, so once is enough.
+from .services import heif_decoder  # noqa: E402 - after the module-level setup above
+heif_decoder.register()
+
 _DEFAULT_DATASET_ARCHIVE_MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024
 _DEFAULT_DATASET_ARCHIVE_MULTIPART_OVERHEAD_BYTES = 1024 * 1024
 _DATASET_ARCHIVE_UPLOAD_ENDPOINTS = frozenset({

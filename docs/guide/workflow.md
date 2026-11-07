@@ -41,7 +41,7 @@ Sources mix freely inside one dataset:
 | Source | When to use it |
 |---|---|
 | **Generate from references** | Build a Character set from one primary reference and optional extra angles |
-| **Import** | Bring your own JPEG, PNG, WebP or BMP images; Character can auto-crop while Concept/Style preserve the frame |
+| **Import** | Bring your own JPEG, PNG, WebP, BMP or HEIC images; Character can auto-crop while Concept/Style preserve the frame |
 | **Image Bank** | Triage a large unsorted local folder before promoting a smaller set |
 
 ### Generate from references

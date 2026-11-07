@@ -118,6 +118,11 @@ INPUT_MAX_PIXELS = DEFAULT_INPUT_MAX_PIXELS
 #: was hardcoded, and is a dead end now that it is not.
 INPUT_BUDGET_SETTING_PATH = 'Settings ▸ Captioning & quality ▸ Image size budget'
 
+
+class ImageTooLargeError(ValueError):
+    """An image refused for its size. A ValueError, so no caller changes."""
+
+
 _budget_provider = None
 
 

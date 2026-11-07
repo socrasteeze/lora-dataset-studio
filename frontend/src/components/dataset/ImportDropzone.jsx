@@ -66,7 +66,7 @@ export default function ImportDropzone({ onImport, busy, visionBusy = false, cro
         )}
         <span>Files larger than {inputLimit} are rejected — resize before importing, or raise the budget.</span>
         <span>Photos upload one at a time with recovery after each file.</span>
-        <span>For HEIC or HEIF photos, export JPEG or PNG copies first.</span>
+        <span>HEIC and HEIF photos are stored as lossless PNG copies.</span>
         <SettingsLink section="captioning" focus="dataset-import-encoding">Change storage mode</SettingsLink>
         <SettingsLink section="captioning" focus="image-input-max-pixels">Change size budget</SettingsLink>
       </span>
