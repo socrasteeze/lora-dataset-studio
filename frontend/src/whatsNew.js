@@ -170,6 +170,13 @@ export const WHATS_NEW = [
     to: '/settings/captioning',
   },
   {
+    id: '2026-11-02-zzz-final-save-galleries',
+    date: '2026-11-02',
+    title: 'See every image made with a run’s final save',
+    blurb: 'The Canvas and the checkpoint galleries now show every image made with a run’s final save, '
+      + 'including the ones tested from its deployed LoRA file. Images tested earlier are added the next time the app starts.',
+  },
+  {
     id: '2026-11-02-zz-saved-keys-survive-restart',
     date: '2026-11-02',
     title: 'A key you change in Settings stays changed after a restart',
