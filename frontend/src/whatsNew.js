@@ -120,6 +120,14 @@ export const WHATS_NEW = [
     blurb: 'Pick a profile and Studio restarts faster and comes back on the same screen. Buttons that wait on setup checks appear sooner, and large banks open faster after a restart.',
   },
   {
+    id: '2026-11-07-zz-stopped-local-run-checkpoints',
+    date: '2026-11-07',
+    title: 'A stopped local training keeps its checkpoints in Runs',
+    blurb: 'Stopping a local training showed it as a crash, with an error and ↻ Retry, and the Runs page offered no ◉ Graph '
+      + 'for a local run on its own. A Stop now reads as a stop, and every local run opens its ◉ Graph with the checkpoints it saved.',
+    to: '/cloud',
+  },
+  {
     id: '2026-11-07-z-local-token-settings-card',
     date: '2026-11-07',
     title: 'Local token protection shows up in Settings',

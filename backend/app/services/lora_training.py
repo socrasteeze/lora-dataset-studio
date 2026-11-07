@@ -7880,7 +7880,8 @@ def _mark_exact_resume_launching(journal_path, run_token) -> None:
 
 
 def _watch_training(
-        app, proc, log_path, dataset_id, exact_resume_transaction=None) -> None:
+        app, proc, log_path, dataset_id, exact_resume_transaction=None,
+        run_token=None) -> None:
     """Wait for ai-toolkit in a daemon, then immediately advance the queue.
 
     Free ComfyUI or launch the next job without client polling; surface log tails
@@ -7908,7 +7909,14 @@ def _watch_training(
             if exact_resume_transaction:
                 bridge_reason = _exact_resume_bridge_failure(
                     exact_resume_transaction.get('status_path'), rc)
-            if rc not in (0, None) or bridge_reason:
+            # Stop records its confirmed kill while holding this same lock.
+            with _queue_lock:
+                stopped = run_token in _STOPPED_RUN_TOKENS
+                _STOPPED_RUN_TOKENS.discard(run_token)
+            if stopped and not bridge_reason:
+                logger.info("ai-toolkit training for dataset %s stopped on request (rc=%s); "
+                            "its saved checkpoints are kept.", dataset_id, rc)
+            elif rc not in (0, None) or bridge_reason:
                 payload = _crash_payload(log_path, dataset_id, rc)
                 if bridge_reason:
                     try:
@@ -8621,7 +8629,7 @@ def launch_training(user_id, dataset_id, steps: int | None = None, check_caption
         from flask import current_app
         threading.Thread(target=_watch_training,
                          args=(current_app._get_current_object(), proc, log_path,
-                               int(dataset_id), _exact_resume_transaction),
+                               int(dataset_id), _exact_resume_transaction, run_token),
                          daemon=True).start()
     except Exception as e:
         logger.warning("training watcher not started: %s", e)
@@ -9481,6 +9489,8 @@ def stop_training(expected_dataset_id=None, expected_run_token=None,
                     f"{_STOP_VERIFY_TIMEOUT_SECONDS}s after kill attempt")
                 raise TrainingStopVerificationError(
                     f"Could not confirm training process {pid} stopped")
+            if current_token:
+                _STOPPED_RUN_TOKENS.add(current_token)
         # Stop = arrêt voulu : on VIDE la file D'ABORD (sinon le prochain poll
         # relancerait l'entraînement suivant), PUIS on lève le flag EN DERNIER
         # (c'est lui qui signale à ComfyUI de reprendre le GPU).
@@ -10139,6 +10149,12 @@ TRAIN_QUEUE_KEY = 'lora_train_queue'
 # reentrant lock so queue advancement can call helpers safely. Keep costly
 # preflights outside the short duplicate-check/read/write transaction.
 _queue_lock = threading.RLock()
+
+# Local runs a Stop ended on purpose, by run token. stop_training adds one once
+# the kill is confirmed and _watch_training takes it back, both under _queue_lock:
+# the killed ai-toolkit exits non-zero, and that exit is the Stop itself, not a
+# crash to report or offer ↻ Retry for. Its saved checkpoints stay the run's.
+_STOPPED_RUN_TOKENS: set = set()
 
 _TRAIN_IDENTITY_KEYS = (
     'training_pid', 'training_pid_create_time', 'training_dataset_id',

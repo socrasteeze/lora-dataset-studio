@@ -491,6 +491,7 @@ def start_video_training(user_id, video_dataset_id, steps=1000, base_model=None,
     threading.Thread(
         target=lt._watch_training,
         args=(app, proc, log_path, dataset_id),
+        kwargs={'run_token': run_token},
         daemon=True).start()
     logger.info('local video run %s started: %s clips, %s steps, profile %s',
                 run_name, clips, n_steps, ds.target_profile)
