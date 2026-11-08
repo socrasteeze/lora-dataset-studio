@@ -26,6 +26,7 @@ from flask import current_app, has_app_context
 from . import config as cfg
 from .services import ffmpeg_tools
 from .services import infer_env
+from .services.comfy_model_paths import scan_state as _comfy_scan
 from .utils import comfy_fs
 
 _CACHE_TTL = 30
@@ -363,6 +364,20 @@ def comfyui_down_message(status, waited) -> str:
 
 
 def probe_comfyui() -> dict:
+    """One verdict per endpoint for a full scan's own threads: every plugin probe
+    asks, and a dead address costs about 2 s per connect on Windows. Any other
+    caller (Test button, Generate admission) always gets a live answer."""
+    memo = getattr(_comfy_scan, 'memo', None)
+    if memo is None:
+        return _probe_comfyui_uncached()
+    api_url = (cfg.get('comfyui.api_url') or '').rstrip('/')
+    with memo['lock']:
+        if api_url not in memo['verdicts']:
+            memo['verdicts'][api_url] = _probe_comfyui_uncached()
+        return dict(memo['verdicts'][api_url])
+
+
+def _probe_comfyui_uncached() -> dict:
     """{ok, detail, status, hint}. `status` is 'ok' / 'slow' / 'unreachable' /
     'unconfigured' / 'ignored' (`comfyui.ignored`: no request at all) — the two
     failure modes are published SEPARATELY so every
@@ -2511,12 +2526,17 @@ def _comfyui_caps_section(comfy, base_dir, comfy_dir, comfy_launcher,
 def _parallel_probes(probes):
     """Bound cold subprocess/network work and give each worker its own context."""
     app = current_app._get_current_object() if has_app_context() else None
+    memo = getattr(_comfy_scan, 'memo', None)
 
     def run(function):
-        if app is None:
-            return function()
-        with app.app_context():
-            return function()
+        _comfy_scan.memo = memo
+        try:
+            if app is None:
+                return function()
+            with app.app_context():
+                return function()
+        finally:
+            _comfy_scan.memo = None
 
     with ThreadPoolExecutor(max_workers=_PROBE_WORKERS,
                             thread_name_prefix='capability') as executor:
@@ -2610,22 +2630,39 @@ def _plugin_capabilities(caps):
     from .plugins.registry import active
     registry = active()
     errors = {}
-    for key, (pid, callback) in (registry.probes.items() if registry else ()):
-        if not plugin_available(pid):
-            continue
-        try:
-            _set_capability(caps, key, callback())
-        except Exception:
+
+    def guarded(callback):
+        def run():
+            try:
+                return True, callback()
+            except Exception:
+                return False, None
+        return run
+
+    # Independent, like the core's probes: pay the slowest one, not their sum.
+    probes = [(key, pid, callback)
+              for key, (pid, callback) in (registry.probes.items() if registry else ())
+              if plugin_available(pid)]
+    engines = [spec for spec in all_specs()
+               if spec.plugin and plugin_available(spec.plugin) and spec.probe]
+    results = _parallel_probes({
+        **{('probe', key): guarded(callback) for key, _pid, callback in probes},
+        **{('engine', spec.id): guarded(lambda spec=spec: bool(spec.probe().get('ok')))
+           for spec in engines},
+    })
+    for key, pid, _callback in probes:
+        ok, value = results[('probe', key)]
+        if ok:
+            _set_capability(caps, key, value)
+        else:
             logging.getLogger(__name__).warning('plugin %s capability %s failed', pid, key)
             errors[key] = {'plugin': pid, 'error': 'Capability probe failed.'}
-    for spec in all_specs():
-        if spec.plugin and plugin_available(spec.plugin) and spec.probe:
-            try:
-                caps.setdefault('engines', {})[spec.id] = bool(spec.probe().get('ok'))
-            except Exception:
-                logging.getLogger(__name__).warning('plugin %s engine probe %s failed', spec.plugin, spec.id)
-                caps.setdefault('engines', {})[spec.id] = False
-                errors[f'engines.{spec.id}'] = {'plugin': spec.plugin, 'error': 'Engine probe failed.'}
+    for spec in engines:
+        ok, value = results[('engine', spec.id)]
+        caps.setdefault('engines', {})[spec.id] = value if ok else False
+        if not ok:
+            logging.getLogger(__name__).warning('plugin %s engine probe %s failed', spec.plugin, spec.id)
+            errors[f'engines.{spec.id}'] = {'plugin': spec.plugin, 'error': 'Engine probe failed.'}
     if errors:
         caps['plugin_probe_errors'] = errors
     caps['training_visible'] = bool(caps.get('training_visible') or caps.get('cloud_training'))
@@ -2657,9 +2694,12 @@ def probe(force=False) -> dict:
                 return copy.deepcopy(_cache)
             generation = _cache_generation
         caps = None
+        _comfy_scan.memo = {'lock': threading.Lock(), 'verdicts': {},
+                            'listing_lock': threading.Lock(), 'listings': {}}
         try:
             caps = _plugin_capabilities(_probe_uncached())
         finally:
+            _comfy_scan.memo = None
             with _cache_lock:
                 if generation != _cache_generation:
                     # Discard a late encoder verdict even if another probe

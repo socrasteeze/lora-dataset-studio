@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-08-one-click-profiles', date: '2026-11-08',
+    title: 'Switch profiles in one click',
+    blurb: 'Pick a profile and Studio restarts faster and comes back on the same screen. Buttons that wait on setup checks appear sooner, and large banks open faster after a restart.',
+  },
+  {
     id: '2026-11-01-faster-keep-reject', date: '2026-11-01',
     title: 'Keep and Reject respond right away',
     blurb: 'On a large bank, the grid no longer waits for every counter to recalculate after a decision. Prev and Next now fill the row, and changing page returns you to the top.',

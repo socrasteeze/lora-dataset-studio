@@ -1040,6 +1040,7 @@ _OBJECT_INFO_FAIL_TTL = 20
 # the cache outright (`clear_model_caches`) for the fresh-deploy case.
 _OBJECT_INFO_STALE_MAX = 600
 _object_info_refresh_lock = threading.Lock()
+_object_info_fetch_lock = threading.Lock()
 _object_info_refreshing = False
 # Outcome of the last real ATTEMPT (a cache hit is not an attempt and never
 # rewrites it). Doubles as the negative cache: `status != 'ok'` within
@@ -1249,51 +1250,68 @@ def _fetch_object_info(timeout=None, force=False):
     if comfyui_ignored():
         return None, None, None
     addr = api_address()
-    now = time.time()
-    cached_here = (not force and _object_info_cache["data"] is not None
-                   and _object_info_cache["key"] == addr)
-    if cached_here and now - _object_info_cache["timestamp"] < _OBJECT_INFO_TTL:
-        return (_object_info_cache["data"], _object_info_cache["enums"],
-                _object_info_cache["files"])
-    if cached_here and now - _object_info_cache["timestamp"] < _OBJECT_INFO_STALE_MAX:
-        # Stale-while-revalidate: answer with what we have, refresh behind.
-        _refresh_object_info_in_background()
-        return (_object_info_cache["data"], _object_info_cache["enums"],
-                _object_info_cache["files"])
-    if (not force and _object_info_last["status"] not in ('ok', 'unknown')
-            and _object_info_last["key"] == addr
-            and now - _object_info_last["timestamp"] < _OBJECT_INFO_FAIL_TTL):
-        # Negative cache: one failure answers the burst behind it. See
-        # _OBJECT_INFO_FAIL_TTL — every consumer of this already fails OPEN.
-        return None, None, None
-    read_budget = int(timeout) if timeout else object_info_timeout()
-    try:
-        resp = requests.get(urljoin(addr, '/object_info'),
-                            timeout=network_timeout((_OBJECT_INFO_CONNECT_TIMEOUT, read_budget)))
-        resp.raise_for_status()
-        data = resp.json()
-    except Exception as e:
-        # 'timeout' = the connection was accepted and ComfyUI then took too long to
-        # build the payload — it IS running, it is slow at enumerating itself. Any
-        # other failure means nothing answered. Collapsing the two is the bug this
-        # split exists to kill: a user was sent to check whether ComfyUI was started
-        # while it was, in fact, started and busy (j_o_e_l., Discord).
-        status = 'timeout' if isinstance(e, requests.exceptions.ReadTimeout) else 'unreachable'
-        _object_info_last.update(timestamp=now, key=addr, status=status,
-                                 waited=read_budget)
-        logger.warning('fetch_object_info failed (%s, %ss budget): %s',
-                       status, read_budget, e)
-        return None, None, None
-    if not isinstance(data, dict):
-        _object_info_last.update(timestamp=now, key=addr, status='unreachable',
-                                 waited=read_budget)
-        return None, None, None
-    classes, enums = set(data.keys()), _distill_object_info(data)
-    files = _distill_model_files(data)
-    _object_info_cache.update(data=classes, timestamp=now, key=addr, enums=enums,
-                              files=files)
-    _object_info_last.update(timestamp=now, key=addr, status='ok', waited=read_budget)
-    return classes, enums, files
+
+    def from_cache():
+        """The cached answer, or None when this call has to ask ComfyUI."""
+        now = time.time()
+        cached_here = (not force and _object_info_cache["data"] is not None
+                       and _object_info_cache["key"] == addr)
+        if cached_here and now - _object_info_cache["timestamp"] < _OBJECT_INFO_TTL:
+            return (_object_info_cache["data"], _object_info_cache["enums"],
+                    _object_info_cache["files"])
+        if cached_here and now - _object_info_cache["timestamp"] < _OBJECT_INFO_STALE_MAX:
+            # Stale-while-revalidate: answer with what we have, refresh behind.
+            _refresh_object_info_in_background()
+            return (_object_info_cache["data"], _object_info_cache["enums"],
+                    _object_info_cache["files"])
+        if (not force and _object_info_last["status"] not in ('ok', 'unknown')
+                and _object_info_last["key"] == addr
+                and now - _object_info_last["timestamp"] < _OBJECT_INFO_FAIL_TTL):
+            # Negative cache: one failure answers the burst behind it. See
+            # _OBJECT_INFO_FAIL_TTL — every consumer of this already fails OPEN.
+            return None, None, None
+        return None
+
+    cached = from_cache()
+    if cached is not None:
+        return cached
+    # Capability probes run in parallel: this is ComfyUI's heaviest endpoint, so
+    # one cold fetch at a time and the callers behind it reuse its answer.
+    with _object_info_fetch_lock:
+        cached = from_cache()
+        if cached is not None:
+            return cached
+        now = time.time()
+        read_budget = int(timeout) if timeout else object_info_timeout()
+        try:
+            resp = requests.get(urljoin(addr, '/object_info'),
+                                timeout=network_timeout((_OBJECT_INFO_CONNECT_TIMEOUT, read_budget)))
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            # 'timeout' = the connection was accepted and ComfyUI then took too long to
+            # build the payload — it IS running, it is slow at enumerating itself. Any
+            # other failure means nothing answered. Collapsing the two is the bug this
+            # split exists to kill: a user was sent to check whether ComfyUI was started
+            # while it was, in fact, started and busy (j_o_e_l., Discord).
+            status = 'timeout' if isinstance(e, requests.exceptions.ReadTimeout) else 'unreachable'
+            # Stamped at the END of the request: the read budget outlasts the
+            # negative TTL, so a start-time stamp would publish an expired failure.
+            _object_info_last.update(timestamp=time.time(), key=addr, status=status,
+                                     waited=read_budget)
+            logger.warning('fetch_object_info failed (%s, %ss budget): %s',
+                           status, read_budget, e)
+            return None, None, None
+        if not isinstance(data, dict):
+            _object_info_last.update(timestamp=time.time(), key=addr, status='unreachable',
+                                     waited=read_budget)
+            return None, None, None
+        classes, enums = set(data.keys()), _distill_object_info(data)
+        files = _distill_model_files(data)
+        _object_info_cache.update(data=classes, timestamp=now, key=addr, enums=enums,
+                                  files=files)
+        _object_info_last.update(timestamp=now, key=addr, status='ok', waited=read_budget)
+        return classes, enums, files
 
 
 def _refresh_object_info_in_background():
