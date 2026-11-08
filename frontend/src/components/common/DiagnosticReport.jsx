@@ -3,6 +3,7 @@ import { apiFetch } from '../../api/fetchClient'
 import { useToast } from './Toast'
 import { formatDiagnostic } from './diagnosticFormat'
 import { copyText } from '../../utils/copyText'
+import { copyWhenReady } from './clipboardWhenReady'
 
 export { formatDiagnostic }
 
@@ -22,19 +23,29 @@ export default function DiagnosticReport() {
   const copy = async () => {
     setBusy(true)
     setFallback(null)
+    const report = apiFetch('/api/diagnostic').then(formatDiagnostic)
+    // Before any await: Firefox only lets the click that asked write the clipboard.
+    const copied = copyWhenReady(report)
+    copied.catch(() => {})
     let text
     try {
-      text = formatDiagnostic(await apiFetch('/api/diagnostic'))
+      text = await report
     } catch (err) {
       toast.error(`Could not build the report: ${err.message}`)
       setBusy(false)
       return
     }
-    const out = await copyText(text)
-    if (out.ok) toast.success('Diagnostic report copied — paste it into your bug report.')
-    else {
-      setFallback(text)
-      toast.error(`The report is ready, but ${out.reason}. Copy it from the box below.`)
+    try {
+      await copied
+      toast.success('Diagnostic report copied — paste it into your bug report.')
+    } catch {
+      // The async path refused: the fork's copyText tries the legacy path, then the box.
+      const out = await copyText(text)
+      if (out.ok) toast.success('Diagnostic report copied — paste it into your bug report.')
+      else {
+        setFallback(text)
+        toast.error(`The report is ready, but ${out.reason}. Copy it from the box below.`)
+      }
     }
     setBusy(false)
   }
