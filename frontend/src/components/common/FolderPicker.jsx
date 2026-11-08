@@ -201,7 +201,7 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
 export default function FolderPickerField({
   id, label, value, onChange, placeholder, required, hint, size = 'md', inline = false,
   fieldClassName = 'min-w-64 grow-[3]', browseClassName,
-  inputProps = {},
+  inputProps = {}, fieldError = null,
 }) {
   const [browsing, setBrowsing] = useState(false)
   const field = (
@@ -230,6 +230,7 @@ export default function FolderPickerField({
             <label htmlFor={id} className="mb-1 block text-sm font-medium text-content">{label}</label>
           )}
           {field}
+          {fieldError}
         </div>
         {browse}
         {hint && <p className="mt-1 basis-full text-xs text-content-muted">{hint}</p>}

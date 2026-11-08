@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-08-bank-form-errors', date: '2026-11-08',
+    title: 'The Bank form keeps its shape when a field is missing',
+    blurb: 'A missing name or folder now shows under its own field. Browse, Subfolders and Create Bank stay together on one row.',
+    to: '/bank',
+  },
+  {
     id: '2026-11-08-one-click-profiles', date: '2026-11-08',
     title: 'Switch profiles in one click',
     blurb: 'Pick a profile and Studio restarts faster and comes back on the same screen. Buttons that wait on setup checks appear sooner, and large banks open faster after a restart.',

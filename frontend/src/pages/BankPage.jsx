@@ -730,7 +730,7 @@ export default function BankPage() {
               onClick={(event) => { event.preventDefault(); document.getElementById(`bank-${field}`)?.focus() }}>{message}</a>)}
         </div>}
         <fieldset disabled={creating} className="space-y-3">
-        <div className="grid grid-cols-4 items-end gap-2 lg:flex lg:flex-wrap">
+        <div className="grid grid-cols-4 items-start gap-2 lg:flex lg:flex-wrap">
           <div className="col-span-2 min-w-0 lg:min-w-40 lg:grow">
             <label htmlFor="bank-name" className="mb-1 block text-sm font-medium text-content">Name</label>
             <Input id="bank-name" size="lg" value={name} onChange={(e) => {
@@ -739,32 +739,32 @@ export default function BankPage() {
               placeholder={splitMode ? 'Named per subfolder automatically' : 'Telegram export 07/2026'}
               required={!splitMode} disabled={splitMode}
               className="w-full" />
-            {createErrors.name && <p id="bank-name-error" className="text-xs text-rose-200">{createErrors.name}</p>}
+            {createErrors.name && <p id="bank-name-error" className="mt-1 text-xs text-rose-200">{createErrors.name}</p>}
           </div>
           <FolderPickerField inline size="lg" id="bank-folder" label="Folder"
             fieldClassName="col-span-2 min-w-0 lg:min-w-64 lg:grow-[3]"
-            browseClassName="min-w-0 w-full !px-1 !text-xs lg:w-auto lg:!px-4 lg:!text-sm"
+            browseClassName="min-w-0 w-full !px-1 !text-xs lg:mt-6 lg:w-auto lg:!px-4 lg:!text-sm"
             value={folder} onChange={changeImportFolder} required
             inputProps={{ 'aria-invalid': !!createErrors.folder || !!folderNotice,
               'aria-describedby': [createErrors.folder && 'bank-folder-error', folderNotice && 'bank-folder-notice'].filter(Boolean).join(' ') || undefined }}
+            fieldError={createErrors.folder && <p id="bank-folder-error" className="mt-1 text-xs text-rose-200">{createErrors.folder}</p>}
             placeholder="C:\path\to\unsorted-images (subfolders included)" />
-          {createErrors.folder && <p id="bank-folder-error" className="col-span-4 text-xs text-rose-200">{createErrors.folder}</p>}
           <Button type="button" size="lg" aria-expanded={foldersOpen}
             aria-controls="bank-import-subfolders" aria-label="Choose Subfolders"
             onClick={() => setFoldersOpen((value) => !value)}
             title="Choose which subfolders to include, with one bank or separate banks."
-            className={`min-w-0 w-full !px-1 !text-xs lg:w-auto lg:!px-4 lg:!text-sm ${foldersOpen || splitMode || excluded.size ? 'border-primary/60 bg-primary/15 text-content' : ''}`}>
+            className={`min-w-0 w-full !px-1 !text-xs lg:mt-6 lg:w-auto lg:!px-4 lg:!text-sm ${foldersOpen || splitMode || excluded.size ? 'border-primary/60 bg-primary/15 text-content' : ''}`}>
             Subfolders {excluded.size > 0 && <span className="tabular-nums">({excluded.size})</span>}
           </Button>
           <Button type="submit" size="lg" variant="primary" disabled={creating || !!folderNotice || emptySelection || previewPending || needsImportRestart}
-            className="col-span-2 min-w-0 w-full lg:w-auto"
+            className="col-span-2 min-w-0 w-full lg:mt-6 lg:w-auto"
             title={folderNotice ? 'That folder belongs to a dataset' : undefined}>
             {creating ? 'Inventorying' : (
               <span className="inline-flex items-center gap-1.5"><Plus aria-hidden="true" className="h-4 w-4" />
                 {splitMode ? 'Create Banks' : 'Create Bank'}</span>
             )}
           </Button>
-          <HelpBadge topic="bank-split-subfolders" className="col-span-4 lg:col-auto" />
+          <HelpBadge topic="bank-split-subfolders" className="col-span-4 lg:col-auto lg:mt-6" />
         </div>
         {foldersOpen && <section id="bank-import-subfolders" aria-label="Import Subfolders" className="space-y-3">
           <label className="flex min-h-10 items-center gap-2 text-sm text-content-muted">
