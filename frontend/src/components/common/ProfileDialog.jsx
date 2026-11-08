@@ -202,7 +202,8 @@ export default function ProfileDialog({ onClose, bank = null, banks = null, onMo
     <div ref={dialog} role="dialog" aria-modal="true" aria-label={moving ? 'Move to Profile' : 'Profiles'}
       data-probe-layer className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-3 sm:p-4"
       onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); close() } }}>
-      <section className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-xl border border-border bg-surface-overlay p-4 shadow-2xl sm:p-5">
+      {/* Focus starts on the panel: landing on the name field opens the phone keyboard. */}
+      <section tabIndex={moving ? undefined : 0} className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-xl border border-border bg-surface-overlay p-4 shadow-2xl sm:p-5">
         <h2 className="text-base font-bold text-content">{moving ? 'Move to Profile' : 'Profiles'}</h2>
         <p className="mt-2 text-sm text-content-muted">
           {moving ? 'Metadata, edits, groups and caches move together. Source images stay in place.'
