@@ -13,6 +13,33 @@ function operationId() {
     (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
+// Every profile shares this origin, and IDs mean something else in the next one.
+const PROFILE_SELECTION_KEYS = ['datasetCurrentId', 'bankCurrentId', 'videoBankCurrentId',
+  'studioPicked_v1', 'studioCaptionDataset_v1', 'lds.canvasRun', 'lds.canvasDatasets',
+  'lds.videoReferenceDraft.v1']
+
+function forgetProfileSelections() {
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (PROFILE_SELECTION_KEYS.includes(key) || key.startsWith('studioBaseRun_')) localStorage.removeItem(key)
+    }
+    for (const key of Object.keys(sessionStorage)) {
+      if (!key.startsWith('image-source-draft:')) continue
+      try {
+        // Keep the typed text; only the destination Bank belongs to the old profile.
+        sessionStorage.setItem(key, JSON.stringify({ ...JSON.parse(sessionStorage.getItem(key)), target: '' }))
+      } catch { sessionStorage.removeItem(key) }
+    }
+  } catch { /* Storage can be unavailable in private sessions. */ }
+}
+
+// The same workspace in the next profile, minus anything that selects by ID.
+function workspaceAfterSwitch(hash) {
+  const path = hash.replace(/^#/, '').split('?')[0]
+  if (path.startsWith('/dataset/studio/')) return '/studio'
+  return !path || path === '/' || /\/\d/.test(path) ? '/datasets' : path
+}
+
 export default function ProfileDialog({ onClose, bank = null, banks = null, onMoved, onResults }) {
   const dialog = useRef(null)
   const operation = useRef(null)
@@ -98,8 +125,8 @@ export default function ProfileDialog({ onClose, bank = null, banks = null, onMo
     const ready = new URL(url)
     ready.pathname = '/api/profiles/ready'
     ready.hash = ''
-    for (let attempt = 0; attempt < 60; attempt++) {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+    const deadline = Date.now() + 120000
+    while (Date.now() < deadline) {
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), 1500)
       try {
@@ -117,13 +144,14 @@ export default function ProfileDialog({ onClose, bank = null, banks = null, onMo
         }
       } catch { /* The selected backend is still restarting. */ }
       finally { clearTimeout(timeout) }
+      await new Promise((resolve) => setTimeout(resolve, 250))
     }
     setError('Studio did not reconnect. Use Open Profile to check the selected instance.')
     setBusy('')
   }
 
-  const apply = async () => {
-    if (!selected || busy || submitting.current) return
+  const apply = async (profileId = selected) => {
+    if (!profileId || busy || submitting.current) return
     if (name.trim()) { setError('Create the new profile or clear its name first.'); return }
     if (!(bulk && targetLocked) && hasUnsavedWork()) { setError('Save or discard open edits before changing profiles.'); return }
     submitting.current = true
@@ -154,12 +182,13 @@ export default function ProfileDialog({ onClose, bank = null, banks = null, onMo
         })
         onMoved?.(); onClose()
       } else {
-        const result = await postJson('/api/profiles/switch', { profile_id: selected })
+        const result = await postJson('/api/profiles/switch', { profile_id: profileId })
         const url = new URL(result.destination)
         // Keep the address the operator uses, including a remote phone's host.
         url.hostname = window.location.hostname
         url.protocol = window.location.protocol
-        url.hash = '/datasets'
+        url.hash = workspaceAfterSwitch(window.location.hash)
+        forgetProfileSelections()
         setDestination(url.toString())
         await reconnect(url.toString(), result.profile_id)
       }
@@ -182,13 +211,27 @@ export default function ProfileDialog({ onClose, bank = null, banks = null, onMo
         <p className="mt-2 break-words text-xs text-content-subtle">Current: {current?.name || 'Loading'}</p>
         {bank && <p className="mt-2 break-words text-sm font-medium text-content">{bank.name}</p>}
         {bulk && <p className="mt-2 text-sm text-content-muted">{remaining.length} of {moveBanks.length} banks remain.</p>}
-        <label htmlFor="profile-destination" className="mt-4 block text-sm font-medium text-content">Destination</label>
-        <select id="profile-destination" value={selected} disabled={!!busy || targetLocked}
-          onChange={(event) => { setSelected(event.target.value); setError(''); setDestination('') }}
-          className="mt-1 min-h-10 w-full min-w-0 rounded-md border border-border bg-surface-raised px-3 text-sm text-content">
-          <option value="">{choices.length ? 'Choose a profile' : 'Create a profile below'}</option>
-          {choices.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
-        </select>
+        {moving ? <>
+          <label htmlFor="profile-destination" className="mt-4 block text-sm font-medium text-content">Destination</label>
+          <select id="profile-destination" value={selected} disabled={!!busy || targetLocked}
+            onChange={(event) => { setSelected(event.target.value); setError(''); setDestination('') }}
+            className="mt-1 min-h-10 w-full min-w-0 rounded-md border border-border bg-surface-raised px-3 text-sm text-content">
+            <option value="">{choices.length ? 'Choose a profile' : 'Create a profile below'}</option>
+            {choices.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+          </select>
+        </> : <>
+          <h3 className="mt-4 text-sm font-medium text-content">Switch Profile</h3>
+          {catalog && !choices.length && <p className="mt-1 text-xs text-content-subtle">Create a profile below.</p>}
+          <div className="mt-1 space-y-1">
+            {choices.map((profile) => (
+              <Button key={profile.id} disabled={!!busy || !catalog.can_switch} className="min-h-10 w-full min-w-0 !justify-between"
+                onClick={() => { setSelected(profile.id); setDestination(''); apply(profile.id) }}>
+                <span className="min-w-0 truncate">{profile.name}</span>
+                {busy === 'switching' && selected === profile.id && <span className="shrink-0 text-xs font-normal">Switching</span>}
+              </Button>
+            ))}
+          </div>
+        </>}
         <form onSubmit={create} className="mt-4 border-t border-border pt-3">
           <label htmlFor="profile-name" className="block text-sm font-medium text-content">New Profile</label>
           <div className="mt-1 flex min-w-0 flex-col gap-2 sm:flex-row">
@@ -226,10 +269,10 @@ export default function ProfileDialog({ onClose, bank = null, banks = null, onMo
         </p>}
         <div className="mt-4 flex gap-2">
           <Button type="button" onClick={close} disabled={!!busy} className="flex-1">Cancel</Button>
-          <Button type="button" variant="primary" onClick={apply} className="flex-1"
-            disabled={!!busy || !selected || (bulk && !remaining.length) || (!moving && !catalog?.can_switch)}>
-            {bulk ? targetLocked ? 'Retry Moves' : 'Move Banks' : moving ? 'Move Bank' : 'Switch Profile'}
-          </Button>
+          {moving && <Button type="button" variant="primary" onClick={() => apply()} className="flex-1"
+            disabled={!!busy || !selected || (bulk && !remaining.length)}>
+            {bulk ? targetLocked ? 'Retry Moves' : 'Move Banks' : 'Move Bank'}
+          </Button>}
         </div>
       </section>
     </div>

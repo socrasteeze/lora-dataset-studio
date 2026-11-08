@@ -338,6 +338,35 @@ def _abs_under(base: str, relpath: str) -> str | None:
     return None
 
 
+def _listed_folder(base: str, parent: str) -> tuple[str | None, set[str]]:
+    """``(resolved folder, exact entry names)``, symlinks left out."""
+    real = base if not parent else _abs_under(base, parent)
+    if real is None:
+        return None, set()
+    try:
+        with os.scandir(real) as entries:
+            return real, {e.name for e in entries if not e.is_symlink()}
+    except OSError:
+        return real, set()
+
+
+def _abs_under_listed(base: str, relpath: str, folders: dict) -> str | None:
+    """``_abs_under`` for a poll over thousands of rows: one listing per folder
+    instead of a realpath per file, which opens each file on Windows. Anything
+    the listing cannot vouch for (a symlink, a missing file, a name in another
+    case) takes the real resolver, so the key stays the one the semantic cache
+    stored."""
+    parent, name = os.path.split(relpath)
+    if name in ('', '.', '..'):
+        return _abs_under(base, relpath)
+    if parent not in folders:
+        folders[parent] = _listed_folder(base, parent)
+    real, names = folders[parent]
+    if real is None or name not in names:
+        return _abs_under(base, relpath)
+    return os.path.join(real, name)
+
+
 def abs_image_path(bank: ImageBank, row: BankImage) -> str | None:
     """Absolute SOURCE path of a bank image, or None when it escapes the
     bank's folder (belt & braces — relpaths only ever come from our own walk).
@@ -5560,6 +5589,7 @@ def _semantic_eligible_paths(bank: ImageBank) -> tuple[int, tuple[str, ...]]:
         except OSError:
             pass   # unreadable entry: the rotation scan skips it
     base, resolved = _poll_path_memo(bank)
+    folders = {}
     paths = []
     for image_id, relpath, rotation, clean_method in rows:
         turn = int(rotation or 0)
@@ -5573,7 +5603,7 @@ def _semantic_eligible_paths(bank: ImageBank) -> tuple[int, tuple[str, ...]]:
             try:
                 raw = resolved[relpath]
             except KeyError:
-                raw = _abs_under(base, relpath)
+                raw = _abs_under_listed(base, relpath, folders)
                 resolved[relpath] = raw
             if raw is not None:
                 paths.append(raw)

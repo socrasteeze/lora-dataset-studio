@@ -106,7 +106,7 @@ def switch_profile():
                 destination = store.browser_url(target['id'])
                 store.request_switch(source, target['id'])
                 requested = True
-                if not updater.schedule_restart(block_during_update=True):
+                if not updater.schedule_restart(delay=0.3, block_during_update=True):
                     raise ProfileError('A restart is already scheduled. Wait before switching again.')
     except (ProfileError, RestartBlocked, updater.UpdateInProgressError) as exc:
         if gate is not None:

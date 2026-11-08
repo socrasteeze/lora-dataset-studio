@@ -103,7 +103,10 @@ folders and training paths in place.
 Open the **Settings** navigation menu and choose **Profiles**. On a phone, open
 the navigation menu and choose **Profiles**. The popup lists your profiles and
 lets you create another profile without leaving the app. Enter its name and
-choose **Create Profile**, then **Switch Profile** to open it.
+choose **Create Profile**, then choose its row under **Switch Profile** to open
+it. One click switches: Studio restarts and returns to the same workspace.
+Open datasets, Banks and Studio selections are cleared, because their IDs belong
+to the previous profile.
 
 New profiles have separate databases, settings, credentials, plugin data,
 datasets, caches and training storage. LAN access defaults to on for new profiles.

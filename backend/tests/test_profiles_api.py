@@ -82,7 +82,7 @@ def test_switch_records_the_target_before_scheduling_restart(profiles_app, monke
     assert payload['port'] == store.shared_port()
     from urllib.parse import urlsplit
     assert urlsplit(payload['destination']).port == payload['port']
-    assert seen == [({'source': 'default', 'target': target['id']}, {'block_during_update': True})]
+    assert seen == [({'source': 'default', 'target': target['id']}, {'delay': 0.3, 'block_during_update': True})]
     assert store.selected() == 'default'
     response.close()
 

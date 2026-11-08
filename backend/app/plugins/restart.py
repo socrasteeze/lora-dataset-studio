@@ -31,6 +31,9 @@ _READ_DRAIN_SECONDS = 5.0
 _UNBLOCKING_READS = frozenset((
     '/api/capabilities',
     '/api/capabilities/startup',
+    # A POST only because it re-verifies on every page load. Same probe; the one
+    # write it makes is an atomic replace, so a restart cannot leave it torn.
+    '/api/setup-state/recheck',
 ))
 _ACTIVE_QUEUE = ('pending', 'processing', 'sent_to_comfy', 'cancel_requested', 'stalled')
 
@@ -112,7 +115,7 @@ def install_gate(app):
         with gate.lock:
             if gate.frozen and gate.message != _RESTARTING:
                 return jsonify(error=gate.message, code='restarting'), 503
-            if request.method in ('GET', 'HEAD', 'OPTIONS'):
+            if request.method in ('GET', 'HEAD', 'OPTIONS') or request.path.rstrip('/') in _UNBLOCKING_READS:
                 # A freeze waiting for reads to drain must not be refilled.
                 if gate.draining:
                     return jsonify(error=_RESTARTING, code='restarting'), 503

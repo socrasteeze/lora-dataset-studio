@@ -123,6 +123,7 @@ def backend_launcher(python, script, *, env=None, spawn=None, wait_for_port=None
                 state['LDS_NO_BROWSER'] = '1'
                 release_port['value'] = state.get('LDS_PORT')
         state['LDS_OPEN_BROWSER'] = '0'
+        once.port_wait_pending = release_port['value'] is not None
         return code
 
     return once
@@ -165,7 +166,9 @@ def supervise(run_once, *, sleep=time.sleep, now=time.monotonic,
             notify(f'[LDS] the app stopped unexpectedly (crash, exit code {code}) '
                    f'— restarting it. If a long pass was running, reopen the app '
                    f'and start it again; work already committed is kept.')
-        sleep(RELAUNCH_DELAY)
+        # A profile switch polls the port itself; a fixed pause on top only delays it.
+        if not getattr(run_once, 'port_wait_pending', False):
+            sleep(RELAUNCH_DELAY)
 
 
 def main():

@@ -62,6 +62,7 @@ import threading
 from .. import config as cfg
 
 logger = logging.getLogger(__name__)
+scan_state = threading.local()  # .memo: the running capability scan's shared answers
 
 # PyYAML guard: many existing installs `git pull` (Update & restart) WITHOUT
 # reinstalling requirements, and pyyaml is only a TRANSITIVE dep today (via
@@ -650,7 +651,21 @@ def list_models(folder_type: str) -> list[tuple[str, str]]:
     """``[(rel_name, abs_path)]`` for every model file across the search roots of a
     folder type — the faithful mirror of folder_paths.get_filename_list. ``rel_name``
     is exactly the string a workflow loader node expects. De-duplicated by
-    ``rel_name`` (highest-priority root wins), roots scanned in priority order."""
+    ``rel_name`` (highest-priority root wins), roots scanned in priority order.
+
+    A full capability scan asks for the same folders dozens of times, so it shares
+    one walk per folder across its own threads (``scan_state``). Every other caller
+    walks the disk as before."""
+    memo = getattr(scan_state, 'memo', None)
+    if memo is None:
+        return _walk_models(folder_type)
+    with memo['listing_lock']:
+        if folder_type not in memo['listings']:
+            memo['listings'][folder_type] = _walk_models(folder_type)
+        return list(memo['listings'][folder_type])
+
+
+def _walk_models(folder_type: str) -> list[tuple[str, str]]:
     seen, out = set(), []
     for root in search_roots(folder_type):
         for rel, ab in _recursive_models(root):
