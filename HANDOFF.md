@@ -1,5 +1,26 @@
 # HANDOFF
 
+## Profile switch and responsiveness (2026-11-08)
+
+Uncommitted on `main`, from base `4496f2f1d`, pending operator sign-off. Tests,
+responsive probes and CI were not run, by operator decision. Ruff and ESLint pass
+(0 errors, 32 existing warnings) and the frontend build passes.
+
+Measured with ComfyUI down: full capability scan 27.6 s to 4.3 s, forced recheck
+24.2 s to 4.0 s, first semantic path resolution on a 56,929-row Bank 6.08 s to
+0.41 s with identical output. Live page load: capabilities 28.5 s to 4.4 s, recheck
+24.6 s to 4.1 s. A real switch from a click to the new page took 8.8 s on the old
+backend and 6.9 s on the new one. Timings with ComfyUI running were not measured.
+
+Open items:
+- `backend/supervise.py` only takes effect after the next `start.bat`, which removes
+  about 2 s more from a switch. The live 6.9 s still includes that wait.
+- `backend/app/plugins/restart.py` (recheck no longer blocks a switch) postdates the
+  final independent inspection. It has an isolated before/after proof only.
+- Another open browser tab keeps its own Image Sources draft target after a switch.
+- Not changed: `GET /api/banks` coverage aggregate (about 1.6 s) and
+  `/api/studio/checkpoints` (about 1.8 s).
+
 ## History rewrite (2026-11-01)
 
 Operator authorized a history rewrite and force-push to remove personal
