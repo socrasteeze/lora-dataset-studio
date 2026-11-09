@@ -65,7 +65,7 @@ export default function BankPassesPanel({
     ? 'lmstudio-vision-model' : 'ollama-vision-model'
   return (
     <div className="grid gap-4 xl:grid-cols-12 xl:items-start">
-      <div className="min-w-0 space-y-3 xl:col-span-7">
+      <div className="min-w-0 space-y-3 xl:col-span-5">
         <Fold compact={compact} title="Semantic engine">
         <BankSemanticEngine state={semanticState} capsLoading={capsLoading}
           switching={semanticSwitching} disabled={semanticOperationBusy} live={live}
@@ -178,6 +178,15 @@ export default function BankPassesPanel({
                 absent from the gate on purpose: they never travel. */}
             <DevicePicker value={passDevice} onChange={onPassDevice}
               onDevice={onPassDeviceObj} kind="bank-pass" size="md" />
+            {/* Import detection cannot prove a CUDA calculation works. Keep the
+                recovery route accessible even when detection looks healthy. */}
+            {onPickPython && (
+              <Button type="button" size="sm" onClick={() => onPickPython('scoring')}
+                disabled={live || semanticOperationBusy}
+                title="Inspect, test or change the Python used by Score">
+                Manage Score Python
+              </Button>
+            )}
           </div>
           {/* Watermark CLEANING — the two manual levels (crop, then inpaint), with
               their own per-level progress. Lives in its own component so the
@@ -207,17 +216,6 @@ export default function BankPassesPanel({
                 : ', which saves installing them twice.'}
             </p>
           )}
-          {/* Import detection cannot prove a CUDA calculation works. Keep the
-              recovery route accessible even when detection looks healthy. */}
-          {onPickPython && (
-            <div>
-              <Button type="button" size="sm" onClick={() => onPickPython('scoring')}
-                disabled={live || semanticOperationBusy}
-                title="Inspect, test or change the Python used by Score">
-                Manage Score Python
-              </Button>
-            </div>
-          )}
           {captionVocab === 'explicit' && !visionModelLooksUncensored && (
             /* The old wording sent people to Settings ▸ Captioning & quality, which holds
                the ENGINE selector — the vision model lives in Settings ▸ Local tools. Now
@@ -235,7 +233,7 @@ export default function BankPassesPanel({
           )}
         </div>
       </div>
-      <div className="min-w-0 xl:col-span-5">
+      <div className="min-w-0 xl:col-span-7">
         <BankOverview payload={payload} compact={compact} />
       </div>
     </div>

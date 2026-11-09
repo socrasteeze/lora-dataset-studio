@@ -59,7 +59,7 @@ import {
 // Structure B's own logic — rail folding, facet groups, the passes panel.
 import {
   FOLD_KEYS, bankPaneHeight, loadDismissedReport, loadFold, loadRailOpen, loadTileShape,
-  passesButtonLabel, railIsColumn, saveDismissedReport, saveFold, saveRailOpen, saveTileShape,
+  passesButtonLabel, railIsColumn, saveDismissedReport, saveFold, saveTileShape,
 } from './bankLayout.js'
 import { coalescedRun } from './bankCoalescedRun.js'
 import { mergeWorkspacePayload } from './bankWorkspaceLoading.js'
@@ -348,17 +348,20 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const closeStyleBrowser = useCallback(() => setStyleBrowserOpen(false), [])
   const [passesOpen, setPassesOpen] = useState(false)
   useEffect(() => {
-    const onResize = () => setRailIsColumnNow(railIsColumn(window.innerWidth))
+    const onResize = () => {
+      const column = railIsColumn(window.innerWidth)
+      setRailIsColumnNow(column)
+      // A window widened past the drawer width has no ☰ button: show the rail.
+      if (column) setRailOpen(true)
+    }
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
-  /* The rail state is REMEMBERED (a screen preference — it belongs with view
-     state, never with the settings that describe what a dataset produces), but
-     only when the rail is a column. Closing the phone drawer is "I am done
-     filtering", not "hide the filters on my desktop too". */
+  /* Open/closed is DRAWER state. A column rail has no button to reopen it, so it
+     never closes and nothing is saved: Compare and Collections close the drawer,
+     and on a desktop that used to save "closed" and hide the rail for good. */
   const setRail = useCallback((open) => {
-    setRailOpen(open)
-    if (railIsColumn(viewportWidth())) saveRailOpen(open)
+    setRailOpen(open || railIsColumn(viewportWidth()))
   }, [])
   const openRail = useCallback(() => setRail(true), [setRail])
   const closeRail = useCallback(() => setRail(false), [setRail])
@@ -2098,7 +2101,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
              pushed the header to 32 % of a 360×800 fold, over the 28 % budget.
              They are mostly pass coverage, and the rail's status tiles repeat
              the undecided / kept / rejected counts. */
-          <div className="hidden min-w-0 sm:block [@media(max-height:500px)]:!hidden">
+          <div className="hidden min-w-0 sm:block xl:hidden [@media(max-height:500px)]:!hidden">
             <BankStatsStrip loading={!counts} error={statsError || (!workspaceReady && metadataError)}
               onRetry={() => { refreshMetadata({ background: true }); refreshPayload({ background: true }) }}>
               {counterStats}
@@ -2136,6 +2139,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             className="font-bold shadow">
             <Rocket aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Launch all
           </Button>
+          {/* From xl the counters fill this row's gap instead of taking a row of their own. */}
+          <div className="hidden min-w-0 flex-1 px-2 xl:block [@media(max-height:500px)]:!hidden">
+            <BankStatsStrip loading={!counts} error={statsError || (!workspaceReady && metadataError)}
+              onRetry={() => { refreshMetadata({ background: true }); refreshPayload({ background: true }) }}>
+              {counterStats}
+            </BankStatsStrip>
+          </div>
           <span className="ml-auto hidden lg:block [@media(max-height:500px)]:block" />
           <Button type="button" size="md" noShrink disabled={bankBusy || !payload?.instance_id}
             onClick={() => setProfileMoveOpen(true)}>Move to Profile</Button>
@@ -2174,7 +2184,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
            it (every pass opens its own window) — so it is measured for targets,
            truncation and fill, and charged to no fold budget. Plain comment: this
            is an EXPRESSION position (inside `{passesOpen && ( … )}`). */
-        <div id="bank-passes-panel" className="h-[min(24rem,40svh)] overflow-y-auto [scrollbar-gutter:stable]" data-probe-chrome="passes" data-probe-panel="passes" data-probe-reading>
+        <div id="bank-passes-panel" className="max-h-[min(24rem,40svh)] overflow-y-auto [scrollbar-gutter:stable]" data-probe-chrome="passes" data-probe-panel="passes" data-probe-reading>
           {(
             <div className="mb-2 sm:hidden">
               <BankStatsStrip loading={!counts} error={statsError || (!workspaceReady && metadataError)}
@@ -2295,20 +2305,20 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             directly above it, where the effect of the click is visible. */}
         <main ref={mainRef} className={`min-w-0 space-y-3 ${railOpen && railIsColumnNow
           ? 'lg:min-h-0 lg:h-[var(--bank-pane-height)] lg:overflow-y-auto lg:[scrollbar-gutter:stable]' : ''}`}>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" className={`${FILTER_HOVER} ${CONTROL_DISABLED}`}
-            disabled={comparisonLoading || !(selected.size || page.total)} onClick={compareCurrent}>Compare</Button>
-          <Button size="sm" className={FILTER_HOVER} onClick={() => openCollections()}>Collections</Button>
-          {filter.collectionId != null && <>
-            <span className="min-w-0 flex-1 truncate text-xs text-content-muted" title={collectionViewName}>Collection: {collectionViewName || `#${filter.collectionId}`}</span>
-            <Button size="sm" className={FILTER_HOVER} onClick={() => { setF({ collectionId: null }); setCollectionViewName('') }}>Clear Collection</Button>
-          </>}
-          {comparisonLoading && <span role="status" className="text-xs text-content-muted">Loading comparison</span>}
-        </div>
+        {(filter.collectionId != null || comparisonLoading) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {filter.collectionId != null && <>
+              <span className="min-w-0 flex-1 truncate text-xs text-content-muted" title={collectionViewName}>Collection: {collectionViewName || `#${filter.collectionId}`}</span>
+              <Button size="sm" className={FILTER_HOVER} onClick={() => { setF({ collectionId: null }); setCollectionViewName('') }}>Clear Collection</Button>
+            </>}
+            {comparisonLoading && <span role="status" className="text-xs text-content-muted">Loading comparison</span>}
+          </div>
+        )}
         {/* Results stay together on portrait; the three selection cells share
-            their own row. Desktop keeps the existing five equal columns. */}
+            their own row, then Compare and Collections. Five equal columns from
+            lg; from xl all seven cells share one row. */}
         <div className="space-y-1.5">
-        <div className="grid w-full grid-cols-3 items-stretch gap-1.5 lg:grid-cols-5">
+        <div className="grid w-full grid-cols-3 items-stretch gap-1.5 lg:grid-cols-5 xl:grid-cols-7">
           <span className={`${TOOLBAR_CELL} col-span-2 flex-wrap gap-x-1 text-content-muted lg:col-span-1`}>
             <span className="whitespace-nowrap"><span className="font-semibold tabular-nums text-content">{(page.total ?? 0).toLocaleString()}</span> shown</span>
             {isFiltered && (
@@ -2415,6 +2425,14 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               </>
             )}
           </div>
+          <button type="button" onClick={compareCurrent} disabled={comparisonLoading || !(selected.size || page.total)}
+            className={`${TOOLBAR_CELL} border ${FILTER_IDLE} ${FILTER_HOVER} ${CONTROL_DISABLED}`}>
+            Compare
+          </button>
+          <button type="button" onClick={() => openCollections()}
+            className={`${TOOLBAR_CELL} border ${FILTER_IDLE} ${FILTER_HOVER}`}>
+            Collections
+          </button>
         </div>
           {(selected.size > 0 || showSelected) && (
             <button type="button" onClick={toggleSelectionView}

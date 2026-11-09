@@ -29,6 +29,8 @@ export default function BankSemanticEngine({ state, disabled = false,
       <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-content-muted">
         Semantic engine
       </legend>
+      {/* The choice and its readiness share a line where the width allows. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
       <div className="flex flex-wrap gap-x-4 gap-y-2">
         {SEMANTIC_ENGINE_OPTIONS.map((option) => (
           <label key={option.id} className="flex items-center gap-2 text-sm text-content">
@@ -40,7 +42,7 @@ export default function BankSemanticEngine({ state, disabled = false,
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-indigo-400/20 pt-2 text-xs">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className={ready ? 'text-emerald-300' : 'text-amber-300'}>
           {ready ? '✓' : '○'} {state.label}:{' '}
           {state.engine === 'siglip2' && capsLoading ? 'checking the Quality tool' : status}
@@ -64,6 +66,7 @@ export default function BankSemanticEngine({ state, disabled = false,
           </span>
         )}
         {switching && <span className="text-content-subtle">Saving choice</span>}
+      </div>
       </div>
 
       {(deviceNote || onPickPython) && (
