@@ -70,6 +70,8 @@ function defaultStore() {
  *  a corrupt preference must never be able to leave the screen with no way to
  *  reach the filters. */
 export function loadRailOpen(width, store = defaultStore()) {
+  // A column rail has no button to reopen it, so a stored "closed" never applies there.
+  if (railIsColumn(width)) return true;
   try {
     const raw = store?.getItem(RAIL_STORAGE_KEY);
     if (raw === 'open') return true;

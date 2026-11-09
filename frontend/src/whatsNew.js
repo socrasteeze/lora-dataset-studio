@@ -85,6 +85,24 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-09-bank-tighter-passes', date: '2026-11-09',
+    title: 'A tighter Bank header and Passes panel',
+    blurb: 'On a wide screen the counters sit in the action row, and the Passes panel balances its two columns, so the overview no longer leaves half the panel empty.',
+    to: '/bank',
+  },
+  {
+    id: '2026-11-09-bank-rail-stays', date: '2026-11-09',
+    title: 'The Bank filters stay put on a desktop',
+    blurb: 'Opening Compare or Collections no longer hides the filter rail. If yours had vanished, it is back the next time you open a bank.',
+    to: '/bank',
+  },
+  {
+    id: '2026-11-09-bank-one-row-controls', date: '2026-11-09',
+    title: 'Bank selection controls share one row',
+    blurb: 'Compare and Collections now sit beside Review, Select All and Auto-Reject on a wide screen, so your first images start one row higher.',
+    to: '/bank',
+  },
+  {
     id: '2026-11-08-zz-bank-queue-status', date: '2026-11-08',
     title: 'Bank Queue progress stays on one line',
     blurb: 'A running bank now uses the empty space in its row, so its step, count and time left no longer wrap into a cramped block.',

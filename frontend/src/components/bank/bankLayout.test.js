@@ -73,9 +73,13 @@ test('the rail opens by default on a desktop', () => {
   assert.equal(railDefaultOpen(1440), true)
 })
 
-test('a remembered rail state wins over the width default', () => {
-  assert.equal(loadRailOpen(1440, fakeStore({ [RAIL_STORAGE_KEY]: 'closed' })), false)
+test('a remembered drawer state wins over the width default', () => {
+  assert.equal(loadRailOpen(400, fakeStore({ [RAIL_STORAGE_KEY]: 'closed' })), false)
   assert.equal(loadRailOpen(400, fakeStore({ [RAIL_STORAGE_KEY]: 'open' })), true)
+})
+
+test('a column rail ignores a stored "closed": a desktop has no button to reopen it', () => {
+  assert.equal(loadRailOpen(1440, fakeStore({ [RAIL_STORAGE_KEY]: 'closed' })), true)
 })
 
 test('a corrupt preference degrades to the width default, never to "no filters"', () => {
@@ -97,7 +101,7 @@ test('a storage that throws on access still yields a usable rail', () => {
 test('saving then loading round-trips both states', () => {
   const store = fakeStore()
   saveRailOpen(false, store)
-  assert.equal(loadRailOpen(1440, store), false)
+  assert.equal(loadRailOpen(400, store), false)
   saveRailOpen(true, store)
   assert.equal(loadRailOpen(400, store), true)
 })

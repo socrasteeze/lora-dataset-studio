@@ -111,11 +111,13 @@ test('the header keeps portrait actions visible and short windows compact', () =
   // below sm; portrait actions use three columns and can grow with labels;
   // desktop and a phone held sideways keep the scrolling row.
   assert.match(workspace, /className="hidden min-w-0 grow items-center gap-2 sm:flex \[@media\(max-height:500px\)\]:!hidden"/);
-  assert.match(workspace, /className="hidden min-w-0 sm:block \[@media\(max-height:500px\)\]:!hidden"/);
+  assert.match(workspace, /className="hidden min-w-0 sm:block xl:hidden \[@media\(max-height:500px\)\]:!hidden"/);
   assert.match(workspace, /data-probe-reading>\s*\{\(\s*<div className="mb-2 sm:hidden">\s*<BankStatsStrip/);
   const strip = read('./BankStatsStrip.jsx');
   assert.match(strip, /flex h-10 min-w-0 shrink-0.*overflow-x-auto overflow-y-hidden whitespace-nowrap/);
-  assert.equal((workspace.match(/<BankStatsStrip/g) || []).length, 2);
+  // Three: its own row below xl, the action row's gap from xl, the passes panel on a phone.
+  assert.equal((workspace.match(/<BankStatsStrip/g) || []).length, 3);
+  assert.match(workspace, /className="hidden min-w-0 flex-1 px-2 xl:block \[@media\(max-height:500px\)\]:!hidden"/);
   assert.match(workspace, /grid min-w-0 grid-cols-3 items-stretch gap-2 \[&>button\]/);
   const actions = workspace.slice(workspace.indexOf('{/* The decisive actions.'), workspace.indexOf('</header>'));
   assert.match(actions, /\[&>button\]:h-auto/);

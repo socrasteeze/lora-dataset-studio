@@ -99,7 +99,7 @@ export default function BankOverview({ payload, compact = false }) {
 
             <div>
               <h3 className="mb-1 text-2xs font-semibold uppercase tracking-wide text-content-muted">Pass coverage</h3>
-              <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3">
+              <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-4">
                 {model.passes.map((pass) => (
                   <li key={pass.key} className="rounded-md border border-border bg-surface-raised px-2 py-1.5">
                     <span className="flex flex-wrap items-baseline justify-between gap-x-2 text-2xs">
@@ -119,13 +119,13 @@ export default function BankOverview({ payload, compact = false }) {
               </ul>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-4">
               {model.distributions.map((item) => <Distribution key={item.id} item={item} />)}
             </div>
 
             <div>
               <h3 className="mb-1 text-2xs font-semibold uppercase tracking-wide text-content-muted">Structure</h3>
-              <dl className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 xl:grid-cols-2 2xl:grid-cols-4">
+              <dl className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                 {model.kpis.map((kpi) => (
                   <div key={kpi.label} className="rounded-md border border-border bg-surface-raised px-2 py-1.5">
                     <dt className="text-2xs text-content-subtle">{kpi.label}</dt>
