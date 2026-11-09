@@ -103,6 +103,14 @@ export const WHATS_NEW = [
     to: '/bank',
   },
   {
+    id: '2026-11-09-start-bat-python-shim',
+    date: '2026-11-09',
+    title: 'start.bat starts when python is a version-manager shim',
+    blurb: 'With pyenv-win, or another tool whose python command is a .bat or .cmd file, start.bat could stop right after '
+      + 'its Python check: back to the prompt, no message, no app. It now carries on. And when a step does fail, start.bat '
+      + 'says which one and waits for a key, so a double-clicked window no longer closes before you can read why.',
+  },
+  {
     id: '2026-11-08-z-diagnostic-report-firefox',
     date: '2026-11-08',
     title: 'The diagnostic report copies in Firefox',
