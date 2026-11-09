@@ -775,6 +775,7 @@ export function brokenOrMissing(missing, invalid) {
 // Setup-installer action -> the short human label shown in the Install-everything list.
 export const INSTALL_ALL_ACTION_LABELS = {
   image_source_extras: 'Source Downloaders',
+  heif_decoder: 'HEIC/HEIF photo support',
   face_scoring: 'Face-similarity scoring',
   masks: 'Person masks',
   watermark_inpaint: 'Watermark inpainting',
@@ -1000,6 +1001,7 @@ function coreInstallCatalog(caps) {
   }
   return [
     item('image_source_extras', c.image_source_deps, true, ''),
+    item('heif_decoder', c.heif_decoder, true, ''),
     mlItem('face_scoring'),
     mlItem('masks'),
     item('watermark_inpaint', c.watermark_inpaint, true, ''),   // auto-provisions its own venv

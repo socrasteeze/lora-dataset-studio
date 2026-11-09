@@ -65,7 +65,8 @@ def test_every_capability_install_set_covers_its_own_probe_imports():
                 'numpy': 'numpy', 'simple_lama_inpainting': 'simple-lama-inpainting',
                 # 🎬 video lane — the import names differ from the distributions,
                 # which is exactly the drift this guard exists to catch.
-                'av': 'av', 'transnetv2_pytorch': 'transnetv2-pytorch'}
+                'av': 'av', 'transnetv2_pytorch': 'transnetv2-pytorch',
+                'pi_heif': 'pi-heif'}
     for action, pkgs in setup_installer._CAPABILITY_PACKAGES.items():
         expr = capabilities.CAPABILITY_IMPORTS.get(action)
         if not expr:
@@ -328,6 +329,21 @@ def test_image_sources_probe_checks_the_binary_it_will_use(monkeypatch):
     assert calls[0][1] == capabilities.sys.executable
     assert calls[0][2].startswith(capabilities.CAPABILITY_IMPORTS['image_source_extras'])
     assert calls[0][2].endswith('imageio_ffmpeg.get_ffmpeg_version()')
+
+
+def test_the_heif_decoder_is_probed_and_repaired_in_the_app_interpreter(monkeypatch):
+    from app import capabilities, setup_installer
+    calls = []
+    monkeypatch.setattr(capabilities, '_cached_import',
+                        lambda *args: calls.append(args) or False)
+    assert capabilities.probe_heif_decoder() == {
+        'ok': False, 'detail': 'Install HEIC/HEIF photo support in Setup.',
+        'action': 'heif_decoder'}
+    assert calls[0][1] == capabilities.sys.executable
+    assert 'heif_decoder' in setup_installer.INSTALL_ACTIONS
+    assert setup_installer._CAPABILITY_PACKAGES['heif_decoder'] == ('pi-heif',)
+    assert setup_installer._requirement_spec(
+        'pi-heif', setup_installer._CORE_REQUIREMENTS).startswith('pi-heif==1.4.0;')
 
 
 def test_every_installed_binary_is_covered_by_a_post_install_check():

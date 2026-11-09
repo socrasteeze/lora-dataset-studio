@@ -996,6 +996,7 @@ CAPABILITY_IMPORTS = {
     'image_source_extras': ('import gallery_dl.job, gallery_dl.extractor, yt_dlp, '
                             'Cryptodome.Cipher.AES, requests, imageio_ffmpeg; '
                             'imageio_ffmpeg.get_ffmpeg_exe()'),
+    'heif_decoder': 'from pi_heif import register_heif_opener',
     'face_scoring': 'import insightface, onnxruntime',
     'masks': 'import rembg',
     # numpy and PIL are named even though nothing pip-installs them directly:
@@ -1469,6 +1470,12 @@ def probe_image_source_deps() -> dict:
     return {'ok': bool(ok), 'detail': 'Image sources are ready.' if ok else
             'Install image sources from the Image Sources panel.',
             'action': 'image_source_extras'}
+
+
+def probe_heif_decoder() -> dict:
+    ok = _cached_import('heif_decoder', sys.executable, CAPABILITY_IMPORTS['heif_decoder'])
+    return {'ok': bool(ok), 'detail': 'HEIC and HEIF photos can be read.' if ok else
+            'Install HEIC/HEIF photo support in Setup.', 'action': 'heif_decoder'}
 
 
 def probe_scrape_deps() -> dict:
@@ -2741,6 +2748,7 @@ def _probe_uncached():
         'video_text': probe_video_text,
         'scrape_deps': probe_scrape_deps,
         'image_source_deps': probe_image_source_deps,
+        'heif_decoder': probe_heif_decoder,
         # Fork-only lane: another cached-but-possibly-cold `import onnxruntime`,
         # so it belongs in the pool with the rest rather than ahead of it.
         'wd14': probe_wd14,
@@ -3004,6 +3012,7 @@ def _probe_uncached():
         'python': python_ml_status(),
         'scrape_deps': scrape_deps['ok'],
         'image_source_deps': results['image_source_deps']['ok'],
+        'heif_decoder': results['heif_decoder']['ok'],
         # DIVERGENCE 1 (Civitai note, 2026-09-03) — upstream reports a
         # '📤 Civitai publishing' capability row here. The publisher is not
         # carried on this fork, and the row's own Setup destination is the

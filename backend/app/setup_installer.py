@@ -457,7 +457,7 @@ _BUNDLED_STAMP = '.lds-version'
 # to all of them; only the FETCH differs between the two registries.
 _ALL_NODE_PACKS = tuple(_NODE_PACKS) + tuple(_BUNDLED_NODE_PACKS)
 
-INSTALL_ACTIONS = ('ml_extras', 'ollama_model', 'image_source_extras',
+INSTALL_ACTIONS = ('ml_extras', 'ollama_model', 'image_source_extras', 'heif_decoder',
                    'face_scoring', 'masks', 'watermark_inpaint',
                    'bank_scoring', 'bank_siglip2', 'wd14', 'pixai',
                    'watermark_detect',
@@ -468,6 +468,7 @@ INSTALL_ACTIONS = ('ml_extras', 'ollama_model', 'image_source_extras',
                    'dlss5nr_bridge') + tuple(_MODEL_DOWNLOADS) + _ALL_NODE_PACKS
 
 _ML_REQUIREMENTS = cfg.BACKEND_DIR / 'requirements-ml.txt'
+_CORE_REQUIREMENTS = cfg.BACKEND_DIR / 'requirements.txt'
 # pip -r installers share one worker and target THIS interpreter.
 _PIP_REQUIREMENTS = {'ml_extras': _ML_REQUIREMENTS,
                      'image_source_extras': cfg.BACKEND_DIR / 'requirements-image-sources.txt'}
@@ -545,6 +546,7 @@ _FLASK_VENV_INCOMPATIBLE = frozenset({_WATERMARK_PKG})
 #                 child fetches those on first run (see services/wd14_tagger.py).
 _CAPABILITY_PACKAGES = {
     'image_source_extras': ('gallery-dl', 'yt-dlp', 'pycryptodomex', 'imageio-ffmpeg'),
+    'heif_decoder': ('pi-heif',),
     'face_scoring': ('insightface', 'onnxruntime', 'numpy', 'opencv-python-headless'),
     'masks': ('rembg', 'onnxruntime', 'numpy', 'opencv-python-headless'),
     'watermark_inpaint': (_WATERMARK_PKG,),
@@ -621,7 +623,7 @@ _MANAGED_CAPABILITY_ACTIONS = (*_CAPABILITY_ML_ACTIONS, 'shot_detect')
 # 600 s TTL (ml_extras/scrape_extras via -r, the scoped per-capability installs).
 _IMPORT_CACHE_ACTIONS = (frozenset(_PIP_REQUIREMENTS)
                          | set(_CAPABILITY_ML_ACTIONS)
-                         | {'watermark_inpaint', 'bank_scoring', 'bank_siglip2',
+                         | {'heif_decoder', 'watermark_inpaint', 'bank_scoring', 'bank_siglip2',
                             'watermark_detect', 'shot_detect', 'pixai'})
 
 # Actions that invoke pip and therefore MUST NOT run concurrently: two pip processes
@@ -638,7 +640,7 @@ _PIP_ACTIONS = (frozenset(_PIP_REQUIREMENTS)
                 # (that sharing is the whole point — it saves a second 2.5 GB
                 # torch), so it must share the pip queue too or the two race on
                 # one environment's dist-info.
-                | {'watermark_inpaint', 'bank_scoring', 'bank_siglip2',
+                | {'heif_decoder', 'watermark_inpaint', 'bank_scoring', 'bank_siglip2',
                    'watermark_detect', 'shot_detect', 'pixai'})
 
 # Transient file-lock errors an install can hit even without concurrency: an antivirus
@@ -922,6 +924,9 @@ def manual_command(action) -> str:
         cmd = (f'{_quote(sys.executable)} -m pip install {specs} '
                f'-c {_quote(str(_ML_REQUIREMENTS))}')
         return f'{cmd} {guard}' if guard else cmd
+    if action == 'heif_decoder':
+        spec = _requirement_spec('pi-heif', _CORE_REQUIREMENTS).split(';', 1)[0].strip()
+        return f'{_quote(sys.executable)} -m pip install {spec}'   # the marker's quotes break a copy-paste
     if action in _PIP_REQUIREMENTS:        # scrape_extras: pure-python -r install
         return f'{_quote(sys.executable)} -m pip install -r {_quote(str(_PIP_REQUIREMENTS[action]))}'
     if action in _CAPABILITY_ML_ACTIONS:
@@ -2501,6 +2506,7 @@ def _verify_capability_import(action, python, *, log_action=None) -> bool:
 _MISSING_MODULE_RE = re.compile(r"No module named ['\"]([\w.]+)['\"]")
 _CAPABILITY_LABEL = {'face_scoring': 'face scoring', 'masks': 'person masks',
                       'image_source_extras': 'Image Sources',
+                      'heif_decoder': 'HEIC/HEIF photo support',
                       'bank_scoring': 'bank scoring',
                       'bank_siglip2': 'SigLIP2 Bank semantics',
                       'watermark_inpaint': 'watermark inpainting',
@@ -3346,8 +3352,26 @@ def _run_image_source_extras(action):
     return 0 if _verify_capability_import(action, sys.executable) else 1
 
 
+def _run_heif_decoder(action):
+    """pi-heif, into the app's own interpreter: HEIF is decoded in this process.
+    The pin and platform marker stay in requirements.txt."""
+    spec = _requirement_spec('pi-heif', _CORE_REQUIREMENTS)
+    _append(action, f'target interpreter: {sys.executable}')
+    _append(action, f'installing {spec}')
+    rc = _run_pip(action, [sys.executable, '-m', 'pip', 'install', spec,
+                           *_flask_pillow_guard(sys.executable)])
+    if rc != 0 or not _verify_capability_import(action, sys.executable):
+        return rc or 1
+    importlib.invalidate_caches()   # new package in an already-scanned site-packages
+    from .services import heif_decoder
+    heif_decoder._registered = None   # a fresh install registers without a restart
+    heif_decoder.register()
+    return 0
+
+
 _WORKERS = {**{a: _run_ml_extras for a in _PIP_REQUIREMENTS},
             'image_source_extras': _run_image_source_extras,
+            'heif_decoder': _run_heif_decoder,
             'dlss5nr_bridge': _run_dlss5nr_bridge,
             'ollama_model': _run_ollama_model,
             **{a: _run_ml_capability for a in _CAPABILITY_ML_ACTIONS},  # face_scoring + masks
