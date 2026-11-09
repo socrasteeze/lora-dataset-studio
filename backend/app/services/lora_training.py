@@ -4907,7 +4907,7 @@ def _export_and_freeze_local_dataset(user_id, dataset_id, *, masked, base_model)
             if (queue_manager._get_system_state('training_in_progress', False)
                     and not _training_process_is_definitely_dead(
                         queue_manager._get_system_state('training_pid', None))):
-                raise ValueError(
+                raise TrainingAlreadyRunning(
                     'a training is already in progress - wait for it to finish '
                     'or queue this dataset')
             from . import checkpoint_registry
@@ -8044,7 +8044,7 @@ def _lt_refuse_or_resolve(user_id, dataset_id, train_type, variant,
     if (queue_manager._get_system_state('training_in_progress', False)
             and not _training_process_is_definitely_dead(
                 queue_manager._get_system_state('training_pid', None))):
-        raise ValueError('a training is already in progress - wait for it to finish or queue this dataset')
+        raise TrainingAlreadyRunning('a training is already in progress - wait for it to finish or queue this dataset')
     # Cheap refusal BEFORE the dataset export below: re-exporting a whole dataset
     # only to reject the launch under the spawn lock would burn minutes of disk
     # for nothing. The authoritative copy of this check lives in that lock.
@@ -8269,7 +8269,7 @@ def _lt_publish_bridge_context(run_dir, config_path, env, masked, _prepared,
         if (queue_manager._get_system_state('training_in_progress', False)
                 and not _training_process_is_definitely_dead(
                     queue_manager._get_system_state('training_pid', None))):
-            raise ValueError(
+            raise TrainingAlreadyRunning(
                 'a training is already in progress - wait for it to finish or '
                 'queue this dataset')
         if _bridge_candidate:
@@ -8406,7 +8406,7 @@ def _lt_spawn_transaction(ds, user_id, dataset_id, steps, masked, launch_fam,
         if (queue_manager._get_system_state('training_in_progress', False)
                 and not _training_process_is_definitely_dead(
                     queue_manager._get_system_state('training_pid', None))):
-            raise ValueError(
+            raise TrainingAlreadyRunning(
                 'a training is already in progress - wait for it to finish or '
                 'queue this dataset')
         # Authoritative: a vision pass may have grabbed the window during the
@@ -9027,7 +9027,7 @@ def _launch_exact_resume_transaction(
                 previous_is_dead = _training_process_is_definitely_dead(
                     queue_manager._get_system_state('training_pid', None))
                 if not (allow_dead_predecessor and previous_is_dead):
-                    raise ValueError('a training is already in progress')
+                    raise TrainingAlreadyRunning('a training is already in progress')
             archived, exact_bundle_path, journal_path = (
                 _archive_and_seed_exact_bundle(
                     user_id, dataset_id, base, family, variant, chosen_filename,
@@ -9140,7 +9140,7 @@ def continue_training(user_id, dataset_id, extra_steps: int = 1000,
         previous_is_dead = _training_process_is_definitely_dead(
             queue_manager._get_system_state('training_pid', None))
         if not (_allow_dead_predecessor and previous_is_dead):
-            raise ValueError('a training is already in progress')
+            raise TrainingAlreadyRunning('a training is already in progress')
     # Same interpreter gate as a fresh launch: a resume spawns the very same
     # ai-toolkit command, so a torch-less Python must be named here too.
     assert_interpreter_ready()
@@ -9363,7 +9363,7 @@ def continue_training(user_id, dataset_id, extra_steps: int = 1000,
                     previous_is_dead = _training_process_is_definitely_dead(
                         queue_manager._get_system_state('training_pid', None))
                     if not (_allow_dead_predecessor and previous_is_dead):
-                        raise ValueError('a training is already in progress')
+                        raise TrainingAlreadyRunning('a training is already in progress')
                 if cloud_checkpoint is not None:
                     # A harvested cloud file is not permission to replace a
                     # local lane. Run the normal admission checks before any
@@ -9391,6 +9391,10 @@ def continue_training(user_id, dataset_id, extra_steps: int = 1000,
     if resume_mode == 'full_state':
         res['state_bundle_id'] = state_bundle_id
     return res
+
+
+class TrainingAlreadyRunning(ValueError):
+    """Another training holds the single local lane: a passing refusal for the queue."""
 
 
 class TrainingStopVerificationError(RuntimeError):
