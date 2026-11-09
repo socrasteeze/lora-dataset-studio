@@ -132,6 +132,9 @@ function Invoke-Step {
   if (-not $LogName) { $LogName = ($Name -replace '[^A-Za-z0-9]+', '-').ToLower() + '.txt' }
   $log = Scratch $LogName
   Write-Head $Name
+  # PowerShell 5.1 turns native stderr into a terminating error under Stop,
+  # which would skip the exit-code record below.
+  $ErrorActionPreference = 'Continue'
   $timer = [Diagnostics.Stopwatch]::StartNew()
   $global:LASTEXITCODE = 0
   & $Body 2>&1 | Tee-Object -FilePath $log | Out-Host
