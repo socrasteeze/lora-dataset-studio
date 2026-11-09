@@ -31,7 +31,8 @@ Removed: personal commit identities, AI trailers on fork commits, and one peer
 address in an old `NOTE.md`. Refs and release tags were moved, and the release
 workflow did not fire. Other clones must re-clone. GitHub's read-only pull request
 refs still hold old commits until GitHub support purges them. The old-to-new hash
-map and a pre-rewrite backup stay outside the repo on the operator's machine.
+map stays outside the repo on the operator's machine. The pre-rewrite backup was
+deleted on 2026-11-08 after every old commit was matched to a rewritten one.
 
 ## Clean delivery checkpoint (2026-11-01)
 
