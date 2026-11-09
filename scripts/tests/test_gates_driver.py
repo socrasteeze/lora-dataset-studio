@@ -10,7 +10,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 DRIVER = ROOT / 'scripts/gates.ps1'
-SHELL = shutil.which('pwsh') or shutil.which('powershell')
+# A Store execution alias under WindowsApps cannot start from an SSH session.
+SHELL = next((path for path in map(shutil.which, ('pwsh', 'powershell'))
+              if path and 'WindowsApps' not in path), None)
 pytestmark = pytest.mark.skipif(not SHELL, reason='PowerShell is required')
 
 

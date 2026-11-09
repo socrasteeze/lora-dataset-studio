@@ -85,13 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
-    id: '2026-11-08-bank-queue-status', date: '2026-11-08',
+    id: '2026-11-08-zz-bank-queue-status', date: '2026-11-08',
     title: 'Bank Queue progress stays on one line',
     blurb: 'A running bank now uses the empty space in its row, so its step, count and time left no longer wrap into a cramped block.',
     to: '/bank',
   },
   {
-    id: '2026-11-08-bank-form-errors', date: '2026-11-08',
+    id: '2026-11-08-z-bank-form-errors', date: '2026-11-08',
     title: 'The Bank form keeps its shape when a field is missing',
     blurb: 'A missing name or folder now shows under its own field. Browse, Subfolders and Create Bank stay together on one row.',
     to: '/bank',
@@ -4058,6 +4058,9 @@ export function latestEntryId(entries = WHATS_NEW) {
 //     which the fork rejected in the OVR.89 sync; no code here implements it.
 export const WITHDRAWN_ID_ALIASES = new Map([
   ['2026-09-22-zzzzzz-optional-usage-statistics', '2026-09-22-zzzzzz-checkpoint-graph-refresh'],
+  // Renamed so the newest entries of their day sort first.
+  ['2026-11-08-bank-queue-status', '2026-11-08-zz-bank-queue-status'],
+  ['2026-11-08-bank-form-errors', '2026-11-08-z-bank-form-errors'],
 ]);
 
 export function unseenEntries(lastSeenId, entries = WHATS_NEW) {

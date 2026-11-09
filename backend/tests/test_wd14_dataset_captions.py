@@ -112,9 +112,11 @@ def test_batch_and_preview_refuse_unavailable_tools(app, monkeypatch, missing, a
             svc._preview_wd14_caption(ds, None, 'sample.webp', str)
 
 
-def test_bank_caption_path_refuses_wd14():
+def test_bank_caption_path_refuses_wd14(tmp_path):
+    sample = tmp_path / 'sample.webp'
+    sample.write_bytes(b'fixture')
     with pytest.raises(RuntimeError, match='Bank Tags pass'):
-        svc.caption_paths(['sample.webp'], backend='wd14')
+        svc.caption_paths([str(sample)], backend='wd14')
 
 
 def test_failed_tagger_reports_its_error_in_batch_and_preview(app, monkeypatch):
