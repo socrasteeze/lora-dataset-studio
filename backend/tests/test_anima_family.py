@@ -283,14 +283,15 @@ def test_anima_hybrid_does_not_loosen_the_mono_form_families(app):
 # --- 7) built-in presets --------------------------------------------------------
 
 def test_builtin_presets_include_anima():
-    """One Character + one Concept preset for Anima, both extrapolated from
-    ai-toolkit defaults (rank 32, weighted) and honestly flagged as such."""
+    """One Character + one Concept preset for Anima. Character is measured;
+    Concept is still extrapolated from ai-toolkit defaults and flagged as such."""
     from app.services.lora_training import BUILTIN_TRAIN_PRESETS
     anima = [pr for pr in BUILTIN_TRAIN_PRESETS if pr['train_type'] == 'anima']
     kinds = {pr['dataset_kind'] for pr in anima}
     assert kinds == {'character', 'concept'}
     for pr in anima:
         assert pr['settings']['timestep_type'] == 'weighted'
-        assert 'no anima-specific' in pr['description'].lower()
+    concept = next(pr for pr in anima if pr['dataset_kind'] == 'concept')
+    assert 'no anima-specific' in concept['description'].lower()
     char = next(pr for pr in anima if pr['dataset_kind'] == 'character')
     assert char['settings']['rank'] == 32 and char['settings']['alpha'] == 32

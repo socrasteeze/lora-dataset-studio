@@ -784,8 +784,10 @@ def test_the_capability_the_workspace_reads_rides_the_bank_payload(app, monkeypa
 def test_the_worker_requires_parent_gpu_permission():
     """CPU fallback hides CUDA; only a parent-owned request enables GPU OCR."""
     src = _infer_source('video_text_infer.py')
-    hide = src.index("os.environ['CUDA_VISIBLE_DEVICES'] = ''")
-    assert hide < src.index('import cv2'), \
+    # main() runs first; _read_bgr's own import above it only runs from main().
+    main = src.index('def main(')
+    hide = src.index("os.environ['CUDA_VISIBLE_DEVICES'] = ''", main)
+    assert hide < src.index('import cv2', main), \
         'CUDA must be hidden before anything heavy is imported'
     assert "want_cuda = req.get('device') == 'cuda'" in src
     assert 'if not want_cuda:' in src

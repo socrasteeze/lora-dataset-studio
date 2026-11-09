@@ -4,6 +4,7 @@ from copy import deepcopy
 import json
 from pathlib import Path
 import sys
+import threading
 
 import pytest
 
@@ -14,6 +15,7 @@ from app.plugins import registry
 
 ROOT = Path(__file__).resolve().parents[2]
 PRODUCTS = tuple(json.loads((ROOT / 'fork-plugins.json').read_text(encoding='utf-8'))['enabled'])
+REAL_THREAD_START = threading.Thread.start
 
 
 @pytest.fixture
@@ -65,7 +67,7 @@ def test_store_factory_starts_without_external_plugins(factory):
     app = factory()
     assert app.extensions['lds_plugins'].records == {}
     assert app.test_client().get('/api/plugins', follow_redirects=True).status_code == 200
-    assert len(db.metadata.tables) == 45
+    assert len(db.metadata.tables) == 46
     assert {'image_source_job', 'image_source_asset'} <= set(db.metadata.tables)
     assert {'dataset_import_receipt', 'dataset_duplicate_keep', 'bank_collection', 'bank_collection_member'} <= set(db.metadata.tables)
     assert {'named_identity', 'identity_subject', 'identity_evidence', 'identity_assignment',
@@ -77,7 +79,7 @@ def test_true_factory_each_product_alone(factory, pid):
     app = factory({pid})
     records = app.extensions['lds_plugins'].records
     assert records[pid].state == 'loaded', records[pid].error
-    assert len(db.metadata.tables) == 45
+    assert len(db.metadata.tables) == 46
     assert {'image_source_job', 'image_source_asset'} <= set(db.metadata.tables)
     assert {'dataset_import_receipt', 'dataset_duplicate_keep', 'bank_collection', 'bank_collection_member'} <= set(db.metadata.tables)
     assert {'named_identity', 'identity_subject', 'identity_evidence', 'identity_assignment',
@@ -117,6 +119,8 @@ def test_settings_refuse_rejected_product_writes(factory, monkeypatch):
 def test_registered_capability_cache_changes_with_retained_owner_state(factory, monkeypatch):
     from app import capabilities
     app = factory({'video'})
+    # Startup stays worker-free; a capability scan runs its probes on workers.
+    monkeypatch.setattr(threading.Thread, 'start', REAL_THREAD_START)
     registry_ = app.extensions['lds_plugins']
     calls = []
     registry_.probes = {'fixture_probe': ('video', lambda: calls.append('probe') or True)}

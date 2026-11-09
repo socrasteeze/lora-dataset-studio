@@ -13,7 +13,7 @@ def test_new_storage_is_padded_without_creating_a_folder(
     from app.services.dataset_storage import dataset_path, ensure_dataset_dir
 
     root = tmp_path / 'datasets'
-    monkeypatch.setattr(cfg, 'dataset_images_root', lambda: root)
+    monkeypatch.setattr(cfg, 'dataset_images_root', lambda create=True: root)
     assert dataset_path(dataset_id) == str(root / name)
     assert not root.exists()
     assert ensure_dataset_dir(dataset_id) == str(root / name)
@@ -29,7 +29,7 @@ def test_legacy_storage_is_used_for_reads_and_writes(app, tmp_path, monkeypatch)
     legacy.mkdir(parents=True)
     original = legacy / 'image.png'
     original.write_bytes(b'original')
-    monkeypatch.setattr(cfg, 'dataset_images_root', lambda: root)
+    monkeypatch.setattr(cfg, 'dataset_images_root', lambda create=True: root)
     assert dataset_path(7) == ensure_dataset_dir(7) == str(legacy)
     assert original.read_bytes() == b'original'
     assert not (root / '00007').exists()
@@ -42,7 +42,7 @@ def test_legacy_folder_is_not_shadowed_by_a_padded_folder(app, tmp_path, monkeyp
     root = tmp_path / 'datasets'
     for name in ('7', '00007'):
         (root / name).mkdir(parents=True)
-    monkeypatch.setattr(cfg, 'dataset_images_root', lambda: root)
+    monkeypatch.setattr(cfg, 'dataset_images_root', lambda create=True: root)
     assert dataset_path(7) == ensure_dataset_dir(7) == str(root / '7')
 
 
@@ -56,7 +56,7 @@ def test_checkpoint_hash_reads_the_resolved_storage(app, tmp_path, monkeypatch, 
     folder.mkdir(parents=True)
     image = folder / 'image.png'
     image.write_bytes(b'original')
-    monkeypatch.setattr(cfg, 'dataset_images_root', lambda: root)
+    monkeypatch.setattr(cfg, 'dataset_images_root', lambda create=True: root)
     before = registry._file_hash(7, 'image.png')
     assert before != '-'
     image.write_bytes(b'changed image bytes')
