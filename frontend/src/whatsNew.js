@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-08-bank-queue-status', date: '2026-11-08',
+    title: 'Bank Queue progress stays on one line',
+    blurb: 'A running bank now uses the empty space in its row, so its step, count and time left no longer wrap into a cramped block.',
+    to: '/bank',
+  },
+  {
     id: '2026-11-08-bank-form-errors', date: '2026-11-08',
     title: 'The Bank form keeps its shape when a field is missing',
     blurb: 'A missing name or folder now shows under its own field. Browse, Subfolders and Create Bank stay together on one row.',

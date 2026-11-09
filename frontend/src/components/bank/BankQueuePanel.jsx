@@ -28,7 +28,7 @@ function ProgressBar({ progress }) {
  * — so the bank the ✕ belongs to is never a guess, on a mouse or a finger. */
 const ACTION = 'min-h-10 lg:min-h-0 flex-1 sm:flex-none rounded border px-2 py-0.5 text-xs'
 const ROW = 'group grid grid-cols-[1.25rem_minmax(0,1fr)_2.5rem] items-center gap-x-2 gap-y-0.5 rounded-md px-1 py-1 text-sm transition-colors '
-  + 'sm:grid-cols-[1.25rem_minmax(0,1fr)_12rem_4.5rem_2.5rem] '
+  + 'sm:grid-cols-[1.25rem_minmax(0,1fr)_fit-content(45%)_4.5rem_2.5rem] '
   + 'hover:bg-surface-raised focus-within:bg-surface-raised active:bg-surface-raised '
   + 'has-[:active]:bg-surface-raised'
 const NAME = 'col-start-2 row-start-1 min-w-0 [overflow-wrap:anywhere] font-medium text-content'
