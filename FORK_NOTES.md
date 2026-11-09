@@ -36,6 +36,10 @@ features back on.
 API image engines and rented-GPU training stay excluded. Saving a cloud-training
 token is refused before any account check, and the token is not stored.
 Plugins that ship with the app are installed with it.
+`pi-heif` is a pinned core requirement that upstream chose and the operator approved.
+It decodes HEIC/HEIF only where images enter, in the app interpreter. The
+`heif_decoder` Setup action and probe and the upload queue's content check in
+`importFilePolicy.js` are this fork's: keep them on a later Setup or import pick.
 There is no plugin catalog and no in-app update check.
 `npm run build` writes the curated fork marker in
 `frontend/dist/plugin-build.json`. The backend reads that marker
