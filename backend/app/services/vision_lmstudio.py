@@ -663,7 +663,8 @@ def describe_image(image_bytes: bytes, prompt: str, *,
                    as_json: bool = False,
                    strict: bool = False,
                    think: bool | None = None,
-                   timeout: tuple[float, float] | float = (10, 180)) -> str:
+                   timeout: tuple[float, float] | float = (10, 180),
+                   max_side: int | None = None) -> str:
     """Describe an image through LM Studio. "" best-effort, or raises if strict.
 
     The image goes through the same gate every provider uses (fresh JPEG, no
@@ -671,7 +672,9 @@ def describe_image(image_bytes: bytes, prompt: str, *,
     turn captioning back into a metadata disclosure.
     """
     global _data_uri_ok
-    safe = vision_image.ensure_vision_safe_jpeg(image_bytes, provider='vision_lmstudio')
+    safe = vision_image.ensure_vision_safe_jpeg(
+        image_bytes, provider='vision_lmstudio',
+        **({'max_side': max_side} if max_side else {}))
     if safe is None:
         if strict:
             raise RuntimeError('The image could not be read safely, so it was not sent.')

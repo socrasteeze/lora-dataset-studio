@@ -12177,6 +12177,14 @@ def start_framing(app, user_id, bank_id, rescan=False, device_id=None,
 # never trip it.
 _FENCE_STREAK_WARN = 5
 
+# Framing is a coarse label, and the model's reading of the picture is most of
+# each call. Measured 2026-11-09 on qwen3-vl 8B: a 1536 px side costs 1814 prompt
+# tokens (0.50 s), 1024 px costs 1122 (0.30 s), and smaller sides cost the same.
+# On 30 bank images the label matched 28 times, against 29 for a plain re-run.
+# Auto-crop keeps the full size: at 1024 its mean confidence fell from 0.99 to
+# 0.90, which is the default crop threshold.
+_FRAMING_MAX_SIDE = 1024
+
 
 @shared_pass('framing')
 def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None, *,
@@ -12263,7 +12271,8 @@ def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None, *,
             try:
                 raw = describe_image_ollama(
                     payload, prompt, num_predict=650 if auto_crop else 400,
-                    prefer_json=True, fmt='json', keep_alive='5m')
+                    prefer_json=True, fmt='json', keep_alive='5m',
+                    max_side=None if auto_crop else _FRAMING_MAX_SIDE)
                 return {'raw': raw, 'fingerprint': fingerprint, 'error': None,
                         'fenced': False}
             except Exception as exc:  # noqa: BLE001 — one image, not the pass
