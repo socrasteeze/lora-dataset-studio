@@ -773,6 +773,7 @@ def clear_import_cache() -> None:
         # on an install that had just been repaired. Nothing else in the app
         # ever emptied that cache; expiry was the only way out.
         _torch_probe_cache.clear()
+        forget_startup_comfy()
         _cache = None
         _cache_ts = 0.0
         # Fork-only: the on-disk copy goes with the in-memory one, under the
@@ -2564,6 +2565,31 @@ def _probe_training_captioner():
     return aitoolkit, probe_joycaption(aitoolkit)
 
 
+# probe_startup runs on every app load, and an address where nothing listens
+# costs about 2 s per connect on Windows (measured 2026-11-10: 2.05 s on each
+# load). That one verdict is kept as long as the full snapshot is. A ComfyUI
+# that answered is asked again every time.
+_startup_comfy_down = None   # (expires_at, (api_url, ignored), verdict)
+
+
+def forget_startup_comfy() -> None:
+    global _startup_comfy_down
+    _startup_comfy_down = None
+
+
+def _probe_comfyui_for_startup() -> dict:
+    global _startup_comfy_down
+    from .utils import comfyui as _cu
+    key = ((cfg.get('comfyui.api_url') or '').rstrip('/'), bool(_cu.comfyui_ignored()))
+    held = _startup_comfy_down
+    if held and held[1] == key and time.time() < held[0]:
+        return dict(held[2])
+    verdict = probe_comfyui()
+    _startup_comfy_down = ((time.time() + _CACHE_TTL, key, dict(verdict))
+                           if verdict.get('status') == 'unreachable' else None)
+    return verdict
+
+
 def probe_startup() -> dict:
     """Publish tool presence before unrelated model and ML checks finish.
 
@@ -2572,7 +2598,7 @@ def probe_startup() -> dict:
     lock, importing optional packages or enumerating ComfyUI models/nodes.
     """
     results = _parallel_probes({
-        'comfyui': probe_comfyui,
+        'comfyui': _probe_comfyui_for_startup,
         'aitoolkit': probe_aitoolkit,
     })
     comfy, aitoolkit = results['comfyui'], results['aitoolkit']
