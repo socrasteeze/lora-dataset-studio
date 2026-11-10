@@ -54,7 +54,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from PIL import Image, ImageOps
-from sqlalchemy import and_, case, func, or_, select, text, update
+from sqlalchemy import and_, case, func, literal, or_, select, text, update
 
 from .. import config as cfg
 from ..generation_limits import improve_timeout_seconds
@@ -2733,10 +2733,11 @@ def _name_excluded_clause():
     names = excluded_folder_names()
     if not names:
         return None
-    rel = func.lower(_relpath_posix_col())
-    return or_(*(or_(rel.startswith(name + '/', autoescape=True),
-                     rel.contains('/' + name + '/', autoescape=True))
-                 for name in names))
+    # One literal search per name on '/<relpath>': the same rows as a "starts
+    # with name/" OR "contains /name/" pair of LIKEs. Measured 2026-11-10 on
+    # 387k images and 5 names: the pair cost 1.1 s per scan, this costs 0.1 s.
+    rel = literal('/').concat(func.lower(_relpath_posix_col()))
+    return or_(*(func.instr(rel, '/' + name + '/') > 0 for name in names))
 
 
 def _processable(bank_id):

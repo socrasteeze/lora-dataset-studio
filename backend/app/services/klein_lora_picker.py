@@ -78,6 +78,10 @@ _COMPAT_RANK = {'yes': 0, 'unknown': 1, 'no': 2}
 
 _lock = threading.Lock()
 _cache: dict = {'sig': None, 'data': None}
+# One scan at a time. The first scan of a process reads every LoRA header
+# (measured 2026-11-10: 20 843 files took minutes), and each request that
+# arrived meanwhile used to start its own. They now wait and reuse the result.
+_scan_lock = threading.Lock()
 
 
 def _roots_signature() -> tuple:
@@ -121,20 +125,21 @@ def scan_generation_loras(force: bool = False, family: str = _KLEIN_FAMILY) -> l
     computed per call and two engines' pickers share one cache slot."""
     fam = family if family in KNOWN_FAMILIES else _KLEIN_FAMILY
     sig = _roots_signature()
-    scanned = None
-    if not force:
-        with _lock:
-            if _cache['sig'] == sig and _cache['data'] is not None:
-                scanned = _cache['data']
-    if scanned is None:
-        scanned = []
-        for rel, abs_path in comfy_model_paths.list_models('loras'):
-            arch = detect_lora_arch(abs_path)
-            scanned.append({'name': rel, 'arch': arch,
-                            'label': _ARCH_LABEL.get(arch)})
-        with _lock:
-            _cache['sig'] = sig
-            _cache['data'] = scanned
+    with _scan_lock:
+        scanned = None
+        if not force:
+            with _lock:
+                if _cache['sig'] == sig and _cache['data'] is not None:
+                    scanned = _cache['data']
+        if scanned is None:
+            scanned = []
+            for rel, abs_path in comfy_model_paths.list_models('loras'):
+                arch = detect_lora_arch(abs_path)
+                scanned.append({'name': rel, 'arch': arch,
+                                'label': _ARCH_LABEL.get(arch)})
+            with _lock:
+                _cache['sig'] = sig
+                _cache['data'] = scanned
     out = [dict(e, compatible=_compatibility(e['arch'], fam)) for e in scanned]
     out.sort(key=lambda e: (_COMPAT_RANK[e['compatible']], e['name'].lower()))
     return out

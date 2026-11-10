@@ -253,6 +253,7 @@ def _reset_inmemory_registries():
     from app.services import bank_jobs, bank_queue, bank_undo, clip_text_encoder
     from app.services import dataset_activity
     from app.services import image_bank_service, ollama_gpu_fence, vision_keepalive
+    from app import capabilities
     dataset_activity.reset()
     bank_queue.reset(durable=False)
     bank_jobs.reset()
@@ -262,6 +263,7 @@ def _reset_inmemory_registries():
     vision_keepalive.forget_lease()
     ollama_gpu_fence.reset_for_tests()
     clip_text_encoder.forget_memory_cache()
+    capabilities.forget_startup_comfy()
     yield
     dataset_activity.reset()
     bank_queue.reset(durable=False)
@@ -272,6 +274,7 @@ def _reset_inmemory_registries():
     vision_keepalive.forget_lease()
     ollama_gpu_fence.reset_for_tests()
     clip_text_encoder.forget_memory_cache()
+    capabilities.forget_startup_comfy()
     clip_text_encoder.release()
 
 # Fork-only: upstream never had this fixture or test_config_isolation.py.
