@@ -34,7 +34,7 @@ import SelectionTagsPanel from './SelectionTagsPanel.jsx'
 import SubfolderPersonPanel from './SubfolderPersonPanel'
 import { Button, Input, Select, btnClass, controlHeight, fieldClass } from '../common/Controls.jsx'
 import { Chip, FILTER_ACTIVE, FILTER_HOVER, FILTER_IDLE, FilterGroup, GroupLabel } from './BankAtoms.jsx'
-import { facetMenuState, matchingTagOptions } from './bankTagFacets.js'
+import { MATCH_ALL_MAX_TAGS, facetMenuState, matchingTagOptions } from './bankTagFacets.js'
 import { FLAG_HINT, FLAG_LABEL, ORIGIN_BUCKETS } from './bankFacets.js'
 import { TILE_SHAPES, foldedCount } from './bankLayout.js'
 import { angleTitle, mediumTitle } from './bankMedium.js'
@@ -161,7 +161,7 @@ export default function BankFilterRail({
   thresholdsOpen, setThresholdsOpen, connection, refreshPayload, refreshImages, onRunPass,
   sortGroups, setSort, tileSize, setTileSize, tileShape, setTileShape,
   moreOpen, setMoreOpen, isDrawer, onClose, onBrowseStyles,
-  tagFiltersShown, tagGroups, wd14Tags, toggleFacetTag, selectFacetTags, clearWd14Tags,
+  tagFiltersShown, tagGroups, wd14Tags, wd14Match, setWd14Match, toggleFacetTag, selectFacetTags, clearWd14Tags,
   tagFacetError, retryTagFacets,
   filterSummary, clearAllFilters, shownReasons, reasonCounts, reasonHint,
 }) {
@@ -480,12 +480,32 @@ export default function BankFilterRail({
         <section aria-label="Tag filters" className="pt-2">
           <div className="flex items-center gap-2">
             <GroupLabel>🔖 Tags</GroupLabel>
+            <div role="group" aria-label="Match tags" className="flex items-center gap-1">
+              {[
+                ['any', 'Any', 'Each menu matches images with any of its ticked tags. Different menus must each match.'],
+                ['all', 'All', 'Images must have every ticked tag.'],
+              ].map(([id, text, hint]) => {
+                const active = (wd14Match === 'all') === (id === 'all')
+                return (
+                  <button key={id} type="button" aria-pressed={active} title={hint}
+                    onClick={() => setWd14Match(id)}
+                    className={`inline-flex min-h-10 min-w-10 items-center justify-center rounded-full border px-2.5 text-xs font-medium transition-colors lg:h-7 lg:min-h-0 lg:min-w-0 ${FILTER_HOVER} ${active ? FILTER_ACTIVE : FILTER_IDLE}`}>
+                    {text}
+                  </button>
+                )
+              })}
+            </div>
             {wd14Tags.length > 0 && (
               <Button size="sm" noShrink className="ml-auto" onClick={clearWd14Tags}>
                 Clear ({wd14Tags.length})
               </Button>
             )}
           </div>
+          {wd14Match === 'all' && wd14Tags.length > MATCH_ALL_MAX_TAGS && (
+            <p role="status" className="m-0 mt-1 text-xs text-amber-300">
+              Match All checks {MATCH_ALL_MAX_TAGS} tags at most. Untick some for an exact match.
+            </p>
+          )}
           {tagFacetError && <div role="alert" className="my-2 flex flex-wrap items-center gap-2 text-xs text-content-muted">
             <span>Tag filters are unavailable.</span>
             <Button size="md" onClick={retryTagFacets}>Retry Tags</Button>

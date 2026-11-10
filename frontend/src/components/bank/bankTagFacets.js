@@ -220,14 +220,19 @@ export function selectWd14Tags(selected, names) {
     .map((name) => String(name || '').trim().toLowerCase()).filter(Boolean))];
 }
 
+/** The server keeps this many ANDed groups (`_MAX_TAG_GROUPS`) and drops the
+ *  rest. Match All spends one group per tag, so the rail names the limit. */
+export const MATCH_ALL_MAX_TAGS = 64;
+
 /**
  * The `wd14_tags` query value.
  * Tags that share a facet are one OR group (`blonde_hair|brown_hair`), in the
  * order they were selected. Groups are emitted in facet order and joined with
  * commas, which the server ANDs. Tags no facet claims share one OR group
  * at the end. '' means nothing is picked, so the caller can omit the parameter.
+ * `match` 'all' sends every tag as its own group, so an image needs all of them.
  */
-export function wd14TagsParam(selected) {
+export function wd14TagsParam(selected, match = 'any') {
   const wanted = [];
   const seen = new Set();
   for (const raw of selected || []) {
@@ -236,6 +241,7 @@ export function wd14TagsParam(selected) {
     seen.add(name);
     wanted.push(name);
   }
+  if (match === 'all') return wanted.join(',');
   const byFacet = new Map();
   const loose = [];
   for (const name of wanted) {

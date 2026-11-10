@@ -157,6 +157,15 @@ test('wd14TagsParam ORs one facet and ANDs different facets', () => {
   assert.equal(wd14TagsParam(['blonde_hair', 'Blonde_Hair']), 'blonde_hair');
 });
 
+test('wd14TagsParam in Match All sends every tag as its own ANDed group', () => {
+  assert.equal(wd14TagsParam([], 'all'), '');
+  assert.equal(
+    wd14TagsParam(['shirt', 'brown_hair', 'Blonde_Hair', 'A_Custom', 'B_Custom', 'shirt'], 'all'),
+    'shirt,brown_hair,blonde_hair,a_custom,b_custom');
+  // Anything but 'all' is today's Any.
+  assert.equal(wd14TagsParam(['brown_hair', 'blonde_hair'], undefined), 'brown_hair|blonde_hair');
+});
+
 test('toggleWd14Tag adds a second value in the same facet and removes on the next click', () => {
   assert.deepEqual(toggleWd14Tag(['blonde_hair'], 'brown_hair'), ['blonde_hair', 'brown_hair']);
   assert.deepEqual(toggleWd14Tag(['blonde_hair', 'brown_hair'], 'blonde_hair'), ['brown_hair']);
