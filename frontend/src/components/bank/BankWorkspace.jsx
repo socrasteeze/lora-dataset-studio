@@ -235,6 +235,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     // them; tags from different facets all have to match. Own key beside the
     // 🏷️ `tags` chips — same reasoning as the route's two parameters.
     wd14Tags: [],
+    // 'all' asks for every ticked tag on the image. Anything else is 'any'.
+    wd14Match: 'any',
     framing: null,
     // Dedicated keys, never folded into `flag` or the text lane.
     medium: null,
@@ -605,7 +607,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     // its sibling's field. Also flows to fetchAllIds, so "Select all in filter"
     // and ▶ Review stay scoped to the tags the user is actually looking at.
     if (f.wd14Tags?.length) {
-      const packed = wd14TagsParam(f.wd14Tags)
+      const packed = wd14TagsParam(f.wd14Tags, f.wd14Match)
       if (packed) params.wd14_tags = packed
     }
     // 🎨 what the picture is made of, and ⤢ where the head points. Their OWN
@@ -2282,6 +2284,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               tagFiltersShown={tagFiltersShown} tagGroups={grouped}
               tagFacetError={tagFacetError} retryTagFacets={() => setTagFacetRetry((value) => value + 1)}
               wd14Tags={filter.wd14Tags}
+              wd14Match={filter.wd14Match} setWd14Match={(match) => setF({ wd14Match: match })}
               toggleFacetTag={toggleFacetTag} selectFacetTags={selectFacetTags}
               clearWd14Tags={() => setF({ wd14Tags: [] })}
               filterSummary={filterSummary} clearAllFilters={clearAllFilters}

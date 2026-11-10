@@ -483,3 +483,6 @@ def test_tag_groups_or_within_a_facet_and_and_across(app):
     assert _clean_tag_groups(None) == []
     # A comma inside one list item is stripped, not turned into a second group.
     assert _clean_tag_groups(['blonde_hair|shirt,hat']) == [['blonde_hair', 'shirthat']]
+    # Match All sends one group per tag, so more than a dozen must survive.
+    many = [f'synthetic_tag_{n}' for n in range(40)]
+    assert _clean_tag_groups(','.join(many)) == [[name] for name in many]

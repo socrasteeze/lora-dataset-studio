@@ -2250,7 +2250,9 @@ def _framing_counts(bank_id, extra_crit=None) -> dict:
 # Small groups use tag LIKEs. Large bulk selections use one escaped regexp
 # so the full selection fits without SQLite's expression-depth limit.
 _MAX_TAG_FILTERS = 8
-_MAX_TAG_GROUPS = 12
+# Match All sends one group per tag; the Bank rail names this limit
+# (MATCH_ALL_MAX_TAGS in bankTagFacets.js).
+_MAX_TAG_GROUPS = 64
 _MAX_TAG_LIKES_IN_GROUP = 32
 
 

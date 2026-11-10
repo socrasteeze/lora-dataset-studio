@@ -57,7 +57,7 @@ test('the tag filter is part of filterParams, so it reaches Select-all and Revie
   // reached the grid would make "Select all in filter" hand back rows the user
   // cannot see — the bug the dups chip shipped once. Its own key (wd14_tags),
   // separate from the 🏷️ caption-chip `tags` param upstream added in the same wave.
-  assert.match(workspace, /const packed = wd14TagsParam\(f\.wd14Tags\)/);
+  assert.match(workspace, /const packed = wd14TagsParam\(f\.wd14Tags, f\.wd14Match\)/);
   assert.match(workspace, /if \(packed\) params\.wd14_tags = packed/);
 });
 
