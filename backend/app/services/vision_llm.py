@@ -115,7 +115,8 @@ def describe_image(image_bytes: bytes, prompt: str, **kw) -> str:
             as_json=(kw.get('fmt') == 'json') or bool(kw.get('prefer_json')),
             strict=bool(kw.get('strict') or kw.get('auto_start_local')),
             think=kw.get('think'),
-            timeout=kw.get('timeout', (10, 180)))
+            timeout=kw.get('timeout', (10, 180)),
+            **({'max_side': kw['max_side']} if kw.get('max_side') else {}))
     from . import vision_ollama
     return vision_ollama.describe_image_ollama(image_bytes, prompt, **kw)
 

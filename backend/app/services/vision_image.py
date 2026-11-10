@@ -26,7 +26,8 @@ logger = logging.getLogger(__name__)
 VISION_MAX_SIDE = 1536
 
 
-def ensure_vision_safe_jpeg(image_bytes: bytes, *, provider: str = 'vision') -> bytes | None:
+def ensure_vision_safe_jpeg(image_bytes: bytes, *, provider: str = 'vision',
+                            max_side: int | None = None) -> bytes | None:
     """Return image bytes any local vision server can definitely read, stripped.
 
     Every decodable format becomes a fresh, metadata-free JPEG (alpha flattened
@@ -37,7 +38,11 @@ def ensure_vision_safe_jpeg(image_bytes: bytes, *, provider: str = 'vision') -> 
 
     ``provider`` only names who asked, for the log line — the treatment is
     identical for every provider, deliberately.
+
+    ``max_side`` lets a pass that needs less detail send a smaller image. It can
+    only lower the bound, never raise it past ``VISION_MAX_SIDE``.
     """
+    limit = min(VISION_MAX_SIDE, int(max_side)) if max_side else VISION_MAX_SIDE
     try:
         import io
 
@@ -58,8 +63,8 @@ def ensure_vision_safe_jpeg(image_bytes: bytes, *, provider: str = 'vision') -> 
             im = bg
         elif im.mode != 'RGB':
             im = im.convert('RGB')
-        if max(im.size) > VISION_MAX_SIDE:
-            im.thumbnail((VISION_MAX_SIDE, VISION_MAX_SIDE), Image.LANCZOS)
+        if max(im.size) > limit:
+            im.thumbnail((limit, limit), Image.LANCZOS)
         # Copy only the bounded image, rather than allocating another full-size
         # raster before resizing it. The fresh image still strips all metadata.
         clean = Image.new('RGB', im.size)

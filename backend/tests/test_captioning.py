@@ -748,6 +748,20 @@ def test_describe_image_ollama_bounds_large_jpeg_and_png_payload(app, monkeypatc
         assert max(image.size) == vision_ollama._OLLAMA_MAX_SIDE
 
 
+def test_describe_image_ollama_max_side_lowers_the_bound_and_never_raises_it(app, monkeypatch):
+    """A coarse pass (Bank framing) may send less; no caller may send more."""
+    from app.services import vision_ollama
+    raw = io.BytesIO()
+    Image.new('RGB', (2000, 1000), (20, 110, 220)).save(raw, 'JPEG')
+    for asked, sent_side in ((1024, 1024), (4096, vision_ollama._OLLAMA_MAX_SIDE)):
+        cap = _CapturePost()
+        monkeypatch.setattr(vision_ollama.requests, 'post', cap)
+        with app.app_context():
+            vision_ollama.describe_image_ollama(raw.getvalue(), 'describe this', max_side=asked)
+        with Image.open(io.BytesIO(cap.sent_image_bytes())) as image:
+            assert max(image.size) == sent_side
+
+
 def test_describe_image_ollama_bakes_exif_and_strips_it_from_request(app, monkeypatch):
     """The request carries upright pixels only: no camera EXIF remains outbound."""
     from app.services import vision_ollama
