@@ -254,6 +254,7 @@ def describe_image_ollama(image_bytes: bytes, prompt: str, *,
                           keep_alive: str | int = 0,
                           auto_start_local: bool = False,
                           think: bool | None = None,
+                          max_side: int | None = None,
                           timeout: tuple[float, float] | float = (10, 120)) -> str:
     """Describe an image via Ollama vision. Returns the caption text, or "" on
     failure for ordinary best-effort calls. With ``auto_start_local=True``, a
@@ -286,7 +287,10 @@ def describe_image_ollama(image_bytes: bytes, prompt: str, *,
     `response` (done_reason=length) — a trace the fallback below cannot tell
     from an answer, and which the motion writer then read as the still.
     """
-    prepared = _ensure_ollama_decodable(image_bytes)
+    # `max_side` only lowers the bound (see ensure_vision_safe_jpeg).
+    prepared = (_ensure_ollama_decodable(image_bytes) if max_side is None
+                else vision_image.ensure_vision_safe_jpeg(
+                    image_bytes, provider='vision_ollama', max_side=max_side))
     if prepared is None:
         # This deliberately happens before base64 / requests.post. A malformed
         # Bank master must behave like an unavailable vision result, not become a
@@ -374,7 +378,8 @@ def describe_image_ollama(image_bytes: bytes, prompt: str, *,
                 image_bytes, prompt, ollama_url=ollama_url, model=model,
                 num_predict=num_predict, num_ctx=num_ctx,
                 repeat_penalty=repeat_penalty, prefer_json=prefer_json, fmt=fmt,
-                keep_alive=keep_alive, auto_start_local=False, think=think, timeout=timeout)
+                keep_alive=keep_alive, auto_start_local=False, think=think, timeout=timeout,
+                max_side=max_side)
             if not retried:
                 raise RuntimeError(
                     'Ollama did not return a caption after restart — check the configured '

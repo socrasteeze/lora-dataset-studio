@@ -85,6 +85,18 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-09-quicker-framing-pass', date: '2026-11-09',
+    title: 'A quicker Bank Framing pass',
+    blurb: 'The Framing pass now shows the local vision model a 1024 px picture instead of 1536 px, which took about a third less time per image on qwen3-vl 8B. Captions, Auto-Crop and compute peers keep the full size.',
+    to: '/bank',
+  },
+  {
+    id: '2026-11-09-match-all-tags', date: '2026-11-09',
+    title: 'Find Bank images that have every tag you tick',
+    blurb: 'Switch the new Any / All choice beside the Bank Tags heading to All and the grid shows only images with every ticked tag, across the category menus and Other Tags. Any still works as before. All checks up to 64 tags.',
+    to: '/bank',
+  },
+  {
     id: '2026-11-09-bank-tighter-passes', date: '2026-11-09',
     title: 'A tighter Bank header and Passes panel',
     blurb: 'On a wide screen the counters sit in the action row, and the Passes panel balances its two columns, so the overview no longer leaves half the panel empty.',

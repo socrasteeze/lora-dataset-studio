@@ -862,6 +862,8 @@ The funnel itself:
    filter bar gains menus for hair, clothing, headwear, setting, pose and how
    many people. Each menu keeps every value you tick: two hair colours match
    pictures with either, and a hair colour plus a top still has to match both.
+   Switch **Any** to **All** beside the Tags heading to require every ticked
+   tag on the image, up to 64 tags.
    Expand [Other Tags](#other-bank-tags) to browse and filter tags outside
    these categories.
    They compose with every other filter, and the **search box matches them
@@ -1158,7 +1160,10 @@ many had problems.
 Open **Other Tags** below the Bank tag categories to browse uncategorized tags,
 most common first. Search inside that menu with spaces or underscores.
 Each row shows the number of non-rejected images with that tag. Tick checkboxes
-to filter the grid to images with **any** selected Other Tag (OR).
+to filter the grid to images with **any** selected Other Tag (OR). Choose
+**All** beside the Tags heading to show only images with **every** ticked tag,
+in this menu and the category menus. All checks 64 tags at most, and the rail
+says so when you tick more.
 After you type a search, **Select All** is the first option. It selects every
 matching tag, including matches beyond the visible rows, and keeps earlier
 selections. Category filters still combine with Other Tags as separate requirements.

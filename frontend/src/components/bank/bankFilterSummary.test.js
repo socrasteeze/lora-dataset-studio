@@ -93,6 +93,14 @@ test('several values in one tag facet read as or, and count as one part', () => 
   assert.equal(bankFilterCount({ wd14Tags: ['brown_hair', 'blonde_hair'] }), 1)
 })
 
+test('Match All reads as and, with the same part count', () => {
+  const filter = { wd14Match: 'all', wd14Tags: ['brown_hair', 'blonde_hair', 'synthetic_blue_scarf', 'synthetic_red_scarf'] }
+  assert.deepEqual(bankFilterParts(filter), [
+    '🔖 blonde hair and brown hair', '🔖 synthetic blue scarf and synthetic red scarf',
+  ])
+  assert.equal(bankFilterCount(filter), 2)
+})
+
 test('uncategorized tags read as one OR filter alongside a category', () => {
   const filter = { wd14Tags: ['shirt', 'synthetic_blue_scarf', 'synthetic_red_scarf'] }
   assert.deepEqual(bankFilterParts(filter), [
