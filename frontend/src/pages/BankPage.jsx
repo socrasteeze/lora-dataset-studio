@@ -758,6 +758,11 @@ export default function BankPage() {
             className={`min-w-0 w-full !px-1 !text-xs lg:mt-6 lg:w-auto lg:!px-4 lg:!text-sm ${foldersOpen || splitMode || excluded.size ? 'border-primary/60 bg-primary/15 text-content' : ''}`}>
             Subfolders {excluded.size > 0 && <span className="tabular-nums">({excluded.size})</span>}
           </Button>
+          {/* One bank per subfolder does not carry protection; set it per bank after the split. */}
+          {!splitMode && (
+            <BankReadOnlyToggle checked={readOnly} onChange={setReadOnly} disabled={creating}
+              size="lg" className="min-w-0 w-full lg:mt-6 lg:w-auto" />
+          )}
           <Button type="submit" size="lg" variant="primary" disabled={creating || !!folderNotice || emptySelection || previewPending || needsImportRestart}
             className="col-span-2 min-w-0 w-full lg:mt-6 lg:w-auto"
             title={folderNotice ? 'That folder belongs to a dataset' : undefined}>
@@ -837,12 +842,6 @@ export default function BankPage() {
         {needsImportRestart && <p role="alert" className="text-sm text-amber-300">
           Restart Studio and refresh this page to import with folder exclusions.
         </p>}
-        {/* basis-full: its own row inside the wrapping flex form, so the sentence
-            never squeezes the fields — including at 400 px. */}
-        {/* One bank per subfolder does not carry protection; set it per bank after the split. */}
-        {!splitMode && <div className="basis-full">
-          <BankReadOnlyToggle checked={readOnly} onChange={setReadOnly} disabled={creating} />
-        </div>}
         {folderNotice && (
           <p id="bank-folder-notice" role="alert"
             className="basis-full rounded-md border border-rose-500/70 bg-rose-500/15 p-3 text-sm text-rose-100">
@@ -851,19 +850,6 @@ export default function BankPage() {
         )}
         </fieldset>
       </form>
-
-      {/* One button for "triage everything I have". It QUEUES — one entry per
-          bank, drained one at a time per machine behind an idle GPU — and the confirm says
-          so, because "run all" on twelve banks is the thing to be afraid of. */}
-      {queueAllCount > 0 && (
-        <div className="flex items-center">
-          <button type="button" onClick={() => setDialogScope({ kind: 'all' })}
-            title="Queue every bank with undecided images. Banks run one at a time per machine; another machine runs its own queue alongside this one."
-            className={`${btnClass({ size: 'md' })} w-full lg:w-auto border-indigo-400/50 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20`}>
-            ⏳ Queue all {queueAllCount} bank(s)
-          </button>
-        </div>
-      )}
 
       {/* A queue that drains into nothing is the loudest symptom of a leftover
           "GPU busy" flag — every bank is skipped and the night is wasted. The
@@ -892,22 +878,35 @@ export default function BankPage() {
       ) : (
         <div className="space-y-3">
         <div className="grid grid-cols-2 items-center gap-2 lg:flex lg:flex-wrap">
+          {/* Queues one entry per bank, drained one at a time per machine
+              behind an idle GPU. Counted over ALL banks, never the filtered
+              view, so the number matches what pressing it does. */}
+          {queueAllCount > 0 && (
+            <button type="button" onClick={() => setDialogScope({ kind: 'all' })}
+              title="Queue every bank with undecided images. Banks run one at a time per machine; another machine runs its own queue alongside this one."
+              className={`${btnClass({ size: 'md' })} min-w-0 w-full lg:w-auto border-indigo-400/50 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20`}>
+              ⏳ Queue all {queueAllCount} bank(s)
+            </button>
+          )}
           <FolderCheckLine banks={banks} busy={rescanning} onRescan={rescan}
             className="min-w-0 w-full lg:w-auto" noticeClassName="hidden lg:block" />
-          <p className="hidden text-sm text-content-muted lg:block">
-            {visibleBanks.length === banks.length
-              ? `${banks.length} bank(s)`
-              : `showing ${visibleBanks.length} of ${banks.length}`}
-          </p>
-          <Input
-            type="search"
-            size="md"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Find a bank"
-            aria-label="Find a bank"
-            className="min-w-0 w-full lg:min-w-[9rem] lg:flex-1"
-          />
+          <div className="col-span-2 flex min-w-0 w-full items-center gap-2 lg:min-w-[9rem] lg:flex-1">
+            <Input
+              type="search"
+              size="md"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`Find among ${banks.length} bank${banks.length === 1 ? '' : 's'}`}
+              aria-label="Find a bank"
+              aria-describedby={query.trim() ? 'bank-find-count' : undefined}
+              className="min-w-0 w-full"
+            />
+            {query.trim() && (
+              <span id="bank-find-count" className="shrink-0 text-xs text-content-muted tabular-nums">
+                {visibleBanks.length} of {banks.length}
+              </span>
+            )}
+          </div>
           <Select size="md" value={sort} onChange={(e) => changeSort(e.target.value)}
             aria-label="Sort the banks" className="min-w-0 w-full lg:w-auto">
             {BANK_SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}

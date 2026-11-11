@@ -119,9 +119,15 @@ function promptRename(onRename, d) {
   if (name != null && name.trim() && name.trim() !== d.name) onRename(d.id, name.trim());
 }
 
+/** Assigned reference, else the first kept (or first) image the list sent. */
+function tilePreviewName(d) {
+  return d?.ref_filename || d?.preview_filename || '';
+}
+
 /** Photo-first tile: the reference face IS the identity — lead with it. */
 function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBackup, showPreviews, compact = false }) {
   const canExportZip = (d.images_kept ?? 0) > 0;
+  const previewName = tilePreviewName(d);
   // compact: S and M on a phone pack 5 / 4 tiles per row, too narrow for
   // anything but the thumbnail and the name. The rest returns from sm up and
   // stays reachable inside the dataset. Literal classes: Tailwind scans text.
@@ -132,9 +138,9 @@ function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBacku
         aria-label={`Open the dataset ${d.name}`}
         className="block w-full text-left">
         <div className="relative aspect-[4/3] bg-app/60">
-          {showPreviews && d.ref_filename ? (
+          {showPreviews && previewName ? (
             <img
-              src={datasetThumbUrl(`/api/dataset/${d.id}/img/${encodeURIComponent(d.ref_filename)}`, 384)}
+              src={datasetThumbUrl(`/api/dataset/${d.id}/img/${encodeURIComponent(previewName)}`, 384)}
               alt="" loading="lazy" decoding="async" aria-hidden="true"
               className="h-full w-full object-cover" />
           ) : (
@@ -173,7 +179,7 @@ function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBacku
           <span className={`text-2xs text-content-subtle ${phoneHidden}`}>{tileStats(d)}</span>
         </div>
       </button>
-      <div className={`library-card__actions grid-cols-2 gap-1.5 border-t border-border px-2 py-2 ${compact ? 'hidden sm:grid' : 'grid'}`}>
+      <div className={`library-card__actions library-card__actions--bar grid-cols-2 gap-1.5 border-t border-border bg-surface px-2 py-2 ${compact ? 'hidden sm:grid' : 'grid'}`}>
         <button type="button"
           onClick={() => onExportZip?.(d.id)}
           disabled={!canExportZip}

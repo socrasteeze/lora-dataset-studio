@@ -2018,9 +2018,12 @@ def list_datasets(user_id):
 
 def dataset_list_stats(user_id):
     """Per-dataset aggregates for the library page — image counts and the
-    families ever trained — in two grouped queries (never one per dataset).
+    families ever trained — in grouped queries (never one per dataset).
     Returns {dataset_id: {'images_total', 'images_kept', 'images_captioned',
-    'trained_families': [str]}}; datasets absent from a map just have zeros."""
+    'trained_families': [str], 'preview_filename'}}; datasets absent from a
+    map just have zeros. preview_filename is the first kept image, else the
+    first image, so a library tile can show a picture when no reference is
+    assigned."""
     from sqlalchemy import case, func
     from ..models import TrainingRunRecord
     # Same scope as list_datasets: the counts shown next to the library must add
@@ -2033,18 +2036,35 @@ def dataset_list_stats(user_id):
         func.count(FaceDatasetImage.id),
         func.sum(case((FaceDatasetImage.status == 'keep', 1), else_=0)),
         func.sum(case(((FaceDatasetImage.status == 'keep')
-                       & (func.coalesce(FaceDatasetImage.caption, '') != ''), 1), else_=0)))
+                       & (func.coalesce(FaceDatasetImage.caption, '') != ''), 1), else_=0)),
+        func.min(case((FaceDatasetImage.status == 'keep',
+                       FaceDatasetImage.id), else_=None)),
+        func.min(FaceDatasetImage.id))
         .filter(FaceDatasetImage.dataset_id.in_(db.session.query(owned.c.id)))
         .group_by(FaceDatasetImage.dataset_id).all())
-    for ds_id, total, kept, captioned in img_rows:
+    preview_picks = []
+    for ds_id, total, kept, captioned, first_kept_id, first_id in img_rows:
         stats[ds_id] = {'images_total': int(total or 0), 'images_kept': int(kept or 0),
-                        'images_captioned': int(captioned or 0), 'trained_families': []}
+                        'images_captioned': int(captioned or 0),
+                        'trained_families': [], 'preview_filename': None}
+        pick = first_kept_id or first_id
+        if pick is not None:
+            preview_picks.append((ds_id, pick))
+    if preview_picks:
+        names = dict(
+            db.session.query(FaceDatasetImage.id, FaceDatasetImage.filename)
+            .filter(FaceDatasetImage.id.in_([pick for _, pick in preview_picks]))
+            .all())
+        for ds_id, pick in preview_picks:
+            stats[ds_id]['preview_filename'] = names.get(pick)
     fam_rows = (db.session.query(TrainingRunRecord.dataset_id, TrainingRunRecord.family)
                 .filter(TrainingRunRecord.dataset_id.in_(db.session.query(owned.c.id)))
                 .distinct().all())
     for ds_id, fam in fam_rows:
         entry = stats.setdefault(ds_id, {'images_total': 0, 'images_kept': 0,
-                                         'images_captioned': 0, 'trained_families': []})
+                                         'images_captioned': 0,
+                                         'trained_families': [],
+                                         'preview_filename': None})
         if fam and fam not in entry['trained_families']:
             entry['trained_families'].append(fam)
     for entry in stats.values():

@@ -40,6 +40,22 @@ test('sortBanks: by size and by what is left to triage', () => {
   assert.equal(untriagedCount(LIBRARY[2]), 0);
 });
 
+test('sortBanks: recently updated prefers last_added_at over created_at', () => {
+  const scanned = [
+    bank(1, 'Old dump', '2026-01-01T00:00:00', { last_added_at: '2026-06-01T00:00:00' }),
+    bank(2, 'New dump', '2026-05-01T00:00:00', { last_added_at: '2026-05-01T00:00:00' }),
+  ]
+  assert.deepEqual(names(sortBanks(scanned, 'updated')), ['Old dump', 'New dump'])
+  assert.deepEqual(names(sortBanks(scanned, 'recent')), ['New dump', 'Old dump'])
+  // An older payload without last_added_at falls back to created_at.
+  const legacy = [
+    bank(1, 'Old dump', '2026-01-01T00:00:00'),
+    bank(2, 'New dump', '2026-05-01T00:00:00'),
+  ]
+  assert.deepEqual(names(sortBanks(legacy, 'updated')),
+    names(sortBanks(legacy, 'recent')))
+})
+
 test('sortBanks: never mutates the array React holds', () => {
   const rows = LIBRARY.slice();
   const before = names(rows);

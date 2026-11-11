@@ -166,6 +166,32 @@ def test_list_carries_library_stats(client, app):
     assert entry['images_kept'] == 2
     assert entry['images_captioned'] == 1
     assert entry['trained_families'] == ['krea']
+    # First kept image (lowest id among keep) fills the library tile when no
+    # reference is assigned.
+    assert entry['preview_filename'] == 'a.webp'
+    assert entry['ref_filename'] in (None, '')
+
+
+def test_list_preview_filename_falls_back_to_first_image(client, app):
+    """No kept image: the first row still gives the library tile a picture."""
+    ds_id = _create(client, 'Preview', 'preview').get_json()['id']
+    with app.app_context():
+        from app.extensions import db
+        from app.models import FaceDatasetImage
+        db.session.add_all([
+            FaceDatasetImage(dataset_id=ds_id, status='pending', source='upload',
+                             filename='pending.webp'),
+            FaceDatasetImage(dataset_id=ds_id, status='reject', source='upload',
+                             filename='rejected.webp'),
+        ])
+        db.session.commit()
+    entry = next(d for d in client.get('/api/dataset/list').get_json()['datasets']
+                 if d['id'] == ds_id)
+    assert entry['preview_filename'] == 'pending.webp'
+    empty_id = _create(client, 'Empty', 'empty').get_json()['id']
+    empty = next(d for d in client.get('/api/dataset/list').get_json()['datasets']
+                 if d['id'] == empty_id)
+    assert empty['preview_filename'] is None
 
 
 def test_images_batch_route_validates_and_applies(client, app):

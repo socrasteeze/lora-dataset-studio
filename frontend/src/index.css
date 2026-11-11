@@ -731,8 +731,9 @@
 
 /* Same at-rest/hover contract for the Datasets library cards (photo tiles and
    compact S rows): touch devices keep every control visible; a device with a
-   precise hover pointer gets quieter cards, and card hover or keyboard focus
-   reveals the actions without adding/removing layout space. */
+   precise hover pointer gets quieter cards. Hover or keyboard focus reveals
+   the actions. The ZIP/Backup bar is taken out of flow on hover pointers so
+   it does not leave a blank gap under the stats at rest. */
 .library-card__actions {
   transition: opacity 140ms ease, visibility 140ms ease;
 }
@@ -742,6 +743,13 @@
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
+  }
+
+  .library-card .library-card__actions--bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
   }
 
   .library-card:hover .library-card__actions,

@@ -12,8 +12,10 @@ test('library preview visibility is persistent and suppresses image mounts', () 
   assert.match(panel, /title=\{showPreviews \? 'Hide image previews' : 'Show image previews'\}/);
 
   const tile = panel.slice(panel.indexOf('function DatasetTile'), panel.indexOf('/** The creation form'));
-  const imageGuard = /showPreviews && d\.ref_filename \?\s*\(\s*<img/s;
+  const imageGuard = /showPreviews && previewName \?\s*\(\s*<img/s;
 
+  assert.match(panel, /function tilePreviewName\(d\)/);
+  assert.match(panel, /d\?\.ref_filename \|\| d\?\.preview_filename/);
   assert.match(tile, imageGuard);
   assert.doesNotMatch(panel, /function DatasetRow/);
   assert.equal((panel.match(/showPreviews=\{showPreviews\}/g) || []).length, 1);

@@ -247,7 +247,7 @@ def dataset_list():
     # tiles can show real status without one request per dataset.
     stats = svc.dataset_list_stats(LOCAL_USER)
     empty = {'images_total': 0, 'images_kept': 0, 'images_captioned': 0,
-             'trained_families': []}
+             'trained_families': [], 'preview_filename': None}
     return jsonify({'datasets': [
         {'id': d.id, 'instance_id': d.instance_id,
          'name': d.name, 'trigger_word': d.trigger_word, 'ref_filename': d.ref_filename,

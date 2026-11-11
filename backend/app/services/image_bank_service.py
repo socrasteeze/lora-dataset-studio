@@ -3693,15 +3693,20 @@ def list_banks(user_id, dataset_id=None) -> list:
     coverage = bank_pass_coverage(user_id)
     # Four per-card counters share one grouped read across this user's banks.
     # Keep the existing inventory scope, including hidden rows, on these cards.
+    def _iso(value):
+        return value.isoformat() if hasattr(value, 'isoformat') else (str(value) if value else None)
+
     counters = {
         bank_id: {'total': int(total), 'keep': int(kept or 0),
-                  'reject': int(rejected or 0), 'scanned': int(scanned or 0)}
-        for bank_id, total, kept, rejected, scanned in (
+                  'reject': int(rejected or 0), 'scanned': int(scanned or 0),
+                  'last_added_at': _iso(last_added)}
+        for bank_id, total, kept, rejected, scanned, last_added in (
             db.session.query(
                 BankImage.bank_id, func.count(BankImage.id),
                 func.sum(case((BankImage.status == 'keep', 1), else_=0)),
                 func.sum(case((BankImage.status == 'reject', 1), else_=0)),
-                func.sum(case((BankImage.quality_state.isnot(None), 1), else_=0)))
+                func.sum(case((BankImage.quality_state.isnot(None), 1), else_=0)),
+                func.max(BankImage.created_at))
             .join(ImageBank, ImageBank.id == BankImage.bank_id)
             .filter(ImageBank.user_id == user_id)
             .group_by(BankImage.bank_id).all())
@@ -3714,7 +3719,8 @@ def list_banks(user_id, dataset_id=None) -> list:
             'name': bank.name, 'source_path': bank.source_path,
             'read_only': bool(bank.read_only),
             'created_at': bank.created_at.isoformat() if bank.created_at else None,
-            **counters.get(bank.id, {'total': 0, 'keep': 0, 'reject': 0, 'scanned': 0}),
+            **counters.get(bank.id, {'total': 0, 'keep': 0, 'reject': 0,
+                                     'scanned': 0, 'last_added_at': None}),
             'preview_ids': _preview_ids(bank.id),
             'activity': bank_jobs.get(bank.id),
             'queue_state': bank_queue.state_for(bank.id),

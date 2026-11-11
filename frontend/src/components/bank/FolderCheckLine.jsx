@@ -21,21 +21,15 @@ export default function FolderCheckLine({ banks, busy = false, onRescan, classNa
   const note = folderCheckNote(banks)
   if (!note) return null
   return (
-    <>
-      {note.stale ? (
-        <>
-          <p className={`text-xs font-medium text-amber-300/90 ${noticeClassName}`} title={note.text}
-            aria-label={note.text}>Counts May Be Stale</p>
-          <Button size="md" noShrink onClick={onRescan} disabled={busy}
-            title={note.text} className={className}>
-            <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />{busy ? 'Checking Folders' : 'Rescan Folders'}
-          </Button>
-        </>
-      ) : (
-        <Button size="md" noShrink onClick={onRescan} disabled={busy} title={note.text} className={className}>
-          <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />{busy ? 'Checking Folders' : 'Rescan Folders'}
-        </Button>
+    <div className="flex min-w-0 items-center gap-2">
+      {note.stale && (
+        <p className={`shrink-0 text-xs font-medium text-amber-300/90 ${noticeClassName}`} title={note.text}
+          aria-label={note.text}>Counts May Be Stale</p>
       )}
-    </>
+      <Button size="md" noShrink onClick={onRescan} disabled={busy}
+        title={note.text} className={className}>
+        <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />{busy ? 'Checking Folders' : 'Rescan Folders'}
+      </Button>
+    </div>
   )
 }

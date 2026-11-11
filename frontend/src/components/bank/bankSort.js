@@ -9,6 +9,7 @@
 export const BANK_SORTS = [
   { id: 'recent', label: 'Newest first' },
   { id: 'oldest', label: 'Oldest first' },
+  { id: 'updated', label: 'Recently Updated' },
   { id: 'name', label: 'Name A→Z' },
   { id: 'name_desc', label: 'Name Z→A' },
   { id: 'images', label: 'Most images' },
@@ -44,11 +45,22 @@ const created = (b) => {
   return Number.isNaN(t) ? 0 : t
 }
 
+/* last_added_at is the newest BankImage.created_at the list payload sends:
+   the last time a folder scan (or the original inventory) actually added a
+   row. A walk that found nothing new does not bump it. Missing on an older
+   payload falls back to created_at, which matches Newest first until the
+   server is restarted onto a build that includes the field. */
+const lastAdded = (b) => {
+  const t = Date.parse(b?.last_added_at || b?.created_at || '')
+  return Number.isNaN(t) ? 0 : t
+}
+
 /* Every comparator falls back to the name, then the id, so the order is TOTAL:
    two banks with the same image count must not swap places between renders. */
 const COMPARATORS = {
   recent: (a, b) => created(b) - created(a) || byName(a, b),
   oldest: (a, b) => created(a) - created(b) || byName(a, b),
+  updated: (a, b) => lastAdded(b) - lastAdded(a) || byName(a, b),
   name: byName,
   name_desc: (a, b) => byName(b, a),
   images: (a, b) => num(b.total) - num(a.total) || byName(a, b),
