@@ -72,12 +72,12 @@ test('the duplicate comparison is a layer too', () => {
 
 test('the bank list names its opener, so the probe can prime the workspace', () => {
   /* DIVERGENCE 5 — widened, not re-pointed. Upstream's opener is a bare <button>
-     in the card, so its label interpolates the map variable `b`; this fork wraps
-     the opener in BankTitle (the ✎ inline rename), where the same button names
-     its prop `bank`. Pinning either literal would fail on the other tree while
-     proving nothing extra — what the probe needs is that SOME opener in this
-     file carries the label its `prime` selector matches on. Drop the alternation
-     if the fork ever adopts upstream's bare button. */
+     in the card, so its label interpolates the map variable `b`. This fork puts
+     the same label on the card's Open button (the title now starts a rename).
+     Pinning either literal would fail on the other tree while proving nothing
+     extra — what the probe needs is that SOME opener in this file carries the
+     label its `prime` selector matches on. Drop the alternation if the fork
+     ever adopts upstream's bare button. */
   assert.match(page, /aria-label=\{`Open the bank \$\{(b|bank)\.name\}`\}/);
   assert.match(probe, /'#\/bank': \{/);
   // `:visible` is not decoration: the library renders its rows twice (compact

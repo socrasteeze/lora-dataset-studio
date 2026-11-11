@@ -48,16 +48,21 @@ const PAGE_SIZE_KEY = 'bankListPageSize'
 // stop it here too and the user never types into a 400.
 const BANK_NAME_MAX = 100
 
-/** The bank title: click to open, ✎ to rename in place. A bank is named once, at
+/** The bank title: click (or the ✎) to rename in place. A bank is named once, at
  * creation — often before its content is known, and the per-subfolder split names
  * them automatically — so the label has to stay editable. Only the label changes:
- * nothing about the folder or the triage moves. */
-function BankTitle({ bank, onOpen, onRename }) {
+ * nothing about the folder or the triage moves. The Open button and the
+ * thumbnail strip still open the bank. */
+function BankTitle({ bank, onRename }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(bank.name)
   const [saving, setSaving] = useState(false)
 
-  const start = () => { setDraft(bank.name); setEditing(true) }
+  const start = (e) => {
+    e?.stopPropagation()
+    setDraft(bank.name)
+    setEditing(true)
+  }
   const cancel = () => { setEditing(false); setDraft(bank.name) }
   const submit = async (e) => {
     e.preventDefault()
@@ -92,10 +97,7 @@ function BankTitle({ bank, onOpen, onRename }) {
   }
   return (
     <>
-      {/* The responsive probe primes the Bank workspace by clicking the first
-          card's opener ([aria-label^="Open the bank"]). Rename this label and
-          the probe measures an empty list and reports it clean. */}
-      <button type="button" onClick={onOpen} aria-label={`Open the bank ${bank.name}`}
+      <button type="button" onClick={start} title="Rename this bank"
         className="min-w-0 truncate text-left text-base font-semibold text-content hover:underline">
         {bank.name}
       </button>
@@ -108,7 +110,7 @@ function BankTitle({ bank, onOpen, onRename }) {
 
 /** The card's thumbnail strip: the bank's first few images, so a list of banks
  * reads at a glance instead of as a wall of folder paths. Clicking a thumbnail
- * opens the bank, like the title and the Open button. Thumbnails are served by
+ * opens the bank, like the Open button. Thumbnails are served by
  * the same route the workspace grid uses (generated on demand when the bank was
  * never scanned) and load lazily, so an off-screen card costs nothing. */
 function BankPreviewStrip({ bank, onOpen }) {
@@ -991,17 +993,16 @@ export default function BankPage() {
                       className="h-5 w-5 accent-indigo-400 disabled:opacity-50" />
                   </label>
                 )}
-                {/* Upstream's opener is a bare <button> here; this fork wraps it
-                    in BankTitle, which adds the ✎ inline rename. The probe's
-                    `prime` selector — [aria-label^="Open the bank"] — travels
-                    with the button INTO that component, so the label is on
-                    BankTitle's open button rather than on this line. */}
+                {/* Upstream's opener is a bare <button> here; this fork wraps the
+                    title in BankTitle, which adds the ✎ inline rename. The
+                    probe's `prime` selector — [aria-label^="Open the bank"] —
+                    is on the Open button below, not on the title. */}
                 {selectingBanks ? (
                   <button type="button" onClick={() => toggleBankSelection(b)} disabled={!b.instance_id}
                     className="min-h-10 min-w-0 grow truncate text-left text-base font-semibold text-content disabled:opacity-50">
                     {b.name}
                   </button>
-                ) : <BankTitle bank={b} onOpen={() => open(b.id)}
+                ) : <BankTitle bank={b}
                   onRename={(newName) => rename(b, newName)} />}
                 {b.activity && !b.activity.finished && (
                   <span className="text-xs text-amber-300">⏳ {b.activity.kind}</span>
@@ -1018,10 +1019,14 @@ export default function BankPage() {
                 {!selectingBanks && <button type="button" onClick={() => remove(b)} aria-label={`Remove bank ${b.name}`}
                   className="px-1.5 text-content-subtle hover:text-rose-300"><X aria-hidden="true" className="h-4 w-4" /></button>}
               </div>
-              {b.read_only && <p className="text-xs font-medium text-emerald-400">Read-only source</p>}
-              <p className="truncate font-mono text-xs text-content-subtle" title={b.source_path}>
-                {b.source_path}
-              </p>
+              <div className="flex min-w-0 items-center gap-2">
+                <p className="min-w-0 truncate font-mono text-xs text-content-subtle" title={b.source_path}>
+                  {b.source_path}
+                </p>
+                {b.read_only && (
+                  <span className="shrink-0 whitespace-nowrap text-xs font-medium text-emerald-400">Read-only source</span>
+                )}
+              </div>
               {!selectingBanks && <BankPreviewStrip bank={b} onOpen={() => open(b.id)} />}
               {/* Upstream's richer bar-and-breakdown replaces the plain-text
                   count line this used to be; the two badges below carry
@@ -1039,6 +1044,7 @@ export default function BankPage() {
                   <PassCoverageRow coverage={b.pass_coverage} />
                   <div className="grid w-full grid-cols-2 gap-2 lg:ml-auto lg:flex lg:w-auto">
                     <button type="button" onClick={() => open(b.id)}
+                      aria-label={`Open the bank ${b.name}`}
                       className={`${btnClass({ size: 'sm' })} min-w-0 w-full lg:w-auto ${qs ? 'col-span-2' : ''}`}>
                       Open →
                     </button>
