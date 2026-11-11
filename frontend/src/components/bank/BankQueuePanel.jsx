@@ -1,6 +1,8 @@
+import { useLayoutEffect, useRef } from 'react'
 import { HelpBadge } from '../../help/HelpMode'
 import { jobLabel } from './bankPassRun.js'
 import { queueProgressLine, queueProgressPercent, runningItems, waitingItems } from './bankQueueActions.js'
+import { scrollQueueRowIntoView } from './bankQueueScroll.js'
 
 /* The thin bar under a running row; nothing when the step has no count. */
 function ProgressBar({ progress }) {
@@ -41,6 +43,14 @@ const CONTROL = 'col-start-3 row-start-1 row-span-2 inline-flex min-h-10 min-w-0
 export default function BankQueuePanel({ queue, nameOf, onCancel, onRetry, onClearWaiting, onStopRunning, onStopDirect }) {
   const active = queue?.active_jobs || []
   const queued = queue?.items || []
+  const listRef = useRef(null)
+  const runningId = queued.find((it) => it.state === 'running')?.bank_id ?? null
+  useLayoutEffect(() => {
+    const root = listRef.current
+    if (!root || runningId == null) return
+    const row = root.querySelector(`[data-queue-row="queued"][data-bank-id="${String(runningId)}"]`)
+    scrollQueueRowIntoView(root, row)
+  }, [runningId])
   if (!queued.length && !active.length) return null
   const waiting = waitingItems(queue).length
   const running = runningItems(queue).length
@@ -86,7 +96,7 @@ export default function BankQueuePanel({ queue, nameOf, onCancel, onRetry, onCle
           </li>)}
         </ul>
       </div>}
-      <ol className="space-y-1">
+      <ol ref={listRef} data-bank-queue-list className="space-y-1">
         {queued.map((it) => (
           <li key={it.bank_id} className={ROW} data-queue-row="queued" data-bank-id={it.bank_id}>
             <span className="col-start-1 row-start-1 self-start text-right text-content-subtle sm:self-center">{it.position}.</span>

@@ -760,6 +760,34 @@
   }
 }
 
+/* Bank Queue list: show 15 compact rows, then scroll inside the panel so a
+   long line (hundreds of banks) does not stretch the page. The header stays
+   a sibling above this list, not inside the scroll box.
+   --bank-queue-row-h is the one-line queued row (number, name, status, X):
+   below lg the X is min-h-10 (2.5rem) plus py-1 (0.5rem); from lg the row is
+   the text-sm line (1.25rem) plus py-1. --bank-queue-row-gap matches space-y-1.
+   Taller rows (a running progress bar, a wrapped name) simply mean slightly
+   fewer than 15 fit, which is the honest height. */
+[data-bank-queue] {
+  --bank-queue-visible-rows: 15;
+  --bank-queue-row-gap: 0.25rem;
+  --bank-queue-row-h: calc(2.5rem + 0.5rem);
+}
+@media (min-width: 1024px) {
+  [data-bank-queue] {
+    --bank-queue-row-h: calc(1.25rem + 0.5rem);
+  }
+}
+[data-bank-queue-list] {
+  max-height: calc(
+    var(--bank-queue-visible-rows) * var(--bank-queue-row-h)
+    + (var(--bank-queue-visible-rows) - 1) * var(--bank-queue-row-gap)
+  );
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
 /* Toast slide-in animation */
 .review-decision-button {
   transition: background-color 100ms ease-out, opacity 100ms ease-out;
