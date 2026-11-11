@@ -15,19 +15,18 @@ import { Button } from '../common/Controls.jsx'
  * as facts. So the page says what it knows and offers the walk, instead of
  * doing it behind their back on every visit.
  *
- * Freshness stays on the button title. The host can hide the short stale
- * notice on mobile to keep the toolbar compact. */
-export default function FolderCheckLine({ banks, busy = false, onRescan, className = '', noticeClassName = '' }) {
+ * Freshness stays on the button title. When counts may lag, Rescan Folders
+ * itself turns amber so the toolbar stays compact. */
+export default function FolderCheckLine({ banks, busy = false, onRescan, className = '' }) {
   const note = folderCheckNote(banks)
   if (!note) return null
+  const staleClass = note.stale
+    ? 'border-amber-400/60 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25'
+    : ''
   return (
     <div className="flex min-w-0 items-center gap-2">
-      {note.stale && (
-        <p className={`shrink-0 text-xs font-medium text-amber-300/90 ${noticeClassName}`} title={note.text}
-          aria-label={note.text}>Counts May Be Stale</p>
-      )}
       <Button size="md" noShrink onClick={onRescan} disabled={busy}
-        title={note.text} className={className}>
+        title={note.text} className={`${className} ${staleClass}`.trim()}>
         <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />{busy ? 'Checking Folders' : 'Rescan Folders'}
       </Button>
     </div>

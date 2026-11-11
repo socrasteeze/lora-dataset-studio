@@ -43,6 +43,10 @@ import { BANK_BULK_LIMIT, bankSelectionKey, bulkSelectionNote, selectVisibleBank
 const CURRENT_KEY = 'bankCurrentId'
 const SORT_KEY = 'bankListSort'
 const PAGE_SIZE_KEY = 'bankListPageSize'
+// Hide the page title and the Images/Video lane switch until those are in
+// use again. The Images default stays in effect; flip this to bring the
+// chrome back without rewiring the video lane.
+const SHOW_BANK_PAGE_CHROME = false
 // Mirrors ImageBank.name's column width (image_bank_service.BANK_NAME_MAX): the
 // server refuses a longer name rather than let SQLite truncate it silently, so
 // stop it here too and the user never types into a 400.
@@ -712,6 +716,7 @@ export default function BankPage() {
 
   return (
     <div className="space-y-6">
+      {SHOW_BANK_PAGE_CHROME && (
       <header className="flex flex-wrap items-center gap-2">
         {/* Beta chip retired here — it now marks the LoRA Canvas instead. */}
         <h1 className="flex items-center gap-2 text-xl font-semibold text-content"><Archive aria-hidden="true" className="h-5 w-5" /> Image bank</h1>
@@ -721,6 +726,7 @@ export default function BankPage() {
             place someone with a folder of rushes would ever have looked. */}
         <BankLaneTabs className="w-full sm:ml-auto sm:w-72" />
       </header>
+      )}
 
       <form onSubmit={create} noValidate aria-busy={creating}
         className="space-y-3">
@@ -734,20 +740,19 @@ export default function BankPage() {
         <fieldset disabled={creating} className="space-y-3">
         <div className="grid grid-cols-4 items-start gap-2 lg:flex lg:flex-wrap">
           <div className="col-span-2 min-w-0 lg:min-w-40 lg:grow">
-            <label htmlFor="bank-name" className="mb-1 block text-sm font-medium text-content">Name</label>
             <Input id="bank-name" size="lg" value={name} onChange={(e) => {
               setName(e.target.value); setCreateErrors((errors) => ({ ...errors, name: '' }))
-            }} aria-invalid={!!createErrors.name} aria-describedby={createErrors.name ? 'bank-name-error' : undefined}
+            }} aria-label="Name" aria-invalid={!!createErrors.name} aria-describedby={createErrors.name ? 'bank-name-error' : undefined}
               placeholder={splitMode ? 'Named per subfolder automatically' : 'Telegram export 07/2026'}
               required={!splitMode} disabled={splitMode}
               className="w-full" />
             {createErrors.name && <p id="bank-name-error" className="mt-1 text-xs text-rose-200">{createErrors.name}</p>}
           </div>
-          <FolderPickerField inline size="lg" id="bank-folder" label="Folder"
+          <FolderPickerField inline size="lg" id="bank-folder"
             fieldClassName="col-span-2 min-w-0 lg:min-w-64 lg:grow-[3]"
-            browseClassName="min-w-0 w-full !px-1 !text-xs lg:mt-6 lg:w-auto lg:!px-4 lg:!text-sm"
+            browseClassName="min-w-0 w-full !px-1 !text-xs lg:w-auto lg:!px-4 lg:!text-sm"
             value={folder} onChange={changeImportFolder} required
-            inputProps={{ 'aria-invalid': !!createErrors.folder || !!folderNotice,
+            inputProps={{ 'aria-label': 'Folder', 'aria-invalid': !!createErrors.folder || !!folderNotice,
               'aria-describedby': [createErrors.folder && 'bank-folder-error', folderNotice && 'bank-folder-notice'].filter(Boolean).join(' ') || undefined }}
             fieldError={createErrors.folder && <p id="bank-folder-error" className="mt-1 text-xs text-rose-200">{createErrors.folder}</p>}
             placeholder="C:\path\to\unsorted-images (subfolders included)" />
@@ -755,23 +760,23 @@ export default function BankPage() {
             aria-controls="bank-import-subfolders" aria-label="Choose Subfolders"
             onClick={() => setFoldersOpen((value) => !value)}
             title="Choose which subfolders to include, with one bank or separate banks."
-            className={`min-w-0 w-full !px-1 !text-xs lg:mt-6 lg:w-auto lg:!px-4 lg:!text-sm ${foldersOpen || splitMode || excluded.size ? 'border-primary/60 bg-primary/15 text-content' : ''}`}>
+            className={`min-w-0 w-full !px-1 !text-xs lg:w-auto lg:!px-4 lg:!text-sm ${foldersOpen || splitMode || excluded.size ? 'border-primary/60 bg-primary/15 text-content' : ''}`}>
             Subfolders {excluded.size > 0 && <span className="tabular-nums">({excluded.size})</span>}
           </Button>
           {/* One bank per subfolder does not carry protection; set it per bank after the split. */}
           {!splitMode && (
             <BankReadOnlyToggle checked={readOnly} onChange={setReadOnly} disabled={creating}
-              size="lg" className="min-w-0 w-full lg:mt-6 lg:w-auto" />
+              size="lg" className="min-w-0 w-full lg:w-auto" />
           )}
           <Button type="submit" size="lg" variant="primary" disabled={creating || !!folderNotice || emptySelection || previewPending || needsImportRestart}
-            className="col-span-2 min-w-0 w-full lg:mt-6 lg:w-auto"
+            className="col-span-2 min-w-0 w-full lg:w-auto"
             title={folderNotice ? 'That folder belongs to a dataset' : undefined}>
             {creating ? 'Inventorying' : (
               <span className="inline-flex items-center gap-1.5"><Plus aria-hidden="true" className="h-4 w-4" />
                 {splitMode ? 'Create Banks' : 'Create Bank'}</span>
             )}
           </Button>
-          <HelpBadge topic="bank-split-subfolders" className="col-span-4 lg:col-auto lg:mt-6" />
+          <HelpBadge topic="bank-split-subfolders" className="col-span-4 lg:col-auto" />
         </div>
         {foldersOpen && <section id="bank-import-subfolders" aria-label="Import Subfolders" className="space-y-3">
           <label className="flex min-h-10 items-center gap-2 text-sm text-content-muted">
@@ -889,7 +894,7 @@ export default function BankPage() {
             </button>
           )}
           <FolderCheckLine banks={banks} busy={rescanning} onRescan={rescan}
-            className="min-w-0 w-full lg:w-auto" noticeClassName="hidden lg:block" />
+            className="min-w-0 w-full lg:w-auto" />
           <div className="col-span-2 flex min-w-0 w-full items-center gap-2 lg:min-w-[9rem] lg:flex-1">
             <Input
               type="search"
