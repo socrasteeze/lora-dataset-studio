@@ -755,4 +755,12 @@ The 2026-11-08 branch never landed: Fork Gates on `validation/upstream-review-20
 | 99ea52814 | REJECT. Release bump; the fork keeps its own version. |
 | c6a86ed28 | SKIP-BUILD. Only `frontend/dist`; the fork rebuilds its own bundle. |
 
-Decision: 28 re-applied commits, 1 port and the bundle, as local commits on `upstream-review/2026-11-09` (based on `main` at 82a537bc3) in a linked worktree. Tests were not authorized for this run. Passed: `ruff check .`, ESLint 0 errors and 32 existing warnings, `npm run build`, conflict-marker sweep, rejected-term sweep (no hits), `git diff --check`, the static `start.bat` scan above, and attribution and identity scans. Not run: pytest, `node --test`, `npm test`, responsive probes (including the Bank queue alignment probe that failed the 2026-11-08 Fork Gates), fixture checks, `scripts/gates.ps1`. `main` is unchanged until cloud Gates pass on this branch's exact commit. Do not merge upstream/v1 or upstream/v2. A later review starts after `c6a86ed28`.
+Decision: 28 re-applied commits, 1 port and the bundle, as local commits on `upstream-review/2026-11-09` (based on `main` at 82a537bc3) in a linked worktree. Tests were not authorized for this run. Passed: `ruff check .`, ESLint 0 errors and 32 existing warnings, `npm run build`, conflict-marker sweep, rejected-term sweep (no hits), `git diff --check`, the static `start.bat` scan above, and attribution and identity scans. Not run: pytest, `node --test`, `npm test`, responsive probes (including the Bank queue alignment probe that failed the 2026-11-08 Fork Gates), fixture checks, `scripts/gates.ps1`. `main` is unchanged until cloud Gates pass on this branch's exact commit. Do not merge upstream/v1 or upstream/v2. On the owner's instruction the branch was then merged with `main` and pushed to `main` as `7eb4b5920` without waiting for Gates. The next review (2026-11-11, below) started after `c6a86ed28`.
+
+On 2026-11-11, upstream's default branch was v2 at 18e60494c8396f909fe7eed3b15a61beebfaa320. v1 remained 3fe3d4f0e29e28de583a6e22bce886c35e5ecd3f. The review started after c6a86ed28 (an ancestor of the new head) on fork `main` at 1b3914511; merge base with upstream/v2 is d13337cc3. The window has 2 commits, both `README.md` only. No new upstream branches.
+
+| Upstream commits | Class and evidence |
+| --- | --- |
+| ea1c60bc4, 18e60494c | REJECT. README sections for the paid member edition: member-only features and plugins, Patreon-linked updates, cloud training and the online prompt library (support-wording skip and Divergences 4 and 12). None of it exists in the fork. |
+
+Decision: nothing ported; this record is the only change. A later review starts after `18e60494c`.
