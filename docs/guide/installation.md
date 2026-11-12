@@ -14,7 +14,7 @@ cd lora-dataset-studio
 start.bat
 ```
 
-`start.bat` uses Python 3.10–3.12 if available. If none is installed, it downloads a self-contained CPython 3.12 into `.python\`, creates `.venv`, installs the core requirements, opens `http://127.0.0.1:5050/`, and starts the server. It requires no admin rights and changes no system PATH.
+`start.bat` uses Python 3.11–3.12 if available. If none is installed, it downloads a self-contained CPython 3.12 into `.python\`, creates `.venv`, installs the core requirements, opens `http://127.0.0.1:5050/`, and starts the server. It requires no admin rights and changes no system PATH.
 
 Update the checkout with git, then restart. The app does not fetch or apply that update itself. `data/`, `config.json`, `.env`, `.venv` and `.python` stay in place. Features that ship with the app stay installed. External plugin archives are refused. A git checkout needs `git` on your PATH, which an install made through a desktop Git client does not always provide.
 

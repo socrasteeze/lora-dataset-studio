@@ -17,7 +17,7 @@ pipeline behind one UI.
 | | Curation-only | Full local |
 |---|---|---|
 | **What works** | Create datasets, import local files, curate, caption manually, export ZIP | Everything — plus local (Klein) generation, JoyCaption, face scoring, masks, training, Test Studio |
-| **Needs** | Python 3.10–3.12 | ComfyUI and/or ai-toolkit + an NVIDIA GPU (12 GB+ for local generation) |
+| **Needs** | Python 3.11–3.12 | ComfyUI and/or ai-toolkit + an NVIDIA GPU (12 GB+ for local generation) |
 | **Good for** | Laptops, a first try, curating away from your GPU box | The full pipeline on a training rig |
 
 You can start **curation-only** (import your own photos) and add the
@@ -31,7 +31,7 @@ and training both run on hardware you control.
 and double-click `start.bat`. The upstream release zip is a different product
 and is not this fork. The launcher is a script, not a prebuilt executable.
 `start.bat` finds or downloads a compatible Python
-(3.10–3.12), creates `.venv`, installs the requirements, starts the server, and
+(3.11–3.12), creates `.venv`, installs the requirements, starts the server, and
 opens the app in your browser at the address it is actually serving on (default
 `http://127.0.0.1:5050/`; a LAN/Tailscale `server.host` opens that address
 instead, once the server is up — set `LDS_NO_BROWSER=1` to skip the auto-open).
@@ -94,9 +94,10 @@ of running invisibly alongside the first.
 
 ### Supported Python versions {#python-versions}
 
-- **LoRA Dataset Studio: Python 3.10 – 3.12.** `start.bat` finds or downloads
-  one for you; the optional ML extras (insightface, onnxruntime, `numpy<2`)
-  only publish wheels for those versions.
+- **LoRA Dataset Studio: Python 3.11 – 3.12.** `start.bat` finds or downloads
+  one for you; the core needs 3.11 or newer (Pillow 13), and the optional ML
+  extras (insightface, onnxruntime, `numpy<2`) publish no wheels after 3.12.
+  `start.bat` rebuilds a `.venv` still on Python 3.10 and keeps your data.
 - **ai-toolkit: Python 3.11 is the safe choice.** On **3.13** its pinned
   `scipy==1.12.0` has no wheel, pip falls back to building from source and dies
   on a missing Fortran compiler (measured and reported by strouder, GitHub #19).

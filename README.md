@@ -952,13 +952,13 @@ Clone the fork, or download **Source code (zip)** from this repository. Extract 
 
 Releases deliberately contain an archive/source, not a prebuilt executable launcher.
 No Python is needed up front: `start.bat` looks for a compatible interpreter
-(`py -3.12/3.11/3.10` — the range with prebuilt wheels for the optional ML extras)
+(`py -3.12/3.11` — the range with prebuilt wheels for the optional ML extras)
 and, if it finds none, **downloads a self-contained CPython 3.12** into a local
 `.python\` folder (~44 MB, once — no system install, no admin, nothing added to
 PATH). It then creates a `.venv`, installs `backend/requirements.txt`, starts
 the server, and opens your browser at the address the server is actually bound
 to (default `http://127.0.0.1:5050/`; a LAN/Tailscale `server.host` opens that
-address instead, once the server is up). (Already have Python 3.10–3.12? It's
+address instead, once the server is up). (Already have Python 3.11–3.12? It's
 used as-is and nothing is downloaded. On 3.13+ only, the core app still runs
 but the ML extras can't install.) Override the port with `set LDS_PORT=<port>`
 before running; set `LDS_NO_BROWSER=1` to skip the browser auto-open.
@@ -1045,17 +1045,17 @@ The app scales from "no GPU at all" to a full local training rig — each capabi
 
 | Mode / capability | GPU (NVIDIA) | Disk | Notes |
 |---|---|---|---|
-| **Curation-only** (local import, curate, caption manually, export/backup) | none | ~2 GB | Any machine with Python 3.10+ (3.13/3.14 run the core app fine — the 3.10–3.12 window is an ML-extras constraint) |
+| **Curation-only** (local import, curate, caption manually, export/backup) | none | ~2 GB | Any machine with Python 3.11+ (3.13/3.14 run the core app fine — the 3.11–3.12 window is an ML-extras constraint) |
 | **Auto-captioning & framing** (Ollama vision, 8B model) | ~8 GB VRAM | ~7 GB | Runs alongside generation, not concurrently |
 | **Local generation** (Klein 9B **KV** fp8 via ComfyUI) | ~16 GB VRAM | ~30 GB (model + text encoder + VAE) | Free, local and NSFW-capable; Setup downloads the models. The KV build is up to **2.5× faster on multi-reference edits** at the same quality |
 | **LoRA training — Z-Image / SDXL** (ai-toolkit) | 16 GB+ recommended | 10 GB+ free enforced per run | Quantized (qfloat8) + low-VRAM mode |
 | **LoRA training — Krea 2** (ai-toolkit) | **24 GB VRAM** at 1024 px (enforced warning) | ~24 GB base download (Raw), or none if you start from a Krea 2 checkpoint you already have, + 10 GB+ free | Under 24 GB, select **Resolution → 768 only** in Advanced options |
 | **LoRA training — FLUX.2 Klein** (ai-toolkit) | 4B: **16–24 GB VRAM** · 9B: **32–48 GB** | base download + 10 GB+ free | Both bases are gated on Hugging Face; 9B needs a card most desktops don't have |
 | **LoRA training — FLUX.1 / Anima** (ai-toolkit) | ~24 GB VRAM (both are 12B-class families) | base download + 10 GB+ free | **Local only — neither has a cloud lane.** FLUX.1 is gated on Hugging Face; Anima's base is public and reads booru tags natively |
-| **Face scoring / person masks / watermark inpaint** (ML extras) | none (CPU) | ~3 GB (+ CPU torch for LaMa) | Python **3.10–3.12 required** for wheels; installable per capability from Setup |
+| **Face scoring / person masks / watermark inpaint** (ML extras) | none (CPU) | ~3 GB (+ CPU torch for LaMa) | Python **3.11–3.12 required** for wheels; installable per capability from Setup |
 
 - **OS**: Windows 10/11 for the full local stack (`start.bat`). Linux and macOS work for curation-only and a manual venv.
-- **Python**: 3.10–3.12 — but not required up front: `start.bat` fetches a self-contained CPython 3.12 if your machine has none. 3.13+ (already installed) runs the core app but can't install the ML extras.
+- **Python**: 3.11–3.12 — but not required up front: `start.bat` fetches a self-contained CPython 3.12 if your machine has none. 3.13+ (already installed) runs the core app but can't install the ML extras.
 - **RAM**: 16 GB+ recommended when training locally. Unlike VRAM and free disk, this one is a recommendation the app never measures — a run that dies for want of system memory has no guard-rail in front of it.
 - **Dataset size**: a launch is gated on a per-family floor — 12 images for Z-Image, 15 for Krea 2 / FLUX.1 / FLUX.2 Klein, 20 for SDXL, 4 for a slider LoRA — with 20-30 recommended. Below the floor the app asks you to confirm and warns about overfitting rather than refusing outright.
 - Reference rig used for development: RTX 4090 (24 GB) — every number above was measured or enforced there.
