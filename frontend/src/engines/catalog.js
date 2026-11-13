@@ -93,7 +93,6 @@ export function engineCatalog() {
 export function engineSpec(id) { return engineCatalog().find((e) => e.id === id) }
 export function engineLabel(id) { const s = engineSpec(id); return s ? s.label : id }
 export function engineAccent(id) { const s = engineSpec(id); return (s && s.accent) || NEUTRAL_ACCENT }
-export function engineRate(id) { const s = engineSpec(id); return s ? (s.rate || 0) : 0 }
 
 /** Canonical engine order — drives the card order, the primary pick and the
  *  round-robin; local engines first (free, on the user's own GPU). */
@@ -108,18 +107,9 @@ export function apiEngineIds() { return apiEngineSpecs().map((e) => e.id) }
 /** Render on the user's own GPU through ComfyUI: free, slower, serialized on
  *  one GPU, and the ONLY ones allowed to receive 🔞 shots. */
 export function localEngineIds() { return localEngineSpecs().map((e) => e.id) }
-/** Render somewhere else: they never hold the local ComfyUI. */
-export function remoteEngineIds() { return engineCatalog().filter((e) => e.remote).map((e) => e.id) }
 /** One working engine of these = a set-up install (the nav rail's "recommended"). */
 export function recommendedEngineIds() { return engineCatalog().filter((e) => e.recommended).map((e) => e.id) }
 
-export function engineLabels() { return Object.fromEntries(engineCatalog().map((e) => [e.id, e.label])) }
-export function engineAccents() { return Object.fromEntries(engineCatalog().map((e) => [e.id, e.accent || NEUTRAL_ACCENT])) }
-export function engineRates() { return Object.fromEntries(engineCatalog().map((e) => [e.id, e.rate || 0])) }
-/** Which capability probe "Save & test" runs for an engine's key field. */
-export function keyTestTargets() {
-  return Object.fromEntries(engineCatalog().filter((e) => e.keyTestTarget).map((e) => [e.id, e.keyTestTarget]))
-}
 /** The Settings dropdown rows, API engines first as they always were listed. */
 export function engineSettingsOptions() {
   return [...apiEngineSpecs(), ...localEngineSpecs()].map((e) => ({ id: e.id, label: e.settingsLabel || e.label }))
@@ -127,14 +117,6 @@ export function engineSettingsOptions() {
 /** The counted capability rows of the API engines, in canonical order. */
 export function apiEngineSetupRows() {
   return apiEngineSpecs().filter((e) => e.setupRow).map((e) => ({ id: e.id, ...e.setupRow }))
-}
-
-/** The engine a profile with no stored preference generates with: the first
- *  API engine (historically the first cloud engine, the workspace's useState default),
- *  else the first engine there is. Null only with an empty catalog. */
-export function defaultEngineId() {
-  const api = apiEngineIds()
-  return api[0] || engineIds()[0] || null
 }
 
 /** The engines whose lane costs nothing for THIS run — the local ones by

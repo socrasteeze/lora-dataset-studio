@@ -79,11 +79,6 @@ def comfyui_queue_busy():
         return None
 
 
-def _busy_reason():
-    reason, _kind = _busy()
-    return reason
-
-
 def _busy():
     """(reason, kind): the sentence a refusal shows and what stands in the way
     ('training' or 'comfy'), or (None, None)."""

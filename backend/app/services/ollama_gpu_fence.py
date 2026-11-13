@@ -915,13 +915,6 @@ def share_gpu_with_foreign_model() -> dict:
             'models': list(blk.get('models') or ())}
 
 
-def stop_sharing() -> None:
-    """Hand the card back to the fence before the consent runs out."""
-    global _share_until, _share_endpoint
-    with _lock:
-        _share_until, _share_endpoint = 0.0, None
-
-
 def register_lds_load(endpoint_url, model) -> None:
     """LDS itself just loaded `model` there -- own it, with everything owning means.
 

@@ -36,7 +36,7 @@ export const COMFYUI_WAITING_TOPIC = 'comfyui.api_url'
 // Tool reachable + its extra piece present -> ready; reachable only -> partial.
 import { contributions } from '../plugins/registry.js'
 import {
-  apiEngineIds, apiEngineSetupRows, engineSpec, localEngineIds, recommendedEngineIds,
+  apiEngineIds, engineSpec,
 } from '../engines/catalog.js'
 
 function gateStatus(reachable, complete) {

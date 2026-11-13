@@ -13,8 +13,6 @@ import { engineAccent, engineLabel } from '../../engines/catalog.js';
 
 /** The tag pills every card wears: a fact about the price or the machine. */
 export const TAG_CLASS = 'px-1.5 py-px rounded-full bg-app/60 border border-border text-content-muted text-2xs';
-/** Green stays a statement about the PRICE, never a selection state. */
-export const FREE_TAG_CLASS = 'px-1.5 py-px rounded-full bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 text-2xs';
 
 export default function EngineCard({ id, checked, available, generating, onToggle, icon, title, tags, hint, footer }) {
   const accent = engineAccent(id);

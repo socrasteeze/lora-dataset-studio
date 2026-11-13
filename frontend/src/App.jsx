@@ -31,7 +31,6 @@ const SetupPage = lazyPage(() => import('./pages/SetupPage'))
 const GuidePage = lazyPage(() => import('./pages/GuidePage'))
 const CloudRunsPage = lazyPage(() => import('./pages/CloudRunsPage'))
 const GalleryPage = lazyPage(() => import('./pages/GalleryPage'))
-import { recommendedMet } from './hooks/useSetupSteps'
 import { usePeerActivity } from './hooks/usePeerActivity'
 import { useGlobalActivity } from './hooks/useGlobalActivity'
 import { activityHeadline } from './utils/activityLog'

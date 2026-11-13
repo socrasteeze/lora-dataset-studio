@@ -1566,11 +1566,6 @@ def _validated_setup_http_base(value) -> str:
     return raw
 
 
-def setup_comfyui_mode() -> str:
-    """ComfyUI is always an external process on a direct install."""
-    return 'external'
-
-
 def normalized_ollama_deployment_mode(value=None) -> str:
     """Keep ``none`` and ``host``. Any retired mode reads as ``host``."""
     if value is None:
@@ -2366,37 +2361,6 @@ def _probe_krea(comfy):
                   and not krea_blocking_invalid and not krea_pin_gaps)
     return (krea_missing, krea_nodes_missing, krea_nodes_installed,
             krea_invalid, krea_pin_gaps, krea_base_resolved, krea_ready)
-
-
-def _probe_seedvr2(comfy):
-    """The SeedVR2 upscaler's readiness, moved verbatim: weights / node
-    pack / loadability gaps, the single ready verdict, and the optional
-    tiling lane with its full-frame megapixel ceiling."""
-    # SeedVR2 — the fidelity upscaler (issue #32). Same three-part shape as Krea
-    # (weights on disk / node pack present / weights actually loadable), because
-    # it has the same three ways to be half-installed. It is NOT a generation
-    # engine: nothing in the dataset catalog can be produced by it, so it is
-    # published as an upscaler capability and the engine picker that offers it is
-    # the ✨ improve pass's, not the variation catalog's.
-    from .services import seedvr2_helper as _svr
-    seedvr2_missing = _svr.seedvr2_missing_assets()
-    seedvr2_nodes_missing = _svr.seedvr2_missing_nodes() if comfy['ok'] else []
-    seedvr2_nodes_installed = _svr.seedvr2_node_pack_installed()
-    seedvr2_invalid = _svr.seedvr2_invalid_assets()
-    seedvr2_ready = _svr.engine_ready(comfy['ok'], missing=seedvr2_missing,
-                                      invalid=seedvr2_invalid,
-                                      nodes_missing=seedvr2_nodes_missing)
-    # The OPTIONAL high-resolution lane (tiling), contributed by SurpassHR
-    # (GitHub #32). Its absence is not a fault: without it the default lane
-    # still upscales, it is only capped by what this card can hold in one pass.
-    # The ceiling is published so the UI can say that BEFORE a run dies — the
-    # report behind this feature is someone meeting the limit as a CUDA OOM.
-    seedvr2_tiling_nodes_missing = _svr.ttp_missing_nodes() if comfy['ok'] else []
-    seedvr2_tiling_ready = _svr.tiling_available(comfy['ok'])
-    seedvr2_ceiling_mp = _svr.full_frame_ceiling_mp()
-    return (seedvr2_missing, seedvr2_nodes_missing, seedvr2_nodes_installed,
-            seedvr2_invalid, seedvr2_ready, seedvr2_tiling_ready,
-            seedvr2_tiling_nodes_missing, seedvr2_ceiling_mp)
 
 
 def _comfyui_caps_section(comfy, base_dir, comfy_dir, comfy_launcher,

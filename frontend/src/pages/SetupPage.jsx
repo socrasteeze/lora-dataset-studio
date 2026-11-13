@@ -1,4 +1,4 @@
-import { apiEngineSetupRows, apiEngineSpecs } from '../engines/catalog.js'
+import { apiEngineSetupRows } from '../engines/catalog.js'
 import { contributions } from '../plugins/registry.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Dna, Lock, PartyPopper } from 'lucide-react';
@@ -31,12 +31,6 @@ const INPUT_CLASS =
 
 // Credentials belong to their plugin. This legacy wizard step is only a
 // directory to those pages; its metadata also feeds the capability summary.
-function apiKeyFields() {
-  return apiEngineSpecs().filter((s) => s.secret && s.setupKey).map((s) => ({
-    key: s.secret, label: s.setupKey.label, plugin: s.plugin,
-  }))
-}
-
 function pluginKeyFields() {
   return contributions('setup.key', 'setup').filter((k) => k.field && k.field.key)
 }
@@ -129,8 +123,6 @@ export default function SetupPage() {
   const toast = useToast()
   const { caps, refresh: refreshCapabilities } = useCapabilities()
   const [config, setConfig] = useState(null)
-  const [, setSecretsPresence] = useState({})
-  const [secretInputs, setSecretInputs] = useState({})
   const [busy, setBusy] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const [detected, setDetected] = useState(null)   // autodetect result (path suggestions)
@@ -170,7 +162,7 @@ export default function SetupPage() {
   const [startingOllama, setStartingOllama] = useState(false) // "Start Ollama" in flight
   const [startingComfyui, setStartingComfyui] = useState(false) // secure portable launch in flight
   const [runtimeReadiness, setRuntimeReadiness] = useState(null)
-  const [readinessRevision, setReadinessRevision] = useState(0)
+  const [readinessRevision] = useState(0)
   const [dirCheck, setDirCheck] = useState(null)    // live classify of the typed ComfyUI dir
   // Bumped when an override changes what the SAME typed dir resolves to (the input
   // folder adopted from ComfyUI's own report, GitHub #64): the debounce below is keyed

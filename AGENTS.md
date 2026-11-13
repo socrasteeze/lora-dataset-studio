@@ -46,8 +46,7 @@ These rules apply to every edit in this tree.
 - When a request has more than one reading, state the reading you are using before editing.
 - Change only the lines the request needs. Do not refactor, reformat, or clean up adjacent code.
 - Prefer the smallest change that meets a stated check. Do not add flexibility that was not requested.
-- Name the check before editing. Run tests only on an explicit user request.
-  A skipped check is not a pass.
+- Name the check before editing. A skipped check is not a pass.
 - Remove imports, variables, and helpers that the edit itself made unused. Leave older unused code unless the request names it.
 
 ## Communication and scope
@@ -89,8 +88,9 @@ than creating a second policy for another agent.
   in full qualification. Its optional private-name check can skip when no
   external name list is configured; report that limit.
 - `create_app()` changes schema and runtime state. Never smoke-test production data.
-- Isolate `LDS_DATA_DIR`, `LDS_CONFIG`, `LDS_ENV`, `LDS_PLUGINS_DIR` and
-  `LDS_EXTENSIONS_DIR` before importing the application for test runs.
+- Isolate `LDS_DATA_DIR`, `LDS_CONFIG`, `LDS_ENV`, `LDS_PLUGINS_DIR`,
+  `LDS_EXTENSIONS_DIR`, `LDS_DATASET_DESTINATIONS` and `LDS_PROFILES_HOME`
+  before importing the application for test runs.
 - Vite proxies to the real backend by default. Set `LDS_DEV_API_TARGET` to an
   isolated instance before exercising writes. Do not use real GPU jobs, downloads
   or external media as incidental UI fixtures.
@@ -155,8 +155,6 @@ than creating a second policy for another agent.
   Verify the probe after installation. Do not turn a missing dependency into a dead end.
 - Setup installs CPU defaults and preserves user-installed GPU builds. GPU
   availability does not authorize replacing a working runtime.
-- Keep the fork's local-only generation policy. `fork-plugins.json` owns the
-  distribution. Do not restore excluded API generation or rental-training plugins.
 - Nothing reaches another machine without an explicit click, and nothing sends
   the operator's data or config anywhere new. `backend/tests/test_fork_outbound_gate.py`
   enforces this (FORK_NOTES.md Divergence 12). Refresh its inventory only after
@@ -182,7 +180,7 @@ manifests and `scripts/gates.ps1`. Historical test counts are not a current base
 - When tests are requested, run only the requested scope in a separate cloud
   task unless the user explicitly permits a local run. Use the exact branch and
   commit. The commands below define the available checks, not permission to run.
-- For requested full qualification, a scrubbed task branch may transport the
+- For requested full qualification, a scrubbed `validation/**` branch may transport the
   exact source and bundle to cloud. Keep main unchanged until those gates pass,
   unless the user explicitly changes the requested validation scope.
 
@@ -216,14 +214,13 @@ manifests and `scripts/gates.ps1`. Historical test counts are not a current base
 ## Delivery and fork boundaries
 
 - Use a task branch for substantial work. Preserve worktrees and unrelated edits.
-- Follow the user's delivery and test authorization. Scrub attribution and
-  sensitive data before committing or pushing. Run repository gates only when
-  requested. Delivery without tests must use `[skip ci]` and state that full
-  qualification was not completed.
+- Follow the user's delivery authorization. Scrub attribution and sensitive
+  data before committing or pushing.
 - This fork diverges from perfectgf/lora-dataset-studio on purpose. Whole areas
   were removed: cloud generation and training, the plugin catalog, online
   services, and every plugin outside `fork-plugins.json` (Distribution and
-  Divergences 1, 4 and 12 in [FORK_NOTES.md](FORK_NOTES.md)).
+  Divergences 1, 4 and 12 in [FORK_NOTES.md](FORK_NOTES.md)). Image Sources
+  is the one operator-authorized exception; do not restore the rest.
 - Never `git merge`, `git pull` or rebase onto any `upstream/*` ref, and never
   run a generic fork-sync that does. A merge brings removed code back without
   a conflict.

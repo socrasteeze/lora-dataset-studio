@@ -19,7 +19,7 @@ import { requestHelpTip } from '../../help/helpTips';
 import { contributions } from '../../plugins/registry.js';
 import { PluginPanel } from '../../plugins/PluginSlot.jsx';
 import {
-  datasetKind, datasetMatches, groupDatasets, kindsPresent,
+  datasetMatches, groupDatasets, kindsPresent,
   libraryPageFor, normalizeCollapsedMap, normalizePageSize, normalizeTileSize, paginate,
 } from '../../utils/datasetLibrary';
 

@@ -128,13 +128,6 @@ def family_defaults(family):
     return dict(DEFAULTS[_family(family)])
 
 
-def required_node_classes(family, *, with_loras=True):
-    nodes = set(REQUIRED_NODES[_family(family)])
-    if not with_loras:
-        nodes.discard('LoraLoaderModelOnly')
-    return nodes
-
-
 def _safe_name(value, label):
     """Reject paths escaping ComfyUI roots even if a bad allowlist contains one."""
     if not isinstance(value, str) or not value or value.startswith(('/', '\\')):

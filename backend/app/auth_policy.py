@@ -9,8 +9,3 @@ def plugin_available(plugin_id):
     record = registry.records.get(plugin_id) if registry else None
     return bool(record is not None and record.enabled and record.state == 'loaded'
                 and (config.get('plugins.enabled') or {}).get(plugin_id) is not False)
-
-
-def require_plugin(plugin_id):
-    if not plugin_available(plugin_id):
-        raise ValueError(f'{plugin_id} is unavailable. Enable the plugin and restart LDS.')

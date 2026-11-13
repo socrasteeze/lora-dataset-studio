@@ -32,15 +32,6 @@ const STATUS_LABEL = {
   stopped: 'stopped',
 };
 
-const CARD_ACCENT = {
-  done: 'border-l-emerald-400/70',
-  error: 'border-l-rose-400/70',
-  error_pod_kept: 'border-l-amber-400/70',
-  stopped: 'border-l-border-strong',
-};
-
-export const cardAccent = (s) => CARD_ACCENT[s] || 'border-l-border';
-
 export function StatusBadge({ status }) {
   if (!status) return null;
   return (

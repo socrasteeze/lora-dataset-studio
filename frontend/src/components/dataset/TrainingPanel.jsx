@@ -1626,9 +1626,6 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   const [cloudProgressHost, setCloudProgressHost] = useState(null);
   const [cloudNoticeHost, setCloudNoticeHost] = useState(null);
   const [cloudBudgetHost, setCloudBudgetHost] = useState(null);
-  const cloudViewMatches = cloudRunView.datasetId === ds.currentId && cloudRunView.trainType === trainType;
-  const cloudActiveHere = cloudViewMatches ? cloudRunView.active : null;
-  const cloudLastHere = cloudViewMatches ? cloudRunView.last : null;
 
   // A finished run writes its checkpoints to disk, but nothing re-read the list:
   // the poll only refreshed its own status, so a LoRA that had just finished

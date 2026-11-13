@@ -1,4 +1,3 @@
-import { engineIds } from '../../engines/catalog.js'
 import { BarChart3, Dumbbell, Globe, Monitor, Network, Palette, PenLine, Save, Search, Wrench } from 'lucide-react';
 // Data-driven section list for the Settings page: sidebar labels, deep-link
 // ids, the mono eyebrow tag, and the keywords the sidebar search matches on.

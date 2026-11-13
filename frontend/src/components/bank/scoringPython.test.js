@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
   bestUpgrade,
-  calculationNote,
   canSelect,
   detectionFailure,
   detectionSummary,
@@ -11,7 +10,6 @@ import {
   enteredNote,
   gpuWindowCost,
   missingLabels,
-  interpreterPaths,
   openerLabel,
   selectionNote,
   sortInterpreters,

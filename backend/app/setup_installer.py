@@ -3795,12 +3795,6 @@ def _bank_runtime_notice(action, python, selected, *, imports_ok=None, selection
     }
 
 
-def _extra_roots_for(comfy_type):
-    """Generic configured extra model roots; product-derived roots are callbacks."""
-    from .services import comfy_model_paths
-    return comfy_model_paths.extra_roots(comfy_type)
-
-
 def _log_denied(action, status, license_url, provider):
     """The recovery steps for a 401/403, the same four lines whichever file of
     an action the host refused — a companion can be gated while its main file

@@ -261,20 +261,3 @@ export async function refreshCsrfToken() {
   } catch { /* network errors handled by caller */ }
   return getCsrfToken();
 }
-
-/**
- * POST a FormData body to a Flask endpoint that returns JSON, with the same
- * refresh-and-retry-once CSRF recovery as every other mutating call. Returns the
- * raw Response so callers can do their own status-based handling (the /generate /
- * /generate_edit call sites need the Response, not just JSON). Thin wrapper over
- * the shared fetchWithCsrfRetry — kept as a named export for those call sites.
- */
-export async function postFormWithCsrfRetry(url, formData, { signal } = {}) {
-  formData.set?.('csrf_token', getCsrfToken());
-  return fetchWithCsrfRetry(url, {
-    method: 'POST',
-    headers: { 'X-CSRFToken': getCsrfToken() },
-    body: formData,
-    signal,
-  });
-}

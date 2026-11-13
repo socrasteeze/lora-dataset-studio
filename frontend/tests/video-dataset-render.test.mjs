@@ -44,7 +44,7 @@ const { ToastProvider } = await import('../src/components/common/Toast.jsx')
 
 const { configureHostRuntime } = await import('../src/plugins/runtimeHost.jsx')
 const { publishRuntime } = await import('../src/plugins/loadPlugins.js')
-const { resetRegistry, registerDescriptor, setEnabled, contributions } =
+const { resetRegistry, setEnabled, contributions } =
   await import('../src/plugins/registry.js')
 const { default: VideoTrainingBlock } =
   await import('../../bundled/video/frontend/videobank/VideoTrainingBlock.jsx')

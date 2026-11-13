@@ -569,7 +569,6 @@ export default function BankPage() {
    *  Renaming AWAY from the group's name leaves the group — that is the whole
    *  mechanism, and it needs no refetch because grouping is derived. */
   const renamePrompt = async (bank) => {
-    // eslint-disable-next-line no-alert
     const next = window.prompt(`Rename “${bank.name}”`, bank.name)
     if (next == null || !next.trim() || next.trim() === bank.name) return
     try { await rename(bank, next.trim()) } catch { /* rename() already told them */ }
@@ -617,7 +616,6 @@ export default function BankPage() {
       toast.info('Nothing to queue — every bank is fully triaged.')
       return
     }
-    // eslint-disable-next-line no-alert
     if (!window.confirm(confirm)) return
     setDialogScope(null)
     try {

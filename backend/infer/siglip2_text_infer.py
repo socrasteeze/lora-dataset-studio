@@ -76,10 +76,6 @@ def _move_to_device(inputs: Any, device='cpu') -> Any:
     return inputs
 
 
-def _move_to_cpu(inputs: Any) -> Any:
-    return _move_to_device(inputs)
-
-
 def main() -> int:
     raw = sys.stdin.readline()
     try:

@@ -30,7 +30,6 @@ export default function GlobalStopPanel() {
   const [error, setError] = useState('')
 
   const stop = async () => {
-    // eslint-disable-next-line no-alert
     if (!window.confirm(STOP_CONFIRM)) return
     setBusy(true)
     setError('')

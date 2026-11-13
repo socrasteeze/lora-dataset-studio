@@ -69,12 +69,6 @@ class ServiceUnavailable(RuntimeError, AttributeError):
             f"{service.replace('_', ' ')} is not available in this install ({reason})")
 
 
-def unavailable_services() -> list:
-    """What this process has found absent so far, for /api/health."""
-    with _REGISTRY_LOCK:
-        return [dict(v) for v in _UNAVAILABLE.values()]
-
-
 def _is_absence(exc: ImportError, qualname: str) -> bool:
     """True when the module ITSELF (or a parent package) is what is missing —
     not a name it tried to import, not one of its own dependencies."""

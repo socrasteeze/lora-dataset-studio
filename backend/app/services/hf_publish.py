@@ -23,16 +23,12 @@ runs the whole flow in a daemon thread (mirroring `setup_installer`) and
 `publish_to_hf` itself is fully synchronous and the single seam the tests drive
 (HfApi mocked — no real network).
 """
-import json
-import os
 import re
 import threading
 
-from PIL import Image, ImageOps, UnidentifiedImageError
 
 from ..config import LOCAL_USER
 from ..utils.redact import redact_user_paths
-from . import face_dataset_service as fds
 
 # Licence choices offered in the modal — the usual dataset licences plus a
 # catch-all. Validated server-side (never trust the client's dropdown).
@@ -47,9 +43,6 @@ GITHUB_URL = f'https://github.com/{GITHUB_REPO}'
 
 READ_ONLY_MSG = ('your Hugging Face token is read-only — create a write token at '
                  'https://huggingface.co/settings/tokens')
-
-# HF repo id: `<namespace>/<name>`, each segment [A-Za-z0-9._-], name up to 96.
-_REPO_ID_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,95}/[A-Za-z0-9][A-Za-z0-9._-]{0,95}$')
 
 
 class HfPublishError(Exception):
@@ -72,19 +65,10 @@ def _slug(s) -> str:
     return s or 'dataset'
 
 
-def _safe_stem(ds) -> str:
-    """File-name stem for the exported images (mirrors build_export_zip's `safe`)."""
-    return ''.join(c for c in ds.name if c.isalnum() or c in ('-', '_')) or 'dataset'
-
-
 def default_repo_id(username, ds) -> str:
     """`<username>/<slug-of-dataset-name>` — the modal's pre-filled default."""
     stem = _slug(ds.name) if ds is not None else 'dataset'
     return f'{username}/{stem}' if username else stem
-
-
-def _valid_repo_id(repo_id) -> bool:
-    return bool(_REPO_ID_RE.match(repo_id or ''))
 
 
 # --- huggingface_hub seam ----------------------------------------------------
@@ -114,29 +98,12 @@ def hf_namespace(token):
 
 # --- write-scope preflight ---------------------------------------------------
 
-def _fine_grained_can_write(who) -> bool:
-    """A fine-grained token advertises its permissions under
-    auth.accessToken.fineGrained (`global` list + `scoped[].permissions`). We
-    accept it if ANY permission string mentions write (repo.write /
-    repo.content.write / …) — anything narrower is treated as read-only."""
-    fg = (((who.get('auth') or {}).get('accessToken') or {}).get('fineGrained')) or {}
-    perms = list(fg.get('global') or [])
-    for scope in (fg.get('scoped') or []):
-        perms.extend(scope.get('permissions') or [])
-    return any('write' in (p or '').lower() for p in perms)
-
-
 def _require_write_scope(api):
     """This install does not ask Hugging Face who a token is."""
     raise HfPublishError('offline', 'Publishing was removed from this install.')
 
 
 # --- dataset folder build ----------------------------------------------------
-
-def _write_text(dest_dir, name, text):
-    with open(os.path.join(dest_dir, name), 'w', encoding='utf-8') as fh:
-        fh.write(text)
-
 
 def _target_family(ds) -> str:
     return (getattr(ds, 'train_type', None) or 'zimage').lower()
@@ -201,88 +168,6 @@ def build_readme(ds, count, license, nfaa) -> str:
         '',
     ]
     return redact_user_paths('\n'.join(fm + body))
-
-
-def _write_sanitized_publish_png(source_path, destination_path) -> None:
-    """Write a neutral public PNG from a local master without carrying metadata.
-
-    HF publish is an external disclosure boundary. Rebuilding pixels into a fresh
-    image strips EXIF/XMP/GPS/PNG text chunks and bakes camera orientation; merely
-    calling ``save`` on a decoded source can let Pillow retain ``image.info``.
-    The original master is read only and never rewritten.
-    """
-    try:
-        with Image.open(source_path) as source:
-            source.load()
-            oriented = ImageOps.exif_transpose(source)
-            has_alpha = ('A' in oriented.getbands()
-                         or 'transparency' in getattr(oriented, 'info', {}))
-            mode = 'RGBA' if has_alpha else 'RGB'
-            # Image.new has no inherited `.info`, unlike a copy/convert of the
-            # source, so save() has no metadata payload to reproduce.
-            neutral = Image.new(mode, oriented.size)
-            neutral.paste(oriented.convert(mode))
-            neutral.save(destination_path, 'PNG', compress_level=6)
-    except (OSError, ValueError, UnidentifiedImageError) as exc:
-        raise HfPublishError(
-            'invalid_image',
-            'could not prepare a metadata-free image for publishing',
-        ) from exc
-
-
-def build_publish_dir(user_id, dataset_id, dest_dir, include_ref, license, nfaa):
-    """Populate `dest_dir` with metadata-free PNG copies + same-stem
-    `.txt` + metadata.jsonl + README.md) and return {count, entries, readme,
-    trigger}. `entries` is the metadata rows (also what tests assert on)."""
-    from ..models import FaceDatasetImage
-    ds = fds.get_dataset(user_id, dataset_id)
-    if not ds:
-        raise HfPublishError('dataset_not_found', 'dataset not found')
-    license = (license or '').strip().lower()
-    if license not in LICENSE_CHOICES:
-        raise HfPublishError('invalid_license', f'unsupported license: {license or "(empty)"}')
-
-    kept = (FaceDatasetImage.query.filter_by(dataset_id=dataset_id, status='keep')
-            .order_by(FaceDatasetImage.id.asc()).all())
-    entries = []
-    stem = _safe_stem(ds)
-
-    # Real reference photo: opt-in only. Caption = the bare trigger (an identity
-    # anchor, not a described image).
-    if include_ref and ds.ref_filename:
-        ref_path = fds._ref_path(ds)
-        if os.path.exists(ref_path):
-            name = f'{stem}_000_ref.png'
-            _write_sanitized_publish_png(ref_path, os.path.join(dest_dir, name))
-            text = redact_user_paths(ds.trigger_word or '')
-            _write_text(dest_dir, f'{stem}_000_ref.txt', text)
-            entries.append({'file_name': name, 'text': text})
-
-    for n, img in enumerate(kept, 1):
-        if not img.filename:
-            continue
-        src = fds._img_path(img)
-        if not os.path.exists(src):
-            continue
-        name = f'{stem}_{n:03d}.png'
-        _write_sanitized_publish_png(src, os.path.join(dest_dir, name))
-        # redact is a no-op on real captions; belt-and-suspenders so NOTHING in
-        # the public repo can carry a stray home path.
-        text = redact_user_paths(fds._export_caption(ds, img.caption))
-        _write_text(dest_dir, f'{stem}_{n:03d}.txt', text)
-        entries.append({'file_name': name, 'text': text})
-
-    if not entries:
-        raise HfPublishError('no_images', 'no kept images with files on disk to publish')
-
-    with open(os.path.join(dest_dir, 'metadata.jsonl'), 'w', encoding='utf-8') as fh:
-        for e in entries:
-            fh.write(json.dumps(e, ensure_ascii=False) + '\n')
-
-    readme = build_readme(ds, len(entries), license, nfaa)
-    _write_text(dest_dir, 'README.md', readme)
-    return {'count': len(entries), 'entries': entries, 'readme': readme,
-            'trigger': ds.trigger_word}
 
 
 # --- the synchronous publish flow (the tested seam) --------------------------

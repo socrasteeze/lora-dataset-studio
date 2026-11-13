@@ -171,12 +171,6 @@ class _RecoveryContext:
         self._workers.append((self.id, name, fn))
 
 
-    def register_disable_blocker(self, fn):
-        if not callable(fn):
-            raise TypeError('a recovery disable blocker must be callable')
-        self._disable_blockers.append(fn)
-
-
 def _only_failed_requirements(record, records, failed_at_load, seen=frozenset()):
     """True only for dependency import/registration failures, including chains.
 

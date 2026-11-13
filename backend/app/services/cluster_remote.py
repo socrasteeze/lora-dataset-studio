@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import logging
-import threading
 import time
 import uuid
 
@@ -91,21 +90,6 @@ def wait_cluster_job(job_id, *, timeout=3600, poll=1.0) -> dict:
         time.sleep(poll)
         db.session.expire(job)
     raise TimeoutError(f'cluster job {job_id} timed out')
-
-
-def wait_cluster_job_async(job_id, on_done, *, app=None, timeout=3600):
-    """Daemon thread that calls on_done(result_dict) when the job finishes."""
-    def _run():
-        from flask import current_app
-        ctx_app = app or current_app._get_current_object()
-        with ctx_app.app_context():
-            try:
-                result = wait_cluster_job(job_id, timeout=timeout)
-                on_done(result, None)
-            except Exception as e:
-                on_done(None, e)
-
-    threading.Thread(target=_run, daemon=True, name=f'cluster-wait-{job_id[:8]}').start()
 
 
 def read_job_result_json(job_id, artifact_name='vision_result.json') -> dict:

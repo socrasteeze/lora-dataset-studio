@@ -19,7 +19,7 @@
  * `lanes` lets the user choose it — a checkpoint is a file, so a run trained here
  * can be finished on a rented GPU and vice-versa; a mount that doesn't gets its
  * own `where` back and can ignore the field. */
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { HelpBadge } from '../../help/HelpMode';
 import {
   defaultResumeMode,

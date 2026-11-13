@@ -19,7 +19,7 @@
 
 /** The Image engines groups, in display order. `id` is stored in localStorage
  *  and used in DOM anchors — never rename one without an alias. */
-import { BarChart3, Bot, Box, Cloud, Drama, Dumbbell, Eraser, ImageDown, KeyRound, Map, Network, Package, PenLine, Puzzle, SlidersHorizontal, SlidersVertical, Trash2, ZoomIn } from 'lucide-react';
+import { BarChart3, Bot, Box, Cloud, Drama, Dumbbell, Eraser, ImageDown, KeyRound, Map, Network, Package, PenLine, Puzzle, SlidersHorizontal, SlidersVertical, Trash2 } from 'lucide-react';
 import { contributions } from '../../plugins/registry.js';
 export const ENGINES_GROUPS = [
   // The id stays 'engines-keys' (persisted as this group's open state and in

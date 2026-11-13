@@ -7259,18 +7259,6 @@ def _accept_scrape_bytes(raw, seen_hashes, skipped, rescue_small=False):
     return raw
 
 
-def _scrape_resolution_key(downloaded):
-    """Sort key for rescue batches: the best-resolution duplicate must win."""
-    reason, raw = downloaded
-    if reason != 'ok' or not raw:
-        return (0, 0)
-    try:
-        width, height = _import_header_dimensions(raw, label='scrape import')
-        return (min(width, height), width * height)
-    except ValueError:
-        return (0, 0)
-
-
 def _save_small_scrape_pair(user_id, dataset_id, raw, prompt, source_metadata=None):
     """Persist the untouched scrape source and enqueue one Klein candidate.
 
