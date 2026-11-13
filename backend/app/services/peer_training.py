@@ -241,7 +241,9 @@ def status_summary(dataset_id=None) -> dict:
         'runs': [r.to_dict() for r in here + recent_failures(dataset_id)],
         # ACTIVE runs only. A failure being shown must not keep the Train button
         # disabled — the whole point of showing it is that the user relaunches.
-        'any_active': bool(runs),
+        # Scoped like `launch`'s own refusal: one run per dataset, so another
+        # dataset's run must not disable this one's Train button.
+        'any_active': bool(here),
     }
 
 
@@ -389,6 +391,15 @@ def launch(user_id, dataset_id, *, gpu_ids: str, steps=None, base_model=None,
                         allow_not_ready=bool(allow_not_ready),
                         variant=variant)
 
+    # The run name carries no dataset id, so two datasets with one trigger and
+    # base resolve to the same remote job, log and save folder.
+    run_name = lt._run_name(ds, base_model=base_model, family=fam, variant=variant)
+    if any(r.run_name == run_name for r in active_runs()):
+        raise ValueError(
+            'Another dataset with the same trigger and base is already '
+            'training on another machine — stop that run first, or change '
+            'one trigger word.')
+
     if steps is None:
         steps = lt.recommended_steps(int(dataset_id), train_type=fam, variant=variant)
     masked = True if masked is None else bool(masked)
@@ -404,7 +415,6 @@ def launch(user_id, dataset_id, *, gpu_ids: str, steps=None, base_model=None,
     # Built here, not in the supervisor thread, so an unbuildable config is a
     # 400 on the click rather than a failed row appearing seconds later.
     job_config = lt.build_job_config(ds, dataset_folder, steps=int(steps))
-    run_name = lt._run_name(ds, base_model=base_model, family=fam, variant=variant)
     log_path = lt._run_log_path(ds, base_model=base_model, family=fam, variant=variant)
     # The run's TOP folder holds the log; ai-toolkit's checkpoints go in the
     # `lora_<trigger>` save_root BELOW it, which is the folder the checkpoint

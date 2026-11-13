@@ -76,8 +76,7 @@ const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
  * refresh the token and replay the request exactly once with the fresh token.
  * The backend re-plants a fresh cookie on every response (including the 400
  * itself), and the light GET below is a belt-and-suspenders for any path that
- * somehow didn't. A `db_busy` 503 is likewise replayed (with backoff) so
- * curating a bank while another one is being processed doesn't lose clicks.
+ * somehow didn't. A `db_busy` 503 is replayed one level up, in apiFetch.
  * Returns the raw Response so both parsed-JSON and raw-Response callers reuse
  * the same recovery. Network errors propagate to the caller.
  */
@@ -119,6 +118,13 @@ export async function apiFetch(url, options = {}) {
   let res;
   try {
     res = await fetchWithCsrfRetry(url, init);
+    // Replayed here, not in the raw transport: its direct callers include
+    // posts that change files before the failing commit (rotate, mirror), and
+    // a replay would repeat that. A poll is not replayed; its next tick is.
+    for (let i = 0; !background && i < DB_BUSY_RETRIES && await isDbBusy(res); i += 1) {
+      await sleep(DB_BUSY_BACKOFF_MS * (i + 1));
+      res = await fetchWithCsrfRetry(url, init);
+    }
   } catch (error) {
     // Replacing a search or leaving a picker cancels its read deliberately.
     // Keep that cancellation distinct from a failed network connection.

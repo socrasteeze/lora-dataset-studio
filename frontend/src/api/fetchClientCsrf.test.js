@@ -1,6 +1,6 @@
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { fetchWithCsrfRetry, postJson, postForm, CSRF_EXPIRED_MESSAGE } from './fetchClient.js';
+import { apiFetch, fetchWithCsrfRetry, postJson, postForm, CSRF_EXPIRED_MESSAGE } from './fetchClient.js';
 
 const originalFetch = globalThis.fetch;
 const originalDocument = globalThis.document;
@@ -76,5 +76,28 @@ test('application refusals and network failures never replay the restart', async
   await assert.rejects(fetchWithCsrfRetry('/api/plugins/apply', {
     method: 'POST', headers: { 'X-CSRFToken': 'fixture' },
   }), /disconnected/);
+  assert.equal(calls, 1);
+});
+
+test('a foreground db_busy 503 is replayed; a poll, the raw transport and any other 503 are not', async () => {
+  globalThis.document = { cookie: 'csrf_token=fixture', querySelector: () => null };
+  const busy = () => json({ error: 'busy', db_busy: true }, 503);
+  let calls = 0;
+  globalThis.fetch = async () => { calls += 1; return calls === 1 ? busy() : json({ ok: true }); };
+  assert.deepEqual(await postJson('/api/bank/1/images/status', {}), { ok: true });
+  assert.equal(calls, 2);
+
+  calls = 0;
+  globalThis.fetch = async () => { calls += 1; return busy(); };
+  await assert.rejects(apiFetch('/api/bank/1/status', { background: true }), /busy/);
+  assert.equal(calls, 1);
+
+  calls = 0;
+  assert.equal((await fetchWithCsrfRetry('/api/dataset/1/rotate', { method: 'POST' })).status, 503);
+  assert.equal(calls, 1);
+
+  calls = 0;
+  globalThis.fetch = async () => { calls += 1; return json({ error: 'booting' }, 503); };
+  await assert.rejects(postJson('/api/bank/1/images/status', {}), /booting/);
   assert.equal(calls, 1);
 });

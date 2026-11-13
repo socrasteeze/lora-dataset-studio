@@ -58,13 +58,13 @@ export default function PeerTrainingCard({ datasetId, postJson, onChange, enable
       {shown.map((run) => (
         <div key={run.id} className="flex flex-wrap items-center gap-2">
           <span aria-hidden>{isActiveRun(run) ? '🛰' : '⚠'}</span>
-          <span className="text-content">{peerRunLine(run)}</span>
+          <span className="min-w-0 break-words text-content">{peerRunLine(run)}</span>
           {!isActiveRun(run) && (
             <button type="button"
               title="Dismiss this notice. The run itself is already over."
               onClick={() => setDismissed((prev) => new Set(prev).add(run.id))}
               aria-label="Dismiss this training failure"
-              className="ml-auto px-2 py-1 rounded-lg border border-border text-content-muted text-xs">
+              className="ml-auto min-h-10 lg:min-h-0 px-2 py-1 rounded-lg border border-border text-content-muted text-xs">
               ✕ Dismiss
             </button>
           )}
@@ -86,7 +86,7 @@ export default function PeerTrainingCard({ datasetId, postJson, onChange, enable
                   load();
                 }
               }}
-              className="ml-auto px-3 py-1 rounded-lg bg-red-600/80 text-white text-xs font-semibold disabled:opacity-40">
+              className="ml-auto min-h-10 lg:min-h-0 px-3 py-1 rounded-lg bg-red-600/80 text-white text-xs font-semibold disabled:opacity-40">
               {run.stop_requested ? 'Stopping' : '⏹ Stop'}
             </button>
           )}

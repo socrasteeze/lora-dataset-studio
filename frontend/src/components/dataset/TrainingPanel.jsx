@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { Link } from 'react-router';
 import { apiFetch, fetchWithCsrfRetry, getCsrfToken } from '../../api/fetchClient';
 import { useCapabilities } from '../../context/CapabilitiesContext';
+import { postJson } from '../../hooks/useDataset';
 import { animeFamilyNote } from './animeFamilyNote.js';
 import { dualCaptionsSupport } from './dualCaptions.js';
 import { maskedCarryOverAction, clearLegacyMasked } from './maskedMigration.js';
@@ -2017,6 +2018,14 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           </>)}
         </span>
       </div>
+
+      {/* A run on ANOTHER machine, with its own Stop. It cannot appear in the
+          local status above: that describes the single run the machine-wide
+          GPU-busy flag stands for, and this lane never sets it. Mounted
+          unconditionally: it checks once even when no address is configured.
+          It keeps polling while it holds the Train lock, so the lock ends. */}
+      <PeerTrainingCard datasetId={ds.currentId} postJson={postJson} onChange={onPeerRuns}
+        enabled={peerConfigured || peerActive} />
 
       <div className="contents" ref={setCloudNoticeHost} />
 

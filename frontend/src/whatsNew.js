@@ -85,6 +85,17 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-12-peer-run-card-back', date: '2026-11-12',
+    title: 'A run on another machine shows in the Training panel again',
+    blurb: 'A LoRA training on another machine has its row back under the Train button: where it runs, its Stop, and the reason if it failed. Train unlocks again when that run ends, and a run for one dataset no longer locks the others.',
+    to: '/datasets?section=training&panel=launch',
+  },
+  {
+    id: '2026-11-12-busy-click-retried', date: '2026-11-12',
+    title: 'A Bank click during a background pass is retried for you',
+    blurb: 'In the Bank, when a pass or the queue is saving at the moment you click, the app now repeats your request up to twice by itself. It asks you to try again only if the database is still busy after that.',
+  },
+  {
     id: '2026-11-09-quicker-framing-pass', date: '2026-11-09',
     title: 'A quicker Bank Framing pass',
     blurb: 'The Framing pass now shows the local vision model a 1024 px picture instead of 1536 px, which took about a third less time per image on qwen3-vl 8B. Captions, Auto-Crop and compute peers keep the full size.',
