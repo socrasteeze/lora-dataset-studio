@@ -126,6 +126,12 @@ Do not set `LDS_OPEN_BROWSER=1`. That force-flag overrides the Settings
 switch for the common double-click launch.
 Keep the lanes as separate `goto` blocks. A label inside a parenthesised
 block is invalid batch.
+The Python floor is 3.11 (Pillow 13, filelock 4.2). `start.bat` and
+`scripts/bootstrap_python.ps1` enforce it with their own range checks.
+Upstream's `python_floor.py`, `retire_venv.ps1`, `requirements_sync.py` and
+Pinokio env floor are not taken (operator decision, 2026-11-13). Boot-time pip
+stays out under Divergence 12. A Pinokio env on its bundled 3.10 cannot install
+the core.
 
 ## Divergence 9: lint
 

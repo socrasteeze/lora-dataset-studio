@@ -17,7 +17,8 @@ if exist ".venv\Scripts\python.exe" if not "%LDS_ALLOW_SECOND_INSTANCE%"=="1" (
   if errorlevel 10 if not errorlevel 11 exit /b 0
 )
 
-REM --- Pick a Python the OPTIONAL ML extras have wheels for (CPython 3.10-3.12).
+REM --- Pick a Python the OPTIONAL ML extras have wheels for (CPython 3.11-3.12).
+REM     The core needs 3.11 or newer (Pillow 13, filelock 4.2).
 REM     insightface / numpy<2 / onnxruntime publish NO wheels for 3.13+, so a venv
 REM     built on e.g. 3.14 cannot install requirements-ml.txt (pip falls back to
 REM     source builds that fail). `py -3.x` selects an EXACT version; bare `py -3`
@@ -31,18 +32,18 @@ REM     python.bat, other version managers python.cmd), and cmd never comes back
 REM     from a batch file started without CALL. Issue #77: start.bat ended inside
 REM     the check in 1b, with no message and no app.
 
-REM 1) A CPython 3.10-3.12 already installed (via the Windows py launcher)?
-for %%V in (3.12 3.11 3.10) do (
+REM 1) A CPython 3.11-3.12 already installed (via the Windows py launcher)?
+for %%V in (3.12 3.11) do (
   if not defined PY ( call py -%%V -c "import sys" >nul 2>nul && set "PY=py -%%V" )
 )
 
-REM 1b) ... or a `python` on PATH that IS a 3.10-3.12 itself: python.org installs
+REM 1b) ... or a `python` on PATH that IS a 3.11-3.12 itself: python.org installs
 REM     made without the py launcher, scoop, pyenv-win, conda. Issue #77: such a 3.11
 REM     was skipped for a download, then used anyway once the download failed. Its
 REM     version is checked, so a newer default `python` -- the 3.14 trap above --
 REM     still can't slip through.
 if not defined PY (
-  call python -c "import sys; sys.exit(0 if (3,10)<=sys.version_info[:2]<=(3,12) else 1)" >nul 2>nul && set "PY=python"
+  call python -c "import sys; sys.exit(0 if (3,11)<=sys.version_info[:2]<=(3,12) else 1)" >nul 2>nul && set "PY=python"
 )
 
 REM 2) A self-contained Python we fetched on a previous run? (skip the PowerShell hop)
@@ -55,7 +56,7 @@ REM    system install, no admin, nothing added to PATH. This is what lets start.
 REM    be a true one-click launcher even on a machine with no Python at all. Needs
 REM    PowerShell (ships with Windows) + an internet connection.
 if not defined PY (
-  echo [i] No CPython 3.10-3.12 found -- downloading a self-contained one ^(~44 MB, one time^)...
+  echo [i] No CPython 3.11-3.12 found -- downloading a self-contained one ^(~44 MB, one time^)...
   powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\bootstrap_python.ps1" -Dest "%~dp0.python" -PyVersion 3.12
   if exist ".python\python.exe" set "PY=.python\python.exe"
 )
@@ -64,7 +65,7 @@ REM 4) Download failed (offline?) -> fall back to ANY Python so the CORE app can
 REM    still run; the optional ML extras just won't install on 3.13+.
 if not defined PY (
   set "PY_SUPPORTED=0"
-  echo [!] Could not obtain CPython 3.10-3.12 automatically ^(offline?^). The core app
+  echo [!] Could not obtain CPython 3.11-3.12 automatically ^(offline?^). The core app
   echo     can still run on any Python, but the OPTIONAL ML extras -- face-similarity
   echo     scoring and background masks -- won't install. Get 3.12 at https://www.python.org/downloads/
   echo.
@@ -76,7 +77,7 @@ REM 5) Truly no Python anywhere and no download -> can't build a venv, stop.
 REM    A double-clicked window closes the moment this script ends: from here on,
 REM    every stop says why and waits for a key, so the reason stays readable.
 if not defined PY (
-  echo Python 3.10-3.12 is required and the automatic download failed.
+  echo Python 3.11-3.12 is required and the automatic download failed.
   echo Install it from https://www.python.org/downloads/ then re-run start.bat
   pause
   exit /b 1
@@ -97,15 +98,15 @@ set "REBUILD=0"
 set "VENV_BAD=0"
 if not exist "%VPY%" set "REBUILD=1"
 if "%REBUILD%"=="0" (
-  "%VPY%" -c "import sys; sys.exit(0 if (3,10)<=sys.version_info[:2]<=(3,12) else 1)" >nul 2>nul
+  "%VPY%" -c "import sys; sys.exit(0 if (3,11)<=sys.version_info[:2]<=(3,12) else 1)" >nul 2>nul
   if errorlevel 1 set "VENV_BAD=1"
 )
 if "%VENV_BAD%"=="1" if "%PY_SUPPORTED%"=="1" (
-  echo [i] Existing .venv is not on Python 3.10-3.12 -- rebuilding it so the ML extras can install.
+  echo [i] Existing .venv is not on Python 3.11-3.12 -- rebuilding it so the ML extras can install.
   set "REBUILD=1"
 )
 if "%VENV_BAD%"=="1" if "%PY_SUPPORTED%"=="0" (
-  echo [!] .venv runs an unsupported Python and no CPython 3.10-3.12 is installed.
+  echo [!] .venv runs an unsupported Python and no CPython 3.11-3.12 is installed.
   echo     Core features work; ML extras stay unavailable until you install 3.12.
 )
 
