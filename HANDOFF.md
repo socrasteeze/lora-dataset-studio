@@ -1,5 +1,31 @@
 # HANDOFF
 
+## Dead-code cleanup and busy-click retry (2026-11-12)
+
+Six commits from base `00e8a978a`. No tests, probes or CI ran, by repository rule,
+including the new `fetchClientCsrf.test.js` case. Nothing was rendered. Ruff,
+ESLint (0 errors) and the frontend build pass.
+
+- Removed about 43 unreferenced Python definitions, 14 unused frontend exports,
+  `SetupStep.jsx` and the root `PLAN.md`. Found by a static scan, with the
+  deletion list and the result independently reviewed.
+- Restored two merge casualties: the peer training card in the dataset training
+  panel, and the replay of a `db_busy` 503. The replay now lives in `apiFetch`
+  only (foreground requests, two replays). The raw `fetchWithCsrfRetry` does not
+  replay, because rotate and mirror change files before the failing commit.
+- Camera views (canvas and dataset) and Studio run resume pass `replay: false`:
+  they queue one job per commit, so a replay could queue the first ones twice.
+- `peer_training.launch` refuses a run name an active run already holds.
+
+Open items:
+- A read-only audit rated the other replayed POST routes safe. It did not read
+  these in depth: video checkpoint deploy and delete, LoRA merge, FP8 quantize,
+  the repair tool's watermark step, and bundled video routes against their core
+  copies. The Studio resume risk was taken on the audit's reading, not traced.
+- Left in place, unreferenced but public: `LICENSE_CHOICES`, `build_readme`,
+  `default_repo_id`, `wait_cluster_job`, `require_base_repo`.
+- `frontend/scripts/discordAnnounce.mjs` still says "Update & restart".
+
 ## Profile switch and responsiveness (2026-11-08)
 
 Uncommitted on `main`, from base `4496f2f1d`, pending operator sign-off. Tests,
