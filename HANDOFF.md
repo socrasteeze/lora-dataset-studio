@@ -763,4 +763,15 @@ On 2026-11-11, upstream's default branch was v2 at 18e60494c8396f909fe7eed3b15a6
 | --- | --- |
 | ea1c60bc4, 18e60494c | REJECT. README sections for the paid member edition: member-only features and plugins, Patreon-linked updates, cloud training and the online prompt library (support-wording skip and Divergences 4 and 12). None of it exists in the fork. |
 
-Decision: nothing ported; this record is the only change. A later review starts after `18e60494c`.
+Decision: nothing ported; this record is the only change. The next review (2026-11-12, below) started after `18e60494c`.
+
+On 2026-11-12, upstream's default branch was v2 at a80b1f5e6. v1 remained 3fe3d4f0e29e28de583a6e22bce886c35e5ecd3f. The review started after 18e60494c (an ancestor of the new head) on fork `main` at 3d749f10f. The window has 5 commits. No new upstream branches.
+
+| Upstream commits | Class and evidence |
+| --- | --- |
+| 51eaf64d6 | PORT, as `84d8f7148`. Werkzeug 3.1.8 to 3.1.9 (GHSA-g6x2-hccm-hh4m, Windows `safe_join` device names) and the dev baseline's setuptools 84.0.0 to 84.1.0 with its contract test. `start.bat`'s hash-gated pip installs the new Werkzeug on the next launch. |
+| 1431c219c | PORT, as `80b747d6c`. vite 6.4.3 to 6.4.5 and patched transitive packages in `frontend/` and `sdk/frontend/`, lockfile-only otherwise. `npm run build` output is byte-identical to the committed `frontend/dist`. |
+| 14f9285f5 | REJECT. Pillow and filelock for `store/tools`, the catalog-signing operator environment; the fork has no `store/` (Divergence 12). |
+| dae183d7e, a80b1f5e6 | REJECT. README restructure and tool catalog for upstream's edition, with member sections; the fork keeps its own README. |
+
+Decision: 2 ports. Tests were not authorized for this run. Passed: `ruff check .`, ESLint 0 errors, `npm run build` (bundle unchanged), attribution and identity scans. Not run: pytest (including the changed `test_dev_requirements_contract.py`), `node --test`, `npm test`, responsive probes, `scripts/gates.ps1`, cloud Gates. Landed on `main` without Gates, following the owner's 2026-11-09 instruction. Do not merge upstream/v1 or upstream/v2. A later review starts after `a80b1f5e6`.
