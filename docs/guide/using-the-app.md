@@ -919,7 +919,7 @@ most images, least triaged) and remembers your choice between visits.
 **You can curate while a pass is running.** Opening another bank and accepting or
 rejecting images while a scan — or the whole Launch-all queue — is working is
 supported and safe. If a save happens to land at the exact moment a pass is
-writing, the app waits and replays it for you; in the rare case it still can't
+writing, the Bank waits and replays it for you; in the rare case it still can't
 get through you'll see "the database is busy try again in a moment", and
 clicking again is all it takes. Your decision is never partially applied.
 

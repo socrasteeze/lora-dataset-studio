@@ -115,13 +115,17 @@ export const CONNECTION_BACK_MESSAGE = 'Back online.';
  */
 export async function apiFetch(url, options = {}) {
   const { background = false, ...init } = options;
+  // `replay: false` opts a request out of the db_busy replay below: a route
+  // that queues jobs one commit at a time would queue the first ones twice.
+  const replay = init.replay !== false;
+  delete init.replay;
   let res;
   try {
     res = await fetchWithCsrfRetry(url, init);
     // Replayed here, not in the raw transport: its direct callers include
     // posts that change files before the failing commit (rotate, mirror), and
     // a replay would repeat that. A poll is not replayed; its next tick is.
-    for (let i = 0; !background && i < DB_BUSY_RETRIES && await isDbBusy(res); i += 1) {
+    for (let i = 0; replay && !background && i < DB_BUSY_RETRIES && await isDbBusy(res); i += 1) {
       await sleep(DB_BUSY_BACKOFF_MS * (i + 1));
       res = await fetchWithCsrfRetry(url, init);
     }

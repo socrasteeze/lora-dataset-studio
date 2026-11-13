@@ -225,7 +225,7 @@ The final check runs before the launch, not during it. Near-duplicate pairs are 
 
 ### No GPU? Then no training here
 
-Training runs on this machine's own GPU. **This fork has no rented-GPU lane** — upstream ships one, and it is removed here on purpose. Everything before training works with no GPU at all, and **Settings → Devices** can send generation and the Image Bank's analysis passes to another machine on your network, but a training run is always launched on the Primary's own card.
+Training runs on this machine or on another machine on your own network. **This fork has no rented-GPU lane** — upstream ships one, and it is removed here on purpose. Everything before training works with no GPU at all, and **Settings → Devices** can send generation and the Image Bank's analysis passes to another machine on your network, but nothing is ever sent to a rented or cloud GPU.
 
 If this machine has no suitable card, train the LoRA elsewhere and bring the `.safetensors` back: the Test Studio, the Canvas and every export lane work on a checkpoint this app did not produce.
 

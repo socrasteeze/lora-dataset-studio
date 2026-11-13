@@ -126,7 +126,7 @@ def test_write_with_retry_gives_up_on_a_real_fault(app, monkeypatch):
 
 def test_a_lost_write_race_is_a_retryable_503_not_a_500(client, bank, monkeypatch):
     """The last resort: every replay lost. The user must get an honest, machine-
-    readable 'try again' (the SPA replays it) — never an opaque server error."""
+    readable 'try again' (foreground requests on the shared client replay it) — never an opaque server error."""
     monkeypatch.setattr('app.utils.dbbusy.time.sleep', lambda _s: None)
     monkeypatch.setattr(banks, 'write_with_retry',
                         lambda _fn, **_kw: (_ for _ in ()).throw(_locked()))
@@ -266,7 +266,7 @@ def test_a_contended_peer_heartbeat_is_retried_not_lost(app, monkeypatch):
     did not. That asymmetry is most of "I queued jobs and nothing ran for an
     hour": peer_worker calls raise_for_status(), so the db_busy 503 raised
     under contention sets _connected = False and makes the peer skip that
-    tick's job pull entirely. The SPA replays a 503; the peer does not.
+    tick's job pull entirely. The SPA replays a foreground 503 on the shared client; the peer does not.
 
     The observed spacing in the wild was exactly 20 s — the 15 s busy_timeout
     plus peer_worker's 5 s error backoff — which is what identified this.

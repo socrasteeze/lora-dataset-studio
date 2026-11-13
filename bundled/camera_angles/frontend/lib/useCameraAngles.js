@@ -25,7 +25,7 @@ export function useCameraAngles() {
   const toast = useToast();
   return useCallback(async (imageId, poses) => {
     try {
-      const d = await postJson(`/api/canvas/image/${imageId}/camera`, { poses });
+      const d = await postJson(`/api/canvas/image/${imageId}/camera`, { poses }, { replay: false });
       if (!d?.ok) {
         toast.error(d?.error || 'Could not queue the camera views');
         return false;

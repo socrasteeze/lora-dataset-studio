@@ -93,6 +93,10 @@ test('a foreground db_busy 503 is replayed; a poll, the raw transport and any ot
   assert.equal(calls, 1);
 
   calls = 0;
+  await assert.rejects(postJson('/api/canvas/image/1/camera', {}, { replay: false }), /busy/);
+  assert.equal(calls, 1);
+
+  calls = 0;
   assert.equal((await fetchWithCsrfRetry('/api/dataset/1/rotate', { method: 'POST' })).status, 503);
   assert.equal(calls, 1);
 

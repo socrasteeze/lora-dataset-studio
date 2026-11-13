@@ -15,7 +15,8 @@ lost. Two layers fix that:
   re-issue ``commit()``. That's why this takes a callable.
 * ``is_locked_error`` + the app-level handler in ``create_app`` — the last
   resort: an honest, retryable 503 (``db_busy``) instead of a 500, which the
-  front-end replays transparently.
+  front-end replays only for foreground requests on the shared client
+  (``apiFetch``); the Dataset workspace and background polls do not.
 
 Neither layer replaces the real rule: a background pass must never hold the
 write transaction open across slow non-DB work (GPU calls, folder walks, numpy).

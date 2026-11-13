@@ -7,7 +7,6 @@ paths:
 # Release mechanics
 
 Releases are cut on validated waves only — never per commit.
-Announcements tell users to "Update & restart".
 
 - `release.yml` rebuilds `frontend/dist` and only warns when it differs from
   the committed build; it does not block the release. Commit a fresh build

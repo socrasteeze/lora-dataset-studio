@@ -595,7 +595,7 @@ def heartbeat(device: ClusterDevice, capabilities_blob: dict | None = None,
     under contention sets _connected = False and makes the peer skip that
     tick's job pull entirely. That is most of "I queued jobs and nothing ran
     for an hour": one contended write per 20 s took the second machine off the
-    board. The SPA replays a db_busy 503; the peer does not.
+    board. The SPA replays a foreground db_busy 503 on the shared client; the peer does not.
 
     Re-runnable by construction — three assignments from arguments, no reads.
     """

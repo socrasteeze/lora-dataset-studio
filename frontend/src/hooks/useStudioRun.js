@@ -71,7 +71,7 @@ export function useStudioRun(runId) {
   const resume = useCallback(async () => {
     if (!runId) return undefined;
     try {
-      const d = await postJson(`/api/studio/run/${runId}/resume`);
+      const d = await postJson(`/api/studio/run/${runId}/resume`, undefined, { replay: false });
       if (d.ok) toast.success(`${d.resumed} cell(s) restarted with their settings`);
       else toast.error(d.error);
       return d;

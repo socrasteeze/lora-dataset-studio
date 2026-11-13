@@ -9,10 +9,8 @@ paths:
 Update `docs/guide/settings-reference.md` when a setting is added or changes
 meaning.
 
-**README — at every release, not "at milestones".** "Milestone" was never
-defined, so it meant never: seven features shipped in one day while the README
-still described the app as it was that morning, and one line promised a
-capability the app does not have. Two questions, every time:
+**README — at every release.** A looser trigger lets the README drift until
+it promises something the app does not do. Two questions, every time:
 
 - does a section now describe something **that is no longer true**? (a changed
   default, a renamed action, a capability that moved) — that is a debt, not a

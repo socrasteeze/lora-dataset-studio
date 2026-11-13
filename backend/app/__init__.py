@@ -938,8 +938,9 @@ def create_app(config_object=None):
 
         It used to reach the browser as a bare 500 ("unable to complete action")
         while a bank pass was running — the click was lost and nothing said it
-        could simply be retried. Answer 503 + ``db_busy`` instead, so the SPA
-        replays it transparently (see fetchClient) and, if the replays also lose,
+        could simply be retried. Answer 503 + ``db_busy`` instead, so foreground
+        requests on the shared client replay it (see fetchClient apiFetch; the
+        Dataset workspace and background polls do not) and, if the replays also lose,
         the user reads a sentence that tells them what happened. Any other
         OperationalError is a real fault and keeps its 500.
         """
