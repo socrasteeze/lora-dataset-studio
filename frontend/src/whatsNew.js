@@ -209,6 +209,12 @@ export const WHATS_NEW = [
     to: '/bank',
   },
   {
+    id: '2026-11-15-zzz-studio-runs-the-lora-you-pick', date: '2026-11-15',
+    title: 'The Studio runs the LoRA you pick',
+    blurb: 'LDS no longer refuses a LoRA because of the model family it reads in the file. Krea 2 LoRAs saved in the kohya naming were turned away as "SDXL" although ComfyUI loads them; they are now recognized, and no LoRA is refused on that reading, in a test or at import. A file that reads as another family keeps a warning badge, nothing more.',
+    to: '/studio',
+  },
+  {
     id: '2026-11-12-pillow-13-python-3-11', date: '2026-11-12',
     title: 'Image decoding security update, on Python 3.11 or newer',
     blurb: 'LDS now runs Pillow 13 and filelock 4.2, which fix the security advisories filed against image decoding and file locking. Both need Python 3.11 or newer. If your .venv is still on Python 3.10, start.bat rebuilds it on Python 3.11 or 3.12 and keeps datasets, settings and the Image Bank; optional ML extras installed in the old environment are installed again from Setup. Installed plugins keep working.',
