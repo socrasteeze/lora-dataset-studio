@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-18-bank-navigation', date: '2026-11-18',
+    title: 'Images Load First',
+    blurb: 'When you open a Bank, the first page of images gets priority over the statistics. The Bank list also loads all card previews together.',
+    to: '/bank',
+  },
+  {
     id: '2026-11-18-import-bank-caption-files', date: '2026-11-18',
     title: 'Bank captions you already wrote in .txt files stay yours',
     blurb: 'Import captions, in the Bank passes panel, copies a same-name .txt file into an empty bank caption and treats it as one you wrote. A later Caption or Re-caption leaves it alone. A caption already in the bank is not replaced, and the .txt file itself is never changed.',

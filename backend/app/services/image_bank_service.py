@@ -55,7 +55,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from PIL import Image, ImageOps
-from sqlalchemy import and_, case, func, literal, or_, select, text, update
+from sqlalchemy import JSON, and_, case, func, literal, or_, select, text, type_coerce, update
 
 from .. import config as cfg
 from ..generation_limits import improve_timeout_seconds
@@ -3713,8 +3713,10 @@ def list_banks(user_id, dataset_id=None) -> list:
             .group_by(BankImage.bank_id).all())
     }
     out = []
-    for bank in (ImageBank.query.filter_by(user_id=user_id)
-                 .order_by(ImageBank.created_at.desc()).all()):
+    cards = (db.session.query(ImageBank, _card_preview_ids())
+             .filter(ImageBank.user_id == user_id)
+             .order_by(ImageBank.created_at.desc()).all())
+    for bank, preview_ids in cards:
         row = {
             'id': bank.id, 'instance_id': bank.instance_id,
             'name': bank.name, 'source_path': bank.source_path,
@@ -3722,7 +3724,7 @@ def list_banks(user_id, dataset_id=None) -> list:
             'created_at': bank.created_at.isoformat() if bank.created_at else None,
             **counters.get(bank.id, {'total': 0, 'keep': 0, 'reject': 0,
                                      'scanned': 0, 'last_added_at': None}),
-            'preview_ids': _preview_ids(bank.id),
+            'preview_ids': preview_ids,
             'activity': bank_jobs.get(bank.id),
             'queue_state': bank_queue.state_for(bank.id),
             # Opted out of name grouping. Exactly one field — the grouping RULE
@@ -3828,6 +3830,10 @@ def bank_pass_coverage(user_id, bank_ids=None) -> dict:
         func.lower(func.substr(_relpath_posix_col(), 1, func.length(prefix) + 1))
         == func.lower(prefix.concat('/')),
     ).correlate(ImageBank, BankImage).exists()
+    # Skip the correlated JSON subquery when no folders are excluded.
+    hidden_row = case(
+        (or_(ImageBank.excluded_folders.is_(None), ImageBank.excluded_folders == '[]'), False),
+        else_=hidden_row)
 
     def _base():
         q = (db.session.query(BankImage.bank_id,
@@ -3986,18 +3992,16 @@ def _promotable_counts(user_id, dataset_id) -> dict | None:
 PREVIEW_COUNT = 5
 
 
-def _preview_ids(bank_id, limit=PREVIEW_COUNT) -> list:
-    """The first few image ids of a bank, for the card's thumbnail strip.
-    Ordered by id (= inventory order), so the strip is STABLE across reloads —
-    and rejected shots are skipped so a triaged bank doesn't advertise its
-    discards. Kept images are deliberately NOT promoted to the front: most banks
-    sit at zero keeps for their whole life, and re-ordering the strip as the user
-    triages would make the card flicker under them. One query per bank, so the
-    whole page still costs a single HTTP request."""
-    rows = (BankImage.query.with_entities(BankImage.id)
-            .filter(BankImage.bank_id == bank_id, BankImage.status != 'reject')
-            .order_by(BankImage.id.asc()).limit(limit).all())
-    return [r[0] for r in rows]
+def _card_preview_ids():
+    """Put each card's first non-rejected IDs in the Bank list statement."""
+    # Keep the limit inside the correlated read to stop at the fifth preview.
+    # ID order keeps the strip stable across triage.
+    rows = (select(BankImage.id)
+            .where(BankImage.bank_id == ImageBank.id, BankImage.status != 'reject')
+            .order_by(BankImage.id).limit(PREVIEW_COUNT)
+            .correlate(ImageBank).subquery())
+    ids = select(func.json_group_array(rows.c.id)).scalar_subquery()
+    return type_coerce(ids, JSON).label('preview_ids')
 
 
 # --- free-text matching (the search bar, and its inverse) --------------------

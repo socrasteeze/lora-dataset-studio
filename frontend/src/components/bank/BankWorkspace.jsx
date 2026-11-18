@@ -696,11 +696,14 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     const controller = new AbortController()
     setPayload(null); setSubfolders([]); setTagFacets(null)
     setStatsError(false); setMetadataError(false)
-    fullPayloadAt.current = 0
+    // The activity poll can run while the initial grid is still loading.
+    fullPayloadAt.current = Date.now()
     refreshMetadata({ signal: controller.signal, background: true })
-    refreshPayload({ signal: controller.signal, background: true })
     refreshImages(f).then(async (loaded) => {
-      if (dropped || !loaded) return
+      if (dropped) return
+      // Give the first grid request priority over the bank-wide aggregates.
+      refreshPayload({ signal: controller.signal, background: true })
+      if (!loaded) return
       try {
         const sync = await apiFetch(`/api/bank/${bankId}/folder-sync`, { background: true })
         if (dropped) return

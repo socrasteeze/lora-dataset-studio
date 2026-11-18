@@ -443,14 +443,15 @@ def test_bank_cards_share_counter_query_and_keep_existing_scopes(app, tmp_path):
         ])
         db.session.commit()
         cards, query_count = _count_image_queries(db.engine, lambda: banks.list_banks(_uid()))
-        # One pass-coverage read, one counters read, one preview per owned bank.
-        assert query_count == 4
+        # Pass coverage, counters, and one Bank list query including previews.
+        assert query_count == 3
         by_id = {card['id']: card for card in cards}
         assert set(by_id) == {owned.id, empty.id}
         assert {key: by_id[owned.id][key] for key in ('total', 'keep', 'reject', 'scanned')} == {
             'total': 3, 'keep': 1, 'reject': 1, 'scanned': 1,
         }
         assert all(by_id[empty.id][key] == 0 for key in ('total', 'keep', 'reject', 'scanned'))
+        assert by_id[empty.id]['preview_ids'] == []
         assert by_id[owned.id]['preview_ids'] == [
             row.id for row in BankImage.query.filter(
                 BankImage.bank_id == owned.id, BankImage.status != 'reject').order_by(BankImage.id)]

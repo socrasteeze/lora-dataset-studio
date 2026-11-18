@@ -895,10 +895,18 @@ Contributing factors:
 - The UI polls queue/activity/stats endpoints often (extra load, minor).
 
 ### Tasks
+
+First pass on `noble/bank-navigation-speed`: card previews now use the Bank list
+statement with a limit of five per bank. Pass coverage skips the hidden-folder
+JSON lookup when no exclusions are set. Bank detail starts its initial statistics
+request after the first image request settles. The full statistics query and
+coverage advice still need profiling. The frontend build and targeted lint passed.
+Runtime checks, regression tests and endpoint timings remain open.
+
 1. [ ] Checkpoint the WAL (`PRAGMA wal_checkpoint(TRUNCATE)`) after bulk writes (caption import, scans, pipeline runs), and on startup when the WAL is large.
 2. [ ] Raise the SQLite connection cache (`PRAGMA cache_size`, e.g. 64-256 MB) and consider `mmap_size` and `temp_store=MEMORY`.
 3. [ ] Add a composite index on `bank_image (bank_id, status, id)`. Check whether coverage queries need another covering index, and confirm with `EXPLAIN QUERY PLAN`.
-4. [ ] Replace the per-bank `_preview_ids` loop with one batched query, e.g. a window function with `ROW_NUMBER() OVER (PARTITION BY bank_id ORDER BY id)`.
+4. [x] Fetch the first five non-rejected preview IDs per bank in the list statement. Preserve inventory order and empty previews.
 5. [ ] Cache or precompute bank-list counters and pass coverage, either stored per bank and updated on write or kept in memory with invalidation, so the bank list doesn't scan every row on each visit.
 6. [ ] Take the per-row `json_each` hidden-folder check out of the bank-list path, or precompute it.
 7. [ ] Large banks: make `bank_payload()` return a fast first paint and load heavy aggregates lazily or in a second request.
