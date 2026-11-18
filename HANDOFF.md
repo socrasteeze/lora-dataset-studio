@@ -1,5 +1,48 @@
 # HANDOFF
 
+## Plan: bank-native training and the LoRA archive (2026-11-17)
+
+Planning only. No code changed. Owner decisions from 2026-11-17. Build each phase through
+the usual Codex build (sol, xhigh), one phase per run.
+
+Goal: one app. Banks are the workspace; AI Toolkit (ATK) runs headless underneath, the way a
+UI drives a ComfyUI backend; the Datasets page becomes the archive of finished LoRAs.
+
+Phase 1, train from a bank (no Bank to Dataset conversion, no copies):
+1. Add a bank entry point to the existing training code (`backend/app/routes/training.py`,
+   `services/aitoolkit_remote.py`). Reuse its progress, sample, checkpoint and best-epoch plumbing.
+2. ATK reads the bank's own image and caption files in place. When a bank needs filtering
+   (an excluded subfolder or outfit), build a file list or link folder, never copy images.
+3. A Train button and status badge on bank cards (Not trained, Queued, step N/M, Done vN), plus a
+   Train panel: ATK recipe (`AtkRecipeDialog.jsx` presets), key settings, readiness check
+   (15+ images, all captioned, consistent trigger), Queue or Start.
+4. Built-in rules: repeats capped at 4; 80+ images default to 2000 steps at batch 4.
+5. Training page listing every ATK job, including jobs created outside LDS, matched back to a bank
+   by job name: progress, ETA, live samples, log, stop and requeue.
+6. Start the ATK server if it is not running. Never restart it while a job runs.
+
+Phase 2, the Datasets page as the LoRA archive:
+1. "Archive" on a finished bank run snapshots: training images and captions, the kept LoRA file,
+   the recipe and settings, and about 10 showcase images (varied poses, prompts, styles,
+   compositions; generated through the image backend or picked by hand).
+2. The archive is the same zip format the Datasets page already imports, so a retrain on another
+   machine or a new architecture is an import. The existing curator edits archive copies only.
+3. Gallery view: one card per archived LoRA (showcase grid, trigger, base model, train date, links).
+   Working LoRAs stay in the model manager; this is the record that survives bank or disk cleanup.
+4. Storage target: an archive HDD plus a NAS clone (paths come from settings, not code).
+
+Decisions:
+- Keep ATK's job server as the backend over embedding its trainer directly. Its UI, the ATK fork
+  and outside job tools keep working, and LDS does not have to own GPU queueing or crash recovery.
+- Add bank training beside dataset training over rewiring upstream's Datasets flow. New code
+  merges cleanly on upstream syncs; edits to upstream screens would conflict every time.
+- Repurpose Datasets as the archive over hiding it. Its import, export and curator already fit.
+- Upstream's one-click ATK installer (7 commits, see the carried-forward review) stays skipped.
+  It only installs ATK; job control already exists here.
+
+Open: confirm whether the current progress view shows a loss graph. Phase 1 adds one if missing.
+Traps: no host paths or names in code; delete nothing in banks; never restart ATK mid-job.
+
 ## Dead-code cleanup and busy-click retry (2026-11-12)
 
 Six commits from base `00e8a978a`. No tests, probes or CI ran, by repository rule,
