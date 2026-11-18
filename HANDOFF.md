@@ -870,3 +870,43 @@ On 2026-11-16, upstream's default branch was v2 at 24f366ded773d73d44a2f30ce7e4b
 | ce120c079 | REJECT. Release bump; the fork keeps its own version. |
 
 Decision: no ports this run; review record only, on `main`. Checks: `git` inspection and a trial pick of `657078e0b` on a discarded task branch. No tests, lint or build were needed for a documentation-only change. Do not merge upstream/v1 or upstream/v2. A later review starts after `24f366ded`.
+
+## Performance: bank navigation speed (added 2026-11-18)
+
+### Problem
+Navigating the bank tabs is slow and laggy. The app process itself is healthy (low CPU, plenty of RAM, empty queues). The lag comes from SQLite reads on a large database (~1.5 GB, ~448k `bank_image` rows, ~634 banks).
+
+Measured on localhost:
+- `GET /api/banks` (bank list): 40 s on the first call, then 3.5 s on every later call (920 KB payload).
+- `GET /api/bank/<id>/coverage` on a 175k-image bank: 26 s.
+- `GET /api/bank/<id>` on the same bank: 11-13 s, even with `?sync=0&runtime=0`.
+- `GET /api/capabilities`: 4 s on the first call.
+- Small banks and queue/stats polling: under 100 ms (not the cause).
+
+Contributing factors:
+- The WAL grows large after bulk caption writes (194 MB seen) and isn't checkpointed.
+- SQLite cache is at the default `cache_size=-2000` (about 2 MB).
+- `list_banks()` runs `bank_pass_coverage()` over every row: 8 `SUM(CASE ...)` markers plus a correlated `json_each` hidden-folder check per row.
+- `list_banks()` runs a second `GROUP BY bank_id` aggregate with status/quality sums and `max(created_at)`.
+- `list_banks()` makes one `_preview_ids` query per bank (N+1, about 634 queries).
+- There is no composite index for status/coverage scans. Existing indexes are on `bank_id` and `status` separately, so scans read the wide rows, caption text included.
+- `bank_payload()` runs about 60 full aggregates per bank on first paint.
+- `coverage()` loads every caption in a bank into Python.
+- The UI polls queue/activity/stats endpoints often (extra load, minor).
+
+### Tasks
+1. [ ] Checkpoint the WAL (`PRAGMA wal_checkpoint(TRUNCATE)`) after bulk writes (caption import, scans, pipeline runs), and on startup when the WAL is large.
+2. [ ] Raise the SQLite connection cache (`PRAGMA cache_size`, e.g. 64-256 MB) and consider `mmap_size` and `temp_store=MEMORY`.
+3. [ ] Add a composite index on `bank_image (bank_id, status, id)`. Check whether coverage queries need another covering index, and confirm with `EXPLAIN QUERY PLAN`.
+4. [ ] Replace the per-bank `_preview_ids` loop with one batched query, e.g. a window function with `ROW_NUMBER() OVER (PARTITION BY bank_id ORDER BY id)`.
+5. [ ] Cache or precompute bank-list counters and pass coverage, either stored per bank and updated on write or kept in memory with invalidation, so the bank list doesn't scan every row on each visit.
+6. [ ] Take the per-row `json_each` hidden-folder check out of the bank-list path, or precompute it.
+7. [ ] Large banks: make `bank_payload()` return a fast first paint and load heavy aggregates lazily or in a second request.
+8. [ ] Large banks: make `coverage()` use stored pass coverage and page or sample captions instead of loading all of them.
+9. [ ] Reduce UI polling frequency, or skip polling while the tab is hidden or idle.
+10. [ ] Add a regression check: time `/api/banks` and the largest bank's payload and coverage, and record before/after numbers.
+
+### Done when
+- `GET /api/banks` returns in under 500 ms warm and under 2 s cold.
+- Opening the largest bank paints in under 1 s, with coverage under 3 s.
+- No change to caption content, statuses, or files on disk.
