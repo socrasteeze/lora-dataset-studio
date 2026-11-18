@@ -37,6 +37,7 @@ import itertools
 import logging
 import math
 import os
+import stat
 import random
 import re
 import shutil
@@ -13297,6 +13298,148 @@ def set_image_caption(user_id, bank_id, image_id, caption, *,
     caption_sidecar.sync_bank_caption_sidecar(
         bank, relpath=stored_relpath, caption=stored_caption, image_id=stored_id)
     return {'caption': stored_caption or '', 'caption_origin': stored_origin}
+
+
+# Same byte cap the dataset zip reader uses for a same-stem .txt. Larger than
+# CAPTION_MAX_CHARS, so a normal caption fits and a huge file is refused whole
+# instead of being loaded.
+_SIDECAR_IMPORT_MAX_BYTES = 64 * 1024
+
+
+def _empty_sidecar_import_counts():
+    return {'filled': 0, 'skipped': 0, 'missing': 0, 'blank': 0,
+            'errors': 0, 'busy': 0, 'banks': 0}
+
+
+def _contained_sidecar(base, image_path):
+    """The sidecar next to ``image_path``, or None when it leaves ``base``.
+
+    Same containment rule as ``_abs_under``: the resolved path must sit strictly
+    inside the bank folder. A symlink whose target is outside is refused here,
+    before anything opens it.
+    """
+    sidecar = os.path.realpath(caption_sidecar.sidecar_path_for(image_path))
+    if os.path.normcase(sidecar).startswith(os.path.normcase(base + os.sep)):
+        return sidecar
+    return None
+
+
+def _read_import_sidecar(path):
+    """``(status, text)`` for one contained sidecar. Never writes.
+
+    ``status`` is ``ok``, ``missing``, ``blank`` or ``error``. ``text`` is the
+    ``sidecar_text`` normalization, and only on ``ok``.
+    """
+    try:
+        if not os.path.lexists(path):
+            return 'missing', ''
+        info = os.stat(path)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > _SIDECAR_IMPORT_MAX_BYTES:
+            return 'error', ''
+        with open(path, 'rb') as handle:
+            raw = handle.read(_SIDECAR_IMPORT_MAX_BYTES + 1)
+    except OSError:
+        return 'error', ''
+    if len(raw) > _SIDECAR_IMPORT_MAX_BYTES:
+        return 'error', ''
+    try:
+        text = caption_sidecar.sidecar_text(raw.decode('utf-8-sig'))
+    except UnicodeDecodeError:
+        return 'error', ''
+    if not text:
+        return 'blank', ''
+    return 'ok', text
+
+
+def _import_one_bank_caption_sidecars(bank):
+    """Fill empty captions on ``bank`` from same-stem ``.txt`` files.
+
+    Reads sidecars. Writes only ``BankImage.caption`` and ``caption_origin``.
+    Does not call ``sync_bank_caption_sidecar`` and does not otherwise create,
+    rewrite or delete a ``.txt`` file.
+    """
+    from .face_dataset_service import _cap_caption
+    counts = _empty_sidecar_import_counts()
+    present = (BankImage.caption.isnot(None), BankImage.caption != '')
+    counts['skipped'] = (BankImage.query.filter_by(bank_id=bank.id)
+                         .filter(*present).count())
+    rows = (BankImage.query.filter_by(bank_id=bank.id)
+            .filter(or_(BankImage.caption.is_(None), BankImage.caption == ''))
+            .order_by(BankImage.id.asc())
+            .all())
+    base = os.path.realpath(bank.source_path)
+    for row in rows:
+        relpath = row.relpath
+        image_path = _abs_under(base, relpath) if relpath else None
+        sidecar = _contained_sidecar(base, image_path) if image_path else None
+        if sidecar is None:
+            counts['errors'] += 1
+            logger.warning('bank caption sidecar import: refused bank=%s image=%s',
+                           bank.id, row.id)
+            continue
+        status, text = _read_import_sidecar(sidecar)
+        if status != 'ok':
+            counts['errors' if status == 'error' else status] += 1
+            if status == 'error':
+                logger.warning(
+                    'bank caption sidecar import: unreadable bank=%s image=%s',
+                    bank.id, row.id)
+            continue
+        text = _cap_caption(text)
+        if not text:
+            counts['blank'] += 1
+            continue
+        caption_origin.stamp(row, text, caption_origin.ASSERTED)
+        counts['filled'] += 1
+    if counts['filled']:
+        db.session.commit()
+    counts['banks'] = 1
+    return counts
+
+
+@_serialized_bank_mutation('caption_import')
+def import_bank_caption_sidecars(user_id, bank_id, *, _bank_lease=None):
+    """Import sidecars for one bank. ``ValueError`` when the bank is unknown."""
+    bank = get_bank(user_id, bank_id)
+    if bank is None:
+        raise ValueError('bank not found')
+    try:
+        return _import_one_bank_caption_sidecars(bank)
+    except Exception:
+        db.session.rollback()
+        raise
+
+
+def import_caption_sidecars(user_id, bank_id=None):
+    """Import same-stem caption files for one bank, or for every bank of the user.
+
+    ``bank_id`` None walks every bank. A bank that already has a running pass is
+    counted as ``busy`` and left untouched. The return counts are ``filled``,
+    ``skipped`` (a caption was already stored), ``missing``, ``blank``,
+    ``errors``, ``busy`` and ``banks``.
+    """
+    if bank_id is not None:
+        return import_bank_caption_sidecars(user_id, bank_id)
+    totals = _empty_sidecar_import_counts()
+    bank_ids = [row.id for row in
+                ImageBank.query.filter_by(user_id=user_id)
+                .order_by(ImageBank.id.asc())]
+    for one_id in bank_ids:
+        try:
+            one = import_bank_caption_sidecars(user_id, one_id)
+        except bank_jobs.BankJobBusy:
+            totals['busy'] += 1
+            continue
+        except Exception:
+            db.session.rollback()
+            logger.warning('bank caption sidecar import failed bank=%s', one_id,
+                           exc_info=True)
+            totals['errors'] += 1
+            continue
+        for key in ('filled', 'skipped', 'missing', 'blank', 'errors'):
+            totals[key] += one[key]
+        totals['banks'] += 1
+    return totals
 
 
 def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None,

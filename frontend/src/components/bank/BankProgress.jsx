@@ -113,7 +113,8 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
             : ({ scan: 'Quality scan', faces: 'Face pass', score: 'Scoring pass',
               semantic_index: 'Semantic index',
               semantic_dedup: 'Crops & variants', watermark: 'Watermark scan',
-              framing: 'Framing pass', caption: 'Captioning', promote: 'Promotion',
+              framing: 'Framing pass', caption: 'Captioning',
+              caption_import: 'Importing captions', promote: 'Promotion',
               medium: 'Medium pass', angles: 'Measuring head angles',
               // The longest pass in the app (one GPU render per image). A run
               // that costs an hour must not sit under the anonymous fallback.

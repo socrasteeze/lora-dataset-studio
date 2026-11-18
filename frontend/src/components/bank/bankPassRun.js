@@ -60,6 +60,7 @@ export const JOB_LABELS = {
   medium: 'Medium pass',
   angles: '⤢ Angle measurement',
   caption: 'Captioning',
+  caption_import: 'Import captions',
   promote: '⬆ Promotion',
   bank_promote: '⬆ Copy into a new bank',
   import: 'Import',

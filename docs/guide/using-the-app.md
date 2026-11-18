@@ -1865,6 +1865,14 @@ caption in the app leaves that file in place. A bank protected by **Read-only
 Source** writes no caption file. Turn **Write Bank caption files** off in
 Settings ▸ Captioning to keep captions in the database only.
 
+### Import captions already written beside the images
+
+**Import captions**, next to Caption in the passes panel, reads a same-name
+`.txt` file for each image whose bank caption is empty. The text is stored on
+that image and marked as written by you, so Caption and Re-caption leave it
+alone. A caption already stored in the bank is not replaced. The `.txt` file
+is only read: the import never writes, rewrites, or deletes it.
+
 ## Redo the captions of a bank with a different model
 
 🏷️ **Caption** skips images that already have a caption — which is what you want

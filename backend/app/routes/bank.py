@@ -559,6 +559,19 @@ def banks_bulk_delete():
     return _bulk_bank_response(results)
 
 
+@bp.post('/banks/caption-sidecars')
+def banks_import_caption_sidecars():
+    """Copy same-stem ``.txt`` captions into every empty bank caption.
+
+    Reads the files. Writes only the database. A bank that is busy is counted
+    and skipped. See ``import_caption_sidecars``."""
+    try:
+        result = banks.import_caption_sidecars(LOCAL_USER)
+    except bank_jobs.BankJobBusy as e:
+        return _busy(e)
+    return jsonify({'ok': True, **result})
+
+
 @bp.post('/bank/<int:bank_id>/relocate')
 def bank_relocate(bank_id):
     """Point a bank at a new folder after the user moved it (another disk, a
@@ -1380,6 +1393,25 @@ def bank_image_caption(bank_id, image_id):
         return jsonify({'error': str(e)}), 400
     if result is None:
         return jsonify({'error': 'not found'}), 404
+    return jsonify({'ok': True, **result})
+
+
+@bp.post('/bank/<int:bank_id>/caption-sidecars')
+def bank_import_caption_sidecars(bank_id):
+    """Copy same-stem ``.txt`` captions into this bank's empty captions.
+
+    A caption already stored is left as it is. The ``.txt`` files are only
+    read. Imported text is stamped ``asserted``, so a later caption pass skips
+    it. 404 = unknown bank. 409 = a pass holds the bank."""
+    if banks.get_bank(LOCAL_USER, bank_id) is None:
+        return jsonify({'error': 'not found'}), 404
+    try:
+        result = banks.import_caption_sidecars(LOCAL_USER, bank_id)
+    except bank_jobs.BankJobBusy as e:
+        return _busy(e)
+    except ValueError as e:
+        msg = str(e)
+        return jsonify({'error': msg}), 404 if msg == 'bank not found' else 400
     return jsonify({'ok': True, **result})
 
 

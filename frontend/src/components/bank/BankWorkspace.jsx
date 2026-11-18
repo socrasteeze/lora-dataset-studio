@@ -1245,6 +1245,16 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     return runPass('faces', {})
   }
   const startCaption = (run) => runPass('caption', run, captionRunOptions())
+  const importCaptionSidecars = () => act(async () => {
+    const imported = await postJson(`/api/bank/${bankId}/caption-sidecars`, {})
+    const filled = Number(imported?.filled) || 0
+    const skipped = Number(imported?.skipped) || 0
+    const missing = Number(imported?.missing) || 0
+    toast.success(filled
+      ? `Imported ${filled} caption${filled === 1 ? '' : 's'} from .txt files. ${skipped} already had one, ${missing} had no file.`
+      : `No caption imported. ${skipped} already had one, ${missing} had no file.`)
+    return imported
+  })
   const changeReadOnly = async (readOnly) => {
     if (savingReadOnly || live) return
     if (!readOnly && !window.confirm('Turn off read-only protection?\n\nThis bank will allow source file deletion and new imports again.')) return
@@ -2222,7 +2232,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             passGate={passGate} passDevice={passDevice}
             tagsState={tagsState} tagsLabel={tagsButtonLabel(counts)}
             onPassDevice={setPassDevice} onPassDeviceObj={setPassDeviceObj}
-            onStartTags={startTags} onStartPixaiTags={startPixaiTags} />
+            onStartTags={startTags} onStartPixaiTags={startPixaiTags}
+            onImportCaptions={importCaptionSidecars} />
         </div>
       )}
 

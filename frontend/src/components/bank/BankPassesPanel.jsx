@@ -56,7 +56,7 @@ export default function BankPassesPanel({
   // at another machine, so the gate is passGate (which folds the peer's own
   // readiness in) and the picker rides with the buttons it governs.
   passGate, passDevice, tagsState, tagsLabel,
-  onPassDevice, onPassDeviceObj, onStartTags, onStartPixaiTags,
+  onPassDevice, onPassDeviceObj, onStartTags, onStartPixaiTags, onImportCaptions,
 }) {
   // Which Settings field this warning opens depends on the configured provider:
   // sending an LM Studio user to the Ollama model field is a dead end, in a
@@ -161,6 +161,10 @@ export default function BankPassesPanel({
                 ? `Caption the ${selected.size} selected image(s). Opens the window with the engine, model, register, length and scope.`
                 : `${captionScopeNote(selected.size, counts, captionScope)} Opens the window with the engine, model, register, length and scope.`)}>
               {captionButtonLabel(selected.size, counts, captionScope)}
+            </PassButton>
+            <PassButton onClick={onImportCaptions} disabled={live || !onImportCaptions}
+              title="Copy a same-name .txt file into each empty caption and mark it as written by you. Leaves stored captions and the files themselves unchanged.">
+              Import captions
             </PassButton>
             {/* ⤢ the opt-in angle backfill. Its own button and its own window, never
                 folded into 👥: it is hours of work on a big bank and nobody must pay
