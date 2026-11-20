@@ -154,7 +154,7 @@ reinforces each one with Qwen 2.1 (the default) or Krea 2. Turbo is on for
 Qwen 2.1. Turning Turbo off uses 25 steps, CFG 4, and the simple scheduler.
 That off path is untested.
 
-Open it from **Quick Set** on the Datasets page, or from Add images inside a
+Open it from **New Dataset > Quick Set** on the Datasets page, or from Add images inside a
 dataset. The run always creates a new dataset. A name that already exists is
 refused. The trigger word is stored on the dataset and is not written into the
 captions. Captions gain a view tag from the orbit position (front, side, back,
@@ -514,7 +514,7 @@ to the captions instead.
 
 ## Caption a folder outside LDS
 
-**Datasets ▸ Caption folder** writes Anima character booru tags for a folder of
+**Datasets ▸ Caption Folder** writes Anima character booru tags for a folder of
 images that LDS did not build. You do not need a dataset for it. Each caption is
 one line: your trigger word, then the tags, for example
 `trigger, 1girl, solo, ...`.

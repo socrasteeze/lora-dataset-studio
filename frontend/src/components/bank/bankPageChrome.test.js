@@ -23,7 +23,7 @@ test('create-row Name and Folder labels are gone, with aria-labels kept', () => 
 test('stale folder counts color Rescan Folders and do not print a notice', () => {
   assert.doesNotMatch(check, /Counts May Be Stale/)
   assert.doesNotMatch(check, /noticeClassName/)
-  assert.match(check, /note\.stale/)
+  assert.match(check, /note\?\.stale/)
   assert.match(check, /border-amber-400\/60/)
-  assert.match(check, /title=\{note\.text\}/)
+  assert.match(check, /title=\{note\?\.text\}/)
 })

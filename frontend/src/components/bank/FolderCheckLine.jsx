@@ -17,18 +17,16 @@ import { Button } from '../common/Controls.jsx'
  *
  * Freshness stays on the button title. When counts may lag, Rescan Folders
  * itself turns amber so the toolbar stays compact. */
-export default function FolderCheckLine({ banks, busy = false, onRescan, className = '' }) {
+export default function FolderCheckLine({ banks, busy = false, pending = false, onRescan, className = '' }) {
   const note = folderCheckNote(banks)
-  if (!note) return null
-  const staleClass = note.stale
+  if (!note && !pending) return null
+  const staleClass = note?.stale
     ? 'border-amber-400/60 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25'
     : ''
   return (
-    <div className="flex min-w-0 items-center gap-2">
-      <Button size="md" noShrink onClick={onRescan} disabled={busy}
-        title={note.text} className={`${className} ${staleClass}`.trim()}>
-        <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />{busy ? 'Checking Folders' : 'Rescan Folders'}
-      </Button>
-    </div>
+    <Button size="md" onClick={onRescan} disabled={busy || pending}
+      title={note?.text} className={`${className} ${staleClass}`.trim()}>
+      <RefreshCw aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />{busy ? 'Checking Folders' : 'Rescan Folders'}
+    </Button>
   )
 }

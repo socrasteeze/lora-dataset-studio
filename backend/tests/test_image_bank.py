@@ -225,9 +225,14 @@ def test_create_bank_validates_folder(client, tmp_path):
 
 def test_banks_list(client, tmp_path):
     bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': flat()})
+    cards = client.get('/api/banks?view=cards').get_json()
     data = client.get('/api/banks').get_json()
     assert [b['id'] for b in data['banks']] == [bank_id]
     assert data['banks'][0]['total'] == 1
+    assert cards['cards_only'] is True
+    assert [b['id'] for b in cards['banks']] == [bank_id]
+    assert cards['banks'][0]['preview_ids'] == data['banks'][0]['preview_ids']
+    assert {'total', 'pass_coverage', 'folder_sync'}.isdisjoint(cards['banks'][0])
 
 
 def test_banks_list_previews_are_capped_stable_and_skip_rejects(client, tmp_path):

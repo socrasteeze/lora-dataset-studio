@@ -3687,25 +3687,12 @@ def _load_pipeline_report(bank: ImageBank):
     return report
 
 
-def list_banks(user_id, dataset_id=None) -> list:
-    """Every bank of the user, newest first, with its triage counters, the ids
-    of its card preview images — and, when ``dataset_id`` is given, how many
-    kept images each bank would promote into THAT dataset (``promotable``).
-
-    The promotable counts ride along on purpose: the dataset-side bank chooser
-    used to ask /bank/<id>/promotable once per bank, so a library of 12 banks
-    cost 13 requests to open one panel. One grouped query answers them all."""
-    promotable = _promotable_counts(user_id, dataset_id) if dataset_id is not None else None
-    # One aggregate for every bank and every pass. Same reason the promotable
-    # counts ride along: per-bank it would be banks × passes COUNT(*)s to render
-    # one list.
-    coverage = bank_pass_coverage(user_id)
-    # Four per-card counters share one grouped read across this user's banks.
-    # Keep the existing inventory scope, including hidden rows, on these cards.
+def _bank_list_counters(user_id):
+    """Get inventory counters, including hidden rows, in one grouped read."""
     def _iso(value):
         return value.isoformat() if hasattr(value, 'isoformat') else (str(value) if value else None)
 
-    counters = {
+    return {
         bank_id: {'total': int(total), 'keep': int(kept or 0),
                   'reject': int(rejected or 0), 'scanned': int(scanned or 0),
                   'last_added_at': _iso(last_added)}
@@ -3720,6 +3707,17 @@ def list_banks(user_id, dataset_id=None) -> list:
             .filter(ImageBank.user_id == user_id)
             .group_by(BankImage.bank_id).all())
     }
+
+
+def list_banks(user_id, dataset_id=None, *, cards_only=False) -> list:
+    """List cards newest first. Full reads add counts, coverage and promotion totals.
+
+    The initial card read only needs Bank metadata and a bounded preview lookup.
+    Dataset promotion still gets the exact count for each bank in one request.
+    """
+    promotable = _promotable_counts(user_id, dataset_id) if dataset_id is not None else None
+    coverage = {} if cards_only else bank_pass_coverage(user_id)
+    counters = {} if cards_only else _bank_list_counters(user_id)
     out = []
     cards = (db.session.query(ImageBank, _card_preview_ids())
              .filter(ImageBank.user_id == user_id)
@@ -3730,8 +3728,6 @@ def list_banks(user_id, dataset_id=None) -> list:
             'name': bank.name, 'source_path': bank.source_path,
             'read_only': bool(bank.read_only),
             'created_at': bank.created_at.isoformat() if bank.created_at else None,
-            **counters.get(bank.id, {'total': 0, 'keep': 0, 'reject': 0,
-                                     'scanned': 0, 'last_added_at': None}),
             'preview_ids': preview_ids,
             'activity': bank_jobs.get(bank.id),
             'queue_state': bank_queue.state_for(bank.id),
@@ -3745,11 +3741,13 @@ def list_banks(user_id, dataset_id=None) -> list:
             # queueing twelve banks overnight is precisely when nobody is
             # watching. Steps only; the full report stays in the workspace.
             'pipeline_report': _report_steps(bank),
-            # Per-pass coverage, so "what has this bank actually had done to it"
-            # is answerable without queueing anything to find out. Empty for a
-            # bank with no images rather than a fake all-complete.
-            'pass_coverage': coverage.get(bank.id, {}),
         }
+        if not cards_only:
+            row.update(counters.get(bank.id, {
+                'total': 0, 'keep': 0, 'reject': 0, 'scanned': 0,
+                'last_added_at': None,
+            }))
+            row['pass_coverage'] = coverage.get(bank.id, {})
         if promotable is not None:
             row['promotable'] = promotable.get(bank.id, 0)
         out.append(row)

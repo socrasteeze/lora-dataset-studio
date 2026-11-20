@@ -15,8 +15,7 @@
  * progress phrasing and summaries come from utils/fullBackup (pure, tested).
  */
 import { useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Download, FolderOpen, Loader2, Package, RefreshCw, Save, Tags } from 'lucide-react';
-import { HelpBadge } from '../../help/HelpMode';
+import { AlertTriangle, CheckCircle2, Download, FolderOpen, Loader2, Package, RefreshCw, Save } from 'lucide-react';
 import { btnClass } from '../common/controls';
 import {
   describeProgress, progressPercent, summarizeBackupResult, summarizeRestoreReport,
@@ -147,7 +146,7 @@ function RestoreOverlay({ job, onDismiss }) {
 
 const MENU_ITEM = 'w-full flex items-center gap-2 text-left px-2.5 py-1.5 rounded-md text-sm text-content hover:bg-surface-raised disabled:opacity-40';
 
-export default function FullBackupControls({ backup, onRestore, onCaptionFolder }) {
+export default function FullBackupControls({ backup, onRestore }) {
   const [includeLoras, setIncludeLoras] = useState(false);
   const menuRef = useRef(null);
   const restoreRef = useRef(null);
@@ -162,19 +161,19 @@ export default function FullBackupControls({ backup, onRestore, onCaptionFolder 
        * display:flex removes the native summary marker; items stay mounted because details only
        * hides their display.
        */}
-      <details ref={menuRef} className="relative">
+      <details ref={menuRef} className="min-w-0 lg:relative">
         <summary
           title="Back up the whole library, or import a backup archive"
-          className={`${btnClass({ size: 'md' })} cursor-pointer select-none`}>
+          className={`${btnClass({ size: 'md' })} w-full cursor-pointer select-none !px-1 !text-xs sm:!px-3 sm:!text-sm`}>
           {running
             ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
             : <Save aria-hidden="true" className="h-4 w-4" />}
           {/* The label itself carries the in-flight state, so a closed menu
               still says a backup is running. */}
-          <span className="hidden sm:inline">{running ? 'Backing up' : 'Backup'}</span>
-          <span aria-hidden className="text-content-subtle">⋯</span>
+          <span>{running ? 'Backing Up' : 'Backup'}</span>
+          <span aria-hidden="true" className="hidden text-content-subtle sm:inline">⋯</span>
         </summary>
-        <div className="absolute right-0 top-full mt-1 z-20 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-surface-overlay shadow-xl p-1.5 flex flex-col gap-0.5">
+        <div className="absolute inset-x-0 top-10 z-20 mt-1 flex flex-col gap-0.5 rounded-lg border border-border bg-surface-overlay p-1.5 shadow-xl lg:right-auto lg:top-full lg:w-80">
           {backup && (
             <>
               <button type="button" disabled={running}
@@ -205,18 +204,8 @@ export default function FullBackupControls({ backup, onRestore, onCaptionFolder 
               <span className="ml-auto shrink-0 text-content-subtle text-2xs">.zip archive</span>
             </button>
           )}
-          {/* Phone only: the library toolbar has no room for its own button. */}
-          {onCaptionFolder && (
-            <button type="button"
-              onClick={() => { closeMenu(); onCaptionFolder(); }}
-              title="Write Anima booru tag captions for a folder LDS did not build, into a separate output folder"
-              className={`${MENU_ITEM} sm:hidden`}>
-              <span className="whitespace-nowrap inline-flex items-center gap-1.5"><Tags aria-hidden="true" className="h-4 w-4" /> Caption folder</span>
-            </button>
-          )}
         </div>
       </details>
-      <HelpBadge topic="library-backup" />
       {/* Outside the <details>: a file input inside a collapsed disclosure is
           display:none, and .click() on it would be a no-op. */}
       {onRestore && (

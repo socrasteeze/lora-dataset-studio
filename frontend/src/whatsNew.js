@@ -92,6 +92,30 @@ export const WHATS_NEW = [
     to: '/settings/captioning',
   },
   {
+    id: '2026-11-18-datasets-portrait-previews', date: '2026-11-18',
+    title: 'Portrait Dataset Previews',
+    blurb: 'Dataset previews fill a 3:4 frame. On desktop, Small shows eight per row, Medium seven, and Large six.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-11-18-datasets-toolbar-width', date: '2026-11-18',
+    title: 'Compact Dataset Controls',
+    blurb: 'The Datasets toolbar fits on one desktop row. Tap the filter or tile size to cycle through its options.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-11-18-bank-toolbar-layout', date: '2026-11-18',
+    title: 'Aligned Bank Controls',
+    blurb: 'The Bank list controls line up with the creation form on desktop. On phones, Browse, Subfolders, Read-Only, and Create Bank use two equal columns.',
+    to: '/bank',
+  },
+  {
+    id: '2026-11-18-bank-cards-first', date: '2026-11-18',
+    title: 'Bank Cards Load First',
+    blurb: 'Open a Bank from the list while image totals, pass coverage, and folder status load separately.',
+    to: '/bank',
+  },
+  {
     id: '2026-11-18-bank-navigation', date: '2026-11-18',
     title: 'Images Load First',
     blurb: 'When you open a Bank, the first page of images gets priority over the statistics. The Bank list also loads all card previews together.',

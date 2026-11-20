@@ -21,6 +21,7 @@ export default function BankGroupCard({
   queueStateOf,
 }) {
   const [open, setOpen] = useState(false)
+  const countsReady = row.members.every((member) => member.total != null)
   const overlap = groupOverlapNote(row)
   const queued = row.members.filter((m) => queueStateOf?.(m)).length
   return (
@@ -37,7 +38,7 @@ export default function BankGroupCard({
         )}
       </div>
       <p className="text-xs text-content-subtle">{groupLabel(row.members.length - 1)}</p>
-      <p className="text-2xs text-content-muted">{bankListSummaryLine(row)}</p>
+      {countsReady && <p className="text-2xs text-content-muted">{bankListSummaryLine(row)}</p>}
       {/* Counters are summed from the member rows, so overlapping folders make
           them add the same image twice. Said out loud rather than hidden: a
           number that is quietly wrong is worse than one that is explained. */}
@@ -49,7 +50,7 @@ export default function BankGroupCard({
           className={`${btnShape({ size: 'sm' })} border border-indigo-400/50 font-semibold text-indigo-200 hover:bg-indigo-500/10`}>
           ⏳ Queue the group
         </button>
-        <button type="button" onClick={() => onPromote?.(row)} disabled={row.keep === 0}
+        <button type="button" onClick={() => onPromote?.(row)} disabled={!countsReady || row.keep === 0}
           title="Promote every kept image in this group into one dataset"
           className={`${btnShape({ size: 'sm' })} border border-border font-semibold text-content-muted hover:text-content hover:bg-surface-raised`}>
           ⬆ Promote the group
@@ -69,9 +70,9 @@ export default function BankGroupCard({
               <li key={m.id} className="min-w-0 space-y-1">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="min-w-0 truncate text-xs font-medium text-content">{m.name}</span>
-                  <span className="shrink-0 text-2xs text-content-subtle">
+                  {m.total != null && <span className="shrink-0 text-2xs text-content-subtle">
                     {m.total} · {m.keep} kept
-                  </span>
+                  </span>}
                   <button type="button" onClick={() => onRename?.(m)}
                     aria-label={`Rename bank ${m.name}`}
                     title="Rename — renaming it away from this name leaves the group"

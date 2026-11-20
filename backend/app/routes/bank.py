@@ -178,6 +178,9 @@ def banks_list():
     opens on ONE request instead of one per bank. An unknown/junk dataset_id
     simply omits the field (never a 400: the list itself is still valid).
 
+    `?view=cards` returns card metadata and previews before the frontend asks
+    for totals, pass coverage and folder status on the full list.
+
     A bank points at a LIVE folder, and this route used to re-walk EVERY bank's
     folder before answering — so merely navigating to the page cost a full
     inventory of every image in the library (measured on a real one of 8 banks /
@@ -191,10 +194,13 @@ def banks_list():
     how old the last walk is, so the page can say its counts may lag instead of
     showing stale ones silently. ``folder_sync`` carries both shapes."""
     rescan = request.args.get('rescan') == '1'
+    dataset_id = request.args.get('dataset_id') or None
+    if request.args.get('view') == 'cards' and not rescan and dataset_id is None:
+        return jsonify({'banks': banks.list_banks(LOCAL_USER, cards_only=True),
+                        'rescanned': False, 'cards_only': True})
     sync = (banks.refresh_banks(LOCAL_USER, force=True) if rescan
             else banks.folder_sync_state(LOCAL_USER))
-    rows = banks.list_banks(
-        LOCAL_USER, dataset_id=request.args.get('dataset_id') or None)
+    rows = banks.list_banks(LOCAL_USER, dataset_id=dataset_id)
     for row in rows:
         row['folder_sync'] = sync.get(row['id'])
     return jsonify({'banks': rows, 'rescanned': rescan})

@@ -903,6 +903,10 @@ request after the first image request settles. The full statistics query and
 coverage advice still need profiling. The frontend build and targeted lint passed.
 Runtime checks, regression tests and endpoint timings remain open.
 
+The Bank list now requests card metadata and previews before loading totals,
+pass coverage and folder status. The full response still computes exact results.
+Measure the card response and the full response separately when timing is authorized.
+
 1. [ ] Checkpoint the WAL (`PRAGMA wal_checkpoint(TRUNCATE)`) after bulk writes (caption import, scans, pipeline runs), and on startup when the WAL is large.
 2. [ ] Raise the SQLite connection cache (`PRAGMA cache_size`, e.g. 64-256 MB) and consider `mmap_size` and `temp_store=MEMORY`.
 3. [ ] Add a composite index on `bank_image (bank_id, status, id)`. Check whether coverage queries need another covering index, and confirm with `EXPLAIN QUERY PLAN`.

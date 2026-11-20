@@ -43,6 +43,7 @@ import { BANK_BULK_LIMIT, bankSelectionKey, bulkSelectionNote, selectVisibleBank
 const CURRENT_KEY = 'bankCurrentId'
 const SORT_KEY = 'bankListSort'
 const PAGE_SIZE_KEY = 'bankListPageSize'
+const BANK_TOOLBAR_GRID = 'grid grid-cols-2 items-start gap-2 lg:grid-cols-[minmax(17rem,1fr)_minmax(0,2fr)_repeat(3,6.75rem)_8rem]'
 // Hide the page title and the Images/Video lane switch until those are in
 // use again. The Images default stays in effect; flip this to bring the
 // chrome back without rewiring the video lane.
@@ -210,6 +211,7 @@ export default function BankPage() {
   const { caps } = useCapabilities()
   const visionReady = !!caps?.ollama?.vision_model_ready
   const [banks, setBanks] = useState(null)
+  const listRequestRef = useRef(0)
   const [listError, setListError] = useState('')
   const [listLoading, setListLoading] = useState(false)
   const [createErrors, setCreateErrors] = useState({})
@@ -273,12 +275,20 @@ export default function BankPage() {
   // full disk inventory of the whole library on every navigation to this page
   // (690-1 190 ms on a real 8-bank / 86 493-image library). `rescan` is the 🔄
   // button, and it is the only caller that asks the server to walk.
-  const refresh = useCallback(async ({ rescan = false } = {}) => {
+  const refresh = useCallback(async ({ rescan = false, showCards = false } = {}) => {
+    const request = ++listRequestRef.current
     setListLoading(true)
+    setListError('')
     try {
-      const d = await apiFetch(`/api/banks${rescan ? '?rescan=1' : ''}`)
+      const suffix = rescan ? '?rescan=1' : showCards ? '?view=cards' : ''
+      let d = await apiFetch(`/api/banks${suffix}`)
+      if (request !== listRequestRef.current) return
+      if (d.cards_only && d.banks?.length) {
+        setBanks((current) => current ?? d.banks)
+        d = await apiFetch('/api/banks', { background: true })
+        if (request !== listRequestRef.current) return
+      }
       setBanks(d.banks || [])
-      setListError('')
       if (!rescan) return
       // A walk just happened: say what it found, so the counters never move
       // without an explanation — and say so even when it found nothing, because
@@ -287,9 +297,11 @@ export default function BankPage() {
       if (note) toast[note.type](note.text)
       else toast.success('Source folders checked — no new image found.')
     } catch (e) {
-      setListError(e?.message || 'Could not load the banks. Retry the request.')
+      if (request === listRequestRef.current) {
+        setListError(e?.message || 'Could not load the banks. Retry the request.')
+      }
     } finally {
-      setListLoading(false)
+      if (request === listRequestRef.current) setListLoading(false)
     }
   }, [toast])
 
@@ -306,7 +318,7 @@ export default function BankPage() {
     try { await refresh({ rescan: true }) } finally { setRescanning(false) }
   }
 
-  useEffect(() => { if (currentId == null) refresh() }, [currentId, refresh])
+  useEffect(() => { if (currentId == null) refresh({ showCards: true }) }, [currentId, refresh])
   useEffect(() => {
     try { localStorage.setItem(PAGE_SIZE_KEY, String(pageSize)) } catch { /* ignore */ }
   }, [pageSize])
@@ -324,13 +336,14 @@ export default function BankPage() {
     const just = drained.current
     if (!just.length) return
     drained.current = []
+    const request = listRequestRef.current
     ;(async () => {
       const fresh = await apiFetch('/api/banks').catch(() => null)
       const rows = fresh?.banks || []
       const line = queueOutcomeLine(
         just.map((id) => pipelineReportVerdict(
           rows.find((b) => b.id === id)?.pipeline_report)))
-      if (rows.length) setBanks(rows)
+      if (rows.length && request === listRequestRef.current) setBanks(rows)
       if (line) toast[/problems/.test(line) ? 'warning' : 'success'](line)
     })()
   }, [queue, toast])
@@ -409,6 +422,7 @@ export default function BankPage() {
   // queues what the SERVER decides, and a number that shrank when you typed
   // would be a lie about what pressing it does.
   const queueAllCount = queueAllCandidates(banks, queue).length
+  const detailsPending = banks?.length > 0 && banks[0].total == null
 
   // Sort, then filter, then group the full filtered list, then page the display
   // rows. A page slice before grouping would sum only the banks on that page.
@@ -736,8 +750,8 @@ export default function BankPage() {
               onClick={(event) => { event.preventDefault(); document.getElementById(`bank-${field}`)?.focus() }}>{message}</a>)}
         </div>}
         <fieldset disabled={creating} className="space-y-3">
-        <div className="grid grid-cols-4 items-start gap-2 lg:flex lg:flex-wrap">
-          <div className="col-span-2 min-w-0 lg:min-w-40 lg:grow">
+        <div className={BANK_TOOLBAR_GRID}>
+          <div className="min-w-0">
             <Input id="bank-name" size="lg" value={name} onChange={(e) => {
               setName(e.target.value); setCreateErrors((errors) => ({ ...errors, name: '' }))
             }} aria-label="Name" aria-invalid={!!createErrors.name} aria-describedby={createErrors.name ? 'bank-name-error' : undefined}
@@ -747,8 +761,8 @@ export default function BankPage() {
             {createErrors.name && <p id="bank-name-error" className="mt-1 text-xs text-rose-200">{createErrors.name}</p>}
           </div>
           <FolderPickerField inline size="lg" id="bank-folder"
-            fieldClassName="col-span-2 min-w-0 lg:min-w-64 lg:grow-[3]"
-            browseClassName="min-w-0 w-full !px-1 !text-xs lg:w-auto lg:!px-4 lg:!text-sm"
+            fieldClassName="min-w-0"
+            browseClassName="min-w-0 w-full !px-1"
             value={folder} onChange={changeImportFolder} required
             inputProps={{ 'aria-label': 'Folder', 'aria-invalid': !!createErrors.folder || !!folderNotice,
               'aria-describedby': [createErrors.folder && 'bank-folder-error', folderNotice && 'bank-folder-notice'].filter(Boolean).join(' ') || undefined }}
@@ -758,23 +772,26 @@ export default function BankPage() {
             aria-controls="bank-import-subfolders" aria-label="Choose Subfolders"
             onClick={() => setFoldersOpen((value) => !value)}
             title="Choose which subfolders to include, with one bank or separate banks."
-            className={`min-w-0 w-full !px-1 !text-xs lg:w-auto lg:!px-4 lg:!text-sm ${foldersOpen || splitMode || excluded.size ? 'border-primary/60 bg-primary/15 text-content' : ''}`}>
+            className={`min-w-0 w-full !px-1 ${foldersOpen || splitMode || excluded.size ? 'border-primary/60 bg-primary/15 text-content' : ''}`}>
             Subfolders {excluded.size > 0 && <span className="tabular-nums">({excluded.size})</span>}
           </Button>
           {/* One bank per subfolder does not carry protection; set it per bank after the split. */}
           {!splitMode && (
             <BankReadOnlyToggle checked={readOnly} onChange={setReadOnly} disabled={creating}
-              size="lg" className="min-w-0 w-full lg:w-auto" />
+              size="lg" compact />
           )}
           <Button type="submit" size="lg" variant="primary" disabled={creating || !!folderNotice || emptySelection || previewPending || needsImportRestart}
-            className="col-span-2 min-w-0 w-full lg:w-auto"
+            className="col-start-2 min-w-0 w-full !px-1 lg:col-start-6"
             title={folderNotice ? 'That folder belongs to a dataset' : undefined}>
             {creating ? 'Inventorying' : (
               <span className="inline-flex items-center gap-1.5"><Plus aria-hidden="true" className="h-4 w-4" />
                 {splitMode ? 'Create Banks' : 'Create Bank'}</span>
             )}
           </Button>
-          <HelpBadge topic="bank-split-subfolders" className="col-span-4 lg:col-auto" />
+          <div className="col-span-full flex gap-2 empty:hidden">
+            <HelpBadge topic="bank-split-subfolders" />
+            {!splitMode && <HelpBadge topic="bank-read-only" />}
+          </div>
         </div>
         {foldersOpen && <section id="bank-import-subfolders" aria-label="Import Subfolders" className="space-y-3">
           <label className="flex min-h-10 items-center gap-2 text-sm text-content-muted">
@@ -867,7 +884,7 @@ export default function BankPage() {
 
       {listError && <div role="alert" className="min-h-24 space-y-2 rounded-md border border-rose-500/50 p-3 text-sm">
         <p>{listError}</p>
-        <Button disabled={listLoading} onClick={() => refresh()}>Retry</Button>
+        <Button disabled={listLoading} onClick={() => refresh({ showCards: banks == null })}>Retry</Button>
       </div>}
       {banks == null ? (
         !listError && <div role="status" aria-label="Loading banks" className="grid min-h-48 grid-cols-2 gap-3">
@@ -880,20 +897,20 @@ export default function BankPage() {
         </p>
       ) : (
         <div className="space-y-3">
-        <div className="grid grid-cols-2 items-center gap-2 lg:flex lg:flex-wrap">
-          {/* Queues one entry per bank, drained one at a time per machine
-              behind an idle GPU. Counted over ALL banks, never the filtered
-              view, so the number matches what pressing it does. */}
-          {queueAllCount > 0 && (
-            <button type="button" onClick={() => setDialogScope({ kind: 'all' })}
-              title="Queue every bank with undecided images. Banks run one at a time per machine; another machine runs its own queue alongside this one."
-              className={`${btnClass({ size: 'md' })} min-w-0 w-full lg:w-auto border-indigo-400/50 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20`}>
-              ⏳ Queue all {queueAllCount} bank(s)
-            </button>
-          )}
-          <FolderCheckLine banks={banks} busy={rescanning} onRescan={rescan}
-            className="min-w-0 w-full lg:w-auto" />
-          <div className="col-span-2 flex min-w-0 w-full items-center gap-2 lg:min-w-[9rem] lg:flex-1">
+        <div className={BANK_TOOLBAR_GRID}>
+          <div className="col-span-2 grid grid-cols-2 gap-2 empty:hidden lg:col-span-1">
+            {/* The count covers every eligible bank, including those outside the search. */}
+            {(queueAllCount > 0 || detailsPending) && (
+              <button type="button" disabled={detailsPending} onClick={() => setDialogScope({ kind: 'all' })}
+                title="Queue every bank with undecided images. Banks run one at a time per machine; another machine runs its own queue alongside this one."
+                className={`${btnClass({ size: 'md' })} min-w-0 w-full !px-1 border-indigo-400/50 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20`}>
+                {detailsPending ? 'Queue' : <>Queue ({queueAllCount})</>}
+              </button>
+            )}
+            <FolderCheckLine banks={banks} busy={rescanning} pending={detailsPending} onRescan={rescan}
+              className="col-start-2 min-w-0 w-full !px-1" />
+          </div>
+          <div className="relative col-span-2 min-w-0 lg:col-span-1 lg:col-start-2">
             <Input
               type="search"
               size="md"
@@ -902,26 +919,29 @@ export default function BankPage() {
               placeholder={`Find among ${banks.length} bank${banks.length === 1 ? '' : 's'}`}
               aria-label="Find a bank"
               aria-describedby={query.trim() ? 'bank-find-count' : undefined}
-              className="min-w-0 w-full"
+              className={`min-w-0 w-full ${query.trim() ? 'pr-28' : ''}`}
             />
             {query.trim() && (
-              <span id="bank-find-count" className="shrink-0 text-xs text-content-muted tabular-nums">
+              <span id="bank-find-count" className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-content-muted tabular-nums">
                 {visibleBanks.length} of {banks.length}
               </span>
             )}
           </div>
           <Select size="md" value={sort} onChange={(e) => changeSort(e.target.value)}
-            aria-label="Sort the banks" className="min-w-0 w-full lg:w-auto">
+            aria-label="Sort the banks" className="min-w-0 w-full lg:col-span-3 lg:col-start-3">
             {BANK_SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
           </Select>
           <Button size="md" type="button" onClick={() => {
             setSelectingBanks((value) => !value)
             if (selectingBanks) setSelectedBanks(new Set())
-          }} aria-pressed={selectingBanks} className="min-w-0 w-full lg:w-auto">
+          }} aria-pressed={selectingBanks} className="min-w-0 w-full !px-1 lg:col-start-6">
             {selectingBanks ? 'Done Selecting' : 'Select Banks'}
           </Button>
-          <HelpBadge topic="bank-bulk-manage" className="col-span-2 lg:col-auto" />
+          <HelpBadge topic="bank-bulk-manage" className="col-span-full" />
         </div>
+        {detailsPending && listLoading && (
+          <p role="status" className="text-xs text-content-muted">Loading counts and coverage…</p>
+        )}
         {selectingBanks && (
           <div data-probe-chrome="bank-bulk-actions"
             className="space-y-2 rounded-lg border border-indigo-400/40 bg-indigo-500/10 p-3">
@@ -1034,7 +1054,7 @@ export default function BankPage() {
                   count line this used to be; the two badges below carry
                   information BankListSummary does not (the last Launch-all's
                   verdict, per-pass coverage) and are kept alongside it. */}
-              {!selectingBanks && <BankListSummary bank={b} />}
+              {!selectingBanks && !detailsPending && <BankListSummary bank={b} />}
               {/* The last Launch-all's verdict, ON THE CARD. A run where every
                   GPU pass was skipped for "GPU busy" used to look identical to a
                   clean one from here — and queueing banks overnight is exactly
@@ -1051,7 +1071,7 @@ export default function BankPage() {
                       Open →
                     </button>
                     {!qs && (
-                      <button type="button" onClick={() => setDialogScope({ kind: 'bank', bankId: b.id })} disabled={b.total === 0}
+                      <button type="button" onClick={() => setDialogScope({ kind: 'bank', bankId: b.id })} disabled={detailsPending || b.total === 0}
                         title="Run Launch all now, or add this bank to the queue"
                         className={`${btnClass({ size: 'sm', variant: 'ghost' })} min-w-0 w-full lg:w-auto`}>
                         Launch All

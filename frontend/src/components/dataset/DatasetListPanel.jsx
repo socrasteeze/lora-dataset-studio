@@ -3,7 +3,6 @@ import { familyBadge } from '../../utils/familyBadges';
 import { AlertTriangle, Download, Image as ImageIcon, LayoutGrid, Lightbulb, Palette, PenLine, PersonStanding, Plus, Save, Smile, Tags, Trash2, User, X } from 'lucide-react';
 import { datasetThumbUrl } from '../../utils/datasetThumbUrl';
 import ShotIllustration from './ShotIllustration';
-import TileSizeControl from '../shared/TileSizeControl';
 import FullBackupControls from './FullBackupControls';
 import ExternalRecaptionDialog from './ExternalRecaptionDialog.jsx';
 import QuickSetDialog from './QuickSetDialog.jsx';
@@ -76,21 +75,18 @@ const TILE_SIZE_KEY = 'datasetLibraryTileSize';
 const PAGE_SIZE_KEY = 'datasetLibraryPageSize';
 const COLLAPSED_KEY = 'datasetLibraryCollapsed_v1';
 const PREVIEWS_VISIBLE_KEY = 'datasetLibraryPreviewsVisible';
-const TILE_SIZE_TITLE = {
-  S: 'Compact tiles — the most datasets on one screen',
-  M: 'Medium tiles (default)',
-  L: 'Large tiles — big reference previews',
-};
+const TILE_SIZE_LABELS = { S: 'Small', M: 'Medium', L: 'Large' };
+const TILE_SIZES = Object.keys(TILE_SIZE_LABELS);
 // Phone (below sm): 5 / 4 / 3 tiles per row, S and M as compact tiles.
 const GRID_COLS = {
-  S: 'grid grid-cols-5 gap-1 sm:gap-1.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
-  M: 'grid grid-cols-4 gap-1.5 sm:gap-2.5 sm:grid-cols-3 xl:grid-cols-4',
-  L: 'grid grid-cols-3 gap-2 sm:gap-2.5 sm:grid-cols-2 xl:grid-cols-3',
+  S: 'grid grid-cols-5 gap-1 sm:gap-1.5 sm:grid-cols-3 lg:grid-cols-8',
+  M: 'grid grid-cols-4 gap-1.5 sm:gap-2.5 sm:grid-cols-3 lg:grid-cols-7',
+  L: 'grid grid-cols-3 gap-2 sm:gap-2.5 sm:grid-cols-2 lg:grid-cols-6',
 };
 
-// Kind filter chips — only rendered when at least two kinds coexist in the
-// library. Transient on purpose: a persisted filter reads as lost datasets.
-const KIND_CHIPS = {
+// The filter is transient. A persisted filter can make datasets look lost.
+const KIND_LABELS = {
+  all: 'All',
   character: 'Character',
   concept: 'Concept',
   style: 'Style',
@@ -137,7 +133,7 @@ function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBacku
       <button type="button" onClick={() => onOpen(d.id)}
         aria-label={`Open the dataset ${d.name}`}
         className="block w-full text-left">
-        <div className="relative aspect-[4/3] bg-app/60">
+        <div className="relative aspect-[3/4] bg-app/60">
           {showPreviews && previewName ? (
             <img
               src={datasetThumbUrl(`/api/dataset/${d.id}/img/${encodeURIComponent(previewName)}`, 384)}
@@ -179,7 +175,7 @@ function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBacku
           <span className={`text-2xs text-content-subtle ${phoneHidden}`}>{tileStats(d)}</span>
         </div>
       </button>
-      <div className={`library-card__actions library-card__actions--bar grid-cols-2 gap-1.5 border-t border-border bg-surface px-2 py-2 ${compact ? 'hidden sm:grid' : 'grid'}`}>
+      <div className={`library-card__actions library-card__actions--bar grid-cols-2 gap-1.5 border-t border-border bg-surface px-2 py-2 lg:grid-cols-[2fr_3fr] lg:gap-1 lg:px-1 xl:grid-cols-2 ${compact ? 'hidden sm:grid' : 'grid'}`}>
         <button type="button"
           onClick={() => onExportZip?.(d.id)}
           disabled={!canExportZip}
@@ -187,14 +183,14 @@ function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBacku
             ? 'Download the kept images and captions as a training-ready ZIP'
             : 'Keep at least one image before exporting a training ZIP'}
           aria-label={`Export training ZIP for ${d.name}`}
-          className="rounded-md border border-border bg-app/50 px-2 py-1 text-2xs font-semibold text-content-muted transition-colors hover:border-primary/40 hover:bg-surface-raised hover:text-content disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-app/50 disabled:hover:text-content-muted inline-flex items-center justify-center gap-1">
+          className="rounded-md border border-border bg-app/50 px-2 py-1 text-2xs font-semibold text-content-muted transition-colors hover:border-primary/40 hover:bg-surface-raised hover:text-content disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-app/50 disabled:hover:text-content-muted inline-flex items-center justify-center gap-1 lg:px-1">
           <Download aria-hidden="true" className="h-3 w-3" /> ZIP
         </button>
         <button type="button"
           onClick={() => onExportBackup?.(d.id)}
           title="Download a portable backup with all images, captions and settings"
           aria-label={`Export portable backup for ${d.name}`}
-          className="rounded-md border border-border bg-app/50 px-2 py-1 text-2xs font-semibold text-content-muted transition-colors hover:border-primary/40 hover:bg-surface-raised hover:text-content inline-flex items-center justify-center gap-1">
+          className="rounded-md border border-border bg-app/50 px-2 py-1 text-2xs font-semibold text-content-muted transition-colors hover:border-primary/40 hover:bg-surface-raised hover:text-content inline-flex items-center justify-center gap-1 lg:px-1">
           <Save aria-hidden="true" className="h-3 w-3" /> Backup
         </button>
       </div>
@@ -223,7 +219,7 @@ function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBacku
 
 /** The creation form — folded behind "New dataset" (auto-open on an empty
  *  library). Fields unchanged from the historical always-open card. */
-function NewDatasetForm({ onCreate, onClose }) {
+function NewDatasetForm({ onCreate, onClose, onQuickSet }) {
   const [media, setMedia] = useState('images');
   const creators = contributions('datasets.create', 'datasets');
   const creator = creators.find((item) => `${item.plugin}:${item.id}` === media);
@@ -258,6 +254,7 @@ function NewDatasetForm({ onCreate, onClose }) {
     /* No card of its own: it opens in the page flow under the toolbar, whose
        New dataset / Close button already names and closes it. */
     <section id="new-dataset-form" aria-label="New dataset" className="flex w-full flex-col gap-2">
+      <Button className="self-start" onClick={onQuickSet}>Quick Set</Button>
       {creators.length > 0 && (
         <div className="flex flex-wrap gap-1.5" aria-label="Dataset media">
           {[{ key: 'images', label: 'Images' }, ...creators.map((item) => ({
@@ -431,7 +428,7 @@ export default function DatasetListPanel({
   const [recaptioning, setRecaptioning] = useState(false);
   const [quickSet, setQuickSet] = useState(false);
   const [query, setQuery] = useState('');
-  // Kind chip filter — transient (see KIND_CHIPS): reset on every page load.
+  // Reset the kind filter on every page load.
   const [kindFilter, setKindFilter] = useState('all');
   // Tile size + collapsed sections: persisted display preferences (same lazy
   // init + save effect as datasetGridTileSize / the CloudRuns group folds).
@@ -487,101 +484,77 @@ export default function DatasetListPanel({
   // One-time tip: once the library is sizeable, point out tile sizing / folding /
   // filtering. Gated at ≥6 so it never fires for a first-time, near-empty library.
   useEffect(() => { if (datasets.length >= 6) requestHelpTip('library-browse'); }, [datasets.length]);
-  const filtered = datasets.filter((d) => datasetMatches(d, query, kindFilter));
+  const kinds = ['all', ...kindsPresent(datasets)];
+  const activeKind = kinds.includes(kindFilter) ? kindFilter : 'all';
+  const nextKind = kinds[(kinds.indexOf(activeKind) + 1) % kinds.length];
+  const KindIcon = KIND_ICONS[activeKind];
+  const nextTileSize = TILE_SIZES[(TILE_SIZES.indexOf(tileSize) + 1) % TILE_SIZES.length];
+  const filtered = datasets.filter((d) => datasetMatches(d, query, activeKind));
   const paged = paginate(filtered, viewPage, pageSize);
   const groups = groupDatasets(paged.items);
-  const kinds = kindsPresent(datasets);
   // While a search/filter is active every section is forced open: a fold that
   // hides matches would read as lost datasets. Folding resumes when cleared.
-  const filterActive = Boolean(query.trim()) || kindFilter !== 'all';
+  const filterActive = Boolean(query.trim()) || activeKind !== 'all';
   return (
     <div className="flex flex-col gap-3">
-      {/* Header: the page IS the library. Row 1 = title + primary actions;
-          row 2 (below, non-empty library only) = search + filters + size. */}
       <div>
-        {/*
-         * relative z-30 creates a stacking context; otherwise the Backup menu panel's z-20 would
-         * remain trapped below the tiles.
-         */}
-        {/* Phone (below sm): no title; row 1 = New dataset | search | ⋯ (Backup
-            menu, which also holds Caption folder); row 2 = kind switcher |
-            previews | size, spread across the row. `order-*` reorders only on
-            the phone and `sm:contents` dissolves the row-2 wrapper from sm up,
-            so the desktop toolbar is unchanged. */}
-        <div className="relative z-30 flex flex-wrap items-center gap-2">
-          <h1 className="sr-only text-xl font-semibold text-content items-center gap-2 sm:not-sr-only sm:flex">Datasets<HelpBadge topic="page-datasets" /></h1>
-          {!empty && <span className="hidden text-sm text-content-subtle sm:inline">{datasets.length}</span>}
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => {
-              if (soleForm) document.getElementById('new-dataset-name')?.focus();
-              else setCreating((v) => !v);
-            }}
-            aria-expanded={soleForm ? undefined : formOpen}
-            aria-controls={soleForm ? undefined : 'new-dataset-form'}
-          >
-            {!soleForm && creating
-              ? <><X aria-hidden="true" className="h-4 w-4" /> Close</>
-              : <><Plus aria-hidden="true" className="h-4 w-4" /> New dataset</>}
-          </Button>
-          <Button size="md" className="min-h-10" onClick={() => setQuickSet(true)}>Quick Set</Button>
-          {/* Back up everything, its include-LoRAs option and Import backup
-              all live in ONE Backup menu. New dataset stays out of it. */}
-          <div className="order-2 flex items-center gap-2 sm:order-none">
-            <FullBackupControls backup={backup} onRestore={onRestore} onCaptionFolder={() => setRecaptioning(true)} />
+        <h1 className="sr-only">Datasets</h1>
+        <div className="relative z-30 grid items-center gap-2 lg:grid-cols-[8rem_8.5rem_8.5rem_minmax(0,1fr)_6.5rem_8rem_5.5rem]">
+          <div className="grid grid-cols-3 gap-2 lg:contents">
+            <Button variant="primary" className="min-w-0 !px-1 !text-xs sm:!px-3 sm:!text-sm"
+              onClick={() => {
+                if (soleForm) document.getElementById('new-dataset-name')?.focus();
+                else setCreating((v) => !v);
+              }}
+              aria-expanded={soleForm ? undefined : formOpen}
+              aria-controls={soleForm ? undefined : 'new-dataset-form'}>
+              {!soleForm && creating
+                ? <><X aria-hidden="true" className="h-4 w-4" /> Close</>
+                : <><Plus aria-hidden="true" className="hidden h-4 w-4 sm:block" /> New Dataset</>}
+            </Button>
+            <FullBackupControls backup={backup} onRestore={onRestore} />
+            <Button onClick={() => setRecaptioning(true)} className="min-w-0 !px-1 !text-xs sm:!px-3 sm:!text-sm"
+              title="Write Anima booru tag captions for a folder LDS did not build, into a separate output folder">
+              <Tags aria-hidden="true" className="hidden h-4 w-4 sm:block" /> Caption Folder
+            </Button>
           </div>
-          {/* Not a dataset action: it captions a folder LDS did not build, so it
-              lives on the library, beside Backup, and needs no open dataset. */}
-          <Button size="md" onClick={() => setRecaptioning(true)} className="hidden sm:inline-flex"
-            title="Write Anima booru tag captions for a folder LDS did not build, into a separate output folder">
-            <Tags aria-hidden="true" className="h-4 w-4" /> Caption folder
-          </Button>
           {!empty && (
-            <>
+            <div className="grid grid-cols-[minmax(0,1fr)_5rem_2.5rem_4.25rem] items-center gap-2 min-[390px]:grid-cols-[minmax(0,1fr)_5rem_6rem_4.25rem] lg:contents">
               <Input
                 type="search"
                 size="md"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Find a dataset"
+                placeholder="Search"
                 aria-label="Find a dataset"
-                className="order-1 min-w-0 flex-1 sm:order-none sm:min-w-[9rem] sm:max-w-xs"
+                className="min-w-0 w-full"
               />
-              <div className="order-3 flex w-full items-center justify-between gap-2 sm:contents">
-                {kinds.length >= 2 && (
-                  <div role="group" aria-label="Filter by dataset kind" className="flex min-w-0 flex-1 items-center gap-1 sm:flex-none sm:flex-wrap">
-                    {['all', ...kinds].map((k) => {
-                      const KindIcon = KIND_ICONS[k];
-                      return (
-                        <Chip key={k} size="md" pressed={kindFilter === k} onClick={() => setKindFilter(k)}
-                          className="min-w-0 flex-1 !px-1 !text-xs sm:flex-none sm:!px-3 sm:!text-sm">
-                          {k === 'all' ? 'All' : (
-                            <span className="inline-flex min-w-0 items-center gap-1"><KindIcon aria-hidden="true" className="hidden h-3 w-3 sm:block" /><span className="truncate">{KIND_CHIPS[k]}</span></span>
-                          )}
-                        </Chip>
-                      );
-                    })}
-                  </div>
-                )}
-                <Chip
-                  size="md"
-                  pressed={showPreviews}
-                  onClick={() => setShowPreviews((visible) => !visible)}
-                  title={showPreviews ? 'Hide image previews' : 'Show image previews'}
-                >
-                  {showPreviews
-                    ? <ImageIcon aria-hidden="true" className="h-3.5 w-3.5" />
-                    : <LayoutGrid aria-hidden="true" className="h-3.5 w-3.5" />}
-                  <span className="hidden sm:inline">{showPreviews ? 'Hide previews' : 'Show previews'}</span>
-                  <span className="sr-only">Image previews {showPreviews ? 'shown' : 'hidden'}</span>
-                </Chip>
-                {/* The grid glyph is dropped on the phone: the row needs the room. */}
-                <TileSizeControl size={tileSize} onChange={setTileSize} titles={TILE_SIZE_TITLE}
-                  className="[&>svg]:hidden sm:[&>svg]:block" />
-              </div>
-            </>
+              <Button className="min-w-0 !px-1" onClick={() => setKindFilter(nextKind)}
+                title={`Dataset filter: ${KIND_LABELS[activeKind]}. Next: ${KIND_LABELS[nextKind]}`}
+                aria-label={`Dataset filter: ${KIND_LABELS[activeKind]}. Switch to ${KIND_LABELS[nextKind]}`}>
+                {KindIcon && <KindIcon aria-hidden="true" className="hidden h-3 w-3 lg:block" />}
+                {KIND_LABELS[activeKind]}
+              </Button>
+              <Chip size="md" className="min-w-0 !px-1" pressed={showPreviews}
+                onClick={() => setShowPreviews((visible) => !visible)}
+                title={showPreviews ? 'Hide image previews' : 'Show image previews'}>
+                {showPreviews
+                  ? <ImageIcon aria-hidden="true" className="h-3.5 w-3.5 min-[390px]:hidden lg:!block" />
+                  : <LayoutGrid aria-hidden="true" className="h-3.5 w-3.5 min-[390px]:hidden lg:!block" />}
+                <span className="sr-only min-[390px]:not-sr-only">{showPreviews ? 'Hide Previews' : 'Show Previews'}</span>
+              </Chip>
+              <Button className="min-w-0 !px-1" onClick={() => setTileSize(nextTileSize)}
+                title={`Tile size: ${TILE_SIZE_LABELS[tileSize]}. Next: ${TILE_SIZE_LABELS[nextTileSize]}`}
+                aria-label={`Tile size: ${TILE_SIZE_LABELS[tileSize]}. Switch to ${TILE_SIZE_LABELS[nextTileSize]}`}>
+                <LayoutGrid aria-hidden="true" className="hidden h-3.5 w-3.5 lg:block" />
+                {TILE_SIZE_LABELS[tileSize]}
+              </Button>
+            </div>
           )}
+        </div>
+        <div className="mt-2 flex gap-2 empty:hidden">
+          <HelpBadge topic="page-datasets" />
+          <HelpBadge topic="library-backup" />
         </div>
       </div>
 
@@ -589,7 +562,7 @@ export default function DatasetListPanel({
       {quickSet && <QuickSetDialog onClose={() => setQuickSet(false)} onOpen={onOpen} />}
 
       {formOpen && (
-        <NewDatasetForm onCreate={onCreate}
+        <NewDatasetForm onCreate={onCreate} onQuickSet={() => setQuickSet(true)}
           onClose={soleForm ? null : () => setCreating(false)} />
       )}
 
@@ -600,8 +573,8 @@ export default function DatasetListPanel({
       ) : groups.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border bg-app/30 px-4 py-5 text-center text-sm text-content-muted">
           {query.trim()
-            ? <>No dataset matches “{query.trim()}”{kindFilter !== 'all' ? ` in ${KIND_CHIPS[kindFilter]}` : ''}.</>
-            : <>No {KIND_CHIPS[kindFilter]} dataset.</>}
+            ? <>No dataset matches “{query.trim()}”{activeKind !== 'all' ? ` in ${KIND_LABELS[activeKind]}` : ''}.</>
+            : <>No {KIND_LABELS[activeKind]} dataset.</>}
         </p>
       ) : (
         <>

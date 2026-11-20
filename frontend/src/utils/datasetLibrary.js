@@ -17,7 +17,7 @@ export const TRAINED = ['trained', 'Trained', GraduationCap];
 export const NOT_TRAINED = ['not-trained', 'Not trained yet', CircleDashed];
 
 // Tile size: 'S' compact tiles, 'M' the historical photo grid, 'L' large
-// previews. Same 3-step segmented idiom as the workspace image grid.
+// previews. The workspace image grid uses the same sizes.
 const LIBRARY_TILE_SIZES = ['S', 'M', 'L'];
 export const LIBRARY_PAGE_SIZES = [24, 48, 96];
 
@@ -96,8 +96,7 @@ export function datasetMatches(d, query = '', kind = 'all') {
     || (d.trigger_word || '').toLowerCase().includes(q);
 }
 
-/** Kinds present in the library, in canonical order — the kind filter chips
- *  only render when at least two coexist (a single-kind library needs none). */
+/** Kinds present in the library, in the order the filter cycles through them. */
 export function kindsPresent(datasets = []) {
   const present = new Set(datasets.map(datasetKind));
   return ['character', 'concept', 'style'].filter((k) => present.has(k));

@@ -320,7 +320,7 @@ const TOPICS = [
     guide: { chapter: 'getting-started', anchor: 'around-the-app' },
     app: { route: '/datasets' },
     tip: { trigger: 'library-browse',
-      text: 'Resize tiles S/M/L, turn the page, and filter by kind.' } },
+      text: 'Select All to cycle dataset types. Select the current tile size to change it.' } },
   action('library-backup', 'Back up everything',
     ['backup', 'back up', 'export everything', 'move machine', 'migrate', 'restore',
      'settings', 'config', 'archive', 'save all', 'new install',
