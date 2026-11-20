@@ -44,7 +44,9 @@ export const KLEIN_CLEAN_TITLE =
  *  does not depend on the install, and a tooltip that kept naming a prompt the user had
  *  changed would be worse than one that named none. */
 export const kleinCleanTitle = (caps) =>
-  `${KLEIN_CLEAN_TITLE} ${sentPromptLine(caps?.watermark_clean_prompt)}`
+  caps?.watermark_clean_custom
+    ? 'Clean with the custom ComfyUI workflow and preserve the original.'
+    : `${KLEIN_CLEAN_TITLE} ${sentPromptLine(caps?.watermark_clean_prompt)}`
 
 /** The half-sentence appended after "Engine: Klein" in a launch window, where the
  *  engine name is already on screen and only the difference is worth the room. */

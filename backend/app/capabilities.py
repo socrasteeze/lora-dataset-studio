@@ -1420,7 +1420,8 @@ def _watermark_clean_options() -> dict:
     from .services import watermark_klein
     return {'prompt': watermark_klein.clean_prompt(),
             'max_mp': watermark_klein.clean_max_mp(),
-            'output': watermark_klein.clean_output_mode()}
+            'output': watermark_klein.clean_output_mode(),
+            'custom': bool(watermark_klein.custom_clean_workflow_path())}
 
 
 def watermark_detect_weights_present() -> bool:
@@ -2968,6 +2969,7 @@ def _probe_uncached():
         'watermark_clean_prompt': _wm_clean['prompt'],
         'watermark_clean_max_mp': _wm_clean['max_mp'],
         'watermark_clean_output': _wm_clean['output'],
+        'watermark_clean_custom': _wm_clean['custom'],
         # The video lane, reported as its three independent pieces. A single
         # boolean would be a lie here: decoding, shot detection and encoding come
         # from three different installs and fail apart. The front uses the parts to
@@ -2984,7 +2986,7 @@ def _probe_uncached():
         # Klein-inpaint (V2, quality) readiness = same as the Klein engine (ComfyUI
         # reachable + Klein models on disk). The custom-node preflight is a clean-time
         # 409. Greys the batch's "Klein (quality)" option when False.
-        'watermark_klein': klein_ready,
+        'watermark_klein': comfy['ok'] if _wm_clean['custom'] else klein_ready,
         # Persisted "allow automatic crop" preference (Settings ▸ Watermark inpainting).
         # The batch Clean bar reads it here to seed/reflect its inline toggle and the
         # review lightbox uses it as the per-image crop-vs-inpaint default; when False,

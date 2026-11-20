@@ -71,6 +71,9 @@ export default function KleinCleanOptions({ caps = {}, disabled = false, classNa
   return (
     <div className={`min-w-0 space-y-2 text-xs text-content-subtle ${className}`}>
       <p className="m-0">Saves to Settings for Bank and Dataset.</p>
+      {caps.watermark_clean_custom ? (
+        <p className="m-0">The custom workflow supplies the prompt, processing size, and models.</p>
+      ) : <>
       <label className="block min-w-0">
         <span className="font-medium text-content">Clean Prompt</span>
         {/* A textarea, because an instruction can run to a sentence and a single-line
@@ -143,6 +146,7 @@ export default function KleinCleanOptions({ caps = {}, disabled = false, classNa
         </span>
         <span className="mt-1 block leading-snug">{mpNote(maxMp)}</span>
       </label>
+      </>}
 
       <label className="block min-w-0">
         <span className="font-medium text-content">Output Size</span>

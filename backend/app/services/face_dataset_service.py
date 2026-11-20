@@ -9981,6 +9981,18 @@ def _route_watermark(bbox, W, H, *, min_side=WATERMARK_MIN_SIDE, allow_crop=True
     return 'review', None
 
 
+def _watermark_original_path(path):
+    stem, ext = os.path.splitext(path)
+    return f'{stem}.orig{ext or ".webp"}'
+
+
+def _restore_preserved_watermark_original(path):
+    backup = _watermark_original_path(path)
+    if os.path.islink(backup) or not os.path.isfile(backup):
+        raise FileNotFoundError('no original to restore')
+    shutil.copy2(backup, path)
+
+
 def _preserve_original(path) -> bool:
     """Durably preserve ``path`` before any destructive watermark edit.
 
@@ -9991,8 +10003,9 @@ def _preserve_original(path) -> bool:
     it atomically instead.  Existing backups are deliberately never overwritten
     (they are the older, recoverable master from a prior clean pass).
     """
-    stem, ext = os.path.splitext(path)
-    backup = f'{stem}.orig{ext or ".webp"}'
+    backup = _watermark_original_path(path)
+    if os.path.islink(backup):
+        return False
     if os.path.exists(backup):
         # A prior interrupted *old* implementation could have left a partial
         # .orig behind. Do not assume its mere existence makes an edit safe.
@@ -10721,7 +10734,7 @@ def _clean_inpaint_engine(route, method):
 
 
 def _wm_route_images(user_id, row_ids, token, method, allow_crop, lama_ok,
-                     klein_ok, klein_model, out):
+                     klein_ok, klein_model, out, *, custom_path=''):
     """The per-image watermark routing pass, moved verbatim (2026-08-23)
     together with its two closures — they rebind ``error`` via nonlocal,
     so every writer of that cell lives in this one scope. Manual regions
@@ -10781,8 +10794,8 @@ def _wm_route_images(user_id, row_ids, token, method, allow_crop, lama_ok,
             _backup_failed(img, staged)
             return
         try:
-            ok, err = watermark_klein.inpaint_watermark_klein(user_id, staged, boxes,
-                                                              klein_model=klein_model)
+            ok, err = watermark_klein.inpaint_watermark_klein(
+                user_id, staged, boxes, klein_model=klein_model, custom_path=custom_path)
             if ok and _promote_staged_watermark_edit(staged, path):
                 # The hand-drawn zones SURVIVE the clean. They used to be
                 # dropped here, which quietly cost the user their work: ↩ Restore
@@ -10842,7 +10855,7 @@ def _wm_route_images(user_id, row_ids, token, method, allow_crop, lama_ok,
                 out['failed'] += 1
                 db.session.commit()
                 continue
-            if text_ok and img.text_state == 'detected':
+            if text_ok and img.text_state == 'detected' and not custom_path:
                 # Text rows: the outline-safe filler first, whatever the
                 # engine toggle says — the toggle rules WATERMARKS, while text
                 # leftovers are glyph boxes on art, exactly LaMa's case (the
@@ -11179,13 +11192,16 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
     out = {'cropped': 0, 'inpainted': 0, 'inpainted_klein': 0, 'text_filled': 0,
            'needs_review': 0, 'failed': 0, 'skipped': 0}
     lama_ok = watermark_lama.is_available()
-    klein_ok = method == 'klein' and watermark_klein.is_available()
+    custom_path = watermark_klein.custom_clean_workflow_path() if method == 'klein' else ''
+    if custom_path:
+        watermark_klein.load_custom_clean_workflow(custom_path)
+    klein_ok = method == 'klein' and watermark_klein.clean_available(custom_path)
     # The Klein model this DATASET runs on — the same pick ✨ improve and Klein
     # generation use. A watermark clean overwrites the image in place, so running
     # it on a model the dataset did not choose is the one lane where the swap
     # cannot be spotted afterwards by comparing to a source.
     klein_model = dataset_klein_model(ds)
-    if klein_ok and klein_model:
+    if klein_ok and klein_model and not custom_path:
         # Refuse the WHOLE pass by name, before a single file is touched: every
         # image would fail identically, and a half-cleaned dataset is worse than
         # an untouched one. None (never chose) skips this — nothing was promised.
@@ -11202,7 +11218,7 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
     try:
         lama_pending, text_pending, error, vanished = _wm_route_images(
             user_id, row_ids, token, method, allow_crop, lama_ok,
-            klein_ok, klein_model, out)
+            klein_ok, klein_model, out, custom_path=custom_path)
         error, vanished = _wm_text_fill_tail(
             dataset_id, text_pending, lama_pending, out, error, vanished, token=token)
         error, vanished = _wm_lama_tail(
@@ -11502,11 +11518,7 @@ def restore_watermark_original(user_id, dataset_id, image_id) -> dict | None:
     if not img or not img.filename:
         return None
     path = _img_path(img)
-    stem, ext = os.path.splitext(path)
-    backup = f'{stem}.orig{ext or ".webp"}'
-    if not os.path.exists(backup):
-        raise FileNotFoundError('no original to restore')
-    shutil.copy2(backup, path)   # bring the watermarked original back in place
+    _restore_preserved_watermark_original(path)
     # Re-flag as 'detected' so the badge/Clean count pick it up again; bbox and manual
     # regions are left exactly as stored (re-cleanable, possibly with the other engine).
     img.watermark_state = 'detected'

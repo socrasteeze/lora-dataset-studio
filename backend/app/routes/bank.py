@@ -1064,8 +1064,7 @@ def bank_watermark_klein_compare(bank_id):
 
 @bp.post('/bank/<int:bank_id>/watermark/undo')
 def bank_watermark_undo(bank_id):
-    """Drop the cleaned versions of {image_ids} (empty = all) and re-flag them.
-    Synchronous — it only deletes blobs we made."""
+    """Restore originals for {image_ids} (empty = all) and re-flag them."""
     data = request.get_json(silent=True) or {}
     try:
         n = banks.undo_watermark_clean(LOCAL_USER, bank_id,
@@ -2193,11 +2192,16 @@ def bank_file(bank_id, image_id):
     if request.args.get('previous') in ('1', 'true'):
         path = banks.bank_edit_history.previous_path(bank, row)
     else:
+        original = request.args.get('original') in ('1', 'true')
         # ?original=1 is the untouched SOURCE pixels: the user's file, or the
         # decoded copy of a HEIC/HEIF or AVIF one, which no browser would show.
         path = (banks.source_image_path(bank, row, fail_open=True)
-                if request.args.get('original') in ('1', 'true')
-                else banks.resolved_image_path(bank, row))
+                if original else banks.resolved_image_path(bank, row))
+        if path and original and row.watermark_clean_method == banks.CUSTOM_WATERMARK_CLEAN:
+            from ..services.face_dataset_service import _watermark_original_path
+            path = _watermark_original_path(path)
+            if os.path.islink(path):
+                path = None
     if not path or not os.path.isfile(path):
         return jsonify({'error': 'file missing'}), 404
     return send_file(path, max_age=0)

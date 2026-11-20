@@ -54,7 +54,7 @@ from .output_geometry import (
 
 logger = logging.getLogger(__name__)
 
-WORKFLOW_IMPROVE_SKIN_PATH = cfg.BACKEND_DIR / 'workflows' / 'improve skin.json'
+WORKFLOW_IMPROVE_SKIN_PATH = cfg.BACKEND_DIR / 'workflows' / 'API' / 'improve skin' / 'improve skin.json'
 
 # Nodes this helper rewires — fail LOUDLY if the workflow file changes shape
 # instead of silently enqueuing a job with the wrong source/prompt/model.

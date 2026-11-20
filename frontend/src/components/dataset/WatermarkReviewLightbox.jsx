@@ -764,7 +764,7 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
         {/* Cleaning this image overwrites it, so which model repaints it is not a
             detail — and it is the dataset's model, the same one improve uses.
             Named here, changeable here, only while Klein is the engine. */}
-        {kleinSelected && !useCrop && (
+        {kleinSelected && !useCrop && !caps?.watermark_clean_custom && (
           <div className={foldable}>
             <KleinModelSetting datasetId={datasetId}
               className="mx-auto w-full max-w-md text-center" />

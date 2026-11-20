@@ -1,4 +1,4 @@
-import { INPUT_CLASS, Card } from './primitives'
+import { INPUT_CLASS, Card, TextField } from './primitives'
 import { SettingsGroup, SettingsGroupsToc, useSettingsGroupProps } from './SettingsGroupsView'
 import { CAPTIONING_GROUPS } from './settingsGroups'
 import ResetToDefault from './ResetToDefault'
@@ -321,6 +321,10 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
             </span>
           </span>
         </label>
+        <TextField id="watermark-custom-workflow" label="Custom Klein Workflow"
+          value={config.watermark_clean?.custom_workflow ?? ''}
+          onChange={(value) => setField('watermark_clean', 'custom_workflow', value)}
+          help="Enter a ComfyUI API JSON path on the LDS host. Leave blank to use the shipped workflow." />
       </Card>
 
       </SettingsGroup>

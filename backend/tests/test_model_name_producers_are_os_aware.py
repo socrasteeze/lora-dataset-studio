@@ -166,9 +166,9 @@ def test_every_shipped_template_survives_a_posix_comfyui():
     from pathlib import Path
 
     from app.utils.comfy_names import MODEL_FILE_INPUTS
-    workflow_dir = Path(__file__).resolve().parents[1] / 'workflows'
+    workflow_dir = Path(__file__).resolve().parents[1] / 'workflows' / 'API'
     checked = 0
-    for path in sorted(workflow_dir.glob('*.json')):
+    for path in sorted(workflow_dir.glob('*/*.json')):
         graph = json.loads(path.read_text(encoding='utf-8'))
         if not isinstance(graph, dict):
             continue

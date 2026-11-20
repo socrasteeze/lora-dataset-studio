@@ -18,7 +18,7 @@ will "clean up".
 
 THE ONE DESIGN DECISION WORTH STATING: GRAFTS, NOT WORKFLOW VARIANTS
 --------------------------------------------------------------------
-`workflows/minimax_h3_i2v.json` holds eighteen nodes and no options. Turbo,
+`workflows/API/minimax_h3_i2v/minimax_h3_i2v.json` holds eighteen nodes and no options. Turbo,
 LoRA, sparse attention and upscale are grafted onto that graph at build time
 (ids 600-810), never shipped as separate JSON files. Four options that combine
 freely would otherwise be sixteen workflow files, fifteen of which nobody would
@@ -261,7 +261,7 @@ class VideoStudioAssetsMissing(Exception):
 def workflow_path():
     """Absolute path of the embedded H3 graph."""
     return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__)))), 'workflows', WORKFLOW_FILENAME)
+        os.path.abspath(__file__)))), 'workflows', 'API', 'minimax_h3_i2v', WORKFLOW_FILENAME)
 
 
 def load_base_workflow() -> dict:

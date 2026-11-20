@@ -136,6 +136,12 @@ def test_local_klein_job_is_byte_identical_to_before(app, tmp_path, monkeypatch)
     assert captured.get('worker_id') is None
     assert 'staged_input_paths' not in captured['metadata']
     assert captured['metadata']['model_name'] == 'watermark_klein'
+    workflow = captured['workflow_data']
+    assert workflow['52']['inputs']['image'].startswith('wmklein_crop_')
+    assert workflow['6']['inputs']['text'] == wk.KLEIN_INPAINT_PROMPT
+    assert workflow['77']['inputs']['seed'] == 1
+    assert workflow['10']['inputs']['vae_name'] == 'vae.safetensors'
+    assert workflow['90']['inputs']['clip_name'] == 'te.safetensors'
     # processing_timeout_seconds is the resolved budget the worker reads; it is
     # part of every image job's metadata now (same as generate), not a remote-only
     # field. Assert presence + type, not a hard-coded seconds value.

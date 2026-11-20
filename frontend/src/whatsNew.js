@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-19-custom-klein-clean',
+    date: '2026-11-19',
+    title: 'Clean with your own Klein workflow',
+    blurb: 'Use a ComfyUI API workflow to clean watermarks and text in Bank and Dataset. Each successful clean replaces the image in place and keeps the original for undo.',
+    to: '/settings/captioning',
+  },
+  {
     id: '2026-11-18-bank-navigation', date: '2026-11-18',
     title: 'Images Load First',
     blurb: 'When you open a Bank, the first page of images gets priority over the statistics. The Bank list also loads all card previews together.',

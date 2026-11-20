@@ -11,7 +11,7 @@ who has no LoRA yet.
 
 WHY A HAND-BUILT GRAPH (no shipped workflow JSON)
 -------------------------------------------------
-Klein loads `workflows/improve skin.json`, a file lifted from a developer's own
+Klein loads `workflows/API/improve skin/improve skin.json`, a file lifted from a developer's own
 ComfyUI whose loader nodes hardcode filenames that exist on no fresh install —
 `klein_edit_helper` then has to re-resolve every one of them. Building the Krea
 graph in code removes that whole class of bug: every loader value comes from a

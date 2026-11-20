@@ -45,7 +45,7 @@ from .klein_edit_helper import (_lora_abs, normalize_rel_model_name,
 
 logger = logging.getLogger(__name__)
 
-WORKFLOW_CAMERA_PATH = cfg.BACKEND_DIR / 'workflows' / 'qwen_camera_angles.json'
+WORKFLOW_CAMERA_PATH = cfg.BACKEND_DIR / 'workflows' / 'API' / 'qwen_camera_angles' / 'qwen_camera_angles.json'
 
 # Nodes the shipped graph MUST still contain. Checked before anything is staged
 # or enqueued: a template edited into a different shape has to fail by name here

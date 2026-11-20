@@ -59,7 +59,7 @@ from pathlib import Path
 
 import pytest
 
-WORKFLOW_DIR = Path(__file__).resolve().parents[1] / 'workflows'
+WORKFLOW_DIR = Path(__file__).resolve().parents[1] / 'workflows' / 'API'
 
 # comfy/samplers.py :: SCHEDULER_HANDLERS — the exact list the reporter's ComfyUI
 # published, and unchanged across every release checked.
@@ -143,7 +143,7 @@ VANILLA_ONLY_WORKFLOWS = ('improve skin.json', 'klein_inpaint.json')
 def _graphs():
     """(filename, graph) for every shipped API-format workflow. sampler_params.json
     is an override store, not a graph, so it has no nodes and is skipped."""
-    for path in sorted(WORKFLOW_DIR.glob('*.json')):
+    for path in sorted(WORKFLOW_DIR.glob('*/*.json')):
         data = json.loads(path.read_text(encoding='utf-8'))
         if isinstance(data, dict) and any(
                 isinstance(v, dict) and v.get('class_type') for v in data.values()):
@@ -204,7 +204,7 @@ def test_the_klein_lane_needs_no_third_party_pack_at_all():
     must stay runnable on a ComfyUI with zero custom nodes — including their
     widget VALUES, which is the part that was missed."""
     for name in VANILLA_ONLY_WORKFLOWS:
-        graph = json.loads((WORKFLOW_DIR / name).read_text(encoding='utf-8'))
+        graph = json.loads((WORKFLOW_DIR / Path(name).stem / name).read_text(encoding='utf-8'))
         for node_id, node in _nodes(graph):
             assert node['class_type'] not in DECLARED_THIRD_PARTY_NODES, (
                 f'{name} node {node_id} needs a third-party pack')
@@ -221,7 +221,7 @@ def test_the_klein_graphs_sample_the_way_the_rest_of_the_app_does():
     "improves" this back to a value that only exists on their own machine, the
     test above catches it; this one catches a silent drift of the render."""
     for name in VANILLA_ONLY_WORKFLOWS:
-        graph = json.loads((WORKFLOW_DIR / name).read_text(encoding='utf-8'))
+        graph = json.loads((WORKFLOW_DIR / Path(name).stem / name).read_text(encoding='utf-8'))
         samplers = {(n['inputs'].get('sampler_name'), n['inputs'].get('scheduler'))
                     for _, n in _nodes(graph) if n['class_type'] == 'KSampler'}
         assert samplers == {('euler', 'simple')}, f'{name}: {samplers}'

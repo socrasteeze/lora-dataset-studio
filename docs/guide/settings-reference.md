@@ -937,6 +937,18 @@ runs still protect captions that were manually reviewed or edited.
 
 ### Watermark inpainting
 
+**Custom Klein Workflow** (`watermark_clean.custom_workflow`) takes a path on the
+LDS host to a ComfyUI API JSON file. Leave it blank to use the shipped workflow.
+The workflow needs exactly one `LoadImage` connected to one `SaveImage` or
+`PreviewImage`. It supplies its own models, prompt, and processing size. LDS
+uses the selected Output Size and saves the cleaned pixels at the job image's
+path. The write-once `.orig` sibling supports Restore Original in Dataset and
+Undo Cleaning in Bank. Bank source protection applies. Sources that Bank can
+only decode to a separate copy, such as HEIC, cannot be replaced in place.
+Revert any existing Bank crop or improvement before cleaning the source. Use
+Undo Cleaning before rescanning an in-place clean for watermarks or text. For
+a remote render, install the workflow's models and nodes on the selected worker.
+
 - **Processing device** → `watermark.device`. Where LaMa inpainting runs. Default **`auto`**. Options: `auto` (GPU when available, otherwise CPU), `cuda` (force GPU — pauses ComfyUI while cleaning), `cpu` (keep the GPU free). This only affects the **LaMa** engine.
 - **Allow automatic crop** → `watermark.allow_crop`. Default **on**. When on, a watermark sitting in an outer border band is **cropped off** (a pure pixel crop — it invents nothing). Turn it **off** and such a mark is **repainted instead** (with LaMa or Klein per the chosen engine) rather than cropped. The exact same preference is editable inline in the workspace's **Clean** bar — it's one shared value, so changing it in either place changes both.
 
@@ -1851,6 +1863,7 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `watermark_clean.klein_prompt` | The instruction the 🧽 Klein clean sends when it re-renders the photo (default `remove watermark`). Empty = that default. Edited next to the Klein model choice on both the Bank panel and the dataset Clean bar; never routed into the ✦ Repair lane. |
 | `watermark_clean.klein_max_mp` | Megapixels the photo is scaled to before Klein re-renders it (default `2.0`, clamped 0.5–4.0). Higher = finer regenerated detail, more VRAM and more time. Never enlarges a smaller photo. The ✦ Repair lane keeps its own fixed cap. |
 | `watermark_clean.klein_output` | What size the cleaned file is written at: `original` (default — resampled back to your file's own dimensions) or `render` (written at the render's size, so **the file changes dimensions**). |
+| `watermark_clean.custom_workflow` | Host path to a [custom ComfyUI API workflow](#watermark-inpainting). Leave blank to use the shipped workflow. |
 | `zimage.vae` | Pins the Z-Image VAE (blank = the app resolves it itself, any spelling, any sub-folder). |
 | `zimage.text_encoder` | Pins the Z-Image text encoder (blank = the app resolves it itself). |
 | `variations.output_megapixels` | Pixel budget every generated variation is rendered at, in megapixels, on the shot card's ratio — shared by **both** local engines (Klein and Krea 2 Edit). Default `2.0` = Klein's historical hardcoded value; 0.5–2.0. Not the improve pass (`klein.improve_megapixels`), and not the ✦ reference edit (source frame, never upscaled). |

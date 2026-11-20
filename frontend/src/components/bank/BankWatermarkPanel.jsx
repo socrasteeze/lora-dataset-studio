@@ -326,6 +326,7 @@ export default function BankWatermarkPanel({
             toggle at 400 px. */}
         {method === 'klein' && (
           <>
+          {!caps.watermark_clean_custom && (
           <div className="w-full flex flex-wrap items-center gap-x-3 gap-y-1">
             <KleinModelSetting className="min-w-0 flex-1" />
             <Button type="button" size="md" noShrink
@@ -346,6 +347,7 @@ export default function BankWatermarkPanel({
               </span>
             )}
           </div>
+          )}
           {/* WHAT the clean will actually do, and the three dials that change it: the
               prompt Klein is sent, the size the photo travels at, and whether the file
               keeps its dimensions. Stored, so the dataset side reads the same values —
@@ -477,7 +479,9 @@ export default function BankWatermarkPanel({
               Engine: <span className="font-semibold text-content">
                 {method === 'klein' ? 'Klein' : 'LaMa'}
               </span>{method === 'klein'
-                ? KLEIN_CLEAN_SHORT
+                ? (caps.watermark_clean_custom
+                  ? '. The custom workflow replaces each source image and preserves the original for undo.'
+                  : KLEIN_CLEAN_SHORT)
                 : ' — fast; a mark on the subject stays flagged instead of being smeared.'}
               {target !== 'all' && (
                 <>

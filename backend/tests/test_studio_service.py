@@ -1521,8 +1521,8 @@ def test_run_owned_and_owned_test_image_are_single_user_no_ops(app):
 def _all_workflow_files():
     from app.services import lora_test_studio as lts
     import glob, os
-    wf_dir = os.path.join(str(lts.cfg.BACKEND_DIR), 'workflows')
-    return sorted(glob.glob(os.path.join(wf_dir, '*.json')))
+    wf_dir = os.path.join(str(lts.cfg.BACKEND_DIR), 'workflows', 'API')
+    return sorted(glob.glob(os.path.join(wf_dir, '*', '*.json')))
 
 
 def test_no_embedded_workflow_references_httpnotifynode():

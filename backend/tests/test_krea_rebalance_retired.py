@@ -26,6 +26,7 @@ for the class, because the resolver is generic and a user template or a Canvas
 plugin graph may still carry it — those are tested elsewhere.
 """
 import json
+from pathlib import Path
 
 import pytest
 
@@ -33,7 +34,7 @@ from app import config as cfg
 
 
 def _graph(name):
-    with open(cfg.BACKEND_DIR / 'workflows' / name, encoding='utf-8') as fh:
+    with open(cfg.BACKEND_DIR / 'workflows' / 'API' / Path(name).stem / name, encoding='utf-8') as fh:
         return json.load(fh)
 
 

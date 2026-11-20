@@ -2969,13 +2969,11 @@ launch by hand** — cheapest and safest first:
    Every clean also writes the prompt, size and write-back mode it used to
    🪵 Server log, so you can tell afterwards what actually ran.
 
-Each step shows how many images it still has to work on and how many it has
-already handled, so you can see where the funnel stands. **Your source files are
-never modified** — a cleaned image is a copy the app keeps beside the bank's
-thumbnails. That copy is what the grid shows, and what **⬆ Promote** sends to
-the dataset, so a cleaned bank produces a clean dataset. **↩ Undo cleaning**
-just deletes those copies and flags the images again, and **👁 Before / after**
-flips a sample between the cleaned version and your untouched original.
+Each step shows how many images it has handled and how many remain. The shipped
+cleaners store a copy beside the Bank thumbnails. The grid and **Promote** use
+the cleaned pixels. A custom Klein workflow replaces writable source images and
+keeps each original in a `.orig` sibling. **Undo Cleaning** restores the prior
+pixels and flags the image again. **Before / After** shows both versions.
 
 If a bank was scanned by an older version, its flagged images carry no recorded
 mark position; the panel says so and one more **🚩 Find watermarks** run makes
@@ -3160,11 +3158,10 @@ What the two cleaning steps then do with your mask:
   is nothing to repaint here": neither step touches that image, and the panel
   says how many are in that state instead of leaving them looking unhandled.
 
-A flagged image an older scan left *without* a box becomes cleanable as soon as
-you draw the zones yourself — that drawing is the missing information. And as
-everywhere else in a bank, **your own file is never modified**: cleaning writes
-a separate copy. A rotated image is shown unrotated here, because the whole
-watermark lane works on your original file, which the ↻ turn never changed.
+A flagged image without a box becomes cleanable when you draw a zone. The
+watermark lane uses the source image's orientation, so this view omits any
+rotation applied by the Bank. A custom Klein clean preserves the original and
+replaces the source image when source protection permits it.
 
 ## Reject every flagged image at once
 

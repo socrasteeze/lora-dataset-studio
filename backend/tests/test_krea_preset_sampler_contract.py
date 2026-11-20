@@ -173,7 +173,7 @@ def _krea_graph():
     keep passing after the template changed underneath it."""
     import json
     from app import config as cfg
-    with open(cfg.BACKEND_DIR / 'workflows' / 'krea2_turbo.json', encoding='utf-8') as fh:
+    with open(cfg.BACKEND_DIR / 'workflows' / 'API' / 'krea2_turbo' / 'krea2_turbo.json', encoding='utf-8') as fh:
         return json.load(fh)
 
 

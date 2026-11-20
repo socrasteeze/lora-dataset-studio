@@ -137,11 +137,11 @@ IDENTITY_PROMPT_TEMPLATE = "{trigger}, close-up portrait, neutral expression, lo
 TEST_WIDTH, TEST_HEIGHT = 832, 1216
 
 # Workflow paths for the bundled image-generation graphs.
-WORKFLOW_ZTURBO_PATH = cfg.BACKEND_DIR / 'workflows' / 'ZImage_bigLove_ZT3_optimal.json'
-WORKFLOW_HQ_PATH = cfg.BACKEND_DIR / 'workflows' / 'image_real_HQ.json'
-WORKFLOW_KREA_TURBO_PATH = cfg.BACKEND_DIR / 'workflows' / 'krea2_turbo.json'
-WORKFLOW_KREA_IMG2IMG_PATH = cfg.BACKEND_DIR / 'workflows' / 'krea2_turbo_img2img.json'
-WORKFLOW_FLUX2KLEIN_PATH = cfg.BACKEND_DIR / 'workflows' / 'flux2_klein_t2i.json'
+WORKFLOW_ZTURBO_PATH = cfg.BACKEND_DIR / 'workflows' / 'API' / 'ZImage_bigLove_ZT3_optimal' / 'ZImage_bigLove_ZT3_optimal.json'
+WORKFLOW_HQ_PATH = cfg.BACKEND_DIR / 'workflows' / 'API' / 'image_real_HQ' / 'image_real_HQ.json'
+WORKFLOW_KREA_TURBO_PATH = cfg.BACKEND_DIR / 'workflows' / 'API' / 'krea2_turbo' / 'krea2_turbo.json'
+WORKFLOW_KREA_IMG2IMG_PATH = cfg.BACKEND_DIR / 'workflows' / 'API' / 'krea2_turbo_img2img' / 'krea2_turbo_img2img.json'
+WORKFLOW_FLUX2KLEIN_PATH = cfg.BACKEND_DIR / 'workflows' / 'API' / 'flux2_klein_t2i' / 'flux2_klein_t2i.json'
 
 
 def _comfy_output_dir():

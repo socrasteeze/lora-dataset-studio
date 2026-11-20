@@ -1696,7 +1696,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       the dataset's model, like improve and generation — named here,
                       changeable here. basis-full: its own row rather than a squeezed
                       column at 400 px. */}
-                  {watermarkMethod === 'klein' && (
+                  {watermarkMethod === 'klein' && !caps.watermark_clean_custom && (
                     <div className="basis-full flex flex-wrap items-center gap-x-3 gap-y-1">
                       <KleinModelSetting datasetId={d.id} className="min-w-0 flex-1" />
                       {/* ⚖ The judging half: try the candidates on ONE flagged image

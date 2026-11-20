@@ -154,6 +154,7 @@ back — and, on the two box lanes only, composites it locally. Same `(ok, error
 contract as watermark_lama, on all of them."""
 from __future__ import annotations
 import io
+import json
 import logging
 import math
 import os
@@ -161,6 +162,7 @@ import random
 import tempfile
 import time
 import uuid
+from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
 
@@ -174,8 +176,8 @@ from ..utils.comfyui import load_workflow_local, fetch_output_image_bytes
 
 logger = logging.getLogger(__name__)
 
-KLEIN_INPAINT_WORKFLOW_PATH = cfg.BACKEND_DIR / 'workflows' / 'klein_inpaint.json'
-KLEIN_MASK_INPAINT_WORKFLOW_PATH = cfg.BACKEND_DIR / 'workflows' / 'klein_mask_inpaint.json'
+KLEIN_INPAINT_WORKFLOW_PATH = cfg.BACKEND_DIR / 'workflows' / 'API' / 'klein_inpaint' / 'klein_inpaint.json'
+KLEIN_MASK_INPAINT_WORKFLOW_PATH = cfg.BACKEND_DIR / 'workflows' / 'API' / 'klein_mask_inpaint' / 'klein_mask_inpaint.json'
 # 2026-07-27: node 77 of that file sampled with `scheduler: "beta57"`, a value the
 # third-party RES4LYF pack injects into ComfyUI's CORE scheduler list at import —
 # so it worked on the machine the graph was captured on and refused to run
@@ -367,6 +369,59 @@ def is_available() -> bool:
         return keh.klein_engine_ready(probe_comfyui()['ok'])
     except Exception:
         return False
+
+
+def custom_clean_workflow_path() -> str:
+    return str(cfg.get('watermark_clean.custom_workflow') or '').strip()
+
+
+def clean_available(custom_path=None) -> bool:
+    if not (custom_clean_workflow_path() if custom_path is None else custom_path):
+        return is_available()
+    from ..capabilities import probe_comfyui
+    return probe_comfyui()['ok']
+
+
+def load_custom_clean_workflow(path):
+    """Read the API export and identify the cleaning lane's ports."""
+    try:
+        source = cfg.REPO_ROOT / Path(path).expanduser()
+        graph = json.loads(source.read_text(encoding='utf-8-sig'))
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise ValueError('Custom Klein workflow could not be read as JSON. Check the path and export.') from exc
+    if not isinstance(graph, dict) or any(
+        not isinstance(node, dict) or not isinstance(node.get('class_type'), str)
+        or not isinstance(node.get('inputs'), dict) for node in graph.values()
+    ):
+        raise ValueError('Custom Klein workflow must be exported in ComfyUI API format.')
+    loaders = [key for key, node in graph.items() if node['class_type'] == 'LoadImage']
+    outputs = [key for key, node in graph.items()
+               if node['class_type'] in ('SaveImage', 'PreviewImage')]
+    if len(loaders) != 1:
+        raise ValueError('Custom Klein workflow needs exactly one LoadImage node.')
+    if len(outputs) != 1:
+        raise ValueError('Custom Klein workflow needs exactly one SaveImage or PreviewImage node.')
+    output = outputs[0]
+    images = graph[output]['inputs'].get('images')
+    if (not isinstance(images, list) or len(images) != 2 or not isinstance(images[0], str)
+            or images[0] not in graph or type(images[1]) is not int):
+        raise ValueError('Custom Klein workflow needs an image connected to its output node.')
+    # Submit only the selected output and its ancestors. Other branches can
+    # report images to the shared queue before the selected output does.
+    reachable = set()
+    pending = [output]
+    while pending:
+        key = pending.pop()
+        if key in reachable:
+            continue
+        reachable.add(key)
+        pending.extend(value[0] for value in graph[key]['inputs'].values()
+                       if isinstance(value, list) and len(value) == 2
+                       and isinstance(value[0], str) and value[0] in graph
+                       and type(value[1]) is int)
+    if loaders[0] not in reachable:
+        raise ValueError('Custom Klein workflow must connect LoadImage to its image output.')
+    return {key: node for key, node in graph.items() if key in reachable}, loaders[0], output
 
 
 # --- Pure geometry (unit-tested, no I/O) --------------------------------------
@@ -686,7 +741,7 @@ def _wait_for_job(job_id, timeout):
 
 def _run_klein_job(user_id, crop_img, *, seed, steps=KLEIN_STEPS,
                    denoise=KLEIN_DENOISE, timeout=None, klein_model=None,
-                   device_id=None, prompt=None):
+                   device_id=None, prompt=None, custom_workflow=None):
     """Enqueue one native full-edit job on `crop_img` and return (rendered_image, None) or
     (None, error). Whatever is passed becomes the KSampler latent AND the ReferenceLatent
     (no SetLatentNoiseMask) — a PRE-FILLED crop on the box-repair lane, the WHOLE photo on
@@ -701,27 +756,53 @@ def _run_klein_job(user_id, crop_img, *, seed, steps=KLEIN_STEPS,
     than repainting on a neighbour: this lane overwrites the user's file in place,
     so a silent swap is not even reversible by regenerating."""
     timeout = repair_timeout_seconds() if timeout is None else timeout
-    workflow = load_workflow_local(str(KLEIN_INPAINT_WORKFLOW_PATH))
-    if not workflow:
-        return None, {'kind': 'failed', 'detail': 'failed to load klein_inpaint workflow'}
-    for node in _REQUIRED_NODES:
-        if node not in workflow:
-            return None, {'kind': 'failed',
-                          'detail': f'workflow node {node} missing — klein_inpaint.json changed'}
     from . import cluster as cluster_svc
     remote = (cluster_svc.normalize_device_id(device_id)
               != cluster_svc.LOCAL_DEVICE_ID)
-    # Model NAMES resolve either way — the workflow needs them — but the
-    # missing-assets raise is a LOCAL disk question; the remote machine's
-    # ComfyUI answers it for itself when the job arrives (same split as
-    # klein_edit_helper).
-    unet = keh.unet_for_job(klein_model)
-    vae = keh.resolve_klein_vae()
-    te = keh.resolve_klein_text_encoder()
-    if not remote:
-        missing = keh.klein_missing_assets()
-        if any(a in missing for a in keh.KLEIN_REQUIRED):
-            raise keh.KleinModelsMissing(missing)
+    uid = uuid.uuid4().hex[:8]
+    crop_name = f'wmklein_crop_{uid}.png'
+    if custom_workflow is not None:
+        workflow, loader, output = custom_workflow
+        workflow[loader]['inputs']['image'] = crop_name
+        # Local, API backend and peer workers all retrieve saved output files.
+        # Keep the selected PreviewImage's connection and persist it for transport.
+        workflow[output]['class_type'] = 'SaveImage'
+        workflow[output]['inputs']['filename_prefix'] = f'wmklein_{uid}'
+        text = (prompt or '').strip()
+        if text:
+            encoders = [node['inputs'] for node in workflow.values()
+                        if node['class_type'] == 'CLIPTextEncode'
+                        and isinstance(node['inputs'].get('text'), str)]
+            if len(encoders) == 1:
+                encoders[0]['text'] = text
+    else:
+        workflow = load_workflow_local(str(KLEIN_INPAINT_WORKFLOW_PATH))
+        if not workflow:
+            return None, {'kind': 'failed', 'detail': 'failed to load klein_inpaint workflow'}
+        for node in _REQUIRED_NODES:
+            if node not in workflow:
+                return None, {'kind': 'failed',
+                              'detail': f'workflow node {node} missing — klein_inpaint.json changed'}
+        unet = keh.unet_for_job(klein_model)
+        vae = keh.resolve_klein_vae()
+        te = keh.resolve_klein_text_encoder()
+        if not remote:
+            missing = keh.klein_missing_assets()
+            if any(a in missing for a in keh.KLEIN_REQUIRED):
+                raise keh.KleinModelsMissing(missing)
+        workflow['114']['inputs']['unet_name'] = unet
+        workflow['114']['inputs']['weight_dtype'] = keh._unet_weight_dtype(unet)
+        workflow['10']['inputs']['vae_name'] = vae
+        workflow['90']['inputs']['clip_name'] = te
+        workflow['52']['inputs']['image'] = crop_name
+        text = (prompt or '').strip() or KLEIN_INPAINT_PROMPT
+        workflow['6']['inputs']['text'] = text
+        workflow['77']['inputs']['seed'] = int(seed)
+        workflow['77']['inputs']['steps'] = max(1, int(steps))
+        workflow['77']['inputs']['denoise'] = float(denoise)
+        workflow['77']['inputs']['sampler_name'] = KLEIN_SAMPLER
+        workflow['77']['inputs']['cfg'] = KLEIN_CFG
+        workflow['9']['inputs']['filename_prefix'] = f'wmklein_{uid}'
 
     # Same filesystem hand-off as the generation lanes (utils/comfy_fs): the crop
     # is WRITTEN into ComfyUI's input folder, which a container/remote install may
@@ -730,8 +811,6 @@ def _run_klein_job(user_id, crop_img, *, seed, steps=KLEIN_STEPS,
     # A REMOTE render never touches the local input folder: the crop goes to a
     # temp file whose path rides staged_input_paths — the peer publisher and the
     # BackendWorker upload read exactly that.
-    uid = uuid.uuid4().hex[:8]
-    crop_name = f'wmklein_crop_{uid}.png'
     if remote:
         import tempfile
         fd, crop_path = tempfile.mkstemp(prefix='wmklein_', suffix='.png')
@@ -747,30 +826,6 @@ def _run_klein_job(user_id, crop_img, *, seed, steps=KLEIN_STEPS,
             # simply cannot be reached over the filesystem from this process. The
             # message already names the folder and what to do about it.
             return None, {'kind': 'unavailable', 'detail': str(exc)}
-
-    workflow['114']['inputs']['unet_name'] = unet
-    # Same rule as the edit lane: the graph hardcodes fp8_e4m3fn, which is only
-    # right for an fp8 build (keh._unet_weight_dtype).
-    workflow['114']['inputs']['weight_dtype'] = keh._unet_weight_dtype(unet)
-    workflow['10']['inputs']['vae_name'] = vae
-    workflow['90']['inputs']['clip_name'] = te
-    workflow['52']['inputs']['image'] = crop_name
-    # A CALLER may steer what is painted back in. None keeps the watermark
-    # reconstruction prompt, so the cleaning lane sends the exact same graph it
-    # always did — a test pins that value. What the free prompt unlocks is the
-    # ONE thing this machinery could not do: a masked, prompted repair that
-    # leaves every pixel outside the box byte-identical, instead of the ✦ Edit
-    # lane's full re-render. (Asked for by mr.arrow and .samexit on Discord.)
-    text = (prompt or '').strip() or KLEIN_INPAINT_PROMPT
-    workflow['6']['inputs']['text'] = text
-    workflow['77']['inputs']['seed'] = int(seed)
-    workflow['77']['inputs']['steps'] = max(1, int(steps))
-    workflow['77']['inputs']['denoise'] = float(denoise)
-    # Pinned from here, not read from the JSON: both lanes' recipes name a sampler and a
-    # cfg, and a hand-edit of the shipped graph would otherwise move them silently.
-    workflow['77']['inputs']['sampler_name'] = KLEIN_SAMPLER
-    workflow['77']['inputs']['cfg'] = KLEIN_CFG
-    workflow['9']['inputs']['filename_prefix'] = f'wmklein_{uid}'
 
     job_id = str(uuid.uuid4())
     status = None
@@ -1088,6 +1143,8 @@ def run_compare(user_id, rows, *, model, image_id=None, seed=None):
     import base64
     from . import klein_edit_helper as keh
 
+    if custom_clean_workflow_path():
+        return {'ok': False, 'error': 'The custom Klein workflow selects its own models.'}
     name = (model or '').strip()
     if not name:
         return {'ok': False, 'error': 'name the Klein model to try'}
@@ -1183,7 +1240,7 @@ def inpaint_watermark_klein(user_id, image_path, boxes, *, seed=None, device='cp
                             timeout=None,
                             klein_model=None, device_id=None, prompt=None,
                             klein_prompt=None, klein_max_mp=None,
-                            klein_output=None) -> tuple[bool, dict | None]:
+                            klein_output=None, custom_path=None) -> tuple[bool, dict | None]:
     """Klein, on `image_path`, in place — the 🧽 watermark CLEAN or the ✦ BOX repair.
 
     ONE entry point, TWO lanes, and `prompt` is the switch (see the module docstring):
@@ -1225,17 +1282,29 @@ def inpaint_watermark_klein(user_id, image_path, boxes, *, seed=None, device='cp
     from . import cluster as cluster_svc
     remote = (cluster_svc.normalize_device_id(device_id)
               != cluster_svc.LOCAL_DEVICE_ID)
-    if not remote and not is_available():
+    repair = bool((prompt or '').strip())
+    if repair:
+        custom_path = ''
+    elif custom_path is None:
+        custom_path = custom_clean_workflow_path()
+    custom_workflow = None
+    if custom_path:
+        try:
+            custom_workflow = load_custom_clean_workflow(custom_path)
+        except ValueError as exc:
+            return False, {'kind': 'failed', 'detail': str(exc)}
+    if not remote and not clean_available(custom_path):
         return False, {'kind': 'unavailable',
-                       'detail': 'Klein inpaint is not ready (ComfyUI unreachable or models missing)'}
+                       'detail': ('Custom Klein workflow needs ComfyUI running' if custom_path else
+                                  'Klein inpaint is not ready (ComfyUI unreachable or models missing)')}
     try:
         original = Image.open(image_path).convert('RGB')
     except (OSError, ValueError) as e:
         return False, {'kind': 'failed', 'detail': f'unreadable image: {e}'}
     norm = _normalize_boxes(boxes)
-    if not norm:
+    if not norm and custom_workflow is None:
         return False, {'kind': 'failed', 'detail': 'no valid watermark box'}
-    if (prompt or '').strip():
+    if repair:
         return _repair_boxes_crop_and_stitch(user_id, image_path, original, norm, seed=seed,
                                              device=device, timeout=timeout,
                                              klein_model=klein_model, device_id=device_id,
@@ -1243,14 +1312,14 @@ def inpaint_watermark_klein(user_id, image_path, boxes, *, seed=None, device='cp
     return _clean_full_frame(user_id, image_path, original, norm, seed=seed, device=device,
                              timeout=timeout, klein_model=klein_model, device_id=device_id,
                              klein_prompt=klein_prompt, klein_max_mp=klein_max_mp,
-                             klein_output=klein_output)
+                             klein_output=klein_output, custom_workflow=custom_workflow)
 
 
 def _clean_full_frame(user_id, image_path, original, norm=None, *, seed=None,
                       device='cpu', timeout=None,
                       klein_model=None, device_id=None,
                       klein_prompt=None, klein_max_mp=None,
-                      klein_output=None) -> tuple[bool, dict | None]:
+                      klein_output=None, custom_workflow=None) -> tuple[bool, dict | None]:
     """The 🧽 clean (maintainer's 2026-08-31 recipe): ERASE the detected zones on the
     whole photo, hand that whole photo to Klein under "remove watermark", and write the
     render back at the file's own size.
@@ -1290,13 +1359,14 @@ def _clean_full_frame(user_id, image_path, original, norm=None, *, seed=None,
       CHANGES DIMENSIONS. That is the user's choice to make, said in those words on
       every surface that offers it."""
     W, H = original.size
-    prompt = clean_prompt(klein_prompt)
     max_mp = clean_max_mp(klein_max_mp)
     output_mode = clean_output_mode(klein_output)
-    sent_size = _mask_frame_size(W, H, max_mp=max_mp)
+    custom = custom_workflow is not None
+    prompt = klein_prompt if custom else clean_prompt(klein_prompt)
+    sent_size = (W, H) if custom else _mask_frame_size(W, H, max_mp=max_mp)
     frame = original if original.size == sent_size else original.resize(sent_size, Image.LANCZOS)
 
-    if norm:
+    if norm and not custom:
         # Boxes grown by the margin and re-normalized against the SENT frame — the
         # crop helper does exactly this when the "crop" is the whole picture.
         sw, sh = sent_size
@@ -1316,12 +1386,17 @@ def _clean_full_frame(user_id, image_path, original, norm=None, *, seed=None,
     # has to be in the log, next to the size and the write-back mode. Logged BEFORE the
     # render, so a job that fails or times out still says what it was asked to do. No
     # file path: this line ends up in pasted diagnostics.
-    logger.info('watermark_klein clean: prompt=%r · sent %d×%d (cap %.2f MP) · '
-                'write-back %s', prompt, sent_size[0], sent_size[1], max_mp, output_mode)
+    if custom:
+        logger.info('watermark_klein custom clean: sent %d×%d · write-back %s',
+                    W, H, output_mode)
+    else:
+        logger.info('watermark_klein clean: prompt=%r · sent %d×%d (cap %.2f MP) · '
+                    'write-back %s', prompt, sent_size[0], sent_size[1], max_mp, output_mode)
+    workflow_options = {'custom_workflow': custom_workflow} if custom else {}
     rendered, err = _run_klein_job(user_id, frame, seed=seed, steps=KLEIN_CLEAN_STEPS,
                                    denoise=KLEIN_DENOISE, timeout=timeout,
                                    klein_model=klein_model, device_id=device_id,
-                                   prompt=prompt)
+                                   prompt=prompt, **workflow_options)
     if err:
         return False, err
     result = (rendered if output_mode == 'render' or rendered.size == (W, H)

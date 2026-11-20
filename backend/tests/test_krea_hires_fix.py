@@ -41,7 +41,7 @@ def _krea_graph():
     """The shipped Krea template, loaded from disk — not a hand-written stub, which
     would freeze the shape the graph had the day this was written and keep passing
     after the template moved underneath it."""
-    with open(cfg.BACKEND_DIR / 'workflows' / 'krea2_turbo.json', encoding='utf-8') as fh:
+    with open(cfg.BACKEND_DIR / 'workflows' / 'API' / 'krea2_turbo' / 'krea2_turbo.json', encoding='utf-8') as fh:
         return json.load(fh)
 
 

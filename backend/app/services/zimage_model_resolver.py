@@ -2,7 +2,7 @@
 
 WHY THIS EXISTS
 ---------------
-``workflows/ZImage_bigLove_ZT3_optimal.json`` was captured on a developer's own
+``workflows/API/ZImage_bigLove_ZT3_optimal/ZImage_bigLove_ZT3_optimal.json`` was captured on a developer's own
 ComfyUI, so its loader nodes carry that machine's filenames verbatim:
 
     node 2 (CLIPLoader) : "Z image\\qwen_3_4b.safetensors"

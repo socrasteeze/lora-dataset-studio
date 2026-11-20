@@ -668,7 +668,7 @@ DEFAULTS = {
     #   the cap keeps the detail the resample would soften, and THE FILE CHANGES
     #   DIMENSIONS. Every surface that offers it says so.
     'watermark_clean': {'klein_prompt': 'remove watermark', 'klein_max_mp': 2.0,
-                        'klein_output': 'original'},
+                        'klein_output': 'original', 'custom_workflow': ''},
     # 🔤 Find text (bank + dataset). score_min: the OCR confidence a line must
     # carry to become a repaint zone — the launch window's Sensitivity slider
     # writes it through. 0.5 is the engine's conventional floor (the video
@@ -976,7 +976,7 @@ DEFAULTS = {
         'output_megapixels': 2.0,
     },
     # Krea hi-res fix — the optional SECOND latent pass on the Krea GENERATION
-    # graph (workflows/krea2_turbo.json: the Test Studio grid and the LoRA Canvas).
+    # graph (workflows/API/krea2_turbo/krea2_turbo.json: the Test Studio grid and the LoRA Canvas).
     # Its own namespace for the same reason `variations` has one: the `krea`
     # block below is the Krea 2 Identity EDIT engine, a hand-built graph that
     # never loads this file, so a key there would read as a dial of the wrong
