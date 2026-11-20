@@ -41,6 +41,7 @@ export function imageVersionQuery(img) {
   if (img?.rotation) parts.push(`r=${img.rotation}`);
   if (img?.edit_generation) parts.push(`e=${img.edit_generation}`);
   if (img?.edit_sequence) parts.push(`v=${img.edit_sequence}`);
+  if (img?.watermark_state === 'cleaned') parts.push('watermark=cleaned');
   return parts.length ? `?${parts.join('&')}` : '';
 }
 

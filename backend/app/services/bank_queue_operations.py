@@ -73,6 +73,11 @@ def prepare(operation, user_id, bank_id, options):
             normalize_ollama_model_ref(options['ollama_model'], allow_empty=True)
     if operation == 'watermark_inpaint':
         banks.normalize_inpaint_options(options.get('method'), options.get('target'))
+        selected = options.get('clean_selected', False)
+        if not isinstance(selected, bool) or (selected and not options.get('ids')):
+            raise ValueError('Clean selected requires clean_selected=true and a nonempty image_ids list')
+        if selected:
+            banks._require_writable_source(bank)
     if operation == 'semantic_dedup':
         banks._semantic_dup_threshold(banks._selected_semantic_engine(bank), options.get('threshold'))
     if operation == 'framing':

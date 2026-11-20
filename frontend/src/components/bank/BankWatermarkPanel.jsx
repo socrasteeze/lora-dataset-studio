@@ -1,10 +1,7 @@
 /**
  * 🚩 Watermark cleaning — the Bank's two-level escalation, launched by hand.
  *
- * A bank points at a folder that belongs to the user and we NEVER write to it,
- * so a cleaned image is a separate copy kept by the app; the original stays on
- * disk untouched. That is what lets both levels be tried freely: ↩ Undo just
- * throws our copy away.
+ * Undo removes working copies or restores originals for in-place cleans.
  *
  * Level 1 (🚩 Find) records WHERE each mark sits — the two below route on it.
  * Level 2 (✂ Auto-crop) cuts off marks sitting in a border — no model, no GPU,
@@ -27,19 +24,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Flag } from 'lucide-react';
 import { apiFetch, postJson } from '../../api/fetchClient'
-import DevicePicker, { loadSavedDeviceId } from '../common/DevicePicker'
+import DevicePicker from '../common/DevicePicker'
 import PassDialog from './PassDialog.jsx'
 import KleinModelSetting from '../shared/KleinModelSetting'
 import KleinCleanOptions from '../shared/KleinCleanOptions'
 import KleinCompareDialog from '../shared/KleinCompareDialog'
 import { useCapabilities } from '../../context/CapabilitiesContext'
 import { useToast } from '../common/Toast'
-import {
-  CLEAN_ENGINES_BLURB, KLEIN_CLEAN_SHORT, kleinCleanTitle,
-} from '../../utils/watermarkCleanEngine.js'
+import { KLEIN_CLEAN_SHORT, kleinCleanTitle } from '../../utils/watermarkCleanEngine.js'
 import {
   cropLevelState, findLevelState, hasCleanedImages, inpaintLevelState,
-  levelCounts, maskNote, progressSummary, rescanNote, sourceNote,
+  levelCounts, maskNote, progressSummary, rescanNote,
   textLevelState,
 } from './bankWatermark.js'
 import { openerLabel } from './scoringPython.js'
@@ -51,24 +46,18 @@ import { Button, btnShape, controlHeight } from '../common/Controls.jsx'
 // judge a pass; the grid holds the full set.
 const COMPARE_SAMPLE = 8
 
-function LevelCard({ index, title, blurb, state, onRun }) {
+function LevelCard({ index, title, state, onRun }) {
+  const message = state.reason || state.note
   return (
-    <div className="lds-section flex-1 min-w-[15rem] py-2.5 space-y-1.5">
-      <div className="flex items-baseline gap-1.5">
-        <span className="text-2xs font-bold uppercase tracking-wide text-content-subtle">
-          Level {index}
-        </span>
-        <span className="text-sm font-semibold text-content">{title}</span>
-      </div>
-      <p className="text-2xs leading-snug text-content-subtle">{blurb}</p>
-      <button type="button" onClick={onRun} disabled={state.disabled} title={state.reason || title}
-        className="rounded-lg border border-amber-400/40 bg-amber-500/15 px-3 py-1.5 text-sm font-semibold text-amber-200 disabled:opacity-40">
+    <div className="min-w-0 space-y-1">
+      <span className="block text-2xs font-bold uppercase tracking-wide text-content-subtle">
+        Level {index}
+      </span>
+      <button type="button" onClick={onRun} disabled={state.disabled} title={message || title}
+        className="min-h-10 w-full whitespace-nowrap rounded-lg border border-amber-400/40 bg-amber-500/15 px-1 py-1 text-xs font-semibold text-amber-200 disabled:opacity-40 lg:min-h-0 lg:py-1.5">
         {state.label}
       </button>
-      <p className="text-2xs text-content-subtle">
-        {state.done > 0 ? `${state.done} already handled here. ` : ''}
-        {state.reason || state.note || `${state.remaining} image(s) waiting.`}
-      </p>
+      {message && <p className="text-2xs text-content-subtle">{message}</p>}
     </div>
   )
 }
@@ -76,19 +65,12 @@ function LevelCard({ index, title, blurb, state, onRun }) {
 export default function BankWatermarkPanel({
   bankId, live, onFind, onFindText = null, onChanged, payload = null,
   selectedIds = [], gpuPresent = true, onPickPython = null,
+  method, onMethodChange, deviceId, onDeviceChange,
+  scanDevice, onScanDeviceChange, onScanDevice,
 }) {
   const { caps, refresh: refreshCaps } = useCapabilities()
   const toast = useToast()
   const [levels, setLevels] = useState(null)
-  const [method, setMethod] = useState('auto')
-  // Which machine renders the KLEIN jobs (LaMa never travels). Shares the
-  // remembered pick with the generation picker on purpose — one habit.
-  const [deviceId, setDeviceId] = useState(() => loadSavedDeviceId('comfy'))
-  // …and which machine runs the SCAN, which is a different question with a
-  // different eligible list (a bare ComfyUI backend can render a repaint but
-  // cannot run a vision pass). Remembered under its own kind, so the two
-  // pickers on this panel stop overwriting each other.
-  const [scanDevice, setScanDevice] = useState(() => loadSavedDeviceId('bank-pass'))
   /* What 🧽 Repaint aims at: every flagged page, only the 🔤 text-flagged ones,
      or only the 🚩 watermark-flagged ones. The split is BY PAGE (a page carrying
      both counts as text — its zones share one channel, so one page is never
@@ -169,7 +151,6 @@ export default function BankWatermarkPanel({
     detectorReady: !!caps.watermark_detect,
   })
   const findText = textLevelState(levels, { live, ocrReady: !!caps.video_text })
-  const source = sourceNote(levels)
   /* The bin is invisible to /watermark/levels (its pool has always excluded
      rejected images), so the two levels read their bin figure from the bank
      payload's per-pass table — the one the server computes from the SAME clause
@@ -205,9 +186,8 @@ export default function BankWatermarkPanel({
   const [open, setOpen] = useState(false)
   useEffect(() => { if (note) setOpen(true) }, [note])
   const c = levelCounts(levels)
-  const headline = c.scanned === 0
-    ? 'not scanned'
-    : c.flagged > 0 ? `${c.flagged} flagged` : 'nothing flagged'
+  const headline = c.flagged > 0 ? `${c.flagged} flagged`
+    : c.scanned === 0 ? 'not scanned' : '0 flagged'
 
   return (
     <div id="bank-watermark-cleaning" data-workspace-focus
@@ -221,47 +201,32 @@ export default function BankWatermarkPanel({
       </button>
       {open && (
       <div className="space-y-2 px-3 pb-3">
-      <p className="text-2xs text-content-subtle">
-        find them, then clear them in two manual steps — your original files are never modified
+      <p className="text-xs text-content-subtle">
+        {[progressSummary(levels), masks].filter(Boolean).join(' · ')}
       </p>
-      <p className="text-xs text-content-subtle">{progressSummary(levels)}</p>
-      {/* WHO ruled, and who will rule next. Wraps onto its own line at 400 px
-          rather than being truncated — the source is the actionable half of a
-          flag the user disagrees with. */}
-      {source && <p className="text-2xs text-content-subtle">🔎 {source}</p>}
       {note && <p className="text-xs text-amber-300/90">⚠️ {note}</p>}
-      {masks && <p className="text-xs text-content-subtle">{masks}</p>}
-
-      <div className="flex flex-wrap gap-2">
-        <LevelCard index={1} title="Find them" state={find}
-          blurb="Scans the images you choose for an overlaid logo/URL and records WHERE it sits — the two steps below route on that box."
+      <div className="grid grid-cols-2 gap-2">
+        <LevelCard index={1} title="Find Watermarks" state={find}
           onRun={onFind} />
         {/* The OTHER level-1 detection: same rung of the same ladder, different
             instrument. Its zones land in the mask channel, so 🧽 below repaints
             them and ✂ skips them (cropping a bubble out of a page is not a
             thing). Only rendered where the parent wires it. */}
         {onFindText && (
-          <LevelCard index={1} title="Find text" state={findText}
-            blurb="Reads burned-in text — speech bubbles, subtitles, captions, sound effects — and marks each zone for 🧽 Repaint below. CPU only, never the GPU."
+          <LevelCard index={1} title="Find Text" state={findText}
             onRun={onFindText} />
         )}
-        <LevelCard index={2} title="Crop it off" state={crop}
-          blurb="Cuts the border strip holding the mark. No model, no GPU, and no invented pixel — try this one first."
+        <LevelCard index={2} title="Auto-Crop" state={crop}
           onRun={() => setCleanOpen('watermark_crop')} />
-        <LevelCard index={3} title="Repaint what's left" state={inpaint}
-          blurb={`Repaints the marks a crop can't remove. ${CLEAN_ENGINES_BLURB}`}
+        <LevelCard index={3} title="Inpaint" state={inpaint}
           onRun={() => setCleanOpen('watermark_inpaint')} />
       </div>
-      {/* Level 1 is a bank vision pass and travels like the others; levels 2-3
-          do not (a crop is local file work, and the repaint is a ComfyUI job
-          with its own picker below). One "Run on" per question, or the label
-          would have to lie about which level it governs. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">
-          Level 1 scan
-        </span>
-        <DevicePicker value={scanDevice} onChange={setScanDevice} kind="bank-pass"
-          className="text-2xs" />
+      {/* The scan and Klein render use different eligible device lists. */}
+      <div className="space-y-1 empty:hidden">
+        <DevicePicker value={scanDevice} onChange={onScanDeviceChange} onDevice={onScanDevice}
+          kind="bank-pass" size="sm" contextLabel="Level 1 Scan" />
+        <DevicePicker value={deviceId} onChange={onDeviceChange} kind="comfy" size="sm"
+          contextLabel="Level 3 Inpaint" />
       </div>
 
       {inpaint.remoteNote && (
@@ -279,9 +244,7 @@ export default function BankWatermarkPanel({
       {caps.watermark_detect && !caps.watermark_detect_gpu && gpuPresent && (
         <div className="space-y-1">
           <p className="text-xs text-amber-400/90">
-            Find runs on the CPU — the detector’s Python has no CUDA torch.
-            This machine has a GPU: point the detector at a Python that already
-            has one (ComfyUI’s, ai-toolkit’s) and the scan runs ~10× faster.
+            Detector runs on CPU. Select a CUDA Python to use the GPU.
           </p>
           {onPickPython && (
             <button type="button" onClick={() => onPickPython('watermark_detect')}
@@ -297,13 +260,13 @@ export default function BankWatermarkPanel({
           Level 3 engine
         </span>
         <div className={`${controlHeight('md')} flex items-center gap-1 rounded-lg border border-border bg-app/60 text-sm`}>
-          <button type="button" aria-pressed={method !== 'klein'} onClick={() => setMethod('auto')}
+          <button type="button" aria-pressed={method !== 'klein'} onClick={() => onMethodChange('auto')}
             title="LaMa: fast, non-generative repaint of small off-centre marks. Marks on the subject stay flagged."
             className={`h-full rounded-md px-2.5 font-semibold ${method !== 'klein'
               ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
             LaMa <span className="font-normal opacity-70">fast</span>
           </button>
-          <button type="button" aria-pressed={method === 'klein'} onClick={() => setMethod('klein')}
+          <button type="button" aria-pressed={method === 'klein'} onClick={() => onMethodChange('klein')}
             disabled={!caps.watermark_klein && deviceId === 'local'}
             title={caps.watermark_klein
               ? kleinCleanTitle(caps)
@@ -315,10 +278,6 @@ export default function BankWatermarkPanel({
             Klein <span className="font-normal opacity-70">quality</span>
           </button>
         </div>
-        {/* Which machine renders the Klein jobs. Self-hides when this install
-            has no peers/backends; LaMa ignores it (it never travels), which the
-            state helper says whenever the pick actually changes behaviour. */}
-        <DevicePicker value={deviceId} onChange={setDeviceId} kind="comfy" size="md" />
         {/* WHICH Klein model is about to repaint these images. A bank has no
             dataset to inherit a choice from, so there is nothing to pick here —
             but "no choice" was never a reason to stay silent about the model.
@@ -393,8 +352,8 @@ export default function BankWatermarkPanel({
           <>
             <button type="button" disabled={live}
               onClick={() => run(`/api/bank/${bankId}/watermark/undo`, {},
-                'Cleaned versions removed — your originals are back.')}
-              title="Throw away every cleaned version and flag those images again. Your original files were never modified, so nothing is lost."
+                'Originals restored.')}
+              title="Restore every cleaned image to its original."
               className={`${btnShape({ size: 'md', noShrink: true })} border border-border bg-surface text-content`}>
               ↩ Undo cleaning
             </button>

@@ -1033,12 +1033,14 @@ def bank_watermark_inpaint(bank_id):
     202/409/400/503 (503 carries the actionable reason: engine missing, GPU busy).
 
     Takes the same {statuses}/{image_ids} scope as the other passes. A body
-    without them repaints exactly what it repainted before."""
+    without them repaints exactly what it repainted before. clean_selected=true
+    requires image_ids and repaints that explicit selection before any scan."""
     data = request.get_json(silent=True) or {}
     return _queued_start('watermark_inpaint', _app(), LOCAL_USER, bank_id,
                   method=data.get('method', 'auto'),
                   device_id=data.get('device_id'),
                   target=data.get('target', 'all'),
+                  clean_selected=data.get('clean_selected', False),
                   klein_model=(data.get('klein_model') or '').strip() or None,
                   **_scope(data))
 
@@ -2203,7 +2205,7 @@ def bank_file(bank_id, image_id):
         # decoded copy of a HEIC/HEIF or AVIF one, which no browser would show.
         path = (banks.source_image_path(bank, row, fail_open=True)
                 if original else banks.resolved_image_path(bank, row))
-        if path and original and row.watermark_clean_method == banks.CUSTOM_WATERMARK_CLEAN:
+        if path and original and row.watermark_clean_method in banks.IN_PLACE_WATERMARK_CLEANS:
             from ..services.face_dataset_service import _watermark_original_path
             path = _watermark_original_path(path)
             if os.path.islink(path):

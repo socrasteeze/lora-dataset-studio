@@ -15,7 +15,7 @@ export { loadSavedDeviceId, saveDeviceId } from './deviceMemory.js'
  * Compact select: "Run on" — only renders when Primary has at least one peer
  * (or always when `always` is set). Value is a device id (`local` or uuid).
  */
-export default function DevicePicker({ value, onChange, onDevice, kind = 'comfy', className = '', always = false, size = 'md', showLabel = true }) {
+export default function DevicePicker({ value, onChange, onDevice, kind = 'comfy', className = '', always = false, size = 'md', showLabel = true, contextLabel = '' }) {
   const [devices, setDevices] = useState(() => lastDeviceList(kind))
 
   useEffect(() => {
@@ -71,9 +71,11 @@ export default function DevicePicker({ value, onChange, onDevice, kind = 'comfy'
   if (!always && peers.length === 0) return null
 
   const current = value || 'local'
+  const layout = contextLabel ? 'grid grid-cols-[6.5rem_auto_minmax(0,1fr)]' : 'inline-flex'
 
   return (
-    <label className={`inline-flex min-w-0 items-center gap-2 ${size === 'sm' ? 'text-xs' : 'text-sm'} text-content ${className}`}>
+    <label className={`${layout} min-w-0 items-center gap-2 ${size === 'sm' ? 'text-xs' : 'text-sm'} text-content ${className}`}>
+      {contextLabel && <span className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">{contextLabel}</span>}
       {showLabel && <span className="text-content-muted whitespace-nowrap">Run On</span>}
       <Select size={size}
         value={current}
@@ -83,7 +85,7 @@ export default function DevicePicker({ value, onChange, onDevice, kind = 'comfy'
           onChange?.(id)
         }}
         className="min-w-0 max-w-[14rem] border-border-strong bg-surface-raised"
-        aria-label="Run on device"
+        aria-label={contextLabel ? `Run ${contextLabel} on device` : 'Run on device'}
       >
         {eligible.map((d) => {
           const offline = !d.local && !d.online

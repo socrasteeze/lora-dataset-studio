@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   cropLevelState, findLevelState, hasCleanedImages, inpaintLevelState, levelCounts,
-  maskNote, progressSummary, rescanNote, sourceNote, textLevelState,
+  maskNote, progressSummary, rescanNote, textLevelState,
 } from './bankWatermark.js';
 
 const levels = (over = {}) => ({
@@ -24,14 +24,14 @@ test('🔤 text card: fresh → Find text, resumes by the remainder, rescans whe
   const fresh = textLevelState(levels({ text: { scanned: 0, found: 0, unscanned: 12 } }),
     { ocrReady: true });
   assert.equal(fresh.disabled, false);
-  assert.equal(fresh.label, '🔤 Find text');
+  assert.equal(fresh.label, '🔤 Find Text (12)');
   assert.equal(fresh.remaining, 12);
   const partial = textLevelState(
     levels({ text: { scanned: 30, found: 4, unscanned: 8 } }), { ocrReady: true });
-  assert.equal(partial.label, '🔤 Read the remaining 8');
+  assert.equal(partial.label, '🔤 Find Text (8)');
   const done = textLevelState(
     levels({ text: { scanned: 38, found: 6, unscanned: 0 } }), { ocrReady: true });
-  assert.equal(done.label, '🔤 Scan again');
+  assert.equal(done.label, '🔤 Rescan Text');
   assert.equal(done.done, 38);
 });
 
@@ -49,12 +49,9 @@ test('🔤 text card: the OCR extra missing names the Setup card, live blocks it
 test('hand-edited masks are reported, and an EMPTY one is called out', () => {
   assert.equal(maskNote(levels()), null);            // nothing edited → no noise
   const drawn = maskNote(levels({ hand_masked: 3 }));
-  assert.match(drawn, /3 flagged image/);
-  assert.match(drawn, /Inpaint/);
-  assert.match(drawn, /Auto-crop skips/);
+  assert.equal(drawn, '3 hand-masked');
   const emptied = maskNote(levels({ hand_masked: 3, empty_masks: 1 }));
-  assert.match(emptied, /EMPTY mask/);
-  assert.match(emptied, /neither level/);            // it is cleaned by NOTHING
+  assert.equal(emptied, '1 empty mask');
 });
 
 test('crop off because every flagged image is hand-masked says THAT, not "no border"', () => {
@@ -72,7 +69,7 @@ test('level 1 is live whenever something is croppable — it needs no model at a
   assert.equal(s.disabled, false);
   assert.equal(s.reason, null);
   assert.equal(s.remaining, 1);
-  assert.match(s.label, /Auto-crop \(1\)/);
+  assert.match(s.label, /Auto-Crop \(1\)/);
 });
 
 test('crop off with marks left says to escalate, not just "disabled"', () => {
@@ -86,7 +83,7 @@ test('crop off with marks left says to escalate, not just "disabled"', () => {
 
 test('level 1 off with nothing flagged points at the scan', () => {
   assert.match(cropLevelState(levels({ flagged: 0, croppable: 0 })).reason,
-    /Find watermarks/);
+    /Find Marks/);
 });
 
 test('a running pass disables both levels with the same honest reason', () => {
@@ -125,17 +122,16 @@ test('level 2 with Klein selected only needs Klein', () => {
 
 test('an emptied pool reads as "done", not as "never ran"', () => {
   const done = inpaintLevelState(levels({ flagged: 0, cropped: 3 }), { lamaReady: true });
-  assert.match(done.reason, /every flagged image has been handled/);
+  assert.match(done.reason, /All flagged images handled/);
   const never = inpaintLevelState(levels({ flagged: 0, cropped: 0 }), { lamaReady: true });
-  assert.match(never.reason, /Find watermarks/);
+  assert.match(never.reason, /Find Marks/);
 });
 
 test('progressSummary tells done-vs-left, and an unscanned bank says so', () => {
-  assert.match(progressSummary(levels({ scanned: 0 })), /Not scanned yet/);
-  assert.match(progressSummary(levels()), /4 still flagged \(1 croppable, 3 to repaint\)/);
-  const mid = progressSummary(levels({ cropped: 2, inpainted: 1, dismissed: 1, flagged: 0 }));
-  assert.match(mid, /2 cropped, 1 repainted, 1 dismissed/);
-  assert.match(mid, /nothing left flagged/);
+  assert.equal(progressSummary(null), '0/0 scanned');
+  assert.equal(progressSummary(levels()), '10/10 scanned · 3 to repaint');
+  const mid = progressSummary(levels({ cropped: 2, inpainted: 1, dismissed: 1, inpaintable: 0 }));
+  assert.match(mid, /2 cropped · 1 repainted · 1 dismissed/);
 });
 
 test('undo only offered once something was actually cleaned', () => {
@@ -146,7 +142,7 @@ test('undo only offered once something was actually cleaned', () => {
 
 test('images flagged before boxes were stored are named, never silently stuck', () => {
   assert.equal(rescanNote(levels()), null);
-  assert.match(rescanNote(levels({ needs_rescan: 7 })), /7 image\(s\).*Find watermarks again/);
+  assert.match(rescanNote(levels({ needs_rescan: 7 })), /Rescan 7 flagged images/);
 });
 
 
@@ -158,11 +154,11 @@ test('images flagged before boxes were stored are named, never silently stuck', 
 test('find is offered when the vision model is ready, and names a rescan once scanned', () => {
   const fresh = findLevelState(levels({ scanned: 0, flagged: 0 }), { visionReady: true });
   assert.equal(fresh.disabled, false);
-  assert.equal(fresh.label, '🚩 Find watermarks');
+  assert.equal(fresh.label, '🚩 Find Marks');
 
   const again = findLevelState(levels({ unscanned: 0 }), { visionReady: true });
   assert.equal(again.disabled, false);
-  assert.equal(again.label, '🚩 Scan again');   // a second pass is a RE-scan, say so
+  assert.equal(again.label, '🚩 Rescan Marks');
   assert.equal(again.done, 10);
 });
 
@@ -174,13 +170,12 @@ test('a STOPPED scan says what is left, never what was flagged', () => {
     { visionReady: true });
   assert.equal(s.done, 3092);
   assert.equal(s.remaining, 248);               // NOT 92
-  assert.equal(s.label, '🚩 Scan the remaining 248');
+  assert.equal(s.label, '🚩 Find Marks (248)');
 });
 
 test('a partial scan is reported as partial, not as a finished pass', () => {
   const line = progressSummary(levels({ scanned: 4351, unscanned: 12981, flagged: 2756 }));
-  assert.match(line, /4351 of 17332 scanned/);
-  assert.match(line, /12981 still to look at/);
+  assert.match(line, /4351\/17332 scanned/);
 });
 
 test('find is off without the vision model, and says where to get it', () => {
@@ -206,42 +201,6 @@ test('with neither route, the refusal names BOTH ways out', () => {
   assert.match(s.reason, /Setup/);
 });
 
-test('sourceNote: nothing scanned yet still says who will do it', () => {
-  const line = sourceNote({ sources: { detector: 0, vision: 0, unknown: 0 },
-    next_source: 'detector', threshold: 0.94 });
-  assert.match(line, /Nothing scanned yet/);
-  assert.match(line, /detector/);
-  assert.match(line, /0\.94/);
-});
-
-test('sourceNote: a bank judged by both routes reports both', () => {
-  const line = sourceNote({ sources: { detector: 1240, vision: 300, unknown: 0 },
-    next_source: 'detector', threshold: 0.94 });
-  assert.match(line, /1240 by the detector/);
-  assert.match(line, /300 by the vision model/);
-});
-
-test('sourceNote: rows scanned before the source was recorded are NOT attributed', () => {
-  // Guessing "vision model" for them would be a lie — they predate the column.
-  const line = sourceNote({ sources: { detector: 0, vision: 0, unknown: 42 },
-    next_source: 'vision' });
-  assert.match(line, /42 before the source was recorded/);
-  assert.doesNotMatch(line, /42 by the/);
-});
-
-test('sourceNote: the vision route is never described with a threshold', () => {
-  // It produces a sentence, not a score — quoting a number would invent one.
-  const line = sourceNote({ sources: { vision: 10 }, next_source: 'vision',
-    threshold: 0.94 });
-  assert.match(line, /the vision model/);
-  assert.doesNotMatch(line, /0\.94/);
-});
-
-test('sourceNote: a half-loaded payload reads as zeros, never NaN', () => {
-  const line = sourceNote({});
-  assert.doesNotMatch(line, /NaN|undefined/);
-});
-
 test('find is off while another pass runs on the bank', () => {
   const s = findLevelState(levels(), { visionReady: true, live: true });
   assert.equal(s.disabled, true);
@@ -252,7 +211,7 @@ test('find survives a missing payload (bank never scanned)', () => {
   const s = findLevelState(null, { visionReady: true });
   assert.equal(s.disabled, false);
   assert.equal(s.done, 0);
-  assert.equal(s.label, '🚩 Find watermarks');
+  assert.equal(s.label, '🚩 Find Marks');
 });
 
 

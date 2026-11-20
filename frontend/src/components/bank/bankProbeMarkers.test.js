@@ -22,6 +22,7 @@ const rail = read('./BankFilterRail.jsx');
 const lightbox = read('./BankReviewLightbox.jsx');
 const dupCompare = read('./DupCompareLightbox.jsx');
 const passes = read('./BankPassesPanel.jsx');
+const watermarks = read('./BankWatermarkPanel.jsx');
 const page = read('../../pages/BankPage.jsx');
 const probe = read('../../../scripts/responsiveProbe.mjs');
 
@@ -44,9 +45,14 @@ test('the passes panel is a READING surface: asked for, one tap away, used again
   // …and below lg it folds everything that is not a pass button: measured at
   // 360 px, the unfolded panel was ~1 500 px tall.
   assert.match(passes, /function Fold\(\{ compact, title, children \}\)/);
-  for (const title of ['Semantic engine', 'Watermarks', 'Edits']) {
+  for (const title of ['Semantic engine', 'Edits']) {
     assert.ok(passes.includes(`<Fold compact={compact} title="${title}">`), `${title} is no longer folded below lg`);
   }
+  assert.doesNotMatch(passes, /<Fold compact=\{compact\} title="Watermarks"/);
+  assert.match(passes, /<BankWatermarkPanel\b/);
+  assert.match(watermarks, /const \[open, setOpen\] = useState\(false\)/);
+  assert.match(watermarks, /onClick=\{\(\) => setOpen\(\(v\) => !v\)\} aria-expanded=\{open\}/);
+  assert.match(watermarks, /\{open && \(\s*<div[^>]*>[\s\S]*?<LevelCard/);
   assert.match(passes, /<BankOverview payload=\{payload\} compact=\{compact\} \/>/);
   assert.match(workspace, /compact=\{!railIsColumnNow\}/);
 });

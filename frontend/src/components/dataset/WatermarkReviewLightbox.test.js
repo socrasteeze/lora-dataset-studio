@@ -6,6 +6,7 @@ const lightbox = readFileSync(new URL('./WatermarkReviewLightbox.jsx', import.me
 const editor = readFileSync(new URL('./WatermarkRegionEditor.jsx', import.meta.url), 'utf8');
 const workspace = readFileSync(new URL('./DatasetWorkspace.jsx', import.meta.url), 'utf8');
 const hook = readFileSync(new URL('../../hooks/useDataset.js', import.meta.url), 'utf8');
+const bankLightbox = readFileSync(new URL('../bank/BankReviewLightbox.jsx', import.meta.url), 'utf8');
 
 // The review lightbox stacks a fixed image cell over a controls bar. On a short
 // mobile viewport a portrait image used to keep its natural height, overflow the
@@ -98,4 +99,13 @@ test('workspace + hook thread allow_crop through clean, and the batch bar toggle
   assert.match(workspace, /const allowAutoCrop = caps\.watermark_allow_crop !== false/);
   assert.match(workspace, /config: \{ watermark: \{ allow_crop: Boolean\(value\) \} \}/);
   assert.match(workspace, /aria-checked=\{allowAutoCrop\}/);
+});
+test('Bank review restores only the displayed cleaned image through undo', () => {
+  assert.match(bankLightbox, /const canRestore = img\?\.watermark_state === 'cleaned'/);
+  assert.match(bankLightbox, /watermark\/undo`, \{ image_ids: \[id\] \}/);
+  assert.match(bankLightbox, /canRestore && e\.key\.toLowerCase\(\) === 'r'\) \{\s*e\.preventDefault\(\)\s*restoreOriginal\(\)/);
+  assert.match(bankLightbox, /↩ Restore original/);
+  assert.match(bankLightbox, /const restoreBlock = img\?\.watermark_clean_in_place \? sourceWriteBlock : null/);
+  assert.match(bankLightbox, /if \(restoreBlock\) \{\s*setError\(restoreBlock\)\s*return/);
+  assert.match(bankLightbox, /onClick=\{restoreOriginal\} disabled=\{busy \|\| !!restoreBlock\}/);
 });

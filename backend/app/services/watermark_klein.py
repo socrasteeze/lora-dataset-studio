@@ -1240,7 +1240,8 @@ def inpaint_watermark_klein(user_id, image_path, boxes, *, seed=None, device='cp
                             timeout=None,
                             klein_model=None, device_id=None, prompt=None,
                             klein_prompt=None, klein_max_mp=None,
-                            klein_output=None, custom_path=None) -> tuple[bool, dict | None]:
+                            klein_output=None, custom_path=None,
+                            allow_unmasked=False) -> tuple[bool, dict | None]:
     """Klein, on `image_path`, in place — the 🧽 watermark CLEAN or the ✦ BOX repair.
 
     ONE entry point, TWO lanes, and `prompt` is the switch (see the module docstring):
@@ -1302,7 +1303,7 @@ def inpaint_watermark_klein(user_id, image_path, boxes, *, seed=None, device='cp
     except (OSError, ValueError) as e:
         return False, {'kind': 'failed', 'detail': f'unreadable image: {e}'}
     norm = _normalize_boxes(boxes)
-    if not norm and custom_workflow is None:
+    if not norm and custom_workflow is None and (repair or not allow_unmasked):
         return False, {'kind': 'failed', 'detail': 'no valid watermark box'}
     if repair:
         return _repair_boxes_crop_and_stitch(user_id, image_path, original, norm, seed=seed,
@@ -1333,10 +1334,9 @@ def _clean_full_frame(user_id, image_path, original, norm=None, *, seed=None,
     had MISSED. That is the July "poisoned reference" doctrine holding on this lane too,
     and it is why the clean is not simply the naked recipe.
 
-    `norm` is the validated zone list. Empty/None is the DEGRADED case: the naked pass
+    `norm` is the validated zone list. For an explicit unmasked clean, the naked pass
     still runs (it is what clears a tiled mark, which has no zones worth erasing) and
-    still removes marks, but the ghost-glyph risk above comes back with it. No caller
-    reaches that path today — every one of them derives boxes before calling.
+    can remove marks, but the ghost-glyph risk above comes back with it.
 
     THREE DIALS, all resolved here so every caller — batch, lightbox, ⚖ compare, both
     surfaces — obeys the same stored choice without threading arguments through four

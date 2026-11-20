@@ -22,6 +22,7 @@ import os
 
 import pytest
 from PIL import Image
+from test_bank_watermark_clean import _flag
 
 
 def _photo(size=1000, value=90):
@@ -178,6 +179,187 @@ def test_inpaint_scope_picks_exactly_that_pile(client, tmp_path, app, monkeypatc
     assert r.status_code == 202, r.get_json()
 
     assert [s for s, _m in _states(app, ids)] == ['detected', 'cleaned', 'detected']
+
+
+@pytest.mark.parametrize('method', ['auto', 'lama', 'klein'])
+def test_clean_selected_requires_a_mark_for_lama_only(
+        client, tmp_path, app, monkeypatch, method):
+    from app.extensions import db
+    from app.models import BankImage
+    from app.services import bank_jobs, image_bank_service as banks, watermark_klein, watermark_lama
+
+    image = Image.new('RGB', (32, 32), 'white')
+    bank_id, folder = _mkbank(client, tmp_path, {'a.jpg': image, 'b.jpg': image, 'c.jpg': image})
+    b_id = _flag(app, bank_id, OFFCENTER_MARK, index=1)
+    with app.app_context():
+        a, _b, c = BankImage.query.filter_by(bank_id=bank_id).order_by(BankImage.id).all()
+        assert a.watermark_fingerprint is None
+        a.status = 'reject'
+        a_id, c_id = a.id, c.id
+        db.session.commit()
+
+    monkeypatch.setattr(banks, '_gpu_busy_reason', lambda: None)
+    monkeypatch.setattr(watermark_lama, 'is_available', lambda: True)
+    monkeypatch.setattr(watermark_lama, 'resolve_device', lambda: 'cpu')
+    monkeypatch.setattr(watermark_klein, 'clean_available', lambda *_: True)
+    calls = []
+
+    def unexpected_lama(*args, **kwargs):
+        pytest.fail('LaMa must skip an image with no mark position')
+
+    expected_input = (255, 255, 255)
+
+    def klein(_user, frame, **options):
+        assert not options.get('custom_workflow')
+        assert frame.getpixel((0, 0)) == expected_input
+        calls.append('klein')
+        return Image.new('RGB', frame.size, 'black'), None
+
+    def unexpected_prefill(*args, **kwargs):
+        pytest.fail('Unmasked stock Klein must receive the original frame')
+
+    monkeypatch.setattr(watermark_lama, 'inpaint_watermarks', unexpected_lama)
+    monkeypatch.setattr(watermark_klein, '_run_klein_job', klein)
+    monkeypatch.setattr(watermark_klein, '_prefill_region', unexpected_prefill)
+
+    source = folder / 'a.jpg'
+    backup = source.with_name('a.orig.jpg')
+    original = source.read_bytes()
+    untouched = {p: p.read_bytes() for p in (folder / 'b.jpg', folder / 'c.jpg')}
+    endpoint = f'/api/bank/{bank_id}/watermark'
+    selected = {'image_ids': [a_id], 'method': method}
+    default = client.post(f'{endpoint}/inpaint', json={**selected, 'statuses': ['reject']})
+    assert 'another pile' in assert_failed_job(client, bank_id, default)
+    assert calls == []
+    assert client.delete(f'/api/bank-queue/{bank_id}').status_code == 200
+
+    response = client.post(f'{endpoint}/inpaint', json={**selected, 'clean_selected': True})
+    assert response.status_code == 202, response.get_json()
+    assert all(p.read_bytes() == before for p, before in untouched.items())
+    if method != 'klein':
+        with app.app_context():
+            detail = bank_jobs.get(bank_id)['detail']
+        assert '0 inpainted, 1 skipped: LaMa needs a mark position' in detail
+        assert calls == []
+        assert _states(app, [a_id, b_id, c_id]) == [
+            (None, None), ('detected', None), (None, None)]
+        assert source.read_bytes() == original
+        assert not backup.exists()
+
+        def lama(path, boxes, *, device):
+            assert boxes == [OFFCENTER_MARK]
+            assert device == 'cpu'
+            calls.append('lama')
+            Image.new('RGB', (32, 32), 'black').save(path, 'JPEG')
+            return True, None
+
+        monkeypatch.setattr(watermark_lama, 'inpaint_watermarks', lama)
+        response = client.post(f'{endpoint}/inpaint', json={
+            'image_ids': [a_id, b_id], 'method': method, 'clean_selected': True,
+        })
+        assert response.status_code == 202, response.get_json()
+        assert calls == ['lama']
+        assert _states(app, [a_id, b_id, c_id]) == [
+            (None, None), ('cleaned', 'selected'), (None, None)]
+        assert source.read_bytes() == original
+        assert not backup.exists()
+        assert (folder / 'b.orig.jpg').read_bytes() == untouched[folder / 'b.jpg']
+        return
+
+    assert calls == ['klein']
+    assert _states(app, [a_id, b_id, c_id]) == [
+        ('cleaned', 'selected_new'), ('detected', None), (None, None)]
+    assert source.read_bytes() != original
+    assert backup.read_bytes() == original
+    assert client.get(f'{endpoint}/levels').json['scanned'] == 1
+    assert client.get(f'/api/bank/{bank_id}').json['counts']['watermark_scanned'] == 1
+    row_url = f'/api/bank/{bank_id}/images?ids={a_id}'
+    cleaned_row = client.get(row_url).json['images'][0]
+    assert cleaned_row['watermark_clean_in_place'] is True
+    with client.get(f'/api/bank/{bank_id}/file/{a_id}?original=1') as original_response:
+        assert original_response.data == original
+    with client.get(f'/api/bank/{bank_id}/file/{a_id}') as cleaned_response:
+        assert cleaned_response.data == source.read_bytes()
+
+    undo = client.post(f'{endpoint}/undo', json={'image_ids': [a_id]})
+    assert undo.get_json() == {'ok': True, 'restored': 1}
+    assert source.read_bytes() == original
+    assert not backup.exists()
+    assert _states(app, [a_id]) == [(None, None)]
+    restored_row = client.get(row_url).json['images'][0]
+    assert restored_row['watermark_clean_in_place'] is False
+    assert restored_row['edit_sequence'] > cleaned_row['edit_sequence'] > 0
+
+    Image.new('RGB', (32, 32), 'gray').save(source, 'JPEG')
+    replacement = source.read_bytes()
+    expected_input = (128, 128, 128)
+    assert client.post(f'{endpoint}/inpaint',
+                       json={**selected, 'clean_selected': True}).status_code == 202
+    assert calls == ['klein', 'klein']
+    assert backup.read_bytes() == replacement
+    recleaned_row = client.get(row_url).json['images'][0]
+    assert recleaned_row['edit_sequence'] > restored_row['edit_sequence']
+    assert client.post(f'{endpoint}/undo', json={'image_ids': [a_id]}).json['restored'] == 1
+    assert source.read_bytes() == replacement
+    assert not backup.exists()
+
+
+
+SUBJECT_MARK = [0.30, 0.30, 0.70, 0.70]
+
+
+def test_clean_selected_lama_leaves_on_subject_marks_flagged(
+        client, tmp_path, app, monkeypatch):
+    """Clean selected must use the same LaMa on-subject hold as the panel path."""
+    from app.services import bank_jobs, image_bank_service as banks, watermark_lama
+
+    bank_id, folder = _mkbank(client, tmp_path, {
+        'off.jpg': Image.new('RGB', (32, 32), 'white'),
+        'on.jpg': Image.new('RGB', (32, 32), 'white'),
+    })
+    off_id, on_id = _setup(app, bank_id, [
+        (OFFCENTER_MARK, 'keep'),
+        (SUBJECT_MARK, 'keep'),
+    ])
+    monkeypatch.setattr(banks, '_gpu_busy_reason', lambda: None)
+    monkeypatch.setattr(watermark_lama, 'is_available', lambda: True)
+    monkeypatch.setattr(watermark_lama, 'resolve_device', lambda: 'cpu')
+    calls = []
+
+    def lama(path, boxes, *, device):
+        assert boxes == [OFFCENTER_MARK]
+        calls.append('lama')
+        Image.new('RGB', (32, 32), 'black').save(path, 'JPEG')
+        return True, None
+
+    monkeypatch.setattr(watermark_lama, 'inpaint_watermarks', lama)
+
+    off_src = folder / 'off.jpg'
+    on_src = folder / 'on.jpg'
+    on_before = on_src.read_bytes()
+    response = client.post(f'/api/bank/{bank_id}/watermark/inpaint', json={
+        'image_ids': [off_id, on_id], 'method': 'lama', 'clean_selected': True,
+    })
+    assert response.status_code == 202, response.get_json()
+    assert len(calls) == 1
+    with app.app_context():
+        detail = bank_jobs.get(bank_id)['detail']
+    assert '1 inpainted' in detail
+    assert '1 left for review' in detail
+    assert _states(app, [off_id, on_id]) == [
+        ('cleaned', 'selected'), ('detected', None)]
+    assert on_src.read_bytes() == on_before
+    assert (folder / 'off.orig.jpg').exists()
+    assert not (folder / 'on.orig.jpg').exists()
+
+
+@pytest.mark.parametrize('body', [{'clean_selected': True, 'image_ids': []},
+                                 {'clean_selected': 'false', 'image_ids': [1]}])
+def test_clean_selected_requires_explicit_boolean_and_ids(client, tmp_path, body):
+    bank_id, _folder = _mkbank(client, tmp_path, {'a.jpg': Image.new('RGB', (32, 32))})
+    response = client.post(f'/api/bank/{bank_id}/watermark/inpaint', json=body)
+    assert response.status_code == 400
+    assert 'nonempty image_ids' in response.get_json()['error']
 
 
 def test_a_selection_is_intersected_with_the_scope_never_widened(client, tmp_path,

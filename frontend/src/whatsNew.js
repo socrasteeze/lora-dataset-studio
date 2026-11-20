@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-20-bank-clean-selected',
+    date: '2026-11-20',
+    title: 'Repaint Selected Bank Images',
+    blurb: 'Use Clean selected with Klein before a scan, or use LaMa on marked images. The shorter Watermarks panel keeps the action counts and engine controls together.',
+    to: '/bank',
+  },
+  {
     id: '2026-11-19-custom-klein-clean',
     date: '2026-11-19',
     title: 'Clean with your own Klein workflow',

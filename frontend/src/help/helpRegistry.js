@@ -2528,6 +2528,9 @@ const TOPICS = [
      'sample run', 'detector threshold', 'tune the threshold', 'too many flags',
      'not flagging enough'],
     '/bank', 'using-the-app', 'clean-the-watermarks-a-bank-found'),
+  action('action-bank-clean-selected', 'Repaint selected Bank images',
+    ['clean selected', 'repaint selection', 'inpaint unflagged', 'restore original'],
+    '/bank', 'using-the-app', 'repaint-selected-bank-images'),
   // DIVERGENCE 10 — hand-ported from upstream's help/topics/actions.js.
   action('action-find-text', 'Erase burned-in text (bubbles, subtitles, captions)',
     ['find text', 'text', 'ocr', 'burned-in', 'burned in', 'speech bubble',

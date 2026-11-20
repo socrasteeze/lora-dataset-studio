@@ -101,6 +101,16 @@ _semantic_group_proof_memo = {}
 DECODED_SOURCE_EXTS = ('.heic', '.heif', '.avif')
 IMG_EXTS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp') + DECODED_SOURCE_EXTS
 CUSTOM_WATERMARK_CLEAN = 'klein_custom'
+SELECTED_WATERMARK_CLEANS = {
+    None: 'selected_new',
+    'none': 'selected_clear',
+    'dismissed': 'selected_ignore',
+    'detected': 'selected',
+}
+IN_PLACE_WATERMARK_CLEANS = {
+    CUSTOM_WATERMARK_CLEAN: 'detected',
+    **{method: state for state, method in SELECTED_WATERMARK_CLEANS.items()},
+}
 # Sanity cap — a bank is a triage layer, not a filesystem indexer: this is what
 # catches "I pointed it at a whole drive", nothing more. Measured on a synthetic
 # tree of 200 000 files (50 subfolders, warm cache): the walk refresh_bank runs
@@ -802,7 +812,7 @@ def resolved_image_path(bank: ImageBank, row: BankImage) -> str | None:
         if edited.is_file():
             return str(edited)
     path = None
-    if row.watermark_clean_method and row.watermark_clean_method != CUSTOM_WATERMARK_CLEAN:
+    if row.watermark_clean_method and row.watermark_clean_method not in IN_PLACE_WATERMARK_CLEANS:
         cleaned = clean_image_path(bank.id, row.id)
         if cleaned.is_file():
             path = str(cleaned)
@@ -849,7 +859,7 @@ def analysis_image_path(bank: ImageBank, row: BankImage, *,
                 or bank_transfer_metadata.content_fingerprint_path(raw)
                 != row.watermark_fingerprint):
             return None
-        if row.watermark_clean_method != CUSTOM_WATERMARK_CLEAN:
+        if row.watermark_clean_method not in IN_PLACE_WATERMARK_CLEANS:
             cleaned = clean_image_path(bank.id, row.id)
             if not cleaned.is_file():
                 return None
@@ -2021,6 +2031,14 @@ def _watermark_history_inactive_clause():
     )
 
 
+def _watermark_scanned_clause():
+    return and_(
+        BankImage.watermark_state.isnot(None),
+        BankImage.watermark_clean_method.is_distinct_from(SELECTED_WATERMARK_CLEANS[None]),
+        ~_watermark_history_inactive_clause(),
+    )
+
+
 def image_flags(row: BankImage, th: dict) -> list:
     """Threshold verdicts for one image, recomputed from the raw scores."""
     if row.quality_state == 'unreadable':
@@ -2139,6 +2157,7 @@ def _image_dict(row: BankImage, th: dict, promoted_by, live) -> dict:
         'style_cluster': row.style_cluster,
         'watermark_state': row.watermark_state if watermark_active else None,
         'watermark_clean_method': row.watermark_clean_method,
+        'watermark_clean_in_place': row.watermark_clean_method in IN_PLACE_WATERMARK_CLEANS,
         # Who ruled on THIS image, and with what score. Per image rather than per
         # bank because a bank scanned over weeks holds both routes' verdicts, and
         # "why is this one flagged?" is asked about one tile, not about a bank.
@@ -3171,8 +3190,7 @@ def _bp_counts(base, total, todo_keep, todo_pending, todo_reject,
         'scored': or_(BankImage.aesthetic_score.isnot(None), BankImage.nsfw_score.isnot(None)),
         'tagged': BankImage.tags_state == 'ok',
         'pixai_tagged': BankImage.pixai_cache_key.isnot(None),
-        'watermark_scanned': and_(BankImage.watermark_state.isnot(None),
-                                  ~_watermark_history_inactive_clause()),
+        'watermark_scanned': _watermark_scanned_clause(),
         'framing_classified': BankImage.framing.isnot(None),
         'cropped': BankImage.edit_method == 'crop',
         'improved': BankImage.edit_method == 'improve',
@@ -5848,7 +5866,7 @@ def _semantic_eligible_paths(bank: ImageBank) -> tuple[int, tuple[str, ...]]:
             marker = f'.r{turn}.'
             paths.extend(str(candidate) for candidate in rotated.get(image_id, ())
                          if marker in candidate.name)
-        elif clean_method and clean_method != CUSTOM_WATERMARK_CLEAN:
+        elif clean_method and clean_method not in IN_PLACE_WATERMARK_CLEANS:
             paths.append(str(clean_image_path(bank.id, image_id)))
         elif image_id in decoded:
             paths.extend(decoded[image_id])
@@ -9887,7 +9905,8 @@ def _watermark_not_dismissed():
 def _bank_watermark_can_rescan():
     # Undo owns the original pixels of an in-place clean. Keep its restore
     # record until the original has been restored.
-    return BankImage.watermark_clean_method.is_distinct_from(CUSTOM_WATERMARK_CLEAN)
+    method = BankImage.watermark_clean_method
+    return or_(method.is_(None), method.notin_(IN_PLACE_WATERMARK_CLEANS))
 
 
 def _watermark_todo_clause():
@@ -11731,7 +11750,7 @@ def normalize_inpaint_options(method='auto', target='all'):
 
 def start_watermark_inpaint(app, user_id, bank_id, method='auto', device_id=None,
                             target='all', statuses=None, ids=None,
-                            klein_model=None):
+                            klein_model=None, clean_selected=False):
     """Level 2 — repaint what is STILL flagged after the crop level.
     ``method``: 'auto'/'lama' (LaMa, non-generative, small off-centre marks; marks
     on the subject stay flagged for manual review) or 'klein' (the detected zones are
@@ -11747,17 +11766,38 @@ def start_watermark_inpaint(app, user_id, bank_id, method='auto', device_id=None
     every other pass, and the same intersection rule. This level REPAINTS PIXELS,
     which is why it needed them: 16 000 images repainted from one click was a run
     nobody could aim. Custom Klein replaces the source after preserving it.
-    The shipped cleaners write to the Bank's own ``clean/`` directory."""
+    The shipped cleaners write to the Bank's own ``clean/`` directory.
+    ``clean_selected`` repaints explicit IDs in place and preserves the master."""
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
     method, target = normalize_inpaint_options(method, target)
-    if method == 'klein':
+    if not isinstance(clean_selected, bool) or (clean_selected and not ids):
+        raise ValueError('Clean selected requires a nonempty image_ids list')
+    if clean_selected:
+        _require_writable_source(bank)
+    elif method == 'klein':
         from . import watermark_klein
         if watermark_klein.custom_clean_workflow_path():
             _require_writable_source(bank)
     want = normalize_pass_statuses(statuses)
-    total = _clean_pool_query(bank_id, want, ids, target=target).count()
+    if clean_selected:
+        selected_ids = sorted({int(i) for i in ids})
+        pool = (db.session.query(BankImage.id).filter(_processable(bank_id)))
+        row_ids = [
+            rid for start in range(0, len(selected_ids), _SQL_IN_CHUNK)
+            for (rid,) in pool.filter(
+                BankImage.id.in_(selected_ids[start:start + _SQL_IN_CHUNK])
+            ).order_by(BankImage.id).all()
+        ]
+        if len(row_ids) != len(selected_ids):
+            raise ValueError('The selection includes images this Bank cannot process')
+        total = len(row_ids)
+        run = _selected_watermark_inpaint_job(bank_id, row_ids, method, device_id, klein_model)
+    else:
+        total = _clean_pool_query(bank_id, want, ids, target=target).count()
+        run = _watermark_inpaint_job(bank_id, method, device_id, want, ids,
+                                     target=target, klein_model=klein_model)
     if not total:
         # "Nothing HERE" and "nothing anywhere" are two situations with two
         # different next moves. Saying "every flagged image is handled" while
@@ -11789,10 +11829,7 @@ def start_watermark_inpaint(app, user_id, bank_id, method='auto', device_id=None
     reason = _gpu_busy_reason() if renders_here else None
     if reason:
         raise RuntimeError(reason)
-    return bank_jobs.start(app, bank_id, 'watermark_inpaint',
-                           _watermark_inpaint_job(bank_id, method, device_id,
-                                                  want, ids, target=target,
-                                                  klein_model=klein_model),
+    return bank_jobs.start(app, bank_id, 'watermark_inpaint', run,
                            total=total,
                            # Klein only: LaMa never travels, so a device picked
                            # with method='auto' must not label the pass remote.
@@ -11800,6 +11837,99 @@ def start_watermark_inpaint(app, user_id, bank_id, method='auto', device_id=None
                                          if method == 'klein' else None),
                            device_id=(cluster_svc.normalize_device_id(device_id)
                                       if not renders_here else None))
+
+
+def _selected_watermark_inpaint_job(bank_id, row_ids, method, device_id, klein_model):
+    def run(job):
+        from contextlib import nullcontext
+        from . import watermark_klein, watermark_lama
+        from ..gpu_window import gpu_exclusive_vision_window
+
+        bank = _detach_bank(db.session.get(ImageBank, bank_id))
+        if not bank:
+            return
+        klein = method == 'klein'
+        custom_path = watermark_klein.custom_clean_workflow_path() if klein else ''
+        device = 'cpu' if klein else watermark_lama.resolve_device()
+        window = gpu_exclusive_vision_window(flag_ttl=1800) if device == 'cuda' else nullcontext()
+
+        def repaint(path, boxes):
+            if klein:
+                return watermark_klein.inpaint_watermark_klein(
+                    bank.user_id, path, boxes, device_id=device_id, klein_model=klein_model,
+                    custom_path=custom_path, allow_unmasked=True)
+            return watermark_lama.inpaint_watermarks(path, boxes, device=device)
+
+        done = cleaned = failed = empty = missing_mark = review = 0
+        lama_skip = 'LaMa needs a mark position; use Klein or Find Marks first'
+        first_error = ''
+        with window:
+            for rid in row_ids:
+                if bank_jobs.cancelled(job):
+                    break
+                row = _live_image(rid)
+                src = source_image_path(bank, row) if row is not None else None
+                fingerprint = bank_transfer_metadata.content_fingerprint_path(src)
+                if not fingerprint:
+                    problem = 'Image source is unavailable'
+                else:
+                    boxes, manual, problem = [], False, None
+                    if (fingerprint == row.watermark_fingerprint
+                            and row.watermark_state == 'detected'):
+                        boxes, manual, problem = _clean_regions(row)
+                    boxes = watermark_klein._normalize_boxes(boxes)
+                    if manual and not boxes and not problem:
+                        empty += 1
+                    elif not klein and not problem and (
+                            not boxes or [0.0, 0.0, 1.0, 1.0] in boxes):
+                        # LaMa needs surrounding pixels. Skip before staging a source.
+                        missing_mark += 1
+                    elif not problem:
+                        hold = False
+                        if not klein and not manual and boxes:
+                            # Same on-subject guard as the panel path: LaMa
+                            # leaves those marks flagged instead of replacing
+                            # the source.
+                            from .face_dataset_service import (
+                                _clean_inpaint_engine, _route_watermark,
+                            )
+                            _sized, width, height = _source_size(bank, row)
+                            if not width or not height:
+                                problem = 'Image source is unavailable'
+                            elif _clean_inpaint_engine(
+                                    _route_watermark(
+                                        boxes[0], width, height, allow_crop=False)[0],
+                                    method) == 'review':
+                                review += 1
+                                hold = True
+                        if not problem and not hold:
+                            error = _apply_in_place_bank_clean(
+                                bank, row, src, boxes, fingerprint, repaint, selected=True)
+                            if error:
+                                problem = error.get('detail') or 'Repaint failed'
+                            else:
+                                cleaned += 1
+                            db.session.commit()
+                if problem:
+                    failed += 1
+                    first_error = first_error or problem
+                done += 1
+                bank_jobs.progress(job, done=done)
+        if cleaned:
+            reset_score_memo()
+        detail = f'{cleaned} inpainted'
+        if empty:
+            detail += f', {empty} with an empty mask'
+        if missing_mark:
+            detail += f', {missing_mark} skipped: {lama_skip}'
+        if review:
+            detail += f', {review} left for review'
+        if failed:
+            detail += f', {failed} failed: {first_error}'
+        if bank_jobs.cancelled(job):
+            detail = f'cancelled — {detail}'
+        bank_jobs.progress(job, done=done, detail=detail)
+    return run
 
 
 def _watermark_inpaint_job(bank_id, method, device_id=None,
@@ -12204,39 +12334,61 @@ def set_watermark_regions(user_id, bank_id, image_id, regions, *,
 
 def _apply_custom_bank_clean(bank, row, src, boxes, fingerprint, device_id, custom_path):
     from . import watermark_klein
+
+    def repaint(path, regions):
+        return watermark_klein.inpaint_watermark_klein(
+            bank.user_id, path, regions, device_id=device_id, custom_path=custom_path)
+
+    return _apply_in_place_bank_clean(bank, row, src, boxes, fingerprint, repaint)
+
+
+def _apply_in_place_bank_clean(bank, row, src, boxes, fingerprint, repaint, *, selected=False):
     from .face_dataset_service import (
         _discard_staged_watermark_edit, _preserve_original,
-        _promote_staged_watermark_edit, _stage_oriented_watermark_edit,
+        _promote_staged_watermark_edit, _stage_oriented_watermark_edit, _watermark_original_path,
     )
 
     if reason := source_write_block(bank):
         return {'kind': 'failed', 'detail': reason}
     if row.edit_method:
-        return {'kind': 'failed', 'detail': 'revert the existing Bank edit before custom Klein cleaning'}
+        return {'kind': 'failed', 'detail': 'revert the existing Bank edit before replacing its source'}
     if not _same_resolved_path(src, abs_image_path(bank, row)):
-        return {'kind': 'failed', 'detail': 'custom Klein clean cannot replace a decode-only source format'}
+        return {'kind': 'failed', 'detail': 'cannot replace a decode-only source format'}
     staged = _stage_oriented_watermark_edit(src)
     if not staged:
-        return {'kind': 'failed', 'detail': 'could not stage image for custom Klein clean'}
+        return {'kind': 'failed', 'detail': 'could not stage image for cleaning'}
     try:
-        ok, err = watermark_klein.inpaint_watermark_klein(
-            bank.user_id, staged, boxes, device_id=device_id, custom_path=custom_path)
+        ok, err = repaint(staged, boxes)
         if not ok:
-            return err or {'kind': 'failed', 'detail': 'custom Klein clean failed'}
+            return err or {'kind': 'failed', 'detail': 'repaint failed'}
         row = _live_image(row.id)
         if (row is None or not _same_resolved_path(src, abs_image_path(bank, row))
                 or not _prepare_watermark_write(row, src, fingerprint)):
-            return {'kind': 'failed', 'detail': 'source image changed during custom Klein clean'}
+            return {'kind': 'failed', 'detail': 'source image changed during cleaning'}
         if reason := source_write_block(bank):
             return {'kind': 'failed', 'detail': reason}
         cleaned_fingerprint = bank_transfer_metadata.content_fingerprint_path(staged)
+        backup = _watermark_original_path(src)
+        if (row.watermark_clean_method not in IN_PLACE_WATERMARK_CLEANS
+                and os.path.lexists(backup)
+                and (os.path.islink(backup)
+                     or bank_transfer_metadata.content_fingerprint_path(backup) != fingerprint)):
+            return {'kind': 'failed', 'detail': 'An original backup exists for different source bytes'}
         if not cleaned_fingerprint or not _preserve_original(src):
-            return {'kind': 'failed', 'detail': 'could not preserve original for custom Klein clean'}
+            return {'kind': 'failed', 'detail': 'could not preserve original for cleaning'}
         if not _promote_staged_watermark_edit(staged, src):
-            return {'kind': 'failed', 'detail': 'could not replace source with the custom Klein result'}
+            return {'kind': 'failed', 'detail': 'could not replace source with the cleaned image'}
+        method = CUSTOM_WATERMARK_CLEAN
+        if selected:
+            # Keep the prior flag state so undo does not invent a scan result.
+            previous = IN_PLACE_WATERMARK_CLEANS.get(
+                row.watermark_clean_method, row.watermark_state)
+            method = SELECTED_WATERMARK_CLEANS.get(previous, 'selected')
+            _drop_clean_blob_by_id(bank.id, row.id)
         row.watermark_fingerprint = cleaned_fingerprint
         row.watermark_state = 'cleaned'
-        row.watermark_clean_method = CUSTOM_WATERMARK_CLEAN
+        row.watermark_clean_method = method
+        row.edit_sequence = bank_edit_history.next_generation(row)
         _invalidate_effective_analysis(row)
         return None
     finally:
@@ -12246,7 +12398,7 @@ def _apply_custom_bank_clean(bank, row, src, boxes, fingerprint, device_id, cust
 @_serialized_bank_mutation('watermark_undo')
 def undo_watermark_clean(user_id, bank_id, image_ids=None, *,
                          _bank_lease=None) -> int:
-    """Restore custom Klein sources or throw away cleaned blobs, then re-flag.
+    """Restore in-place cleans or throw away cleaned blobs, then restore the flag state.
     ``image_ids`` empty selects every cleaned image of the bank.
 
     A bank-side ✂ crop / ✨ improve made on top of a cleaned image goes with it.
@@ -12258,10 +12410,12 @@ def undo_watermark_clean(user_id, bank_id, image_ids=None, *,
         raise ValueError('bank not found')
     q = BankImage.query.filter_by(bank_id=bank_id, watermark_state='cleaned')
     if image_ids:
-        ids = [int(i) for i in image_ids]
-        q = q.filter(BankImage.id.in_(ids[:_SQL_IN_CHUNK]))
-    rows = q.all()
-    if any(row.watermark_clean_method == CUSTOM_WATERMARK_CLEAN for row in rows):
+        ids = list(dict.fromkeys(int(i) for i in image_ids))
+        rows = [row for offset in range(0, len(ids), _SQL_IN_CHUNK)
+                for row in q.filter(BankImage.id.in_(ids[offset:offset + _SQL_IN_CHUNK])).all()]
+    else:
+        rows = q.all()
+    if any(row.watermark_clean_method in IN_PLACE_WATERMARK_CLEANS for row in rows):
         _require_writable_source(bank)
     restored = 0
     for row in rows:
@@ -12270,23 +12424,31 @@ def undo_watermark_clean(user_id, bank_id, image_ids=None, *,
         if not _prepare_watermark_write(
                 row, raw_path, expected_raw_fingerprint):
             continue
-        custom = row.watermark_clean_method == CUSTOM_WATERMARK_CLEAN
-        if custom:
-            from .face_dataset_service import _restore_preserved_watermark_original
+        method = row.watermark_clean_method
+        in_place = method in IN_PLACE_WATERMARK_CLEANS
+        if in_place:
+            from .face_dataset_service import (
+                _restore_preserved_watermark_original, _watermark_original_path,
+            )
             try:
                 _restore_preserved_watermark_original(raw_path)
             except OSError as exc:
                 raise ValueError('could not restore the preserved original') from exc
             row.watermark_fingerprint = bank_transfer_metadata.content_fingerprint_path(raw_path)
+            row.edit_sequence = bank_edit_history.next_generation(row)
         _drop_edited_blob(bank_id, row)
         _discard_clean_blob(bank_id, row)
         _invalidate_effective_analysis(row)
-        # Back to 'detected' with its bbox intact, so it re-enters both levels
-        # (e.g. to retry with the other engine).
-        row.watermark_state = 'detected'
+        row.watermark_state = IN_PLACE_WATERMARK_CLEANS.get(method, 'detected')
+        if row.watermark_state is None:
+            row.watermark_fingerprint = None
         restored += 1
-        if custom:
+        if in_place:
             db.session.commit()
+            try:
+                Path(_watermark_original_path(raw_path)).unlink(missing_ok=True)
+            except OSError:
+                logger.warning('Could not remove the restored watermark backup for bank image %s', row.id)
     if rows:
         db.session.commit()
         if restored:
@@ -12327,9 +12489,7 @@ def dismiss_watermarks(user_id, bank_id, image_ids, *,
 def _watermark_source_counts(bank_id) -> dict:
     """How many SCANNED rows each detection route produced. A row with a state but
     no source predates the column — counted as 'unknown', never attributed."""
-    scanned = BankImage.query.filter_by(bank_id=bank_id).filter(
-        BankImage.watermark_state.isnot(None),
-        ~_watermark_history_inactive_clause())
+    scanned = BankImage.query.filter_by(bank_id=bank_id).filter(_watermark_scanned_clause())
     detector = scanned.filter(BankImage.watermark_source == 'detector').count()
     vision = scanned.filter(BankImage.watermark_source == 'vision').count()
     return {'detector': detector, 'vision': vision,
@@ -12388,9 +12548,7 @@ def watermark_levels(user_id, bank_id) -> dict | None:
                                                 allow_crop=True)[0] == 'crop':
             croppable += 1
     return {
-        'scanned': base.filter(
-            BankImage.watermark_state.isnot(None),
-            ~_watermark_history_inactive_clause()).count(),
+        'scanned': base.filter(_watermark_scanned_clause()).count(),
         # What a plain re-run would still look at. Detection resumes where it
         # stopped (the pass commits every 25 rows), but nothing said so: a
         # progress bar that restarts at 0 each run reads as "it started over
@@ -12409,7 +12567,7 @@ def watermark_levels(user_id, bank_id) -> dict | None:
         'cropped': base.filter_by(watermark_clean_method='crop').count(),
         'inpainted': base.filter(
             BankImage.watermark_clean_method.in_(
-                ('lama', 'klein', CUSTOM_WATERMARK_CLEAN, 'text_fill'))).count(),
+                ('lama', 'klein', 'text_fill', *IN_PLACE_WATERMARK_CLEANS))).count(),
         'dismissed': base.filter(
             BankImage.watermark_state == 'dismissed',
             ~_watermark_history_inactive_clause()).count(),

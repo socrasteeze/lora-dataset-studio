@@ -8,10 +8,11 @@ import test from 'node:test';
 import { BANK_PASSES, passScopeRows } from './bankPasses.js';
 
 const panel = fs.readFileSync(new URL('./BankWatermarkPanel.jsx', import.meta.url), 'utf8');
+const picker = fs.readFileSync(new URL('../common/DevicePicker.jsx', import.meta.url), 'utf8');
 const workspace = bankTreeSource();
 
 test('level 1 delegates Find to the workspace launch dialog', () => {
-  const findCardStart = panel.indexOf('<LevelCard index={1} title="Find them"');
+  const findCardStart = panel.indexOf('<LevelCard index={1} title="Find Watermarks"');
   const cropCardStart = panel.indexOf('<LevelCard index={2}', findCardStart);
   assert.ok(findCardStart >= 0, 'the Level 1 Find card is missing');
   assert.ok(cropCardStart > findCardStart, 'the Level 1 card boundary is missing');
@@ -35,6 +36,37 @@ test('level 1 delegates Find to the workspace launch dialog', () => {
   assert.match(workspace, /onPassOpen=\{setPassOpen\}/);
   assert.match(workspace, /\{passOpen && \(\s*<PassDialog passId=\{passOpen\}/,
     'passOpen must render the shared PassDialog');
+});
+
+test('Clean selected posts the checked IDs with the Level 3 engine and device', () => {
+  assert.match(workspace, /onClick=\{cleanSelected\}\s+disabled=\{!selected\.size/);
+  assert.match(workspace, /const cleanSelected = \(\) => \{[\s\S]*?postJson\(`\/api\/bank\/\$\{bankId\}\/watermark\/inpaint`, \{\s*clean_selected: true,\s*image_ids: \[\.\.\.selected\],\s*method: watermarkMethod,\s*device_id: watermarkDevice,/);
+  assert.match(workspace, /method=\{watermarkMethod\} onMethodChange=\{onWatermarkMethod\}/);
+  assert.match(workspace, /deviceId=\{watermarkDevice\} onDeviceChange=\{onWatermarkDevice\}/);
+  assert.doesNotMatch(panel, /clean_selected/);
+});
+
+test('Clean selected confirms count, engine, replacement, and undo before posting', () => {
+  const handler = workspace.slice(workspace.indexOf('const cleanSelected ='),
+    workspace.indexOf('const importCaptionSidecars ='));
+  assert.match(handler, /watermarkMethod === 'klein' \? 'Klein' : 'LaMa'/);
+  assert.match(handler, /const count = selected\.size\.toLocaleString\(\)/);
+  assert.match(handler, /if \(!window\.confirm\(`Clean \$\{count\}[^\n]+\$\{engine\}[^\n]*\n[^\n]*replaces source files in the Bank folder in place[^\n]*\.orig copy for Undo\.'\)\) return\s*return act\(\(\) => postJson/);
+});
+
+test('Watermarks uses equal-width single-line actions and aligned device pickers', () => {
+  assert.match(panel, /grid grid-cols-2 gap-2/);
+  assert.match(panel, /min-h-10 w-full whitespace-nowrap/);
+  assert.match(panel, /<DevicePicker[^>]+contextLabel="Level 1 Scan"/);
+  assert.match(panel, /<DevicePicker[^>]+contextLabel="Level 3 Inpaint"/);
+  assert.doesNotMatch(panel, />Level [13] (Scan|Inpaint)</);
+  assert.match(picker, /if \(devices == null\) return null[\s\S]*if \(!always && peers\.length === 0\) return null[\s\S]*grid-cols-\[6\.5rem_auto_minmax\(0,1fr\)\][\s\S]*\{contextLabel && <span/);
+  assert.doesNotMatch(panel, /blurb=|already handled here|your original files are never modified|sourceNote/);
+});
+
+test('disabled actions and bin-only actions show their reason under the button', () => {
+  assert.match(panel, /const message = state\.reason \|\| state\.note/);
+  assert.match(panel, /<\/button>\s*\{message && <p[^>]*>\{message\}<\/p>\}/);
 });
 
 test('the watermark pass offers selection, all five scopes, and rescan', () => {

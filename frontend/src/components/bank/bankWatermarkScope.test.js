@@ -114,20 +114,20 @@ test('a level with work only in the bin stays clickable and says so', () => {
   assert.equal(off.disabled, true);                 // today's behaviour, unchanged
   const on = cropLevelState(levels, { binWaiting: 9 });
   assert.equal(on.disabled, false);
-  assert.match(on.label, /9 in the bin/);
+  assert.match(on.label, /\(9\)/);
+  assert.match(on.note, /9 unkept/);
 
   const ip = inpaintLevelState(levels, { lamaReady: true, binWaiting: 9 });
   assert.equal(ip.disabled, false);
-  assert.match(ip.label, /9 in the bin/);
+  assert.match(ip.label, /\(9\)/);
+  assert.match(ip.note, /9 unkept/);
 });
 
-test('the line under a bin-only button does not contradict the button', () => {
-  // "0 image(s) waiting" under a live "✂ Auto-crop (2 in the bin)" is the card
-  // arguing with itself — the exact class of defect these counts exist to end.
+test('the bin-only tooltip names the scope', () => {
   const levels = { scanned: 50, flagged: 0, croppable: 0, cropped: 7 };
-  assert.match(cropLevelState(levels, { binWaiting: 2 }).note, /2 image\(s\) waiting/);
+  assert.match(cropLevelState(levels, { binWaiting: 2 }).note, /2 unkept/);
   assert.match(inpaintLevelState(levels, { lamaReady: true, binWaiting: 2 }).note,
-    /Unkept only/);
+    /Unkept Only/);
   // Nothing in the bin: no note at all, so the ordinary line shows.
   assert.equal(cropLevelState(levels, {}).note, '');
   assert.equal(cropLevelState({ croppable: 4 }, { binWaiting: 2 }).note, '');

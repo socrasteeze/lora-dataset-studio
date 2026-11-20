@@ -51,6 +51,7 @@ export default function BankPassesPanel({
   selected, captionScope,
   captionVocab, visionModel, visionModelLooksUncensored,
   onPassOpen, onPassRedo, onPickPython, onSemanticEngineChange, onChanged,
+  watermarkMethod, onWatermarkMethod, watermarkDevice, onWatermarkDevice,
   // Divergence 6 (peer dispatch) + the fork's own 🔖 Tags pass. Upstream's panel
   // gates on caps.* directly and has no device concept; here a pass can be aimed
   // at another machine, so the gate is passGate (which folds the peer's own
@@ -195,14 +196,16 @@ export default function BankPassesPanel({
           {/* Watermark CLEANING — the two manual levels (crop, then inpaint), with
               their own per-level progress. Lives in its own component so the
               "which level can run, and why not" logic stays unit-tested. */}
-          <Fold compact={compact} title="Watermarks">
           <BankWatermarkPanel bankId={bankId} live={live}
             onFind={() => onPassOpen('watermark')}
             onFindText={() => onPassOpen('text_scan')}
             payload={payload} selectedIds={[...selected]}
+            method={watermarkMethod} onMethodChange={onWatermarkMethod}
+            deviceId={watermarkDevice} onDeviceChange={onWatermarkDevice}
+            scanDevice={passDevice} onScanDeviceChange={onPassDevice}
+            onScanDevice={onPassDeviceObj}
             gpuPresent={scoreGpuPresent} onPickPython={onPickPython}
             onChanged={onChanged} />
-          </Fold>
           {/* ✂ Edits — the crop and the upscale made in the Bank itself, next to
               the watermark cleaning because they are the same KIND of thing: the
               three actions that produce new pixels, each undone by throwing away

@@ -121,7 +121,8 @@ function Facts({ img }) {
 }
 
 export default function BankReviewLightbox({
-  bankId, ids, startId = null, seedImages = [], onDecided, onRotated, onEdited, onClose, collectionId = null,
+  bankId, ids, startId = null, seedImages = [], onDecided, onRotated, onEdited, onClose,
+  collectionId = null, sourceWriteBlock = null,
 }) {
   const [session, setSession] = useState(() => createSession(ids, { startId }))
   const [meta, setMeta] = useState(() => {
@@ -165,6 +166,8 @@ export default function BankReviewLightbox({
   const done = isFinished(session)
   const p = progress(session)
   const img = id == null ? null : meta[id]
+  const canRestore = img?.watermark_state === 'cleaned'
+  const restoreBlock = img?.watermark_clean_in_place ? sourceWriteBlock : null
   const editKey = `${id}:${img?.edit_generation || 0}:${img?.edit_sequence || 0}`
   const comparing = compareKey === editKey && img?.edit_history_count > 0
   useReviewImagePreload(session.order.slice(Math.max(0, session.pos - 1), session.pos + 3)
@@ -331,6 +334,33 @@ export default function BankReviewLightbox({
     }
   }, [applyEdit, bankId, busy, session])
 
+  const restoreOriginal = useCallback(async () => {
+    if (!canRestore || busy) return
+    if (restoreBlock) {
+      setError(restoreBlock)
+      return
+    }
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const result = await postJson(`/api/bank/${bankId}/watermark/undo`, { image_ids: [id] })
+      if (!result.restored) throw new Error('The original could not be restored.')
+      requested.current.delete(id)
+      setMeta((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+      setCompareKey(null)
+      setNotice('Original restored.')
+    } catch (e) {
+      setError(e?.message || 'Could not restore the original.')
+    } finally {
+      setBusy(false)
+    }
+  }, [bankId, busy, canRestore, id, restoreBlock])
+
   // Moving forward without judging IS a skip: it stays undecided in the DB and
   // is not proposed again in this session (S and ⏭ are the same).
   const doSkip = useCallback(() => { setError(null); setNotice(null); setSession((s) => skip(s)) }, [])
@@ -350,6 +380,11 @@ export default function BankReviewLightbox({
       const action = reviewKeyAction(e, { decisionArrows: true })
       if (action === 'close') { onClose(); return }
       if (action === 'keep') { e.preventDefault(); sendDecision('keep'); return }
+      if (action === 'reject' && canRestore && e.key.toLowerCase() === 'r') {
+        e.preventDefault()
+        restoreOriginal()
+        return
+      }
       if (action === 'reject') { e.preventDefault(); sendDecision('reject'); return }
       if (action === 'skip') { e.preventDefault(); doSkip(); return }
       if (action === 'back') { e.preventDefault(); goBack(); return }
@@ -367,7 +402,8 @@ export default function BankReviewLightbox({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, sendDecision, doSkip, goBack, rotateCurrent, maskId, cropId, img, id, pluginLayer])
+  }, [onClose, sendDecision, doSkip, goBack, rotateCurrent, maskId, cropId, img, id,
+    pluginLayer, canRestore, restoreOriginal])
 
   // The key cap itself is shared with the dataset lightbox (ShortcutKey.jsx):
   // same letters, same look, one place.
@@ -436,12 +472,27 @@ export default function BankReviewLightbox({
         <div className="bank-review-controls min-h-0 overflow-y-auto overscroll-contain space-y-2 bg-black/60 px-4 pt-2.5">
           <div className="min-h-5 text-center text-xs">
             {error ? <p role="alert" className="text-rose-300">{error} Try again.</p>
-              : <p role="status" className="text-white/60">{busy ? 'Saving' : <span>{REVIEW_SHORTCUT_HINT}<span className="hidden lg:inline"> · {REVIEW_ARROW_HINT}</span></span>}</p>}
+              : <p role="status" className="text-white/60">{busy ? 'Saving' : (
+                <span>
+                  {canRestore ? 'K keep · R restore · S skip' : <>{REVIEW_SHORTCUT_HINT}</>}
+                  <span className="hidden lg:inline"> · {REVIEW_ARROW_HINT}</span>
+                </span>
+              )}</p>}
           </div>
           {notice && !error && (
             <p role="status" className="text-center text-sm text-sky-200">✂ {notice}</p>
           )}
           <Facts img={img} />
+          {canRestore && (
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button type="button" onClick={restoreOriginal} disabled={busy || !!restoreBlock}
+                aria-keyshortcuts="R" title={restoreBlock || 'Restore this image to its state before cleaning.'}
+                className="inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border border-white/25 px-3 py-2 text-sm text-white disabled:opacity-50 hover:bg-white/10">
+                ↩ Restore original{shortcut('R')}
+              </button>
+              {restoreBlock && <span className="self-center text-xs text-amber-200">{restoreBlock}</span>}
+            </div>
+          )}
           {canEditMask(img) && (
             <div className="flex justify-center">
               <button type="button" onClick={() => setMaskId(id)} disabled={busy}
@@ -506,10 +557,10 @@ export default function BankReviewLightbox({
           </div>
           <div className="flex w-full gap-2">
             <button type="button" onClick={() => sendDecision('reject')} disabled={busy}
-              title="Reject this image and move on (R or ←). Nothing is deleted from disk."
-              aria-keyshortcuts="R ArrowLeft"
+              title="Reject and move on."
+              aria-keyshortcuts={canRestore ? 'ArrowLeft' : 'R ArrowLeft'}
               className="review-decision-button inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-rose-400/60 bg-rose-500/20 px-3 py-2 text-sm font-semibold text-rose-100 disabled:opacity-50 hover:bg-rose-500/30 lg:min-h-0">
-              ✕ Reject{shortcut('R')}
+              ✕ Reject{shortcut(canRestore ? '←' : 'R')}
             </button>
             <button type="button" onClick={doSkip}
               title="Decide later (S) — stays undecided and is not shown again in this review"

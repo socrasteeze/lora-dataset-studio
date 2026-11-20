@@ -349,6 +349,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const [styleBrowserOpen, setStyleBrowserOpen] = useState(false)
   const closeStyleBrowser = useCallback(() => setStyleBrowserOpen(false), [])
   const [passesOpen, setPassesOpen] = useState(false)
+  const [watermarkMethod, setWatermarkMethod] = useState('auto')
+  const [watermarkDevice, setWatermarkDevice] = useState(() => loadSavedDeviceId('comfy'))
   useEffect(() => {
     const onResize = () => {
       const column = railIsColumn(window.innerWidth)
@@ -1248,6 +1250,19 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     return runPass('faces', {})
   }
   const startCaption = (run) => runPass('caption', run, captionRunOptions())
+  const cleanSelected = () => {
+    if (!selected.size || bankBusy || payload?.source_write_block) return
+    const engine = watermarkMethod === 'klein' ? 'Klein' : 'LaMa'
+    const count = selected.size.toLocaleString()
+    if (!window.confirm(`Clean ${count} selected ${selected.size === 1 ? 'image' : 'images'} with ${engine}?\n\n`
+      + 'This replaces source files in the Bank folder in place. Each original is kept as a .orig copy for Undo.')) return
+    return act(() => postJson(`/api/bank/${bankId}/watermark/inpaint`, {
+      clean_selected: true,
+      image_ids: [...selected],
+      method: watermarkMethod,
+      device_id: watermarkDevice,
+    }))
+  }
   const importCaptionSidecars = () => act(async () => {
     const imported = await postJson(`/api/bank/${bankId}/caption-sidecars`, {})
     const filled = Number(imported?.filled) || 0
@@ -2231,6 +2246,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             onPassOpen={setPassOpen} onPassRedo={setPassRedoFor}
             onPickPython={setPythonPickerFor}
             onSemanticEngineChange={changeSemanticEngine}
+            watermarkMethod={watermarkMethod} onWatermarkMethod={setWatermarkMethod}
+            watermarkDevice={watermarkDevice} onWatermarkDevice={setWatermarkDevice}
             onChanged={async () => { await Promise.all([refreshPayload(), refreshImages()]) }}
             passGate={passGate} passDevice={passDevice}
             tagsState={tagsState} tagsLabel={tagsButtonLabel(counts)}
@@ -2331,11 +2348,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             {comparisonLoading && <span role="status" className="text-xs text-content-muted">Loading comparison</span>}
           </div>
         )}
-        {/* Results stay together on portrait; the three selection cells share
-            their own row, then Compare and Collections. Five equal columns from
-            lg; from xl all seven cells share one row. */}
+        {/* Results and Review share the first portrait row. Selection actions
+            share the second. The full toolbar fits one row at xl. */}
         <div className="space-y-1.5">
-        <div className="grid w-full grid-cols-3 items-stretch gap-1.5 lg:grid-cols-5 xl:grid-cols-7">
+        <div className="grid w-full grid-cols-3 items-stretch gap-1.5 lg:grid-cols-5 xl:grid-cols-8">
           <span className={`${TOOLBAR_CELL} col-span-2 flex-wrap gap-x-1 text-content-muted lg:col-span-1`}>
             <span className="whitespace-nowrap"><span className="font-semibold tabular-nums text-content">{(page.total ?? 0).toLocaleString()}</span> shown</span>
             {isFiltered && (
@@ -2347,11 +2363,17 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               the tile click stays the bulk-selection gesture it has always been. */}
           <button type="button" onClick={() => openReview(null)} disabled={reviewLoading || !(page.total > 0)}
             aria-label="Review from the current filter"
-            title="Review the images of this filter one at a time, full size: ✓ Keep / ✕ Reject / ⏭ Skip (K/R/S) each move to the next. Optional random order."
+            title="Review the images of this filter one at a time, full size."
             className={`${TOOLBAR_CELL} border font-semibold ${FILTER_ACTIVE} ${FILTER_HOVER} ${CONTROL_DISABLED}`}>
             {reviewLoading ? 'Preparing' : 'Review'}
           </button>
           <span className={`${TOOLBAR_CELL} text-content-muted`}>{selected.size} selected</span>
+          <button type="button" onClick={cleanSelected}
+            disabled={!selected.size || bankBusy || !!payload?.source_write_block}
+            title={payload?.source_write_block || 'Repaint selected images with the Level 3 engine. The entire frame can change. Undo restores the original.'}
+            className={`${TOOLBAR_CELL} whitespace-nowrap border ${FILTER_IDLE} ${FILTER_HOVER} ${CONTROL_DISABLED}`}>
+            Clean selected
+          </button>
           <button type="button" onClick={selectAllCurrent} disabled={!(page.total > 0)}
             title="Selects every image the current filters show — all pages, not just the tiles on screen"
             className={`${TOOLBAR_CELL} border ${FILTER_IDLE} ${FILTER_HOVER} ${CONTROL_DISABLED}`}>
@@ -3043,6 +3065,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       {review && (
         <BankReviewLightbox bankId={bankId} ids={review.ids} startId={review.startId}
           seedImages={page.images} onDecided={onReviewDecided}
+          sourceWriteBlock={payload?.source_write_block}
           onRotated={onReviewRotated} onEdited={onReviewEdited} onClose={closeReview} />
       )}
 

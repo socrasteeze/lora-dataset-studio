@@ -54,21 +54,19 @@ export function levelCounts(levels) {
 export function textLevelState(levels, { live = false, ocrReady = false } = {}) {
   const c = levelCounts(levels);
   const reason = live
-    ? 'A pass is already running on this bank — wait for it to finish.'
+    ? 'A pass is already running.'
     : !ocrReady
       // The SAME extra the Video bank's Safe zone pass uses — one install
       // serves both, and naming the card is what makes the fix one click.
-      ? 'Install “Burned-in text” (Setup ▸ Quality tools) to read text — '
-        + 'a small CPU-only package, no GPU, works offline.'
+      ? 'Install Burned-in text in Setup ▸ Quality tools.'
       : null;
   return {
     done: c.textScanned,
     remaining: c.textUnscanned,
     disabled: reason !== null,
     reason,
-    label: c.textUnscanned > 0 && c.textScanned > 0
-      ? `🔤 Read the remaining ${c.textUnscanned}`
-      : c.textScanned > 0 ? '🔤 Scan again' : '🔤 Find text',
+    label: c.textUnscanned > 0 ? `🔤 Find Text (${c.textUnscanned})`
+      : c.textScanned > 0 ? '🔤 Rescan Text' : '🔤 Find Text',
   };
 }
 
@@ -86,13 +84,12 @@ export function findLevelState(levels, {
 } = {}) {
   const c = levelCounts(levels);
   const reason = live
-    ? 'A pass is already running on this bank — wait for it to finish.'
+    ? 'A pass is already running.'
     : !visionReady && !detectorReady
       // Settings ▸ Local tools, NOT ▸ Captioning & quality: that section holds the
       // ENGINE selector, while the Ollama vision model field lives in Local tools.
       // Sending someone to the wrong tab to fix a blocked pass is worse than silence.
-      ? 'Pull the vision model (Settings ▸ Local tools), or install the '
-        + 'watermark detector (Setup ▸ Quality tools), to scan for watermarks.'
+      ? 'Pull a vision model in Settings or install the detector in Setup.'
       : null;
   return {
     done: c.scanned,
@@ -103,9 +100,8 @@ export function findLevelState(levels, {
     remaining: c.unscanned,
     disabled: reason !== null,
     reason,
-    label: c.unscanned > 0 && c.scanned > 0
-      ? `🚩 Scan the remaining ${c.unscanned}`
-      : c.scanned > 0 ? '🚩 Scan again' : '🚩 Find watermarks',
+    label: c.unscanned > 0 ? `🚩 Find Marks (${c.unscanned})`
+      : c.scanned > 0 ? '🚩 Rescan Marks' : '🚩 Find Marks',
   };
 }
 
@@ -120,7 +116,7 @@ export function findLevelState(levels, {
 export function cropLevelState(levels, { live = false, binWaiting = 0 } = {}) {
   const c = levelCounts(levels);
   const reason = live
-    ? 'A pass is already running on this bank — wait for it to finish.'
+    ? 'A pass is already running.'
     : (c.croppable === 0 && binWaiting > 0)
       ? null
       : c.croppable === 0
@@ -129,11 +125,9 @@ export function cropLevelState(levels, { live = false, binWaiting = 0 } = {}) {
           // A hand-drawn mask can hold several zones and zones on the subject —
           // a border crop expresses neither, so this level skips those images.
           // Saying "not in a border" there would be a lie.
-          ? 'The flagged images all carry a hand-edited mask — 🧽 Inpaint repaints '
-            + 'the zones you drew.'
-          : 'Nothing to crop: the remaining marks are not in a border, or cropping '
-            + 'would shrink the image too much. Use level 3.')
-        : 'Nothing flagged — run 🚩 Find watermarks first.')
+          ? 'Use Inpaint for hand-edited masks.'
+          : 'No safe border crop. Use Level 3.')
+        : 'No flags. Run Find Marks.')
       : null;
   return {
     done: c.cropped,
@@ -144,8 +138,8 @@ export function cropLevelState(levels, { live = false, binWaiting = 0 } = {}) {
     // live button is a contradiction, and adding binWaiting to croppable would
     // add an unrouted figure to a routed one.
     label: c.croppable === 0 && binWaiting > 0
-      ? `✂ Auto-crop (${binWaiting} in the bin)`
-      : `✂ Auto-crop (${c.croppable})`,
+      ? `✂ Auto-Crop (${binWaiting})`
+      : `✂ Auto-Crop (${c.croppable})`,
     // …and the line under the button follows the label. Leaving the default
     // "0 image(s) waiting" under a button offering 2 is the card contradicting
     // itself, which is exactly what the counts on this page exist to end.
@@ -156,8 +150,7 @@ export function cropLevelState(levels, { live = false, binWaiting = 0 } = {}) {
 
 /** The line under a level whose only remaining work sits in the bin. */
 function binNote(n) {
-  return `${n} image(s) waiting, all of them unkept — pick “✕ Unkept only” in `
-    + 'the window.';
+  return `${n} unkept. Select Unkept Only to run.`;
 }
 
 /** Level 3 — repaint. `method` is the engine toggle: 'lama' (or 'auto') repaints
@@ -189,24 +182,24 @@ export function inpaintLevelState(levels, {
   // "needs ComfyUI running and the Klein models" sends a user with a corrupted
   // 9.5 GB file to re-check the two things that were already fine.
   const reason = live
-    ? 'A pass is already running on this bank — wait for it to finish.'
+    ? 'A pass is already running.'
     : !engineReady
       ? (wantsKlein
         ? (kleinReason
-          || 'Klein inpainting needs ComfyUI running and the Klein models (Setup ▸ ComfyUI).')
-        : 'LaMa inpainting is not installed yet (Setup ▸ Quality tools).')
+          || 'Start ComfyUI and install the Klein models in Setup.')
+        : 'Install LaMa in Setup ▸ Quality tools.')
       : (c.flagged === 0 && binWaiting > 0)
         ? null                      // see cropLevelState: the bin is reachable now
         : c.flagged === 0
           ? (c.cropped > 0
-            ? 'Nothing left — every flagged image has been handled.'
-            : 'Nothing flagged — run 🚩 Find watermarks first.')
+            ? 'All flagged images handled.'
+            : 'No flags. Run Find Marks.')
           : null;
   // Stated even when the button is live: the local verdict said "not ready",
   // and the only reason the pass can still run is that another machine will do
   // the rendering — that swap must never be silent.
   const remoteNote = wantsKlein && remote && !kleinReady
-    ? 'Klein readiness will be checked on the selected machine when the job runs.'
+    ? 'The selected machine checks Klein readiness.'
     : null;
   return {
     done: c.inpainted,
@@ -215,7 +208,7 @@ export function inpaintLevelState(levels, {
     reason,
     remoteNote,
     label: c.flagged === 0 && binWaiting > 0
-      ? `🧽 Inpaint (${binWaiting} in the bin)`
+      ? `🧽 Inpaint (${binWaiting})`
       : `🧽 Inpaint (${c.flagged})`,
     note: binWaiting > 0 && c.flagged === 0 && engineReady ? binNote(binWaiting) : '',
   };
@@ -227,25 +220,16 @@ export function hasCleanedImages(levels) {
   return c.cropped + c.inpainted > 0;
 }
 
-/** The one-line status above the two buttons. Says what is left AND what has
- * been done, because "0 flagged" alone can't be told apart from "never ran". */
+/** Compact scan and repaint counts. Flagged and croppable are on the controls. */
 export function progressSummary(levels) {
   const c = levelCounts(levels);
-  if (c.scanned === 0) return 'Not scanned yet — run 🚩 Find watermarks to flag the marked images.';
-  // A PARTIAL scan must say so first. Reporting "N still flagged" while
-  // thousands of images were never looked at reads as a finished pass, and it
-  // is the same misreading that makes a resumed scan look like it started over.
-  const partial = c.unscanned > 0
-    ? `${c.scanned} of ${c.scanned + c.unscanned} scanned — ${c.unscanned} still to look at. `
-    : '';
-  const done = [];
-  if (c.cropped) done.push(`${c.cropped} cropped`);
-  if (c.inpainted) done.push(`${c.inpainted} repainted`);
-  if (c.dismissed) done.push(`${c.dismissed} dismissed`);
-  const left = c.flagged === 0
-    ? 'nothing left flagged'
-    : `${c.flagged} still flagged (${c.croppable} croppable, ${c.inpaintable} to repaint)`;
-  return partial + (done.length ? `${done.join(', ')} — ${left}.` : `${left}.`);
+  const counts = [`${c.scanned}/${c.scanned + c.unscanned} scanned`];
+  if (c.textScanned) counts.push(`${c.textScanned} text-scanned`);
+  if (c.inpaintable) counts.push(`${c.inpaintable} to repaint`);
+  if (c.cropped) counts.push(`${c.cropped} cropped`);
+  if (c.inpainted) counts.push(`${c.inpainted} repainted`);
+  if (c.dismissed) counts.push(`${c.dismissed} dismissed`);
+  return counts.join(' · ');
 }
 
 /** What the hand-edited masks change, or null. An emptied mask repaints NOTHING:
@@ -254,40 +238,8 @@ export function progressSummary(levels) {
 export function maskNote(levels) {
   const c = levelCounts(levels);
   if (!c.handMasked) return null;
-  const drawn = `${c.handMasked} flagged image(s) carry a mask you edited — 🧽 Inpaint `
-    + 'repaints those zones, ✂ Auto-crop skips them.';
-  if (!c.emptyMasks) return drawn;
-  return `${drawn} ${c.emptyMasks} of them has an EMPTY mask and will be cleaned by `
-    + 'neither level — draw a zone in ▶ Review, or dismiss the image.';
-}
-
-/** WHO decided these verdicts, and who will decide the next ones — one sentence,
- * or null when there is nothing scanned and nothing to say.
- *
- * This is not trivia. The two routes are different instruments: the detector
- * returns a SCORE compared against a threshold the user can move, the vision
- * model returns a sentence it wrote. A user looking at a flag and asking "why?"
- * gets a different answer, and a different remedy, depending on which one ruled
- * — so a panel that hides the source hides the only actionable half. */
-export function sourceNote(levels) {
-  const l = levels || {};
-  const s = l.sources || {};
-  const detector = num(s.detector);
-  const vision = num(s.vision);
-  const unknown = num(s.unknown);
-  const next = l.next_source === 'detector' ? 'detector' : 'vision';
-  const thr = Number.isFinite(l.threshold) ? l.threshold : null;
-  const nextLabel = next === 'detector'
-    ? `the watermark detector${thr === null ? '' : ` (flags at a score of ${thr})`}`
-    : 'the vision model';
-  if (detector + vision + unknown === 0) return `Nothing scanned yet — ${nextLabel} will do it.`;
-  const done = [];
-  if (detector) done.push(`${detector} by the detector`);
-  if (vision) done.push(`${vision} by the vision model`);
-  // Never attributed to either route: these rows were scanned before the app
-  // recorded which one ruled. Saying "by the vision model" would be a guess.
-  if (unknown) done.push(`${unknown} before the source was recorded`);
-  return `Judged ${done.join(', ')}. A new run uses ${nextLabel}.`;
+  if (c.emptyMasks) return `${c.emptyMasks} empty mask${c.emptyMasks === 1 ? '' : 's'}`;
+  return `${c.handMasked} hand-masked`;
 }
 
 /** Rows a previous build flagged without keeping the box: they are invisible to
@@ -295,6 +247,5 @@ export function sourceNote(levels) {
 export function rescanNote(levels) {
   const c = levelCounts(levels);
   if (!c.needsRescan) return null;
-  return `${c.needsRescan} image(s) were flagged before the marks' positions were `
-    + 'recorded — run 🚩 Find watermarks again to make them cleanable.';
+  return `Rescan ${c.needsRescan} flagged images to locate their marks.`;
 }

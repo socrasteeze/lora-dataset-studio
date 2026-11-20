@@ -2969,8 +2969,8 @@ launch by hand** — cheapest and safest first:
    Every clean also writes the prompt, size and write-back mode it used to
    🪵 Server log, so you can tell afterwards what actually ran.
 
-Each step shows how many images it has handled and how many remain. The shipped
-cleaners store a copy beside the Bank thumbnails. The grid and **Promote** use
+The Watermarks panel shows the scan progress and action counts. The shipped
+panel cleaners store a copy beside the Bank thumbnails. The grid and **Promote** use
 the cleaned pixels. A custom Klein workflow replaces writable source images and
 keeps each original in a `.orig` sibling. **Undo Cleaning** restores the prior
 pixels and flags the image again. **Before / After** shows both versions.
@@ -2997,9 +2997,8 @@ to clean** repaints by.
 
 ### Who decided an image is watermarked
 
-**🚩 Find watermarks** can run two ways, and the panel says which one produced
-the verdicts you are looking at ("Judged 1 240 by the detector, 300 by the vision
-model") and which one a new run would use.
+**🚩 Find watermarks** can use either engine. Its launch window shows the
+engine choice.
 
 - **The vision model** — the way that has always worked. It asks the local vision
   model, in words, whether the picture carries a mark, once per image. About
@@ -3032,6 +3031,21 @@ and not a constant.
 Images flagged **without** a position — the detector was sure there is a mark but
 could not place it — stay flagged and are counted separately in the pass's report.
 Draw a zone on them with **🚩 Edit mask** below, or leave them as a filter.
+
+## Repaint selected Bank images
+
+Check images in the Bank grid and click **Clean selected** in the toolbar.
+The action uses the Watermarks panel's Level 3 engine and accepts images before
+a scan with Klein. LaMa skips images that have no usable mark position. Use
+**Find Marks** or draw a mask before using LaMa. Shipped Klein uses its cleaning
+prompt on the image, and custom Klein uses the configured workflow.
+
+A confirmation shows the engine and selection count. A successful clean replaces
+the writable source and keeps its original as a sibling `.orig` file.
+Use **Undo Cleaning** in Watermarks to restore the batch.
+In Bank Review, use **Restore original** or **R** for the current cleaned image.
+Restoring an in-place clean removes its backup after restoring the source.
+Use **←** to reject that image.
 
 ## Erase burned-in text — bubbles, subtitles, captions
 

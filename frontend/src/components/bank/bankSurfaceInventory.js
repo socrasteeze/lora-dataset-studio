@@ -335,7 +335,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Crop it off",
+    "Auto-Crop",
     1
   ],
   [
@@ -391,7 +391,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Find them",
+    "Find Watermarks",
     1
   ],
   [
@@ -572,11 +572,11 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Reject this image and move on (R or ←). Nothing is deleted from disk.",
+    "Reject and move on.",
     1
   ],
   [
-    "Repaint what's left",
+    "Inpaint",
     1
   ],
   [
@@ -612,7 +612,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Review the images of this filter one at a time, full size: ✓ Keep / ✕ Reject / ⏭ Skip (K/R/S) each move to the next. Optional random order.",
+    "Review the images of this filter one at a time, full size.",
     1
   ],
   [
@@ -700,7 +700,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Throw away every cleaned version and flag those images again. Your original files were never modified, so nothing is lost.",
+    "Restore every cleaned image to its original.",
     1
   ],
   [

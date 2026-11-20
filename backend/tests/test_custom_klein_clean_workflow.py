@@ -126,8 +126,9 @@ def test_custom_workflow_rejects_invalid_port_counts(app, tmp_path, workflow, re
 
 
 @pytest.mark.parametrize('device', ['local', 'api:abc123def456'])
+@pytest.mark.parametrize('selected', [False, True])
 def test_custom_bank_clean_replaces_and_restores_source(client, app, tmp_path, workflow,
-                                                       mock_comfy, device):
+                                                       mock_comfy, device, selected):
     _configure(workflow, tmp_path)
     bank_id, folder = _mkbank(client, tmp_path, {'sample.jpg': Image.new('RGB', (32, 24), 'white')})
     image_id = _flag(app, bank_id, OFFCENTER_MARK)
@@ -137,10 +138,14 @@ def test_custom_bank_clean_replaces_and_restores_source(client, app, tmp_path, w
     with app.app_context():
         row = db.session.get(BankImage, image_id)
         row.caption = 'Sample caption'
+        if selected:
+            row.watermark_state = row.watermark_bbox = row.watermark_fingerprint = None
         db.session.commit()
 
-    response = client.post(f'/api/bank/{bank_id}/watermark/inpaint',
-                           json={'method': 'klein', 'device_id': device})
+    body = {'method': 'klein', 'device_id': device}
+    if selected:
+        body.update(clean_selected=True, image_ids=[image_id])
+    response = client.post(f'/api/bank/{bank_id}/watermark/inpaint', json=body)
     assert response.status_code == 202, response.get_json()
     assert len(mock_comfy) == 1
     with Image.open(source) as result:
@@ -163,4 +168,7 @@ def test_custom_bank_clean_replaces_and_restores_source(client, app, tmp_path, w
 
     response = client.post(f'/api/bank/{bank_id}/watermark/undo', json={})
     assert response.get_json() == {'ok': True, 'restored': 1}
-    assert source.read_bytes() == backup.read_bytes() == original
+    assert source.read_bytes() == original
+    assert not backup.exists()
+    with app.app_context():
+        assert db.session.get(BankImage, image_id).watermark_state == (None if selected else 'detected')
