@@ -711,7 +711,7 @@ Real images pulled off the web carry **overlaid watermarks** — a site logo, a 
 - **Review flagged (N)** opens a lightbox that steps through the flagged images one at a time: you see the **detected box drawn** on the shot and the tool's planned action, pick the engine, then Clean it (and see the **cleaned result** before moving on), **dismiss** it as a false positive (the flag clears and future Find passes never re-flag it), or reject it outright.
 - **🚩 Edit mask** (shortcut `M`), from Review or the image viewer, draws the zones yourself instead of trusting the detector's one guessed box. On an image Find left unflagged the same button reads **Mark a watermark** — draw a zone and it *becomes* the flag, which is the only way to clean a mark the classifier scored under threshold (stock-photo tiling is the usual case).
 
-Inpainting is an **ML extra**: without it, Clean still crops border marks and simply *skips* the off-centre ones — a one-click **⬇ Install inpainting** button sits right next to the tools. The Klein engine additionally needs ComfyUI with the FLUX.2 Klein models (the same preflight/auto-download as Klein generation), and since LaMa is its pre-fill stage, no inpainting extras means Klein cleaning reports itself unavailable instead of degrading silently.
+Inpainting is an **ML extra**. Clean can still crop border marks without it. The built-in Klein workflow needs ComfyUI, FLUX.2 Klein weights, and inpainting extras to erase detected marks before rendering. To use a ComfyUI API export with its own models, open **Bank → Watermarks**, select **Klein**, and choose it from **Klein Workflow**.
 
 ---
 

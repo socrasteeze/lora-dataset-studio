@@ -204,7 +204,7 @@ def scan_family_tree(roots, dir_tokens, *, root_file_accept=None, accept=None,
     return sorted(set(out))
 
 
-def scan_family_folders(roots, dir_tokens, *, accept=None,
+def scan_family_folders(roots, dir_tokens, *, accept=None, match_nested_filenames=False,
                         suffixes=MODEL_FILE_SUFFIXES):
     """``[(prefix, [filenames])]`` at ANY depth under each root, in the order the
     roots were given (ComfyUI's own priority order).
@@ -286,8 +286,12 @@ def scan_family_folders(roots, dir_tokens, *, accept=None,
                 # family's weights at once.
                 root_names = [n for n in names
                               if any(t in n.lower() for t in dir_tokens)]
-            elif names and any(t in rel_dir.lower() for t in dir_tokens):
-                subs.append((rel_dir, names))
+            else:
+                family_dir = any(t in rel_dir.lower() for t in dir_tokens)
+                if match_nested_filenames and not family_dir:
+                    names = [n for n in names if any(t in n.lower() for t in dir_tokens)]
+                if names and (family_dir or match_nested_filenames):
+                    subs.append((rel_dir, names))
         subs.sort(key=lambda group: (group[0].count(os.sep), group[0].lower()))
         out.extend(subs)
         if root_names:

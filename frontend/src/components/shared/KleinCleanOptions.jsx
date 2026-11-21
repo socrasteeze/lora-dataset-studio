@@ -22,7 +22,7 @@ import { useState } from 'react';
 import { putJson } from '../../api/fetchClient';
 import { Button, Select } from '../common/Controls.jsx';
 import {
-  CLEAN_OUTPUT_MODES, cleanPromptText, clampMaxMp, formatMp, maxMpChoices, mpNote,
+  CLEAN_OUTPUT_MODES, cleanPromptText, clampMaxMp, formatMp, maxMpChoices,
   normalizeOutput, outputNote,
 } from '../../utils/kleinCleanOptions.js';
 
@@ -53,33 +53,29 @@ export default function KleinCleanOptions({ caps = {}, disabled = false, classNa
       await putJson('/api/settings', { config: { watermark_clean: patch } });
       setSaved((s) => ({ ...s, ...patch }));
       onChanged?.(patch);
+      return true;
     } catch {
       // The pass still uses the STORED value, so a silent swallow would leave the box
       // showing an instruction that will not run. Say so instead.
       setFailed(true);
+      return false;
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const savePrompt = async (value) => {
     const next = cleanPromptText(value);
     if (next === prompt) { setDraft(null); return; }
-    await save({ klein_prompt: next });
-    setDraft(null);                     // follow the stored value again
+    if (await save({ klein_prompt: next })) setDraft(null);
   };
 
   return (
-    <div className={`min-w-0 space-y-2 text-xs text-content-subtle ${className}`}>
-      <p className="m-0">Saves to Settings for Bank and Dataset.</p>
-      {caps.watermark_clean_custom ? (
-        <p className="m-0">The custom workflow supplies the prompt, processing size, and models.</p>
-      ) : <>
-      <label className="block min-w-0">
-        <span className="font-medium text-content">Clean Prompt</span>
-        {/* A textarea, because an instruction can run to a sentence and a single-line
-            input hides its own end. Enter SAVES (this is one instruction, not a
-            paragraph) and Shift+Enter still breaks a line — said out loud below,
-            because an Enter that does nothing visible reads as a failed save. */}
+    <div className={`grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,max(18rem,45%)),1fr))] gap-2 text-xs text-content-subtle ${className}`}>
+      {caps.watermark_clean_custom ? null : <>
+      <div className="col-span-full min-w-0">
+        <label className="block">
+          <span className="font-medium text-content">Clean Prompt</span>
         <textarea
           rows={2}
           value={text}
@@ -96,14 +92,8 @@ export default function KleinCleanOptions({ caps = {}, disabled = false, classNa
           className="mt-1 block w-full min-w-0 resize-y rounded border border-border bg-app
                      px-1.5 py-1 text-content disabled:opacity-50"
         />
-        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span>
-            Enter saves. Shift+Enter adds a line.
-          </span>
-          {/* min-h-10 lg:min-h-0: this panel renders inside the bank's passes chrome,
-              where the responsive probe holds every button to a finger-sized target
-              below `lg` — and the fix for a short target is the height, never an
-              exemption (.claude/rules/frontend-contracts.md). */}
+        </label>
+        <div className="mt-1 grid grid-cols-2 gap-2">
           <Button size="sm" disabled={disabled || saving || !dirty}
             onClick={() => savePrompt(text)}
             /* Keep the caret where it is: without this the textarea blurs first, saves,
@@ -114,56 +104,45 @@ export default function KleinCleanOptions({ caps = {}, disabled = false, classNa
           </Button>
           <Button size="sm" disabled={disabled || saving}
             onClick={() => savePrompt('')}
-            title="Back to the three words the app ships with — the short instruction Klein answers best on a whole photo."
             onMouseDown={(e) => e.preventDefault()}
             aria-label="Reset to default">
             Reset to Default
           </Button>
-          {dirty && !saving && (
-            <span className="text-amber-300">Not saved yet — a run now uses “{prompt}”.</span>
-          )}
-          {failed && (
-            <span className="text-amber-300">Could not save — a run still uses “{prompt}”.</span>
-          )}
-        </span>
-      </label>
+        </div>
+      </div>
 
-      {/* flex-wrap + min-w-0 throughout: label and select stack rather than overflow at
-          400 px, the width every delivery is checked at. */}
       <label className="block min-w-0">
         <span className="font-medium text-content">Processing Size</span>
-        <span className="mt-1 flex flex-wrap items-center gap-2">
-          <Select size="sm" value={formatMp(maxMp)} disabled={disabled || saving}
+          <Select value={formatMp(maxMp)} disabled={disabled || saving}
             aria-label="Klein clean processing size in megapixels"
             onChange={(e) => save({ klein_max_mp: Number(e.target.value) })}
-            className="min-w-0 max-w-full">
+            className="mt-1 block w-full min-w-0">
             {maxMpChoices(maxMp).map((mp) => (
               <option key={mp} value={formatMp(mp)}>
                 {formatMp(mp)} MP{mp === 2 ? ' (default)' : ''}
               </option>
             ))}
           </Select>
-        </span>
-        <span className="mt-1 block leading-snug">{mpNote(maxMp)}</span>
       </label>
       </>}
 
       <label className="block min-w-0">
         <span className="font-medium text-content">Output Size</span>
-        <span className="mt-1 flex flex-wrap items-center gap-2">
-          <Select size="sm" value={output} disabled={disabled || saving}
+          <Select value={output} disabled={disabled || saving}
             aria-label="What dimensions the cleaned file is written at"
             onChange={(e) => save({ klein_output: e.target.value })}
-            className="min-w-0 max-w-full">
+            className="mt-1 block w-full min-w-0">
             {CLEAN_OUTPUT_MODES.map((m) => (
               <option key={m.id} value={m.id}>{m.label}</option>
             ))}
           </Select>
-        </span>
-        <span className={`mt-1 block leading-snug ${output === 'render' ? 'text-amber-300' : ''}`}>
-          {outputNote(output)}
-        </span>
+        {output === 'render' && (
+          <span className="mt-1 block text-amber-300">{outputNote(output)}</span>
+        )}
       </label>
+      {failed && <p role="status" className="col-span-full text-amber-300">
+        Could not save changes. Try again.
+      </p>}
     </div>
   );
 }

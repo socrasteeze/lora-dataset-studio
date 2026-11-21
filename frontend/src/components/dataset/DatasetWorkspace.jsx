@@ -1705,13 +1705,15 @@ export default function DatasetWorkspace({ ds, onBack }) {
                             // Same endpoint as the picker beside it — one scanner,
                             // one truth about what is on disk.
                             const resp = await apiFetch(`/api/dataset/${d.id}/klein-model`).catch(() => null);
-                            setKleinCompareState({ choices: resp?.choices || [], stored: resp?.stored || null });
+                            setKleinCompareState({
+                              choices: resp?.choices || [], stored: resp?.stored ? resp.resolved : null,
+                            });
                             setKleinCompareOpen(true);
                           }}
                           disabled={ds.busy}
                           title="Run each ticked Klein model on one flagged image (same zones, same seed) and pick the winner before cleaning the batch."
                           className="min-h-10 lg:min-h-0 px-2.5 py-1 rounded-lg border border-border text-xs font-semibold text-content-subtle hover:text-content hover:bg-surface-raised disabled:opacity-40">
-                          ⚖ Compare models
+                          ⚖ Compare Models
                         </button>
                       )}
                     </div>

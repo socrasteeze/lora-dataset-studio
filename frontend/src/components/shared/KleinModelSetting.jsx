@@ -44,8 +44,7 @@ export default function KleinModelSetting({ datasetId = null, className = '', on
     apiFetch(modelEndpoint(datasetId), { background: true })
       .then((d) => {
         if (cancelled || !d || !d.ok) return;
-        setState({ loaded: true, stored: d.stored || null, effective: d.effective || null,
-          missing: d.missing || null, choices: d.choices || [] });
+        setState({ loaded: true, ...d });
         onChange?.(d.stored || null);
       })
       .catch(() => { /* stays loaded:false — see modelLine */ });
@@ -59,8 +58,7 @@ export default function KleinModelSetting({ datasetId = null, className = '', on
       { klein_model: value || '' });
     setSaving(false);
     if (!d || !d.ok) return;
-    setState({ loaded: true, stored: d.stored || null, effective: d.effective || null,
-      missing: d.missing || null, choices: d.choices || [] });
+    setState({ loaded: true, ...d });
     onChange?.(d.stored || null);
   }, [datasetId, onChange]);
 

@@ -384,11 +384,18 @@ def clean_available(custom_path=None) -> bool:
 
 def load_custom_clean_workflow(path):
     """Read the API export and identify the cleaning lane's ports."""
+    return _clean_workflow_ports(_read_clean_workflow(path))
+
+
+def _read_clean_workflow(path):
     try:
         source = cfg.REPO_ROOT / Path(path).expanduser()
-        graph = json.loads(source.read_text(encoding='utf-8-sig'))
+        return json.loads(source.read_text(encoding='utf-8-sig'))
     except (OSError, ValueError, RuntimeError) as exc:
         raise ValueError('Custom Klein workflow could not be read as JSON. Check the path and export.') from exc
+
+
+def _clean_workflow_ports(graph):
     if not isinstance(graph, dict) or any(
         not isinstance(node, dict) or not isinstance(node.get('class_type'), str)
         or not isinstance(node.get('inputs'), dict) for node in graph.values()
@@ -422,6 +429,122 @@ def load_custom_clean_workflow(path):
     if loaders[0] not in reachable:
         raise ValueError('Custom Klein workflow must connect LoadImage to its image output.')
     return {key: node for key, node in graph.items() if key in reachable}, loaders[0], output
+
+
+_WINDOWS_WORKFLOW_ROOTS = (
+    Path(r'E:\ComfyUI\ComfyUI\user\default\workflows'),
+    Path(r'E:\Models\Workflows'),
+) if os.name == 'nt' else ()
+_WORKFLOW_SCAN_SKIP = frozenset({
+    'custom_nodes', 'node_modules', '.venv', 'venv', 'env', '__pycache__',
+    '.git', '.hg', '.svn', '.cache', '.pytest_cache', '.mypy_cache', '.ruff_cache',
+})
+_WORKFLOW_SCAN_MAX_BYTES = 8 * 1024 * 1024
+
+
+def _workflow_path_key(path):
+    return os.path.normcase(os.path.realpath(path))
+
+
+def _workflow_scan_files(roots):
+    protected = {_workflow_path_key(cfg.REPO_ROOT), _workflow_path_key(Path.home())}
+
+    def scan_directory(path):
+        canonical = Path(_workflow_path_key(path))
+        return (canonical.parent != canonical and str(canonical) not in protected
+                and not _WORKFLOW_SCAN_SKIP.intersection(p.casefold() for p in canonical.parts))
+
+    for root in roots:
+        if not scan_directory(root):
+            continue
+        visited = set()
+        for folder, dirs, files in os.walk(root, followlinks=True):
+            real_folder = _workflow_path_key(folder)
+            if real_folder in visited:
+                dirs.clear()
+                continue
+            visited.add(real_folder)
+            dirs[:] = sorted(d for d in dirs if d.casefold() not in _WORKFLOW_SCAN_SKIP
+                             and scan_directory(Path(folder) / d))
+            for name in files:
+                if name.lower().endswith('.json'):
+                    yield Path(folder) / name
+
+
+def _workflow_candidate(path, real_path, repo_workflows):
+    if _WORKFLOW_SCAN_SKIP.intersection(p.casefold() for p in Path(real_path).parts):
+        return None
+    try:
+        if not path.is_file() or path.stat().st_size > _WORKFLOW_SCAN_MAX_BYTES:
+            return None
+        graph = _read_clean_workflow(path)
+    except (OSError, ValueError):
+        return None
+    try:
+        _clean_workflow_ports(graph)
+    except ValueError:
+        if not (isinstance(graph, dict) and isinstance(graph.get('nodes'), list)
+                and graph['nodes'] and isinstance(graph.get('links'), (list, dict))):
+            return None
+        valid = False
+    else:
+        valid = True
+    label = path.stem
+    if label.lower().endswith('.api'):
+        label = label[:-4]
+    row = {'path': str(path), 'label': label, 'valid': valid}
+    if not valid:
+        row['reason'] = 'UI export'
+    archive = '_archive' in {p.casefold() for p in path.parts}
+    priority = 2 if archive else int(path.is_relative_to(repo_workflows))
+    return not valid, priority, real_path, row
+
+
+def list_custom_clean_workflows(selected):
+    """Return the selected display path and the host workflow exports."""
+    repo_workflows = cfg.REPO_ROOT / 'data' / 'workflows'
+    roots = [*_WINDOWS_WORKFLOW_ROOTS, repo_workflows]
+    base = cfg.get('comfyui.base_dir')
+    if base:
+        try:
+            users = (cfg.REPO_ROOT / Path(base).expanduser()) / 'user'
+            roots.extend(users.glob('*/workflows'))
+        except (OSError, RuntimeError):
+            pass
+    selected_file, selected_key = None, None
+    if selected:
+        try:
+            selected_file = cfg.REPO_ROOT / Path(selected).expanduser()
+            selected_key = _workflow_path_key(selected_file)
+        except (OSError, ValueError, RuntimeError):
+            pass
+
+    candidates = []
+    for path in _workflow_scan_files(roots):
+        candidate = _workflow_candidate(path, _workflow_path_key(path), repo_workflows)
+        if candidate:
+            candidates.append(candidate)
+    if selected_key and not any(entry[2] == selected_key for entry in candidates):
+        candidate = _workflow_candidate(selected_file, selected_key, repo_workflows)
+        if candidate:
+            candidates.append(candidate)
+
+    paths, labels, choices = set(), set(), []
+    for _, _, real_path, row in sorted(candidates, key=lambda entry: (*entry[:3], entry[3]['path'])):
+        label = row['label'].casefold()
+        if real_path in paths or label in labels:
+            continue
+        paths.add(real_path)
+        labels.add(label)
+        choices.append(row)
+        if real_path == selected_key:
+            selected = row['path']
+
+    def order(row):
+        label = row['label'].casefold()
+        return not ('remove text' in label or 'clean' in label), label
+
+    return selected, sorted(choices, key=order)
 
 
 # --- Pure geometry (unit-tested, no I/O) --------------------------------------

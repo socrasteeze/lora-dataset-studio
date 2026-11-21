@@ -125,11 +125,124 @@ def test_custom_workflow_rejects_invalid_port_counts(app, tmp_path, workflow, re
         klein.load_custom_clean_workflow(path)
 
 
+def test_picker_discovers_host_exports_and_round_trips_settings(
+    client, tmp_path, workflow, monkeypatch,
+):
+    repo = tmp_path / 'repo'
+    host = tmp_path / 'host'
+    mirror = tmp_path / 'mirror'
+    base = tmp_path / 'ComfyUI'
+    external = tmp_path / 'selected'
+    monkeypatch.setattr(config, 'REPO_ROOT', repo)
+    monkeypatch.setattr(klein, '_WINDOWS_WORKFLOW_ROOTS', (host, mirror, host / '.'))
+    config.save_config({'comfyui': {'base_dir': str(base)}, 'klein': {'unet': 'keep.safetensors'}})
+
+    def write(root, name, content=workflow):
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(content), encoding='utf-8')
+        return path
+
+    repo_file = write(repo / 'data' / 'workflows', 'Remove Text.api.json')
+    ui = {'nodes': [{'id': 1, 'type': 'LoadImage'}], 'links': []}
+    write(host / '_archive', 'remove text.json', ui)
+    write(mirror / '_archive', 'Remove Text.json')
+    write(host / '_archive', 'Other.json')
+    other = write(mirror, 'other.api.json')
+    write(base / 'user' / 'other' / 'workflows' / 'nested', 'UI Only.json', ui)
+    write(base / 'custom_nodes' / 'example' / 'workflows', 'Example.json')
+    write(host / 'custom_nodes', 'Another Example.json')
+    for folder in ('node_modules', '.venv', '__pycache__'):
+        write(host / folder, f'{folder}.json')
+    monkeypatch.setattr(klein, '_WORKFLOW_SCAN_MAX_BYTES', 2048)
+    large = write(host, 'Large.json')
+    with large.open('ab') as stream:
+        stream.write(b' ' * 2048)
+    write(host, 'Unrelated.json', {'not': 'a workflow'})
+    selected = write(external, 'External.json')
+    write(external, 'Extra.json')
+    write(repo, 'Repo Extra.json')
+
+    def choose(path):
+        response = client.put('/api/settings', json={'config': {
+            'watermark_clean': {'custom_workflow': path},
+        }})
+        assert response.status_code == 200
+        settings = client.get('/api/settings').get_json()['config']
+        assert settings['watermark_clean']['custom_workflow'] == path
+        assert settings['klein']['unet'] == 'keep.safetensors'
+        return client.get('/api/settings/klein-clean-workflows').get_json()
+
+    listing = choose(str(selected))
+    assert listing['selected'] == str(selected)
+    choices = listing['workflows']
+    assert [row['label'] for row in choices] == ['Remove Text', 'External', 'other', 'UI Only']
+    assert choices[0] == {'label': 'Remove Text', 'path': str(repo_file), 'valid': True}
+    assert choices[2]['path'] == str(other)
+    assert choices[3]['valid'] is False
+    assert choices[3]['reason'] == 'UI export'
+    relative = repo_file.relative_to(repo)
+    aliased = choose(str(relative))
+    assert aliased['selected'] == str(repo_file)
+    assert [row for row in aliased['workflows'] if row['label'] == 'Remove Text'] == [choices[0]]
+    if klein.os.name == 'nt':
+        assert choose(str(relative).upper())['selected'] == str(repo_file)
+    direct = write(repo, 'Direct.json')
+    assert [row['path'] for row in choose(str(direct))['workflows'] if Path(row['path']).parent == repo] == [
+        str(direct),
+    ]
+    assert choose('~test-unavailable-home/sample.json')['workflows'][0] == choices[0]
+    assert choose('')['selected'] == ''
+    monkeypatch.setenv('LDS_REQUIRE_LOCAL_TOKEN', '1')
+    monkeypatch.setenv('LDS_ACCESS_TOKEN', 'test-picker-token')
+    url = '/api/settings/klein-clean-workflows'
+    assert client.get(url).status_code == 403
+    authorized = client.get(url, headers={'Authorization': 'Bearer test-picker-token'})
+    assert authorized.status_code == 200
+    assert 'test-picker-token' not in authorized.get_data(as_text=True)
+
+
+def test_picker_never_walks_the_selected_parents(tmp_path, monkeypatch):
+    monkeypatch.setattr(klein, '_WINDOWS_WORKFLOW_ROOTS', ())
+    monkeypatch.setattr(config, 'REPO_ROOT', tmp_path / 'repo')
+    monkeypatch.setattr(Path, 'home', lambda: tmp_path / 'home')
+    walked = []
+    inspected = []
+
+    def record(root, **kwargs):
+        walked.append(Path(root))
+        return iter(())
+
+    def record_file(path, *_):
+        inspected.append(path)
+
+    monkeypatch.setattr(klein.os, 'walk', record)
+    monkeypatch.setattr(klein, '_workflow_candidate', record_file)
+    selected = [parent / 'sample.api.json'
+                for parent in (Path(tmp_path.anchor), Path.home(), config.REPO_ROOT)]
+    for path in selected:
+        klein.list_custom_clean_workflows(str(path))
+    assert walked == [config.REPO_ROOT / 'data' / 'workflows'] * 3
+    assert inspected == selected
+
+
+def test_dataset_custom_clean_skips_builtin_preflight(client, app, tmp_path, workflow, mock_comfy):
+    from app.services import face_dataset_service as datasets
+
+    _configure(workflow, tmp_path)
+    config.save_config({'klein': {'unet': 'absent.safetensors'}})
+    with app.app_context():
+        dataset_id = datasets.create_dataset('local', 'Clean sample', 'clean-sample').id
+    response = client.post(f'/api/dataset/{dataset_id}/watermarks/clean', json={'method': 'klein'})
+    assert response.status_code == 200, response.get_json()
+
+
 @pytest.mark.parametrize('device', ['local', 'api:abc123def456'])
 @pytest.mark.parametrize('selected', [False, True])
 def test_custom_bank_clean_replaces_and_restores_source(client, app, tmp_path, workflow,
                                                        mock_comfy, device, selected):
     _configure(workflow, tmp_path)
+    config.save_config({'klein': {'unet': 'absent.safetensors'}})
     bank_id, folder = _mkbank(client, tmp_path, {'sample.jpg': Image.new('RGB', (32, 24), 'white')})
     image_id = _flag(app, bank_id, OFFCENTER_MARK)
     source = folder / 'sample.jpg'

@@ -28,6 +28,7 @@ import DevicePicker from '../common/DevicePicker'
 import PassDialog from './PassDialog.jsx'
 import KleinModelSetting from '../shared/KleinModelSetting'
 import KleinCleanOptions from '../shared/KleinCleanOptions'
+import KleinCleanWorkflowPicker from '../shared/KleinCleanWorkflowPicker'
 import KleinCompareDialog from '../shared/KleinCompareDialog'
 import { useCapabilities } from '../../context/CapabilitiesContext'
 import { useToast } from '../common/Toast'
@@ -46,6 +47,7 @@ import { SEGMENT_CLASS, SEGMENT_GROUP_CLASS, btnClass } from '../common/controls
 // How many cleaned images the before/after strip offers. A sample is enough to
 // judge a pass; the grid holds the full set.
 const COMPARE_SAMPLE = 8
+const CLEAN_GRID = 'grid grid-cols-[repeat(auto-fit,minmax(min(100%,max(18rem,45%)),1fr))] gap-2'
 
 function LevelCard({ index, title, state, onRun }) {
   const message = state.reason || state.note
@@ -85,6 +87,11 @@ export default function BankWatermarkPanel({
   const [kleinCompareOpen, setKleinCompareOpen] = useState(false)
   const [kleinCompare, setKleinCompare] = useState({ choices: [], stored: null })
   const [kleinRunModel, setKleinRunModel] = useState(null)
+  const [workflowSelected, setWorkflowSelected] = useState(null)
+  const customWorkflow = workflowSelected === null ? !!caps.watermark_clean_custom : !!workflowSelected
+  const kleinReady = customWorkflow ? !!caps.comfyui?.reachable
+    : !!(caps.engines?.klein ?? caps.watermark_klein)
+  const cleanCaps = { ...caps, watermark_clean_custom: customWorkflow }
   const [comparing, setComparing] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
   /* Which cleaning level's launch window is open ('watermark_crop' /
@@ -145,7 +152,8 @@ export default function BankWatermarkPanel({
   // The ONE shared sentence for "why not Klein", the same one the generation
   // picker and the ✦ Edit modal show — instead of a per-screen catch-all that
   // blames ComfyUI and the weights whatever the real gap is.
-  const kleinReason = localEngineUnavailableReason('klein', caps)
+  const kleinReason = customWorkflow ? 'Start ComfyUI to use this workflow.'
+    : localEngineUnavailableReason('klein', caps)
   const find = findLevelState(levels, {
     live,
     visionReady: !!activeLocalLlm(caps).vision_model_ready,
@@ -164,7 +172,7 @@ export default function BankWatermarkPanel({
     live,
     method,
     lamaReady: !!caps.watermark_inpaint,
-    kleinReady: !!caps.watermark_klein,
+    kleinReady,
     kleinReason,
     deviceId,
     binWaiting: inpaintBin,
@@ -223,10 +231,10 @@ export default function BankWatermarkPanel({
           onRun={() => setCleanOpen('watermark_inpaint')} />
       </div>
       {/* The scan and Klein render use different eligible device lists. */}
-      <div className="space-y-1 empty:hidden">
+      <div className={`${CLEAN_GRID} empty:hidden [&_select]:max-w-none`}>
         <DevicePicker value={scanDevice} onChange={onScanDeviceChange} onDevice={onScanDevice}
-          kind="bank-pass" size="sm" contextLabel="Level 1 Scan" />
-        <DevicePicker value={deviceId} onChange={onDeviceChange} kind="comfy" size="sm"
+          kind="bank-pass" contextLabel="Level 1 Scan" />
+        <DevicePicker value={deviceId} onChange={onDeviceChange} kind="comfy"
           contextLabel="Level 3 Inpaint" />
       </div>
 
@@ -256,47 +264,49 @@ export default function BankWatermarkPanel({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">
-          Level 3 engine
-        </span>
-        <div role="group" aria-label="Inpaint engine" className={SEGMENT_GROUP_CLASS}>
-          <button type="button" aria-pressed={method !== 'klein'} onClick={() => onMethodChange('auto')}
-            title="LaMa: fast, non-generative repaint of small off-centre marks. Marks on the subject stay flagged."
-            className={SEGMENT_CLASS}>
-            LaMa
-          </button>
-          <button type="button" aria-pressed={method === 'klein'} onClick={() => onMethodChange('klein')}
-            disabled={!caps.watermark_klein && deviceId === 'local'}
-            title={caps.watermark_klein
-              ? kleinCleanTitle(caps)
-              : deviceId !== 'local'
-                ? 'Klein renders on the selected machine — its own ComfyUI checks the models when the job runs.'
-                : (kleinReason || 'Klein inpainting needs ComfyUI running + the Klein models (Setup ▸ ComfyUI).')}
-            className={SEGMENT_CLASS}>
-            Klein
-          </button>
+      <div className={`${CLEAN_GRID} [container-type:inline-size]`}>
+        <div className={`min-w-0 ${method === 'klein' ? 'grid grid-cols-[2fr_3fr] gap-2' : ''}
+          ${method !== 'klein' || customWorkflow ? 'col-span-full' : ''}`}>
+          <div className="min-w-0">
+            <span className="mb-1 block text-xs font-medium text-content">Level 3 Engine</span>
+            <div role="group" aria-label="Inpaint engine" className={`${SEGMENT_GROUP_CLASS} w-full`}>
+              <button type="button" aria-pressed={method !== 'klein'} onClick={() => onMethodChange('auto')}
+                title="LaMa: fast, non-generative repaint of small off-centre marks. Marks on the subject stay flagged."
+                className={SEGMENT_CLASS}>
+                LaMa
+              </button>
+              <button type="button" aria-pressed={method === 'klein'} onClick={() => onMethodChange('klein')}
+                title={kleinReady
+                  ? kleinCleanTitle(cleanCaps)
+                  : deviceId !== 'local'
+                    ? 'Klein renders on the selected machine — its own ComfyUI checks the models when the job runs.'
+                    : (kleinReason || 'Klein inpainting needs ComfyUI running + the Klein models (Setup ▸ ComfyUI).')}
+                className={SEGMENT_CLASS}>
+                Klein
+              </button>
+            </div>
+          </div>
+          {method === 'klein' && (
+            <KleinCleanWorkflowPicker selected={workflowSelected} onSelected={setWorkflowSelected}
+              disabled={live} onSaved={() => {
+                setKleinRunModel(null)
+                setKleinCompareOpen(false)
+                refreshCaps(true, { background: true })
+              }} />
+          )}
         </div>
-        {/* WHICH Klein model is about to repaint these images. A bank has no
-            dataset to inherit a choice from, so there is nothing to pick here —
-            but "no choice" was never a reason to stay silent about the model.
-            w-full: this drops onto its own line rather than squeezing the
-            toggle at 400 px. */}
-        {method === 'klein' && (
-          <>
-          {!caps.watermark_clean_custom && (
-          <div className="w-full flex flex-wrap items-center gap-x-3 gap-y-1">
-            <KleinModelSetting className="min-w-0 flex-1" />
-            <Button type="button" size="md" noShrink
+        {method === 'klein' && !customWorkflow && (
+          <div className="min-w-0 space-y-1 [@container(min-width:36.5rem)]:pt-5">
+            <Button className="w-full font-semibold text-content-subtle"
               onClick={async () => {
                 const d = await apiFetch('/api/klein-model').catch(() => null)
-                setKleinCompare({ choices: d?.choices || [], stored: d?.stored || null })
+                setKleinCompare({ choices: d?.choices || [], stored: d?.stored ? d.resolved : null })
                 setKleinCompareOpen(true)
               }}
-              title="Run each ticked Klein model on one flagged image (same zones, same seed) and pick the winner for THIS run — a bank stores no Klein choice."
-              className="font-semibold text-content-subtle">
-              ⚖ Compare models
+              title="Compare Klein models on one flagged image.">
+              ⚖ Compare Models
             </Button>
+            <KleinModelSetting />
             {kleinRunModel && (
               <span className="text-2xs text-amber-200">
                 Next Klein clean runs on <span className="font-mono break-all">{kleinRunModel}</span>{' '}
@@ -305,27 +315,21 @@ export default function BankWatermarkPanel({
               </span>
             )}
           </div>
-          )}
-          {/* WHAT the clean will actually do, and the three dials that change it: the
-              prompt Klein is sent, the size the photo travels at, and whether the file
-              keeps its dimensions. Stored, so the dataset side reads the same values —
-              the shared feature rule (CLAUDE.md), applied to the dials and not just to
-              the pass. `refreshCaps` re-reads the resolved values so the engine tooltip
-              beside it quotes the prompt the user just typed. */}
-          <KleinCleanOptions caps={caps} disabled={live} className="w-full"
+        )}
+        {method === 'klein' && (
+          <KleinCleanOptions caps={cleanCaps} disabled={live} className="col-span-full"
             onChanged={() => refreshCaps(true, { background: true })} />
-          </>
         )}
         {/* 🔤/🚩 WHAT to clean — only offered once Find text flagged something,
             because with no text-flagged page the three choices collapse into
             one and the control would be a dead dial. */}
         {c.textFound > 0 && (
-          <>
-            <span className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">
-              What to clean
+          <div className="col-span-full">
+            <span className="mb-1 block text-xs font-medium text-content">
+              What to Clean
             </span>
             <div role="group" aria-label="What to clean"
-              className={SEGMENT_GROUP_CLASS}>
+              className={`${SEGMENT_GROUP_CLASS} w-full`}>
               <button type="button" aria-pressed={target === 'all'} onClick={() => setTarget('all')}
                 title="Repaint every flagged page — text and watermarks alike."
                 className={SEGMENT_CLASS}>
@@ -342,10 +346,10 @@ export default function BankWatermarkPanel({
                 🚩 Marks
               </button>
             </div>
-          </>
+          </div>
         )}
         {cleaned && (
-          <div className="grid grid-cols-2 gap-2">
+          <div className="col-span-full grid grid-cols-2 gap-2">
             <button type="button" disabled={live}
               onClick={() => run(`/api/bank/${bankId}/watermark/undo`, {},
                 'Originals restored.')}
@@ -392,7 +396,7 @@ export default function BankWatermarkPanel({
           blocks, same measured scope lines as the passes above — the point being
           that these two are not a different kind of action just because they live
           inside the funnel. */}
-      {kleinCompareOpen && (
+      {kleinCompareOpen && !customWorkflow && (
         <KleinCompareDialog
           choices={kleinCompare.choices}
           stored={kleinCompare.stored}
@@ -421,7 +425,7 @@ export default function BankWatermarkPanel({
                   ...(target !== 'all' ? { target } : {}),
                   /* spread-if-set: absent, the body is byte-identical to before
                      the ⚖ dialog existed, and the run keeps auto resolution. */
-                  ...(method === 'klein' && kleinRunModel
+                  ...(method === 'klein' && !customWorkflow && kleinRunModel
                     ? { klein_model: kleinRunModel } : {}) } : {},
           )}>
           {cleanOpen === 'watermark_inpaint' && (
@@ -434,7 +438,7 @@ export default function BankWatermarkPanel({
               Engine: <span className="font-semibold text-content">
                 {method === 'klein' ? 'Klein' : 'LaMa'}
               </span>{method === 'klein'
-                ? (caps.watermark_clean_custom
+                ? (customWorkflow
                   ? '. The custom workflow replaces each source image and preserves the original for undo.'
                   : KLEIN_CLEAN_SHORT)
                 : ' — fast; a mark on the subject stays flagged instead of being smeared.'}

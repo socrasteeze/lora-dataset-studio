@@ -220,6 +220,15 @@ def get_settings():
     return jsonify(_settings_payload())
 
 
+@bp.get('/settings/klein-clean-workflows')
+def klein_clean_workflows():
+    from ..services import watermark_klein
+
+    selected, workflows = watermark_klein.list_custom_clean_workflows(
+        watermark_klein.custom_clean_workflow_path())
+    return jsonify({'selected': selected, 'workflows': workflows})
+
+
 @bp.post('/settings/prompt-preview')
 def post_prompt_preview():
     """The COMPOSED prompt one engine would receive for one shot — the ~1000

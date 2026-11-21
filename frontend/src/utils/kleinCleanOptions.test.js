@@ -3,7 +3,7 @@ import test from 'node:test'
 import {
   CLEAN_MAX_MP_DEFAULT, CLEAN_MAX_MP_MAX, CLEAN_MAX_MP_MIN, CLEAN_MP_CHOICES,
   CLEAN_OUTPUT_MODES, CLEAN_PROMPT_DEFAULT, cleanPromptText, clampMaxMp, formatMp,
-  maxMpChoices, mpNote, normalizeOutput, outputNote, sentPromptLine,
+  maxMpChoices, normalizeOutput, outputNote, sentPromptLine,
 } from './kleinCleanOptions.js'
 
 /* These clamps MIRROR the backend (watermark_klein.clean_prompt / clean_max_mp /
@@ -55,28 +55,12 @@ test('the write-back mode falls back to the one that cannot resize anybody’s f
   }
 })
 
-test('the size note states BOTH what it buys and what it costs', () => {
-  const note = mpNote(4)
-  assert.match(note, /4 MP/)
-  assert.match(note, /detail/i, 'the note does not say what a larger size buys')
-  assert.match(note, /VRAM/i)
-  assert.match(note, /time/i)
-  // The half people get wrong: raising the cap does nothing for a small photo.
-  assert.match(note, /never enlarged|nothing is ever enlarged/i)
-  assert.match(mpNote(1.5), /1\.5 MP/)
-})
-
-test('the render mode says the file changes dimensions, in those words', () => {
+test('only render size has a short warning about changing dimensions', () => {
   const render = outputNote('render')
-  assert.match(render, /CHANGES DIMENSIONS/,
-    'a user who discovers this after a batch has no undo but ↩ Restore original')
-  assert.match(render, /smaller/i)
-  assert.match(render, /Restore original/)
-  const original = outputNote('original')
-  assert.match(original, /never\s+changes the shape/i)
-  assert.doesNotMatch(original, /CHANGES DIMENSIONS/)
-  // An unknown mode describes the SAFE behaviour, which is also the one it resolves to.
-  assert.equal(outputNote('nonsense'), original)
+  assert.match(render, /change file dimensions/)
+  assert.ok(render.length < 50)
+  assert.equal(outputNote('original'), '')
+  assert.equal(outputNote('nonsense'), '')
 })
 
 test('formatMp writes a number a user would type', () => {

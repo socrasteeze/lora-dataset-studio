@@ -25,6 +25,7 @@ import io
 from app.extensions import db
 import os
 import struct
+import subprocess
 
 import pytest
 from PIL import Image
@@ -167,6 +168,31 @@ def test_a_vanished_model_is_refused_by_name_not_swapped(app, tmp_path):
         assert exc.value.name == OTHER_FILE
 
 
+def test_missing_absolute_pin_does_not_resolve_by_basename(client, tmp_path, monkeypatch):
+    from app import capabilities, config as cfg
+    from app.services import klein_edit_helper as keh
+
+    base = tmp_path / 'ComfyUI'
+    folder = base / 'models' / 'diffusion_models' / 'flux'
+    folder.mkdir(parents=True)
+    (folder / KLEIN_FILE).write_bytes(_VALID_ST)
+    pin = str(tmp_path / 'old' / KLEIN_FILE)
+    cfg.save_config({'comfyui': {'base_dir': str(base)}, 'klein': {'unet': pin}})
+    offered = keh.klein_unet_choices()
+    monkeypatch.setattr(capabilities, 'probe', lambda: {'comfyui': {'models': {'klein': offered}}})
+
+    assert keh.klein_model_on_disk(KLEIN_FILE) == os.path.join('flux', KLEIN_FILE)
+    assert keh.klein_model_on_disk(pin) is None
+    assert keh.klein_override_status()['unet']['status'] == 'missing'
+    state = client.get('/api/klein-model').get_json()
+    assert state['missing'] == state['stored'] == pin
+    assert state['resolved'] is None
+    with pytest.raises(keh.KleinModelGone) as exc:
+        keh.unet_for_job()
+    assert exc.value.name == pin
+    assert cfg.get('klein.unet') == pin
+
+
 # --- 4. The offered list is as WIDE as the resolver -------------------------
 # Offering fewer places than the resolver accepts is the same bug seen from the
 # other end: the app would refuse to let you pick a model it can happily load.
@@ -199,6 +225,66 @@ def test_every_resolvable_layout_is_also_offerable(app, tmp_path, label, parts, 
     cmp.clear_cache()
 
 
+def test_flux_weights_in_extra_paths_resolve_an_absolute_pin_through_a_link(
+    app, client, tmp_path, monkeypatch,
+):
+    from app import capabilities, config as cfg
+    from app.services import face_dataset_service as svc, klein_edit_helper as keh
+
+    base = tmp_path / 'ComfyUI'
+    registered = tmp_path / 'registered'
+    flux = registered / 'diffusion_models' / 'flux'
+    flux.mkdir(parents=True)
+    base.mkdir()
+    (base / 'extra_model_paths.yaml').write_text(
+        'shared:\n  base_path: ../registered\n  diffusion_models: diffusion_models\n',
+        encoding='utf-8',
+    )
+    pinned = 'flux-2-klein-9b.safetensors'
+    kv = 'flux-2-klein-9b-kv-fp8.safetensors'
+    unrelated = 'other-flux.safetensors'
+    for name in (pinned, kv, unrelated):
+        (flux / name).write_bytes(_VALID_ST)
+    link = tmp_path / 'linked'
+    if os.name == 'nt':
+        subprocess.run(['cmd', '/c', 'mklink', '/J', str(link), str(flux)],
+                       check=True, capture_output=True)
+    else:
+        link.symlink_to(flux, target_is_directory=True)
+    try:
+        path = str(link / pinned)
+        cfg.save_config({'comfyui': {'base_dir': str(base)}, 'klein': {'unet': path}})
+        expected = os.path.join('flux', pinned)
+        kv_ref = os.path.join('flux', kv)
+        assert keh.klein_model_on_disk(path) == expected
+        assert keh.klein_model_on_disk(kv) == kv_ref
+        assert keh.resolve_klein_unet() == expected
+        assert keh.klein_override_status()['unet']['status'] == 'ok'
+        assert keh.unet_for_job() == expected
+        offered = capabilities._scan_models()['klein']
+        assert expected in offered and kv_ref in offered
+        assert os.path.join('flux', unrelated) not in offered
+        monkeypatch.setattr(capabilities, 'probe', lambda: {'comfyui': {'models': {'klein': offered}}})
+        state = client.get('/api/klein-model').get_json()
+        assert state['stored'] == path
+        assert state['missing'] is None
+        assert state['effective'] == pinned
+        assert cfg.get('klein.unet') == path
+        with app.app_context():
+            dataset_id = svc.create_dataset('local', 'Model sample', 'model-sample').id
+        response = client.post(f'/api/dataset/{dataset_id}/klein-model', json={'klein_model': kv_ref})
+        assert response.status_code == 200
+        assert response.get_json()['resolved'] == kv_ref
+        assert cfg.get('klein.unet') == kv_ref
+        assert keh.unet_for_job() == kv_ref
+        assert keh.klein_model_on_disk(os.path.join('absent', kv)) is None
+    finally:
+        if os.name == 'nt':
+            link.rmdir()
+        else:
+            link.unlink()
+
+
 # --- 5. Storing the choice -------------------------------------------------
 def test_the_choice_is_stored_on_the_dataset_not_the_browser(app):
     from app.config import LOCAL_USER
@@ -215,15 +301,7 @@ def test_the_choice_is_stored_on_the_dataset_not_the_browser(app):
 
 
 def test_a_path_separator_cannot_be_smuggled_into_the_choice(app):
-    """The picker sends a BARE file name; the prefix is the resolver's job. A
-    value carrying a separator would be a traversal attempt, not a model.
-
-    BOTH separators must be refused on BOTH hosts. The guard used to be written
-    with `os.path.basename`, which reads a backslash as an ordinary filename
-    character on Linux — so `sub\\model.safetensors` was refused on Windows and
-    accepted on every Linux install (reported by socrasteeze, GitHub #20).
-    That is why these cases are asserted unconditionally rather than per-OS.
-    """
+    """Only installed picker choices may carry a path, on either OS."""
     from app.config import LOCAL_USER
     from app.services import face_dataset_service as svc
     with app.app_context():

@@ -104,6 +104,6 @@ export function canChooseModel({ datasetId = null, choices = [] } = {}) {
  * NOT silently replaced by the first option — it keeps the field empty so the
  * warning line above is the only thing speaking about it.
  */
-export function selectValue({ stored = null, choices = [] } = {}) {
-  return stored && choices.includes(stored) ? stored : '';
+export function selectValue({ stored = null, resolved = stored, choices = [] } = {}) {
+  return stored && choices.includes(resolved) ? resolved : '';
 }

@@ -1519,9 +1519,6 @@ def _scan_models() -> dict:
     """
     from .services import comfy_model_paths, klein_edit_helper
     from .utils import comfyui as comfy
-    klein = [os.path.join(prefix, f) if prefix else f
-             for prefix, files in klein_edit_helper._klein_unet_folders()
-             for f in files]
     return {
         'zimage': comfy.get_zimage_models(),
         # `('',)` matches every relative directory: an SDXL checkpoint has no
@@ -1531,7 +1528,7 @@ def _scan_models() -> dict:
             comfy_model_paths.search_roots('checkpoints'), ('',),
             root_file_accept=lambda _f: True),
         'krea': comfy.get_krea_models(),
-        'klein': sorted(set(klein)),
+        'klein': klein_edit_helper.klein_unet_choices(),
     }
 
 

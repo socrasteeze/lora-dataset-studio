@@ -39,10 +39,12 @@ test('both surfaces mount the compare dialog against their own route', () => {
   const bank = read('components/bank/BankWatermarkPanel.jsx');
   for (const [name, src] of [['dataset', ds], ['bank', bank]]) {
     assert.match(src, /<KleinCompareDialog/, `the ${name} surface lost the ⚖ dialog`);
-    assert.match(src, /Compare models/, `the ${name} surface lost the ⚖ button`);
+    assert.match(src, /Compare Models/, `the ${name} surface lost the ⚖ button`);
   }
   assert.match(ds, /watermarks\/klein-compare/);
   assert.match(bank, /watermark\/klein-compare/);
+  assert.match(ds, /stored: resp\?\.stored \? resp\.resolved : null/);
+  assert.match(bank, /stored: d\?\.stored \? d\.resolved : null/);
   // Two DIFFERENT adopt semantics, both deliberate: the dataset saves its one
   // stored authority; the bank arms a per-run override and stores nothing.
   assert.match(ds, /\/klein-model`, \{ klein_model: model \}/,

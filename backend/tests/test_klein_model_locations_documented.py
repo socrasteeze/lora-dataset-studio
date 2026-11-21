@@ -79,6 +79,8 @@ DOCUMENTED_LAYOUTS = [
      ('diffusion_models', 'flux2-klein-9b', KLEIN_FILE),
      os.path.join('flux2-klein-9b', KLEIN_FILE)),
     ('diffusion_models root, no subfolder', ('diffusion_models', KLEIN_FILE), KLEIN_FILE),
+    ('diffusion_models/flux shared folder', ('diffusion_models', 'flux', KLEIN_FILE),
+     os.path.join('flux', KLEIN_FILE)),
 ]
 
 

@@ -1517,11 +1517,16 @@ def _klein_clean_preflight():
     shape as the generate path). Mirrors lora_test_studio.gpu_busy_reason + the Klein
     generate preflight so the batch never enqueues a doomed round-trip."""
     from ..job_queue import queue_manager
-    from ..services import klein_edit_helper as keh
+    from ..services import klein_edit_helper as keh, watermark_klein
     if queue_manager._get_system_state('training_in_progress', False):
         return jsonify({'error': 'GPU busy', 'detail': 'LoRA training in progress'}), 503
     if queue_manager._get_system_state('vision_in_progress', False):
         return jsonify({'error': 'GPU busy', 'detail': 'a vision pass is running'}), 503
+    custom_path = watermark_klein.custom_clean_workflow_path()
+    if custom_path:
+        if not watermark_klein.clean_available(custom_path):
+            return jsonify({'error': 'Custom Klein workflow needs ComfyUI running'}), 409
+        return None
     missing = keh.klein_missing_assets()
     missing_nodes = keh.klein_missing_nodes()
     if any(a in missing for a in keh.KLEIN_REQUIRED) or missing_nodes:
@@ -1796,6 +1801,7 @@ def _klein_model_state(ds):
     resolved = keh.klein_model_on_disk(stored) if stored else keh.resolve_klein_unet()
     return {'stored': stored,
             'effective': os.path.basename(resolved) if resolved else None,
+            'resolved': resolved,
             'missing': stored if (stored and not resolved) else None,
             'choices': choices}
 

@@ -307,12 +307,13 @@ def test_capabilities_publish_the_RESOLVED_dials_not_the_raw_config(monkeypatch)
     from app import capabilities
     _stored(monkeypatch, **{'watermark_clean.klein_prompt': '  take the logo out ',
                             'watermark_clean.klein_max_mp': 12,
-                            'watermark_clean.klein_output': 'RENDER'})
+                            'watermark_clean.klein_output': 'RENDER',
+                            'watermark_clean.custom_workflow': 'sample.api.json'})
     assert capabilities._watermark_clean_options() == {
-        'prompt': 'take the logo out', 'max_mp': 4.0, 'output': 'render'}
+        'prompt': 'take the logo out', 'max_mp': 4.0, 'output': 'render', 'custom': True}
     _stored(monkeypatch)
     assert capabilities._watermark_clean_options() == {
-        'prompt': 'remove watermark', 'max_mp': 2.0, 'output': 'original'}
+        'prompt': 'remove watermark', 'max_mp': 2.0, 'output': 'original', 'custom': False}
 
 
 def test_the_config_section_ships_the_documented_defaults():
@@ -324,4 +325,5 @@ def test_the_config_section_ships_the_documented_defaults():
     assert section['klein_prompt'] == wk.KLEIN_CLEAN_PROMPT
     assert section['klein_max_mp'] == wk.KLEIN_MASK_MAX_MP
     assert section['klein_output'] == wk.KLEIN_CLEAN_OUTPUT_DEFAULT
-    assert set(section) == {'klein_prompt', 'klein_max_mp', 'klein_output'}
+    assert section['custom_workflow'] == ''
+    assert set(section) == {'klein_prompt', 'klein_max_mp', 'klein_output', 'custom_workflow'}

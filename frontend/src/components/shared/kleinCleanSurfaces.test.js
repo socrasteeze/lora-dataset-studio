@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { selectValue } from './kleinModelChoice.js'
 
 /* Source-as-text contract for the 🧽 Klein clean's three dials.
  *
@@ -51,12 +52,57 @@ test('the dials are written through to the config keys the backend reads', () =>
   for (const key of ['klein_prompt', 'klein_max_mp', 'klein_output']) {
     assert.match(src, new RegExp(`\\{ ${key}:`), `no dial writes ${key}`)
   }
+  assert.deepEqual([...src.matchAll(/save\(\{ (\w+):/g)].map((match) => match[1]).sort(),
+    ['klein_max_mp', 'klein_output', 'klein_prompt'])
   // The values it shows come from the RESOLVED capabilities, not from raw config: the
   // backend clamps, and a panel quoting an unclamped number would misdescribe the run.
   for (const cap of ['watermark_clean_prompt', 'watermark_clean_max_mp',
     'watermark_clean_output']) {
     assert.match(src, new RegExp(`caps\\.${cap}`), `the panel ignores caps.${cap}`)
   }
+})
+
+test('Bank lists clean workflows and writes the same key Settings uses', () => {
+  const bank = read(SURFACES.bank)
+  const picker = read('components/shared/KleinCleanWorkflowPicker.jsx')
+  const settings = read('components/settings/CaptioningSection.jsx')
+  assert.match(bank, /method === 'klein' && \(\s*<KleinCleanWorkflowPicker\b/)
+  assert.match(picker, /apiFetch\('\/api\/settings\/klein-clean-workflows'/)
+  assert.match(picker, /putJson\('\/api\/settings', \{ config: \{ watermark_clean: \{ custom_workflow: path \} \} \}\)/)
+  assert.match(picker, /onChange=\{\(e\) => save\(e.target.value\)\}/)
+  assert.match(picker, /<option value="">Built-in<\/option>/)
+  assert.match(picker, /disabled=\{!valid\}/)
+  assert.match(settings, /setField\('watermark_clean', 'custom_workflow', value\)/)
+})
+
+test('custom clean hides the built-in model on both surfaces', () => {
+  assert.match(read(SURFACES.bank),
+    /method === 'klein' && !customWorkflow && \([\s\S]*?<KleinModelSetting\b/)
+  assert.match(read(SURFACES.dataset),
+    /watermarkMethod === 'klein' && !caps.watermark_clean_custom && \([\s\S]*?<KleinModelSetting\b/)
+})
+
+test('Bank fills the engine row without Compare and aligns it to the panel width', () => {
+  const bank = read(SURFACES.bank)
+  assert.match(bank, /method !== 'klein' \|\| customWorkflow \? 'col-span-full'/)
+  assert.match(bank, /\[container-type:inline-size\]/)
+  assert.match(bank, /\[@container\(min-width:36\.5rem\)\]:pt-5/)
+  assert.doesNotMatch(bank, /lg:pt-5/)
+})
+
+test('an absolute pin selects its resolved model option', () => {
+  const resolved = 'flux/flux-2-klein-9b.safetensors'
+  const choices = [resolved, 'flux/flux-2-klein-9b-kv-fp8.safetensors']
+  assert.equal(selectValue({ stored: `/models/${resolved}`, resolved, choices }), resolved)
+  assert.equal(selectValue({ stored: null, resolved, choices }), '')
+})
+
+test('shared clean controls fill the row and omit the long help copy', () => {
+  const src = read('components/shared/KleinCleanOptions.jsx')
+  assert.doesNotMatch(src, /mpNote|Saves to Settings|Shift\+Enter adds a line/)
+  assert.match(src, /grid-cols-\[repeat\(auto-fit,minmax\(min\(100%,max\(18rem,45%\)\),1fr\)\)\]/)
+  assert.match(src, /grid grid-cols-2 gap-2/)
+  assert.equal((src.match(/className="mt-1 block w-full min-w-0"/g) || []).length, 2)
 })
 
 test('the prompt box offers a way back to the shipped instruction', () => {

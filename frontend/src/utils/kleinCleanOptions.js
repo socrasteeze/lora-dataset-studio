@@ -30,8 +30,8 @@ export const CLEAN_OUTPUT_DEFAULT = 'original'
 export const CLEAN_MP_CHOICES = [1, 1.5, 2, 3, 4]
 
 export const CLEAN_OUTPUT_MODES = [
-  { id: 'original', label: 'Original dimensions (resampled)' },
-  { id: 'render', label: 'Render size (file dimensions change)' },
+  { id: 'original', label: 'Original Dimensions' },
+  { id: 'render', label: 'Render Size' },
 ]
 
 /** The prompt this install will really send. Blank means "the default" everywhere —
@@ -77,26 +77,9 @@ export const formatMp = (value) => {
   return Number.isInteger(n) ? `${n}` : `${n}`.replace(/\.0+$/, '')
 }
 
-/** What a larger processing size buys, and what it costs. Both halves, always: this is
- *  the dial most likely to be pushed to its maximum by someone who reads only the first
- *  half and then asks why their clean takes four times as long. */
-export const mpNote = (value) => (
-  `Your photo is scaled to at most ${formatMp(value)} MP before Klein re-renders it. `
-  + 'Higher means finer regenerated detail — and more VRAM and more time, roughly with '
-  + 'the pixel count, on a card that is probably also running ComfyUI. A photo already '
-  + 'smaller than this is sent as it is: nothing is ever enlarged.'
-)
-
-/** What each write-back mode does to the FILE. The 'render' half has to say the
- *  dimensions change — that is the entire trade, and a user who discovers it after a
- *  batch has no undo but ↩ Restore original. */
 export const outputNote = (value) => (normalizeOutput(value) === 'render'
-  ? 'The cleaned file is written at the size Klein rendered it, with no second '
-    + 'resample — so it keeps that detail, and the file CHANGES DIMENSIONS: it comes '
-    + 'out smaller than your original whenever the photo was above the processing '
-    + 'size above. ↩ Restore original brings the file back.'
-  : 'The render is resampled back to your file’s own dimensions, so a clean never '
-    + 'changes the shape of your images. This is what has always shipped.')
+  ? 'Render size can change file dimensions.'
+  : '')
 
 /** The prompt, quoted, for the engine tooltip and the panel. Short on purpose — it is
  *  appended to sentences that are already long. */

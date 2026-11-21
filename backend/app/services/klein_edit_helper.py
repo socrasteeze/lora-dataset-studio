@@ -210,7 +210,9 @@ def _configured_model(comfy_type, cfg_key):
     brick generation. `klein_override_status()` is what surfaces a
     pinned-but-unresolvable file to the UI, so the fallback is visible rather
     than silent."""
-    rel, status = resolve_model_ref(comfy_type, cfg.get(cfg_key))
+    raw = cfg.get(cfg_key)
+    rel, status = (_resolve_klein_unet_ref(raw) if cfg_key == 'klein.unet'
+                   else resolve_model_ref(comfy_type, raw))
     if status == 'ok':
         return rel
     if status != 'empty':
@@ -231,7 +233,8 @@ def klein_override_status():
         raw = (cfg.get(key) or '').strip()
         if not raw:
             continue
-        _, status = resolve_model_ref(comfy_type, raw)
+        _, status = (_resolve_klein_unet_ref(raw) if slot == 'unet'
+                     else resolve_model_ref(comfy_type, raw))
         out[slot] = {'configured': raw, 'found': status == 'ok', 'status': status}
     return out
 
@@ -266,19 +269,8 @@ def klein_pin_gaps():
         shipped = str(defaults.get(key.split('.', 1)[1], '') or '').strip()
         if shipped and raw == shipped:
             continue
-        _, status = resolve_model_ref(comfy_type, raw)
-        # THE UNET SLOT IS WRITTEN BY THE APP ITSELF, and not in this dialect.
-        # `set_dataset_klein_model` — the run panel's dropdown — stores the BARE
-        # file name into this very key and refuses to store a folder ("the loader
-        # prefix is resolve_klein_unet's job"). `resolve_model_ref` only looks for
-        # a relative name at the ROOT of a search folder, so every model living in
-        # a klein/ sub-folder came back 'missing': picking a model from the app's
-        # own menu wrote a value the app's own gate then called broken, and the
-        # engine went dark explaining that no file was missing.
-        # So the gate asks the LOADER before it declares a gap — the same scan the
-        # picker lists from. A file that is genuinely gone still fails both.
-        if status != 'ok' and slot == 'unet' and klein_model_on_disk(raw):
-            continue
+        _, status = (_resolve_klein_unet_ref(raw) if slot == 'unet'
+                     else resolve_model_ref(comfy_type, raw))
         if status != 'ok':
             gaps.append({'slot': slot, 'key': key, 'configured': raw, 'status': status})
     return gaps
@@ -288,11 +280,9 @@ def _klein_unet_folders():
     """(prefix, [model files]) candidates for the Klein UNET across each diffusion-
     model search root (base models/unet + models/diffusion_models, then any
     extra_model_paths roots) — mirrors capabilities._scan_models, so anything the
-    picker lists is resolvable here. `prefix` is a 'klein'-named subfolder (e.g.
-    'klein', 'Flux2 klein') OR '' for a file dropped straight into the root of a
-    search folder: flat / Stability-Matrix installs place the model in
-    diffusion_models/ with no klein/ subfolder, and os.path.join('', name) == name
-    is exactly what UNETLoader loads for a root-level file. Per root, subfolders
+    picker lists is resolvable here. A Klein token in the directory or filename
+    qualifies a file, including under a shared folder such as diffusion_models/flux.
+    The prefix is empty for files directly in a search root. Per root, subfolders
     first (sorted), then the root entry; across roots, base unet/ first (the
     canonical download location), then shared-install folders, then extra roots.
     With no extra_model_paths.yaml the roots are exactly [unet, diffusion_models].
@@ -303,7 +293,12 @@ def _klein_unet_folders():
     somebody else's exclusion list."""
     return comfy_model_paths.scan_family_folders(
         comfy_model_paths.search_roots('diffusion_models'), ('klein',),
-        suffixes=_MODEL_SUFFIXES)
+        match_nested_filenames=True, suffixes=_MODEL_SUFFIXES)
+
+
+def klein_unet_choices():
+    return sorted({os.path.join(prefix, name) for prefix, files in _klein_unet_folders()
+                   for name in files})
 
 
 def klein_unet_choices_exist() -> bool:
@@ -343,23 +338,43 @@ class KleinModelGone(ValueError):
              '— pick another one, or put the file back'))
 
 
-def klein_model_on_disk(selected):
-    """The loader-relative `unet_name` for the BARE model file `selected` (e.g.
-    'klein\\flux-2-klein-9b-fp8.safetensors'), or None when no search root holds a
-    file by that name. This is the STRICT half of resolve_klein_unet: it answers
-    "is exactly this file there?" and never falls back to another one.
-
-    Scans the same roots as the picker's list (capabilities._scan_models) so a
-    model the UI offers is always one this can name — see
-    tests/test_improve_klein_model_choice.py, which asserts both ends layout by
-    layout."""
-    bare = os.path.basename(selected) if selected else None
-    if not bare:
-        return None
+def _resolve_klein_unet_ref(selected):
+    """Resolve a Klein pin or picker value to a registered ComfyUI loader name."""
+    raw = os.path.expandvars(os.path.expanduser((selected or '').strip()))
+    path = raw.replace('\\', '/').replace('/', os.sep)
+    absolute = os.path.isabs(path)
+    if not absolute and (os.path.splitdrive(path)[0] or '..' in path.split(os.sep)):
+        return None, 'missing'
+    rel, status = resolve_model_ref('diffusion_models', path)
+    if status in ('ok', 'empty'):
+        return rel, status
+    if (absolute and status != 'outside_roots') or (not absolute and os.path.dirname(path)):
+        return None, status
+    bare = os.path.normcase(os.path.basename(path))
+    # A registered subdirectory can link to the absolute pin's directory even
+    # when the registered root itself does not contain the resolved path.
+    roots = (comfy_model_paths.search_roots('diffusion_models')
+             if status == 'outside_roots' else [])
     for sub, names in _klein_unet_folders():
-        if bare in names:
-            return os.path.join(sub, bare)
-    return None
+        for name in names:
+            if os.path.normcase(name) != bare:
+                continue
+            candidate = os.path.join(sub, name)
+            if status != 'outside_roots':
+                return candidate, 'ok'
+            for root in roots:
+                try:
+                    if os.path.samefile(path, os.path.join(root, candidate)):
+                        return candidate, 'ok'
+                except OSError:
+                    continue
+    return None, status
+
+
+def klein_model_on_disk(selected):
+    """Return the named model's loader value, without choosing another model."""
+    rel, _ = _resolve_klein_unet_ref(selected)
+    return rel
 
 
 def resolve_klein_unet(selected=None):
@@ -371,11 +386,9 @@ def resolve_klein_unet(selected=None):
     subfolder prefix was the original bug. Preference: the picker's choice
     (searched across ALL klein folders), then the user-pinned klein.unet, then
     the canonical download, then the first file found."""
-    bare_pick = os.path.basename(selected) if selected else None
-    if bare_pick:
-        for sub, names in _klein_unet_folders():
-            if bare_pick in names:
-                return os.path.join(sub, bare_pick)
+    picked = klein_model_on_disk(selected)
+    if picked:
+        return picked
     # The pin is honoured even when the file lives OUTSIDE a 'klein'-named
     # subfolder — the folder-name convention only ever drove the SCAN, and the
     # scan is what a pin is there to bypass. Checked before the folder guard
@@ -493,7 +506,7 @@ def _lora_abs(rel_name):
     rel_name = normalize_rel_model_name(rel_name)
     for root in comfy_model_paths.search_roots('loras'):
         cand = os.path.join(root, rel_name)
-        if os.path.exists(cand):
+        if os.path.isfile(cand):
             return cand
     return None
 

@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-20-klein-workflow-picker',
+    date: '2026-11-20',
+    title: 'Choose a Klein workflow in Watermarks',
+    blurb: 'Pick a ComfyUI API export or use Built-in. Klein also detects weights in shared model folders.',
+    to: '/bank',
+  },
+  {
     id: '2026-11-20-compact-controls',
     date: '2026-11-20',
     title: 'Find controls faster',

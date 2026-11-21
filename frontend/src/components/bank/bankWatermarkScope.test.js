@@ -183,7 +183,7 @@ test('the launch spreads statuses/image_ids only when set', () => {
   // ignores it, and the crop level has no device to pick at all.
   assert.ok(PANEL.includes('? { method, device_id: deviceId,'));
   assert.ok(PANEL.includes("...(target !== 'all' ? { target } : {})"));
-  assert.ok(PANEL.includes("...(method === 'klein' && kleinRunModel"));
+  assert.ok(PANEL.includes("...(method === 'klein' && !customWorkflow && kleinRunModel"));
   assert.ok(PANEL.includes("? { klein_model: kleinRunModel } : {})"));
 });
 

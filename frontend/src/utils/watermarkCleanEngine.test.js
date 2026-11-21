@@ -30,7 +30,8 @@ test('every surface that offers Klein shows the SAME sentence about it', () => {
        (2026-08-31) the sentence has an install-specific half, and a surface that
        pasted the constant would quote "remove watermark" at a user who had changed
        it — the exact failure the shared module exists to prevent, one level down. */
-    assert.match(text, /kleinCleanTitle\(caps\)/,
+    const capsArg = rel.endsWith('BankWatermarkPanel.jsx') ? 'cleanCaps' : 'caps'
+    assert.match(text, new RegExp(`kleinCleanTitle\\(${capsArg}\\)`),
       `${rel} describes the Klein clean in its own words, or names the prompt from a `
       + 'stale constant instead of the resolved capabilities value')
   }

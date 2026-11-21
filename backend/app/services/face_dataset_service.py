@@ -1205,7 +1205,7 @@ def suggest_dataset_signature_tags(user_id, dataset_id) -> list:
 # for improve". NULL = auto (resolve_klein_unet decides), which is exactly what
 # every improve did before this setting existed.
 def dataset_klein_model(ds):
-    """The bare Klein model file name in use, or None for auto.
+    """The Klein model reference in use, or None for auto.
 
     ONE VALUE, NOT ONE PER DATASET — and the `ds` argument is now ignored on
     purpose. The setting used to live in a per-dataset column, which meant the
@@ -1233,12 +1233,8 @@ def set_dataset_klein_model(user_id, dataset_id, name):
     screen that is not looking at a real dataset is a bug worth answering with a
     404, and dropping the argument would change every caller for nothing.
 
-    Only a BARE file name is accepted: the picker lists bare names (the loader
-    prefix is resolve_klein_unet's job), so a value carrying a path separator is
-    never something the UI produced. Existence is deliberately NOT checked here —
-    a model can be moved away long after it was chosen, and the honest place to
-    say so is the run (KleinModelGone names the file), not a settings write that
-    would silently drop the user's answer."""
+    Accept legacy bare names and loader-relative paths offered by the picker.
+    Settings retains the separate absolute path input."""
     if not get_dataset(user_id, dataset_id):
         raise ValueError('dataset not found')
     value = (name or '').strip()
@@ -1248,7 +1244,9 @@ def set_dataset_klein_model(user_id, dataset_id, name):
     if value and (ntpath.basename(value) != value
                   or posixpath.basename(value) != value
                   or value in ('.', '..')):
-        raise ValueError('a Klein model is named by its file name, without a folder')
+        from . import klein_edit_helper
+        if value not in klein_edit_helper.klein_unet_choices():
+            raise ValueError('select a Klein model from the installed choices')
     cfg.save_config({'klein': {'unet': value}})
     return dataset_klein_model(None)
 
