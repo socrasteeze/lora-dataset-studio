@@ -170,7 +170,7 @@ export default function LaunchAllDialog({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) dismiss() }}>
       <div ref={cardRef}
-        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-surface-overlay p-5 shadow-2xl space-y-4">
+        className="w-full max-w-lg lg:max-w-3xl xl:max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-surface-overlay p-5 shadow-2xl space-y-4">
         {/* No intro paragraph and no "What will run" list: the ticked boxes ARE
             the plan, and dropping both lets the dialog fit without scrolling. */}
         <h2 className="flex items-center gap-2 text-base font-bold text-content"><Rocket aria-hidden="true" className="h-4 w-4" /> Launch All</h2>
@@ -184,10 +184,11 @@ export default function LaunchAllDialog({
           </p>
         )}
 
-        <ul className="space-y-1.5">
+        <ul className="grid gap-2 lg:grid-cols-2">
           {STEPS.map((s) => (
-            <li key={s.key}>
-              <label className={`flex items-start gap-2 rounded-md border border-border bg-surface p-2 text-sm${
+            <li key={s.key} className={s.key === 'auto_reject' && autoRejectOn ? 'lg:col-span-2' : undefined}>
+              <label title={s.desc}
+                className={`flex items-start gap-2 rounded-md border border-border bg-surface p-2 text-sm${
                 gates[s.key]?.blocked ? ' opacity-50 cursor-not-allowed' : ''}`}>
                 <input type="checkbox" className="mt-0.5" checked={steps.has(s.key)}
                   disabled={!!gates[s.key]?.blocked}
@@ -210,9 +211,6 @@ export default function LaunchAllDialog({
                     <span className="ml-1.5 rounded bg-amber-500/15 px-1.5 py-px text-2xs font-semibold text-amber-300">
                       {gates[s.key].warn}
                     </span>
-                  ) : null}
-                  {s.desc ? (
-                    <span className="block text-xs text-content-subtle">{s.desc}</span>
                   ) : null}
                 </span>
               </label>
@@ -240,16 +238,12 @@ export default function LaunchAllDialog({
                       ⚠ {rejectNote}
                     </p>
                   )}
-                  <label className="flex items-center gap-1.5 text-sm text-content">
+                  <label className="flex items-center gap-1.5 text-sm text-content"
+                    title="Marks one image Keep before applying quality flags. Uses an existing keeper when available.">
                     <input type="checkbox" checked={resolveDups}
                       onChange={(e) => setResolveDups(e.target.checked)} />
                     ≈ Duplicates — keep best
                   </label>
-                  {resolveDups && (
-                    <p className="m-0 text-xs text-content-muted">
-                      Marks a survivor Keep before applying quality flags. Uses your existing kept copy when available.
-                    </p>
-                  )}
                 </div>
               )}
             </li>

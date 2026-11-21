@@ -3,14 +3,15 @@ import { apiFetch } from '../../api/fetchClient'
 import DiagnosticReport from '../common/DiagnosticReport'
 import GlobalStopPanel from './GlobalStopPanel'
 import { Card } from './primitives'
+import { btnClass } from '../common/controls.js'
 import { copyText } from '../../utils/copyText'
 
 /* Offline maintenance is performed outside the running app. */
 function UpdatesCard() {
   return (
-    <Card title="Updates" help="Online update APIs are disabled in this fork.">
+    <Card title="Updates">
       <p className="text-sm text-content-muted">
-        Update the checkout or replace the local release outside LDS, then restart the app.
+        Update LDS outside the app, then restart.
       </p>
     </Card>
   )
@@ -46,23 +47,23 @@ function LogViewer() {
         className="flex w-full items-center gap-2 text-left">
         <h2 className="text-base font-semibold text-content">🪵 Server log</h2>
         <span className="text-xs text-content-subtle">
-          {open ? (file ? `data/${file} — last ${lines.length} lines, refreshes every 5 s` : 'no log file yet')
-            : 'something failed? open this and copy the log into your bug report'}
+          {open && (file ? `data/${file} · ${lines.length} lines` : 'No log file')}
         </span>
         <span aria-hidden className="ml-auto text-content-subtle">{open ? '▾' : '▸'}</span>
       </button>
       {open && (
         <div className="mt-3 space-y-2">
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <button type="button" onClick={load}
-              className="rounded-md border border-border bg-surface-raised px-2.5 py-1 text-xs text-content">
+              className={btnClass({ size: 'sm' })}>
               ↻ Refresh
             </button>
             <button type="button" onClick={copy} disabled={!lines.length}
-              className="rounded-md border border-border bg-surface-raised px-2.5 py-1 text-xs text-content disabled:opacity-40">
-              {copyFailed ? 'Copy failed — select the log below' : '📋 Copy all'}
+              className={btnClass({ size: 'sm' })}>
+              {copyFailed ? 'Copy Failed' : '📋 Copy Log'}
             </button>
           </div>
+          {copyFailed && <p role="alert" className="text-xs text-amber-300">Select the log text to copy it.</p>}
           <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-app/60 p-2 text-2xs leading-snug text-content-muted">
             {lines.length ? lines.join('\n') : 'Log is empty.'}
           </pre>

@@ -19,7 +19,8 @@ export default function AutoCropOptions({ enabled, onEnabledChange, confidence,
       </label>
       <HelpBadge topic="auto-crop-framing" />
     </div>}
-    <label htmlFor={id} className="flex min-h-10 flex-wrap items-center gap-2 text-sm text-content">
+    <label htmlFor={id} title="Only images at or above this score can be cropped."
+      className="flex min-h-10 flex-wrap items-center gap-2 text-sm text-content">
       <span className="min-w-0 flex-1">Minimum Confidence</span>
       <input id={id} type="number" min="0" max="100" step="any" value={confidence}
         disabled={disabled || !enabled} onChange={(event) => onConfidenceChange(event.target.value)}
@@ -30,7 +31,7 @@ export default function AutoCropOptions({ enabled, onEnabledChange, confidence,
       Enter a confidence greater than 0 and at most 100%.
     </p>}
     {enabled && <p className="m-0 text-xs text-content-muted">
-      {note && <>{note}{' '}</>}Only scores at or above this minimum allow a crop. Model confidence is uncalibrated.
+      {note && <>{note}{' '}</>}Confidence is uncalibrated.
     </p>}
   </div>;
 }

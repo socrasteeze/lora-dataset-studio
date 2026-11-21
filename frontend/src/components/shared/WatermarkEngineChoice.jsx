@@ -7,24 +7,11 @@ import {
 import VisionModelPicker from './VisionModelPicker.jsx';
 import { Select } from '../common/Controls.jsx';
 
-/* Which engine 🚩 Find watermarks runs — ONE control, mounted in BOTH scan
- * windows (dataset dialog and bank panel), write-through persisted exactly like
- * the threshold beside it: `watermark_detect.backend` is what the scan routes
- * have always read, so saving IS arming, on both surfaces at once.
- *
- * The status line under the select is the honest half: it names the route a
- * scan launched NOW will take (mirroring the backend resolver), names the
- * vision model that would run, and — for the one amber case, detector pinned
- * but missing — says the run still happens on the vision route and where the
- * detector installs from. A selector that changed a value without saying what
- * it changes would be the same dead key this replaces.
- */
+/* The saved engine is shared by both scan dialogs. A missing detector shows a fallback warning. */
 export default function WatermarkEngineChoice({ caps = {}, disabled = false, onChanged }) {
   const [value, setValue] = useState(() => normalizeEngine(caps.watermark_detect_backend));
   const [saving, setSaving] = useState(false);
-  // The model picked below is reflected in the sentence at once — a select that
-  // saved a value while the line under it kept naming the old model would read
-  // as a failed save.
+  // Keep the engine tooltip in sync with the selected vision model.
   const [visionModel, setVisionModel] = useState('');
   const capsView = visionModel
     ? withVisionModel(caps, activeLocalLlm(caps).provider, visionModel) : caps;
@@ -44,22 +31,18 @@ export default function WatermarkEngineChoice({ caps = {}, disabled = false, onC
   return (
     <div className="text-xs text-content-subtle">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-medium text-content">Detection Engine</span>
-        <span title="Saved to Settings for Bank and Dataset">Shared Setting</span>
-      </div>
-      <span className="mt-1 flex flex-wrap items-center gap-2">
+        <span className="font-medium text-content" title="Shared by Bank and Dataset.">Detection Engine</span>
         <Select size="sm" value={value} disabled={disabled || saving}
           aria-label="Watermark detection engine"
+          title={status.warn ? undefined : status.line}
           onChange={(e) => save(e.target.value)}
           className="min-w-0 max-w-full">
           {WATERMARK_ENGINES.map((e) => (
             <option key={e.id} value={e.id}>{e.label}</option>
           ))}
         </Select>
-      </span>
-      <span className={`mt-1 block leading-snug ${status.warn ? 'text-amber-300' : 'text-content-subtle'}`}>
-        {status.line}
-      </span>
+      </div>
+      {status.warn && <p className="m-0 mt-1 text-amber-300">{status.line}</p>}
       {status.runs === 'vision' && (
         <VisionModelPicker caps={capsView} disabled={disabled} onModel={setVisionModel} />
       )}

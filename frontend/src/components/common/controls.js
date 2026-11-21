@@ -36,6 +36,10 @@ const BTN_VARIANT = {
   ghost: 'text-content-muted hover:text-content hover:bg-surface-raised',
 }
 
+export const SEGMENT_GROUP_CLASS = 'inline-grid max-w-full grid-flow-col auto-cols-fr items-stretch gap-1 rounded-md bg-surface ring-1 ring-inset ring-border'
+
+export const SEGMENT_CLASS = `${btnShape()} min-w-0 font-semibold text-content-muted hover:bg-surface-raised hover:text-content aria-pressed:bg-primary/20 aria-pressed:text-content`
+
 const FIELD_SIZE = {
   sm: 'px-2 py-0 text-xs',
   md: 'px-2 py-0 text-sm',

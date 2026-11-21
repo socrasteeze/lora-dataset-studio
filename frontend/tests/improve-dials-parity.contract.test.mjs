@@ -69,3 +69,14 @@ test('the app-wide sentence is true on a bank, not only in a dataset', () => {
   assert.match(scope, /every dataset/)
   assert.match(scope, /every bank/)
 })
+
+test('Klein finishing resets use the visible field names', () => {
+  const card = readSource('../bundled/image_upscale/frontend/panels/ImproveFinishCard.jsx')
+  for (const [id, field] of [['colour-match', 'colour_match'], ['sharpen', 'sharpen'],
+    ['grain', 'grain'], ['grain-sat', 'grain_saturation']]) {
+    const label = card.match(new RegExp(`<label htmlFor="improve-${id}"[^>]*>\\s*([^<]+?) \\(\\{`))
+    const reset = card.match(new RegExp(`<ResetToDefault label="([^"]+)" section="improve"\\s+field="${field}"`))
+    assert.ok(label, `${id}: no visible label text`)
+    assert.equal(reset?.[1], label[1].trim(), `${id}: reset label differs from the field label`)
+  }
+})

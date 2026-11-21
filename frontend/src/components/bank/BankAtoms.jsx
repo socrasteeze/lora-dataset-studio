@@ -74,7 +74,7 @@ export function FilterGroup({ label, children }) {
 export function PassButton({ onClick, disabled, title, children }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled} title={title}
-      className="min-h-10 lg:min-h-0 rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content transition-colors hover:bg-surface disabled:opacity-50 disabled:hover:bg-surface-raised">
+      className="min-h-10 min-w-0 rounded-md border border-border bg-surface-raised px-2 py-1 text-xs lg:min-h-8 text-content transition-colors hover:bg-surface disabled:opacity-50 disabled:hover:bg-surface-raised">
       {children}
     </button>
   )

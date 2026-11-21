@@ -56,7 +56,7 @@ test('Clean selected confirms count, engine, replacement, and undo before postin
 
 test('Watermarks uses equal-width single-line actions and aligned device pickers', () => {
   assert.match(panel, /grid grid-cols-2 gap-2/);
-  assert.match(panel, /min-h-10 w-full whitespace-nowrap/);
+  assert.match(panel, /btnClass\(\{ size: 'sm' \}\)\} w-full/);
   assert.match(panel, /<DevicePicker[^>]+contextLabel="Level 1 Scan"/);
   assert.match(panel, /<DevicePicker[^>]+contextLabel="Level 3 Inpaint"/);
   assert.doesNotMatch(panel, />Level [13] (Scan|Inpaint)</);
@@ -64,7 +64,7 @@ test('Watermarks uses equal-width single-line actions and aligned device pickers
   assert.doesNotMatch(panel, /blurb=|already handled here|your original files are never modified|sourceNote/);
 });
 
-test('disabled actions and bin-only actions show their reason under the button', () => {
+test('disabled actions and bin-only actions show their reason below the button', () => {
   assert.match(panel, /const message = state\.reason \|\| state\.note/);
   assert.match(panel, /<\/button>\s*\{message && <p[^>]*>\{message\}<\/p>\}/);
 });
@@ -78,7 +78,7 @@ test('the watermark pass offers selection, all five scopes, and rescan', () => {
     ['', 'keep', 'pending', 'reject', 'all']);
   assert.deepEqual(spec.redo && { key: spec.redo.key, label: spec.redo.label }, {
     key: 'rescan',
-    label: 'Also re-check images that were already scanned',
+    label: 'Rescan Images',
   });
 });
 

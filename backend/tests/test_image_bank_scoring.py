@@ -244,6 +244,31 @@ def test_subfolders_facet_and_filter(client, tmp_path):
     assert [i['name'] for i in root['images']] == ['root.jpg']
 
 
+def test_subfolder_facet_orders_months_then_names(client, tmp_path):
+    bank_id, _ = _mkbank(client, tmp_path, {
+        'instagram/1.jpg': _flat(), 'instagram/2.jpg': _flat(),
+        'instagram/3.jpg': _flat(), '2025-05/1.jpg': _flat(),
+        '2025-05/2.jpg': _flat(), '_unmatched/1.jpg': _flat(),
+        '2025-01/1.jpg': _flat(), '2024-07/1.jpg': _flat(),
+        '2025-13/1.jpg': _flat(), 'root.jpg': _flat(),
+    })
+    url = f'/api/bank/{bank_id}'
+    expected = {'total': 10, 'subfolders': [
+        {'name': '', 'count': 1},
+        {'name': '2024-07', 'count': 1},
+        {'name': '2025-01', 'count': 1},
+        {'name': '2025-05', 'count': 2},
+        {'name': '2025-13', 'count': 1},
+        {'name': '_unmatched', 'count': 1},
+        {'name': 'instagram', 'count': 3},
+    ]}
+    assert client.get(f'{url}/subfolders').get_json() == expected
+    for folder in expected['subfolders']:
+        scoped = client.get(f'{url}/images', query_string={'subfolder': folder['name']})
+        assert scoped.get_json()['total'] == folder['count']
+        assert client.get(f'{url}/subfolders').get_json() == expected
+
+
 # --- aesthetic-aware keep-best ----------------------------------------------
 def test_keep_best_prefers_aesthetic_when_scored(client, tmp_path, app):
     big = _photo(256)

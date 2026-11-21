@@ -35,10 +35,6 @@ export default function StudioModelDownloads({ readiness, onRefresh }) {
       className="min-w-0 space-y-3 rounded-lg border border-amber-400/40 bg-amber-400/5 p-3">
       <div className="space-y-1">
         <h3 className="text-sm font-semibold text-content">Prepare {readiness.label} for generation<HelpBadge topic="studio_models" /></h3>
-        <p className="text-xs text-content-muted">
-          Download the required files here. LDS puts them in the correct folders and checks them
-          when each download finishes. Your prompt and checkpoint selection stay in place.
-        </p>
       </div>
       {downloads.map((item) => (
         <div key={item.action} className="min-w-0 space-y-1.5 border-t border-border pt-2">

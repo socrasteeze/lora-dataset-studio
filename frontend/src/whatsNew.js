@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-20-compact-controls',
+    date: '2026-11-20',
+    title: 'Find controls faster',
+    blurb: 'Pass windows are wider on desktop. Shorter labels and even button rows make choices easier to scan.',
+  },
+  {
     id: '2026-11-20-bank-widen-ancestor',
     date: '2026-11-20',
     title: 'Widen a bank without losing your analysis',

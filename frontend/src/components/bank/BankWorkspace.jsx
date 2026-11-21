@@ -1662,7 +1662,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
      and overflow on their own); the rest are max-w-full with a 16rem ceiling from
      sm up, because capping them by symmetry truncated them into nonsense
      ("Standard — the prompt as⌄"). */
-  const captionSelectClass = 'mt-0.5 w-full bg-app/60'
+  const captionSelectClass = 'mt-0.5 w-full min-w-0 max-w-full bg-app/60'
   /* Rendered UNDER the engine picker, because it is about the engine and the picker
      is the lever it names. It re-computes as the engine changes, so ticking
      JoyCaption turns the warning into its own confirmation instead of leaving an
@@ -1711,30 +1711,23 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     : {})
   const watermarkScanControls = (
     <div className="space-y-2 border-t border-border pt-2">
-      <label className="flex items-start gap-2 text-2xs text-content-subtle">
-        <input type="checkbox" className="mt-0.5" checked={wmSampleOn}
-          onChange={(e) => setWmSampleOn(e.target.checked)} disabled={live} />
-        <span>
-          <span className="font-medium text-content">Try on a sample first</span>
-          {' — judge only the first '}
-          <input type="number" min="1" max="10000" value={wmSampleSize}
-            onChange={(e) => setWmSampleSize(e.target.value)}
-            disabled={live || !wmSampleOn} aria-label="Sample size"
-            className="mx-1 w-16 rounded border border-border bg-app px-1 py-0.5 text-content" />
-          {' images of the scope. Judge the boxes below, then run again for the '}
-          {'rest — or tick “re-check” above to re-judge the SAME sample at '}
-          {'another threshold.'}
-        </span>
-      </label>
+      <div className="flex min-h-10 flex-wrap items-center gap-2 text-xs">
+        <label className="inline-flex min-h-10 items-center gap-2 lg:min-h-7" title="Scan only the first images in scope.">
+          <input type="checkbox" checked={wmSampleOn}
+            onChange={(e) => setWmSampleOn(e.target.checked)} disabled={live} />
+          Sample Run
+        </label>
+        <input type="number" min="1" max="10000" value={wmSampleSize}
+          onChange={(e) => setWmSampleSize(e.target.value)}
+          disabled={live || !wmSampleOn} aria-label="Sample size"
+          title="Number of images in the sample" className="h-10 w-20 rounded border border-border bg-app px-2 text-content lg:h-7" />
+      </div>
       <WatermarkEngineChoice caps={caps} disabled={live}
         onChanged={(engine) => setWmEngine(engine)} />
       {watermarkEngineStatus(wmEngine, caps).runs === 'detector' ? (
-        <label className="block text-2xs text-content-subtle">
-          <span className="font-medium text-content">Detector threshold</span>
-          {' — the score an image needs to be flagged as watermarked. Lower '}
-          {'flags fainter marks at the cost of false flags; higher keeps only '}
-          {'the confident ones. Stored: the dataset scan reads the same value.'}
-          <span className="mt-1 flex items-center gap-2">
+        <label className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 text-xs" title="Lower values flag fainter marks and can add false flags. Shared by Bank and Dataset.">
+          <span className="font-medium text-content">Detector Threshold</span>
+          <span className="flex flex-wrap items-center gap-2">
             <input type="range" min="0.50" max="0.99" step="0.01"
               value={effectiveWmThreshold} disabled={live}
               aria-label="Detector threshold"
@@ -1747,12 +1740,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             <span className="text-content-subtle">(default 0.94)</span>
           </span>
         </label>
-      ) : (
-        <p className="m-0 text-2xs leading-snug text-content-subtle">
-          The vision route answers yes/no with no score — so there is no
-          threshold to tune here.
-        </p>
-      )}
+      ) : null}
       {/* The run's RESULT: the 🚩-family flagged pages (text-flagged ones live
           in the 🔤 window) with their boxes, filling in live while the scan
           runs — the window stays open on launch, like 🔤. */}
@@ -1761,27 +1749,20 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   )
   const textScanControls = (
     <div className="space-y-2 border-t border-border pt-2">
-      <label className="flex items-start gap-2 text-2xs text-content-subtle">
-        <input type="checkbox" className="mt-0.5" checked={textSampleOn}
-          onChange={(e) => setTextSampleOn(e.target.checked)} disabled={live} />
-        <span>
-          <span className="font-medium text-content">Try on a sample first</span>
-          {' — read only the first '}
-          <input type="number" min="1" max="10000" value={textSampleSize}
-            onChange={(e) => setTextSampleSize(e.target.value)}
-            disabled={live || !textSampleOn} aria-label="Sample size"
-            className="mx-1 w-16 rounded border border-border bg-app px-1 py-0.5 text-content" />
-          {' images of the scope. Judge the zones in ▶ Review (flagged), then '}
-          {'run again for the rest — or tick “re-read” above to try the SAME '}
-          {'sample at another sensitivity.'}
-        </span>
-      </label>
-      <label className="block text-2xs text-content-subtle">
+      <div className="flex min-h-10 flex-wrap items-center gap-2 text-xs">
+        <label className="inline-flex min-h-10 items-center gap-2 lg:min-h-7" title="Scan only the first images in scope.">
+          <input type="checkbox" checked={textSampleOn}
+            onChange={(e) => setTextSampleOn(e.target.checked)} disabled={live} />
+          Sample Run
+        </label>
+        <input type="number" min="1" max="10000" value={textSampleSize}
+          onChange={(e) => setTextSampleSize(e.target.value)}
+          disabled={live || !textSampleOn} aria-label="Sample size"
+          title="Number of images in the sample" className="h-10 w-20 rounded border border-border bg-app px-2 text-content lg:h-7" />
+      </div>
+      <label className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 text-xs" title="Lower values detect fainter lettering and can add false zones. Shared by Bank and Dataset.">
         <span className="font-medium text-content">Sensitivity</span>
-        {' — the OCR confidence a line needs to become a zone. Lower catches '}
-        {'fainter or stylised lettering, at the cost of false zones. Stored: '}
-        {'the dataset scan reads the same value.'}
-        <span className="mt-1 flex items-center gap-2">
+        <span className="flex flex-wrap items-center gap-2">
           <input type="range" min="0.30" max="0.70" step="0.05"
             value={effectiveTextSensitivity} disabled={live}
             aria-label="Text sensitivity"
@@ -1836,8 +1817,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const captionRunControls = (
     <div className="space-y-2 border-t border-border pt-2">
       <p className="m-0 text-xs leading-snug text-content-subtle">
-        These override your Settings for this run only — the global values are never
-        written from here.
+        Options apply to this run only.
       </p>
       {/* 🧪 The bench, in the window that launches the pass — the Bank's half of the
           entry point the Dataset's Captions section carries. Same bench, same shared
@@ -1863,7 +1843,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           <Select size="md" value={captionEngine} onChange={(e) => setCaptionEngine(e.target.value)}
             disabled={live} aria-label="Caption engine"
             title="Which engine writes this run's captions, without changing your Settings. Auto is a CHAIN, not a choice between two: JoyCaption drafts, then Ollama covers whatever it missed."
-            className={`${captionSelectClass} sm:max-w-[16rem]`}>
+            className={captionSelectClass}>
             {/* 'none' is dropped on purpose: "caption with nothing" is not a pass. */}
             {ENGINE_OPTIONS.filter((o) => o.id !== 'none')
               .map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
@@ -1874,23 +1854,17 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           <Select size="md" value={captionModel} onChange={(e) => setCaptionModel(e.target.value)}
             disabled={live || !ollamaPicksApply} aria-label="Caption vision model"
             title={ollamaPicksApply ? llmPicker.perRunHint : llmPicker.inertHint}
-            className={`${captionSelectClass} sm:max-w-[11rem]`}>
+            className={captionSelectClass}>
             <option value="">Configured model</option>
             {captionModelChoices.map((m) => <option key={m} value={m}>{m}</option>)}
           </Select>
-          {!ollamaPicksApply && (
-            <span className="mt-0.5 block text-2xs leading-snug text-amber-300/90">
-              The engine you picked does not reach {llmPicker.label}, so this choice would
-              change nothing — disabled rather than quietly ignored.
-            </span>
-          )}
         </label>
         <label className="block text-xs text-content-subtle">
           Register
           <Select size="md" value={captionVocab} onChange={(e) => setCaptionVocab(e.target.value)}
             disabled={live} aria-label="Caption vocabulary register"
             title={llmPicker.registerHint}
-            className={`${captionSelectClass} sm:max-w-[16rem]`}>
+            className={captionSelectClass}>
             {VOCABULARY_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
           </Select>
         </label>
@@ -1899,7 +1873,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           <Select size="md" value={captionLength} onChange={(e) => setCaptionLength(e.target.value)}
             disabled={live} aria-label="Caption length"
             title="How much the captioner writes. Concise aims for one short sentence, Detailed for several - a target the model follows loosely, not a hard cap. Standard leaves the prompt untouched. Longer captions give the search more to match on."
-            className={`${captionSelectClass} sm:max-w-[16rem]`}>
+            className={captionSelectClass}>
             {CAPTION_LENGTH_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
           </Select>
         </label>

@@ -30,7 +30,7 @@ test('empty comparison and collection loading do not throw and retain clear cont
   const html = render(BankGroupComparison, { bankId: 1, group: { ids: [], kind: 'collection' }, onClose() {}, onSaveCollection() {} });
   assert.match(html, /This group has no members/);
   const collections = render(BankCollectionsDialog, { bankId: 1, initialIds: [], onClose() {}, onOpenGrid() {}, onCompare() {} });
-  assert.match(collections, /Collections store membership only/);
+  assert.match(collections, /title="Collections store membership only\."/);
   assert.match(collections, /New collection name/);
   assert.match(collections, /maxLength="128"|maxlength="128"/);
 });

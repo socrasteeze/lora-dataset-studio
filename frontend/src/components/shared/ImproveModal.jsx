@@ -135,11 +135,7 @@ export default function ImproveModal({ img, host = 'library', datasetId = null,
           <span aria-hidden className="mt-0.5">✨</span>
           <div className="min-w-0 flex-1">
             <h2 className="font-sans text-base font-semibold text-gray-100">Upscale &amp; improve via Klein</h2>
-            <p className="mt-0.5 text-xs leading-snug text-gray-400">
-              {phase === 'done'
-                ? 'Done — the result below also lives in ' + routes.dest + '.'
-                : 'Check the instruction and the dials, then Generate. The result shows here — or in ' + routes.dest + ' if you leave.'}
-            </p>
+            {phase === 'done' && <p className="mt-0.5 text-xs text-gray-400">Saved in {routes.dest}.</p>}
           </div>
           <button type="button" onClick={close} aria-label="Close" ref={closeRef}
             className="min-h-10 lg:min-h-0 -mr-1 rounded-lg px-2 text-gray-400 hover:bg-white/5 hover:text-gray-200">
@@ -155,8 +151,7 @@ export default function ImproveModal({ img, host = 'library', datasetId = null,
             <div className="flex flex-col items-center gap-3 py-8 text-center">
               <span aria-hidden className="animate-pulse text-2xl">✨</span>
               <p className="m-0 max-w-md text-sm text-gray-300" role="status">
-                Generating you can close this dialog — the render keeps going and
-                the result lands in {routes.dest}.
+                  Generating. The result will appear in {routes.dest}.
               </p>
             </div>
           )}
@@ -172,7 +167,8 @@ export default function ImproveModal({ img, host = 'library', datasetId = null,
           )}
         </div>
 
-        <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-white/10 px-4 py-3">
+        <footer className={`gap-2 border-t border-white/10 px-4 py-3 ${
+          phase === 'settings' || phase === 'failed' ? 'grid grid-cols-2' : 'flex justify-end'}`}>
           {phase === 'failed' && (
             <button type="button"
               onClick={(e) => {

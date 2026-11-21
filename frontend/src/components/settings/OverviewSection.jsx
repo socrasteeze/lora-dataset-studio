@@ -23,12 +23,7 @@ export default function OverviewSection({ caps }) {
     <div className="space-y-4">
       {!caps.configured && (
         <div role="status" className="rounded-xl border border-primary/40 bg-primary/10 p-4 text-sm text-content">
-          <p className="font-medium">Your dataset workspace is ready.</p>
-          <p className="mt-1 text-content-muted">
-            Point the{' '}
-            <Link to="/setup" className="font-medium text-sky-300 underline hover:text-sky-200">Setup wizard</Link>
-            {' '}at ComfyUI, Ollama and ai-toolkit — this fork generates and trains locally only.
-          </p>
+          <Link to="/setup" className="font-medium text-sky-300 underline hover:text-sky-200">Open Setup</Link> to configure local tools.
         </div>
       )}
 
@@ -39,7 +34,6 @@ export default function OverviewSection({ caps }) {
             {ready}/{summary.length} ready{waiting ? ` · ${waiting} waiting` : ''}
           </span>
         </div>
-        <p className="mt-1 text-xs text-content-subtle">Each row says what it unlocks — pick one to jump to the setting that turns it on.</p>
         <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
           {summary.map((s) => {
             const dest = capabilityDestination(s)
@@ -48,7 +42,7 @@ export default function OverviewSection({ caps }) {
             const glyph = s.pending ? '◐' : (s.ok ? '✓' : '✗')
             const glyphCls = s.pending ? 'text-amber-400' : (s.ok ? 'text-emerald-400' : 'text-content-subtle')
             return (
-              <Link key={s.label} to={dest.href} aria-label={dest.announce}
+              <Link key={s.label} to={dest.href} aria-label={dest.announce} title={s.what}
                 className="group flex min-w-0 items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2
                   text-sm no-underline transition-colors hover:border-border-strong hover:bg-surface-raised
                   focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
@@ -57,11 +51,6 @@ export default function OverviewSection({ caps }) {
                   <span className={`block truncate ${s.ok || s.pending ? 'text-content' : 'text-content-muted'}`}>
                     {s.label}
                   </span>
-                  {/* What the row unlocks, always shown: a name alone ("Test
-                      Studio") did not say it was where test IMAGES are made —
-                      read from a phone, 2026-09-03. Wraps rather than truncates:
-                      the second half of the sentence is the point. */}
-                  {s.what && <span className="block text-2xs leading-snug text-content-subtle">{s.what}</span>}
                   {s.note && <span className="block truncate text-2xs text-amber-300/80">{s.note}</span>}
                 </span>
                 <span aria-hidden
@@ -72,9 +61,7 @@ export default function OverviewSection({ caps }) {
           })}
         </div>
         <p className="mt-4 border-t border-border pt-3 text-xs text-content-muted">
-          Not sure where to start?{' '}
-          <Link to="/setup" className="font-medium text-sky-300 underline hover:text-sky-200">Run the Setup wizard</Link>
-          {' '}— it scans your machine and installs what it can.
+          <Link to="/setup" className="font-medium text-sky-300 underline hover:text-sky-200">Open Setup</Link>
         </p>
       </section>
     </div>

@@ -598,7 +598,7 @@ export default function GalleryPage() {
                 This cannot be undone.
               </p>
             )}
-            <div className="flex flex-wrap justify-end gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <button type="button" autoFocus onClick={() => setConfirming(false)}
                 className="rounded-md border border-border px-3 py-2 text-content-muted text-xs hover:text-content">
                 Cancel

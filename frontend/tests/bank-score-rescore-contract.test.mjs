@@ -50,7 +50,7 @@ test('"Rescore all" is a separate intent, and it is now a line in ✨ Score\'s w
   const spec = BANK_PASSES.score
   assert.ok(spec, 'the ✨ Score spec is missing')
   assert.equal(spec.redo?.key, 'rescore')
-  assert.match(spec.redo.label, /Throw the cached embeddings away and recompute everything/)
+  assert.equal(spec.redo.label, 'Recompute Scores')
   assert.match(spec.redo.note, /Costs a full pass/)
   // …and it is never pre-ticked: the workspace boots every redo flag off.
   assert.match(workspace, /const \[passRedo, setPassRedo\] = useState\(\{\}\)/)

@@ -76,7 +76,7 @@ test('a failed core completion does not mark setup as completed', async () => {
 
 test('missing historical workspaces explain the plugin state and link to the library', () => {
   const html = mount(UnavailablePluginPage)
-  assert.match(html, /not active in this session/)
+  assert.match(html, /This plugin is inactive/)
   assert.match(html, /\/plugins\?tab=installed/)
   assert.match(html, /Open Datasets/)
 })

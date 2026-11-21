@@ -508,7 +508,7 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
       setLaunchingImprove(false);
     }
   };
-  const batchBtn = 'px-2.5 py-1 rounded-lg text-xs font-semibold disabled:opacity-40';
+  const batchBtn = `${btnShape({ size: 'sm' })} !h-auto !whitespace-normal py-1 font-semibold lg:!min-h-7`;
 
   return (
     <div id="ds-images-review" tabIndex={-1} data-workspace-focus
@@ -557,6 +557,7 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
                   {bulkActionMessage(bulkAction)}
                 </span>
               )}
+              <div className="grid w-full auto-rows-fr grid-cols-[repeat(auto-fit,minmax(min(100%,9rem),1fr))] gap-2">
               <button type="button" disabled={curationWriteBusy} onClick={() => act('reject')}
                 title="Reject the selected images (R)" aria-keyshortcuts="R"
                 className={`${batchBtn} bg-red-600/80 text-white`}>✕ Reject<ShortcutKey>R</ShortcutKey></button>
@@ -578,9 +579,7 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
                   Klein re-renders detail (and can move skin and colour),
                   SeedVR2 resolves it and leaves the look alone (issue #32,
                   SurpassHR). Each button's title carries that sentence, so the
-                  difference is readable before the click, not after a ruined
-                  batch. They wrap onto their own line on a narrow screen — the
-                  toolbar is already flex-wrap. */}
+                  difference is readable before the click. Each action fills its grid cell. */}
               {onImproveBatch && improveEngines.map((engine) => {
                 const blocked = improveEngineBlockedReason(engine.id, {
                   caps, engines: caps?.engines,
@@ -598,15 +597,16 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
                   </button>
                 );
               })}
+              <button type="button" disabled={curationWriteBusy} onClick={() => act('delete')}
+                className={`${batchBtn} bg-red-500/15 border border-red-500/40 text-red-300`}>
+                {bulkAction?.action === 'delete' ? bulkActionMessage(bulkAction) : <><Trash2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Delete</>}
+              </button>
+              </div>
               {onImproveBatch && improveSelection.excluded.length > 0 && (
                 <span className="text-content-subtle" title={exclusionSummary}>
                   {improveSelection.excluded.length} not eligible
                 </span>
               )}
-              <button type="button" disabled={curationWriteBusy} onClick={() => act('delete')}
-                className={`${batchBtn} bg-red-500/15 border border-red-500/40 text-red-300`}>
-                {bulkAction?.action === 'delete' ? bulkActionMessage(bulkAction) : <><Trash2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Delete</>}
-              </button>
               <span className="ml-auto flex gap-2">
                 <button type="button" disabled={bulkBusy}
                   title="Selects every image the current filters show — all pages, not just the tiles on screen"

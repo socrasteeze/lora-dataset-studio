@@ -20,6 +20,7 @@
  * user walks it once. Per-image outcomes are tracked locally; the parent refreshes the
  * grid counts underneath and shows a recap toast on close.
  */
+import { SEGMENT_CLASS, SEGMENT_GROUP_CLASS } from '../common/controls.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Brush, Eraser, Eye, Palette } from 'lucide-react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
@@ -740,12 +741,11 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
         <div role="group" aria-label="Inpaint method"
           className="flex items-center justify-center gap-1 text-xs">
           <span className={useCrop ? 'text-white/30' : 'text-white/50'}>Engine:</span>
-          <div className="flex items-center rounded-lg border border-white/15 bg-white/5 p-0.5">
+          <div className={SEGMENT_GROUP_CLASS}>
             <button type="button" aria-pressed={!kleinSelected} onClick={() => setMethod('lama')}
               disabled={working || useCrop}
               title="LaMa: fast, non-generative (border crop + small off-center marks). On-subject marks stay manual review."
-              className={`px-2.5 py-1 rounded-md font-semibold disabled:opacity-40 ${!kleinSelected
-                ? 'bg-amber-500/25 text-amber-100' : 'text-white/60 hover:text-white'}`}>
+              className={SEGMENT_CLASS}>
               LaMa
             </button>
             <button type="button" aria-pressed={kleinSelected} onClick={() => setMethod('klein')}
@@ -754,8 +754,7 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
                 ? kleinCleanTitle(caps)
                 : (kleinReason
                   || 'Klein inpaint needs ComfyUI running + the Klein models installed (Setup ▸ ComfyUI).')}
-              className={`px-2.5 py-1 rounded-md font-semibold disabled:opacity-40 ${kleinSelected
-                ? 'bg-amber-500/25 text-amber-100' : 'text-white/60 hover:text-white'}`}>
+              className={SEGMENT_CLASS}>
               Klein
             </button>
           </div>

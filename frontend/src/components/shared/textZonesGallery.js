@@ -46,7 +46,7 @@ export function zoneStyle([left, top, right, bottom]) {
 export function galleryHeadline(shown, total) {
   const t = Number(total) || 0;
   const s = Number(shown) || 0;
-  let line = ` — ${t} page${t === 1 ? '' : 's'} flagged`;
+  let line = `${t} page${t === 1 ? '' : 's'} flagged`;
   if (t > s) line += `, first ${s} shown`;
   return line;
 }

@@ -40,7 +40,8 @@ import {
 import { openerLabel } from './scoringPython.js'
 import { localEngineUnavailableReason } from '../../utils/localEngineReason'
 import { activeLocalLlm } from '../../utils/localLlm'
-import { Button, btnShape, controlHeight } from '../common/Controls.jsx'
+import { Button } from '../common/Controls.jsx'
+import { SEGMENT_CLASS, SEGMENT_GROUP_CLASS, btnClass } from '../common/controls.js'
 
 // How many cleaned images the before/after strip offers. A sample is enough to
 // judge a pass; the grid holds the full set.
@@ -53,11 +54,11 @@ function LevelCard({ index, title, state, onRun }) {
       <span className="block text-2xs font-bold uppercase tracking-wide text-content-subtle">
         Level {index}
       </span>
-      <button type="button" onClick={onRun} disabled={state.disabled} title={message || title}
-        className="min-h-10 w-full whitespace-nowrap rounded-lg border border-amber-400/40 bg-amber-500/15 px-1 py-1 text-xs font-semibold text-amber-200 disabled:opacity-40 lg:min-h-0 lg:py-1.5">
+      <button type="button" onClick={onRun} disabled={state.disabled} title={message ? undefined : title}
+        className={`${btnClass({ size: 'sm' })} w-full !px-1 font-semibold`}>
         {state.label}
       </button>
-      {message && <p className="text-2xs text-content-subtle">{message}</p>}
+      {message && <p className="m-0 text-2xs text-content-subtle">{message}</p>}
     </div>
   )
 }
@@ -205,7 +206,7 @@ export default function BankWatermarkPanel({
         {[progressSummary(levels), masks].filter(Boolean).join(' · ')}
       </p>
       {note && <p className="text-xs text-amber-300/90">⚠️ {note}</p>}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 [&>*:last-child:nth-child(odd)]:col-span-2">
         <LevelCard index={1} title="Find Watermarks" state={find}
           onRun={onFind} />
         {/* The OTHER level-1 detection: same rung of the same ladder, different
@@ -259,12 +260,11 @@ export default function BankWatermarkPanel({
         <span className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">
           Level 3 engine
         </span>
-        <div className={`${controlHeight('md')} flex items-center gap-1 rounded-lg border border-border bg-app/60 text-sm`}>
+        <div role="group" aria-label="Inpaint engine" className={SEGMENT_GROUP_CLASS}>
           <button type="button" aria-pressed={method !== 'klein'} onClick={() => onMethodChange('auto')}
             title="LaMa: fast, non-generative repaint of small off-centre marks. Marks on the subject stay flagged."
-            className={`h-full rounded-md px-2.5 font-semibold ${method !== 'klein'
-              ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
-            LaMa <span className="font-normal opacity-70">fast</span>
+            className={SEGMENT_CLASS}>
+            LaMa
           </button>
           <button type="button" aria-pressed={method === 'klein'} onClick={() => onMethodChange('klein')}
             disabled={!caps.watermark_klein && deviceId === 'local'}
@@ -273,9 +273,8 @@ export default function BankWatermarkPanel({
               : deviceId !== 'local'
                 ? 'Klein renders on the selected machine — its own ComfyUI checks the models when the job runs.'
                 : (kleinReason || 'Klein inpainting needs ComfyUI running + the Klein models (Setup ▸ ComfyUI).')}
-            className={`h-full rounded-md px-2.5 font-semibold disabled:opacity-40 ${method === 'klein'
-              ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
-            Klein <span className="font-normal opacity-70">quality</span>
+            className={SEGMENT_CLASS}>
+            Klein
           </button>
         </div>
         {/* WHICH Klein model is about to repaint these images. A bank has no
@@ -326,44 +325,41 @@ export default function BankWatermarkPanel({
               What to clean
             </span>
             <div role="group" aria-label="What to clean"
-              className={`${controlHeight('md')} flex items-center gap-1 rounded-lg border border-border bg-app/60 text-sm`}>
+              className={SEGMENT_GROUP_CLASS}>
               <button type="button" aria-pressed={target === 'all'} onClick={() => setTarget('all')}
                 title="Repaint every flagged page — text and watermarks alike."
-                className={`h-full rounded-md px-2.5 font-semibold ${target === 'all'
-                  ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
+                className={SEGMENT_CLASS}>
                 Both
               </button>
               <button type="button" aria-pressed={target === 'text'} onClick={() => setTarget('text')}
                 title="Only pages 🔤 Find text flagged. A page carrying both a watermark and text counts here — one page is never split between two runs."
-                className={`h-full rounded-md px-2.5 font-semibold ${target === 'text'
-                  ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
+                className={SEGMENT_CLASS}>
                 🔤 Text
               </button>
               <button type="button" aria-pressed={target === 'watermark'} onClick={() => setTarget('watermark')}
                 title="Only pages 🚩 flagged with no text flag on them."
-                className={`h-full rounded-md px-2.5 font-semibold ${target === 'watermark'
-                  ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
+                className={SEGMENT_CLASS}>
                 🚩 Marks
               </button>
             </div>
           </>
         )}
         {cleaned && (
-          <>
+          <div className="grid grid-cols-2 gap-2">
             <button type="button" disabled={live}
               onClick={() => run(`/api/bank/${bankId}/watermark/undo`, {},
                 'Originals restored.')}
               title="Restore every cleaned image to its original."
-              className={`${btnShape({ size: 'md', noShrink: true })} border border-border bg-surface text-content`}>
-              ↩ Undo cleaning
+              className={btnClass({ size: 'sm' })}>
+              ↩ Undo Cleaning
             </button>
             <button type="button" onClick={() => setComparing((v) => !v)}
               aria-expanded={comparing}
               title="Show a sample of the cleaned images so you can flip between the cleaned version and your original."
-              className={`${btnShape({ size: 'md', noShrink: true })} border border-border bg-surface text-content`}>
-              {comparing ? '✕ Hide before/after' : '👁 Before / after'}
+              className={btnClass({ size: 'sm' })}>
+              {comparing ? '✕ Hide Preview' : '👁 Before / After'}
             </button>
-          </>
+          </div>
         )}
       </div>
 
@@ -372,7 +368,7 @@ export default function BankWatermarkPanel({
           <label className="flex items-center gap-1.5 text-xs text-content-subtle">
             <input type="checkbox" checked={showOriginal}
               onChange={(e) => setShowOriginal(e.target.checked)} />
-            Show my original files instead of the cleaned versions
+            Show Originals
           </label>
           {/* `relative` makes this scroller the containing block for any
               absolutely-positioned descendant — see

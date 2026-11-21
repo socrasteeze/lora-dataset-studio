@@ -1198,12 +1198,9 @@ filesystem permissions or prevent other programs from modifying the folder.
 
 ## Choosing where a bank pass runs
 
-Every pass button in the bank ends in `` and opens a **launch window** before
-anything runs. The window is not a settings panel — it says three separate
-things, and keeping them apart is the point.
+Bank pass buttons open a **launch window** before the pass runs.
 
-**This run — where it applies, and how big that is.** Five lines, and each one
-quotes the number of images *that pass* would actually walk:
+**This Run** shows the available scopes and image counts.
 
 | Line | What it means |
 |---|---|
@@ -1218,25 +1215,19 @@ default — the pass runs on your selection, narrowed by what it still has to do
 It says *"up to N"*, never a bare N, because the server intersects your selection
 with the pass's own pool and the run can only ever be shorter.
 
-Under those lines sits the **"do it again"** tick: *also re-measure images that
-were already scanned*, *throw the cached embeddings away*, and so on. This is
-where the old **Rescan all** and **Rescore all** buttons went. They were never
-separate passes — they were this scope, wearing a button's clothes — so they now
-sit next to the pool they re-run, unticked, with their price written next to
-them.
+Controls such as **Rescan Images** and **Recompute Scores** include work that
+already has results. They start unchecked.
 
-**Settings this pass reads.** Only what the *calculation* consumes, with where
+**Saved Settings.** Only what the *calculation* consumes, with where
 each value lives. 🔎 Scan quality, for instance, reads exactly one of the twelve
 🎚 filter thresholds (`dup_distance`), and it reads it for the duplicate grouping
 at the end — not for the measuring.
 
-**Not decided here.** The knobs that only change how the grid is **sorted and
-flagged**. Those re-apply the moment you save them, with no pass at all. The
+Thresholds that change how the grid is **sorted and flagged** live in Settings. Those re-apply the moment you save them, with no pass at all. The
 sharpness, noise and aesthetic thresholds live here: nudging one costs you
 nothing.
 
-Three passes **refuse a partial scope**, and the window shows the option greyed
-out with the reason rather than hiding it: **✨ Score**, **👥 Group by person**
+Three passes **refuse a partial scope**, and the window shows the fixed scope and gives the reason in a tooltip: **✨ Score**, **👥 Group by person**
 and **✂ Find crops & variants** each produce one numbering of the *whole* bank,
 recomputed from scratch on every run. Handed a slice, they would number that
 slice from 1 and land those ids on top of unrelated groups already saved.
@@ -2983,7 +2974,7 @@ them cleanable.
 
 **🚩 Find watermarks opens the same kind of window as 🔤 Find text now, on
 both surfaces** — the dataset button used to fire straight from the click.
-*Try on a sample first* judges only the first N images of the scope
+**Sample Run** judges only the first N images of the scope
 (deterministic — a re-run re-judges the same ones), so on a huge bank you can
 check the flags before paying for the whole scan. When the dedicated detector
 is installed, the *Detector threshold* slider edits the stored score an image
@@ -3095,7 +3086,7 @@ What it does *not* do, said plainly:
   the scan, and a watermark box found on the same image joins them.
 
 **Try it on a sample before paying for the whole bank.** The launch window
-carries two dials. *Try on a sample first* reads only the first N images of
+carries two dials. **Sample Run** reads only the first N images of
 the scope (deterministic — a re-read hits the same pages), so on a 9 000-page
 bank you can judge the result on twenty before committing to the rest.
 *Sensitivity* is the OCR confidence a line needs to become a zone — lower

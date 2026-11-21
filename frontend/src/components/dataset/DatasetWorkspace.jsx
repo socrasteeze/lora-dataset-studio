@@ -68,7 +68,7 @@ import {
 import { useToast } from '../common/Toast';
 import { copyText } from '../../utils/copyText';
 import { FolderBrowserModal } from '../common/FolderPicker';
-import { btnClass, btnShape, controlHeight, fieldClass } from '../common/controls';
+import { SEGMENT_CLASS, SEGMENT_GROUP_CLASS, btnClass, btnShape, controlHeight, fieldClass } from '../common/controls';
 import ImportQueuePanel from './ImportQueuePanel';
 import { useCapabilities } from '../../context/CapabilitiesContext';
 import InstallRunner from '../setup/InstallRunner';
@@ -1564,6 +1564,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 {/* Watermark auto-correction (V1): find overlaid site logos/URLs/usernames on
                     the kept images, then Clean them (border → crop, small off-center → LaMa
                     inpaint, on-subject → manual review). Applies to any dataset kind. */}
+                <div className="grid w-full grid-cols-2 gap-2 sm:max-w-md">
                 <button type="button" data-workspace-focus onClick={() => setWmScanOpen(true)}
                   disabled={ds.busy}
                   title="Opens the launch window: try a sample, tune the detector threshold, then scan — each mark's position is recorded so 🧽 Clean can crop or repaint it (deletes nothing)"
@@ -1571,7 +1572,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   <Eraser aria-hidden="true" className="h-4 w-4" />
                   {ds.watermarking
                     ? `Scanning${act?.kind === 'watermark_detect' && act.total ? ` ${act.done}/${act.total}` : ''}`
-                    : 'Find watermarks'}
+                    : 'Find Watermarks'}
                 </button>
                 {kleinCompareOpen && (
                   <KleinCompareDialog
@@ -1614,8 +1615,9 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   className={btnClass()}>
                   🔤 {ds.textScanning
                     ? `Reading${act?.kind === 'text_detect' && act.total ? ` ${act.done}/${act.total}` : ''}`
-                    : 'Find text'}
+                    : 'Find Text'}
                 </button>
+                </div>
                 {textScanOpen && (
                   <TextScanDialog
                     onClose={() => setTextScanOpen(false)}
@@ -1642,13 +1644,12 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       Klein is greyed until ComfyUI + the Klein models are ready
                       (caps.watermark_klein). */}
                   <div role="group" aria-label="Watermark inpaint method"
-                    className={`${controlHeight()} flex items-stretch rounded-md border border-border bg-surface p-0.5 text-xs`}>
+                    className={SEGMENT_GROUP_CLASS}>
                     <button type="button" aria-pressed={watermarkMethod === 'lama'}
                       onClick={() => setWatermarkMethod('lama')} disabled={ds.busy}
                       title="LaMa: fast, non-generative. Crops border marks, repaints small off-center marks; on-subject marks go to manual review."
-                      className={`inline-flex items-center gap-1 px-2.5 rounded-md font-semibold disabled:opacity-40 ${watermarkMethod === 'lama'
-                        ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
-                      LaMa <span className="font-normal opacity-70">fast</span>
+                      className={SEGMENT_CLASS}>
+                      LaMa
                     </button>
                     <button type="button" aria-pressed={watermarkMethod === 'klein'}
                       onClick={() => setWatermarkMethod('klein')} disabled={ds.busy || !caps.watermark_klein}
@@ -1656,9 +1657,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                         ? kleinCleanTitle(caps)
                         : (localEngineUnavailableReason('klein', caps)
                           || 'Klein inpaint needs ComfyUI running + the Klein models installed (Setup ▸ ComfyUI).')}
-                      className={`inline-flex items-center gap-1 px-2.5 rounded-md font-semibold disabled:opacity-40 ${watermarkMethod === 'klein'
-                        ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
-                      Klein <span className="font-normal opacity-70">quality</span>
+                      className={SEGMENT_CLASS}>
+                      Klein
                     </button>
                   </div>
                   {/* 🔤/🚩 WHAT to clean — only offered once Find text flagged
@@ -1667,26 +1667,23 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       bank panel. */}
                   {textFlaggedDetected > 0 && (
                     <div role="group" aria-label="What to clean"
-                      className={`${controlHeight()} flex items-stretch rounded-md border border-border bg-surface p-0.5 text-xs`}>
+                      className={SEGMENT_GROUP_CLASS}>
                       <button type="button" aria-pressed={watermarkTarget === 'all'}
                         onClick={() => setWatermarkTarget('all')} disabled={ds.busy}
                         title="Repaint every flagged page — text and watermarks alike."
-                        className={`inline-flex items-center gap-1 px-2.5 rounded-md font-semibold disabled:opacity-40 ${watermarkTarget === 'all'
-                          ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
+                        className={SEGMENT_CLASS}>
                         Both
                       </button>
                       <button type="button" aria-pressed={watermarkTarget === 'text'}
                         onClick={() => setWatermarkTarget('text')} disabled={ds.busy}
                         title="Only pages 🔤 Find text flagged. A page carrying both a watermark and text counts here — one page is never split between two runs."
-                        className={`inline-flex items-center gap-1 px-2.5 rounded-md font-semibold disabled:opacity-40 ${watermarkTarget === 'text'
-                          ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
+                        className={SEGMENT_CLASS}>
                         🔤 Text
                       </button>
                       <button type="button" aria-pressed={watermarkTarget === 'watermark'}
                         onClick={() => setWatermarkTarget('watermark')} disabled={ds.busy}
                         title="Only pages 🚩 flagged with no text flag on them."
-                        className={`inline-flex items-center gap-1 px-2.5 rounded-md font-semibold disabled:opacity-40 ${watermarkTarget === 'watermark'
-                          ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
+                        className={SEGMENT_CLASS}>
                         🚩 Marks
                       </button>
                     </div>

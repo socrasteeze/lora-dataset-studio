@@ -192,7 +192,7 @@ test('the three improve pointers land on the three things they name', () => {
   // Each target is the thing its label names, not a section that contains it.
   const engines = read('../bundled/image_upscale/frontend/panels/KleinImproveSettings.jsx')
   assert.match(engines, /id="klein-improve-strength"/)
-  assert.match(engines, /id="klein-improve-strength"[^>]*>\s*[\s\S]{0,200}?Upscale &amp; improve — strength/)
+  assert.match(engines, /id="klein-improve-strength"[^>]*>\s*[\s\S]{0,200}?Upscale Strength/)
   assert.match(engines, /id="identity-prompt-klein-improve"/)
   // The preset CARD is the half the panel does not do: it is where a row is
   // added, removed or reordered, which is why the chain points at it by id

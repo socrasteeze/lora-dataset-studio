@@ -60,9 +60,6 @@ function EmptyState() {
           ))}
         </div>
         <p className="text-content-muted text-sm font-medium">No datasets yet</p>
-        <p className="max-w-xs text-content-subtle text-xs">
-          Create a dataset, then import images or generate from a reference.
-        </p>
     </div>
   );
 }

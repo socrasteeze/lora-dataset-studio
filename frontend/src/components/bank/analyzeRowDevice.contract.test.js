@@ -58,6 +58,11 @@ test('the row has its own picker, remembered separately from the inpaint one', (
     'the panel no longer wires that setter into the picker');
 });
 
+test('an unpaired pass or machine control fills its row', () => {
+  assert.match(ws, /grid auto-rows-fr grid-cols-2[^"]*\[&>\*:last-child:nth-child\(odd\)\]:col-span-2/);
+  assert.match(ws, /grid grid-cols-2[^"]*\[&>\*:only-child\]:col-span-2[^"]*"[^>]*>[\s\S]*?<DevicePicker value=\{passDevice\}[\s\S]*?Manage Score Python/);
+});
+
 test('the buttons grey out per machine through the SAME gate as Launch all', () => {
   assert.match(ws, /import \{ stepGate \} from '\.\/passDeviceGate\.js'/);
   for (const key of ['score', 'faces', 'framing', 'caption']) {

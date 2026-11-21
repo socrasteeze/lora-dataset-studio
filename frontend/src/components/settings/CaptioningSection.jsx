@@ -379,7 +379,7 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
       <Card
         id="bank-quality-thresholds"
         title="Image bank triage"
-        help="Thresholds for the Bank quality flags. Raw scores are stored per image, so changing a threshold re-sorts an already-scanned bank instantly — no rescan."
+        help="Quality flags update when you save."
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
@@ -389,8 +389,8 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
             <input id="bank-sharpness-min" type="number" min="0" step="10"
               value={config.bank?.sharpness_min ?? bankDefault('sharpness_min')}
               onChange={(e) => setField('bank', 'sharpness_min', parseFloat(e.target.value) || 0)}
+              title="Values below this flag blurry images."
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">Sharpest region under this = blurry.</p>
             <ResetToDefault label="Sharpness minimum" section="bank" field="sharpness_min"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
@@ -401,8 +401,8 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
             <input id="bank-noise-max" type="number" min="0" step="1"
               value={config.bank?.noise_max ?? bankDefault('noise_max')}
               onChange={(e) => setField('bank', 'noise_max', parseFloat(e.target.value) || 0)}
+              title="Values above this flag noisy images."
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">Residual grain over this = noisy.</p>
             <ResetToDefault label="Noise maximum" section="bank" field="noise_max"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
@@ -413,8 +413,8 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
             <input id="bank-uniformity-min" type="number" min="0" step="1"
               value={config.bank?.uniformity_min ?? bankDefault('uniformity_min')}
               onChange={(e) => setField('bank', 'uniformity_min', parseFloat(e.target.value) || 0)}
+              title="Values below this flag flat images."
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">Grayscale spread under this = ⬜ flat frame.</p>
             <ResetToDefault label="Uniformity minimum" section="bank" field="uniformity_min"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
@@ -425,8 +425,8 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
             <input id="bank-min-side" type="number" min="0" step="64"
               value={config.bank?.min_side ?? bankDefault('min_side')}
               onChange={(e) => setField('bank', 'min_side', parseInt(e.target.value, 10) || 0)}
+              title="Smaller dimensions flag small images."
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">Smaller side under this = small (trainers only downscale).</p>
             <ResetToDefault label="Minimum side" section="bank" field="min_side"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
@@ -437,10 +437,8 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
             <input id="bank-detail-min" type="number" min="0" max="1" step="0.02"
               value={config.bank?.detail_min ?? bankDefault('detail_min')}
               onChange={(e) => setField('bank', 'detail_min', parseFloat(e.target.value) || 0)}
+              title="Values below this flag soft detail. Blur and enlargement can both lower the score."
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">
-              Share of the stored size that still carries real picture, under which an image is flagged 🫧 soft detail — the usual cause is an enlargement. 0.72 picks the softest few percent. A soft or out-of-focus photo reads the same way, so treat it as a score, not proof.
-            </p>
             <ResetToDefault label="Real-detail minimum" section="bank" field="detail_min"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
@@ -451,8 +449,8 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
             <input id="bank-bars-max" type="number" min="0" max="1" step="0.01"
               value={config.bank?.bars_max ?? bankDefault('bars_max')}
               onChange={(e) => setField('bank', 'bars_max', parseFloat(e.target.value) || 0)}
+              title="Black-bar coverage above this flags the image."
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">Share of the frame that may be flat black letterbox before an image is flagged 🎞 black bars (video screenshots, padded stills).</p>
             <ResetToDefault label="Black-bar maximum" section="bank" field="bars_max"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
@@ -463,8 +461,8 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
             <input id="bank-dup-distance" type="number" min="0" max="16" step="1"
               value={config.bank?.dup_distance ?? bankDefault('dup_distance')}
               onChange={(e) => setField('bank', 'dup_distance', parseInt(e.target.value, 10) || 0)}
+              title="Maximum dHash distance for duplicate grouping. Applies on the next scan."
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">dHash bits (of 64) two images may differ by and still group as ≈ duplicates. Applies at the next scan.</p>
             <ResetToDefault label="Duplicate distance" section="bank" field="dup_distance"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
@@ -475,8 +473,8 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
             <input id="bank-face-threshold" type="number" min="0" max="1" step="0.01"
               value={config.bank?.face_threshold ?? bankDefault('face_threshold')}
               onChange={(e) => setField('bank', 'face_threshold', parseFloat(e.target.value) || 0)}
+              title="Cosine similarity for the next person grouping pass."
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">Cosine similarity for the person clustering. Applies at the next face pass.</p>
             <ResetToDefault label="Same-person similarity" section="bank" field="face_threshold"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
@@ -487,8 +485,8 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
             <input id="bank-aesthetic-min" type="number" min="0" max="10" step="0.5"
               value={config.bank?.aesthetic_min ?? bankDefault('aesthetic_min')}
               onChange={(e) => setField('bank', 'aesthetic_min', parseFloat(e.target.value) || 0)}
+              title="CLIP aesthetic scores below this are flagged."
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">LAION score (~1–10) under which an image is flagged low aesthetic. Set by the Score pass.</p>
             <ResetToDefault label="Aesthetic minimum" section="bank" field="aesthetic_min"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
@@ -499,8 +497,8 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
             <input id="bank-nsfw-max" type="number" min="0" max="1" step="0.05"
               value={config.bank?.nsfw_max ?? bankDefault('nsfw_max')}
               onChange={(e) => setField('bank', 'nsfw_max', parseFloat(e.target.value) || 0)}
+              title="NSFW scores above this are flagged."
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">NSFW probability (0–1) over which an image is flagged NSFW. Set by the Score pass.</p>
             <ResetToDefault label="NSFW maximum" section="bank" field="nsfw_max"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
@@ -512,29 +510,12 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
               value={String(config.watermark_detect?.backend
                 ?? defaultValueAt(configDefaults, 'watermark_detect', 'backend'))}
               onChange={(e) => setField('watermark_detect', 'backend', e.target.value)}
+              title="Auto uses the detector when installed. The vision model is the fallback."
               className={INPUT_CLASS}>
               {WATERMARK_BACKEND_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>{o.label}</option>
               ))}
             </select>
-            {/* The fallback rule is stated here AND said out loud when it fires
-                (a toast on the dataset, the job's own line on the bank): a
-                setting that silently does nothing is how someone changes a
-                detector, sees no difference, and concludes the app is broken. */}
-            <p className="mt-0.5 text-xs text-content-muted">
-              Which engine Find watermarks uses, on datasets and banks alike.
-              <strong> Auto</strong> takes the detector extra when it is installed
-              (~0.14 s per image, and it returns a score) and the vision model
-              otherwise — that is the behaviour that shipped, so leaving this alone
-              changes nothing. Picking <strong>Watermark detector</strong> without the
-              extra installed does not fail the scan: the vision model runs it and the
-              app says so, with the link to install the extra (Setup ▸ Quality tools).
-              The two engines disagree at the margins, and only the detector can flag an
-              image <em>without</em> a position — those are counted apart and Clean
-              leaves them for Review. Changing this applies at the next scan; images
-              you already dismissed as false positives are only re-judged by
-              <em> ⟲ Rescan incl. dismissed</em>.
-            </p>
             <ResetToDefault label="Watermark detection" section="watermark_detect"
               field="backend" config={config} configDefaults={configDefaults}
               setField={setField} />
@@ -548,19 +529,8 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
                 ?? defaultValueAt(configDefaults, 'watermark_detect', 'threshold')}
               onChange={(e) => setField('watermark_detect', 'threshold',
                 parseFloat(e.target.value) || 0)}
+              title="Minimum detector score for a flag. Lower values catch fainter marks."
               className={INPUT_CLASS} />
-            {/* The number looks wrong until you know why, so the help says why:
-                this model's scores sit hard against 1, and the default is the
-                knee MEASURED on a real bank, not a probability you can reason
-                about from first principles. */}
-            <p className="mt-0.5 text-xs text-content-muted">
-              Score (0–1) at or above which Find flags an image, when the watermark
-              detector extra is installed. 0.94 is measured on a 110-image hand-labelled
-              sample of a real 29 759-image bank: it flagged none of the 55 clean images
-              and 54 of the 55 marked ones. Lower it to ~0.92 to catch the faintest marks
-              (and hand-check a few clean ones); raise it to ~0.96 to miss a mark rather
-              than crop anything by mistake. Applies at the next scan.
-            </p>
             <ResetToDefault label="Watermark detector sensitivity" section="watermark_detect"
               field="threshold" config={config} configDefaults={configDefaults}
               setField={setField} />
@@ -572,8 +542,8 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
             <input id="bank-style-threshold" type="number" min="0" max="1" step="0.01"
               value={config.bank?.style_threshold ?? bankDefault('style_threshold')}
               onChange={(e) => setField('bank', 'style_threshold', parseFloat(e.target.value) || 0)}
+              title="Cosine similarity for the next style grouping pass."
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">Cosine similarity for the style clustering. Applies at the next scoring pass.</p>
             <ResetToDefault label="Same-style similarity" section="bank" field="style_threshold"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
@@ -584,12 +554,8 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
             <input id="bank-style-kmeans-k" type="number" min="0" step="1"
               value={config.bank_style?.kmeans_k ?? defaultValueAt(configDefaults, 'bank_style', 'kmeans_k')}
               onChange={(e) => setField('bank_style', 'kmeans_k', Math.max(0, parseInt(e.target.value, 10) || 0))}
+              title="Set the number of style groups. Zero groups by similarity."
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">
-              0 groups by the similarity above. A number splits the bank into exactly that many
-              style groups, which avoids one giant group on a bank of look-alike images. Applies at
-              the next scoring pass.
-            </p>
             <ResetToDefault label="Style groups (k-means)" section="bank_style" field="kmeans_k"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
@@ -600,8 +566,8 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
             <input id="bank-semantic-dup-threshold" type="number" min="0" max="1" step="0.01"
               value={config.bank?.semantic_dup_threshold ?? bankDefault('semantic_dup_threshold')}
               onChange={(e) => setField('bank', 'semantic_dup_threshold', parseFloat(e.target.value) || 0)}
+              title="Minimum similarity to group crops and variants. Uses cached embeddings."
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">Cosine similarity at or above which two scored images are a ✂ semantic near-duplicate (crop/variant of the same shot). Re-runs instantly from cached embeddings — no re-scan.</p>
             <ResetToDefault label="Semantic duplicate similarity" section="bank" field="semantic_dup_threshold"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>

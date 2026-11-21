@@ -45,6 +45,10 @@ test('every seedvr2 setting has a labelled control and a reset in the card', () 
       `${field}: the control writes to some other config key`)
     assert.ok(CARD.includes(`section="seedvr2" field="${field}"`),
       `${field}: no ResetToDefault — a dial you cannot undo is a trap`)
+    const label = CARD.match(new RegExp(`<label htmlFor="${domId}"[^>]*>([^<]+)</label>`))
+    const reset = CARD.match(new RegExp(`<ResetToDefault label="([^"]+)" section="seedvr2" field="${field}"`))
+    assert.ok(label, `${field}: no visible label text`)
+    assert.equal(reset?.[1], label[1].trim(), `${field}: reset label differs from the field label`)
   }
 })
 
@@ -81,6 +85,6 @@ test('the tile bounds mirrored in the card match the backend clamps', () => {
 test('the batch-size refusal is still stated, not silently dropped', () => {
   // The one item of #32 deliberately NOT shipped: batch_size is a temporal
   // window. Refusing it is defensible; refusing it without saying so is not.
-  assert.match(CARD, /No batch size here, on purpose/)
+  assert.match(CARD, /One image per job\./)
   assert.match(GUIDE, /There is no batch-size setting, on purpose/)
 })

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { btnClass } from '../common/controls.js'
 import { attemptModalSubmit } from '../../utils/submitOutcome.js'
 import { lastPassNote, lastPassSentence } from './lastPassNote.js'
 import AutoCropOptions, { DEFAULT_CROP_CONFIDENCE_PERCENT, validCropConfidence } from '../dataset/AutoCropOptions.jsx'
@@ -34,29 +35,15 @@ import {
  * are far taller than the screen, and a button that has scrolled off the bottom
  * of a modal is a button that is not there.
  *
- * The window carries THREE blocks, and their separation is the whole design — see
- * the header of bankPasses.js for why a single "settings for this pass" panel
- * would have been a measured lie.
+ * Run options and saved settings stay separate because they have different scope.
  */
 
-function Block({ title, subtitle, children }) {
+function Block({ title, children }) {
   return (
     <section className="lds-section py-3 space-y-2">
-      <div>
-        <h3 className="text-xs font-bold uppercase tracking-wide text-content-muted">{title}</h3>
-        {subtitle && <p className="mt-0.5 text-2xs leading-snug text-content-subtle">{subtitle}</p>}
-      </div>
+      <h3 className="text-xs font-bold uppercase tracking-wide text-content-muted">{title}</h3>
       {children}
     </section>
-  )
-}
-
-/** A choice that cannot be taken. Rendered, greyed, and carrying its objection —
- *  the alternative (leaving it out) is what made a shipped feature read as an
- *  absent one twice on this screen. */
-function DisabledNote({ children }) {
-  return (
-    <span className="mt-0.5 block text-2xs leading-snug text-amber-300/90">{children}</span>
   )
 }
 
@@ -154,10 +141,9 @@ export default function PassDialog({
     <div role="dialog" aria-modal="true" aria-label={spec.label}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 sm:p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) dismiss() }}>
-      <div className="flex w-full max-w-lg max-h-[92vh] flex-col overflow-hidden rounded-xl border border-border bg-surface-overlay shadow-2xl">
+      <div className="flex w-full max-w-lg lg:max-w-3xl xl:max-w-4xl max-h-[92vh] flex-col overflow-hidden rounded-xl border border-border bg-surface-overlay shadow-2xl">
         <header className="shrink-0 border-b border-border p-4">
-          <h2 className="text-base font-bold text-content">{spec.label}</h2>
-          <p className="mt-1 text-sm text-content-muted">{spec.what}</p>
+          <h2 className="text-base font-bold text-content" title={spec.what}>{spec.label}</h2>
           {/* "Did I already run this?" used to be answerable only by running it
               again and watching. See lastPassNote.js for why this line stops at
               what the last run FOUND and leaves "is it still current" to the run
@@ -168,22 +154,18 @@ export default function PassDialog({
         </header>
 
         <div ref={bodyRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 sm:p-4">
-          <Block title="This run"
-            subtitle="Where this pass applies, and how many images that is.">
-            {/* ② the four piles + the default. A pass with a global result shows
-                ONE immutable line instead, and the objection under it. */}
-            <PassScopeChoices payload={payload} passId={passId} scope={scope} redo={effectiveRedo}
+          <Block title="This Run">
+            <PassScopeChoices columns="lg:grid-cols-2" payload={payload} passId={passId} scope={scope} redo={effectiveRedo}
               onScope={setScope} selectionSize={selectionSize} selection={selection}
               useSelection={useSelection} onUseSelection={setUseSelection}
               rows={spec.scopes === true ? rows : []} disabled={busy} />
             {spec.scopes !== true && (
-              <div className="lds-section py-2 text-sm">
+              <div className="lds-section py-2 text-sm" title={spec.scopes}>
                 <p className="m-0 font-medium text-content">
                   {spec.fixedScopeLine}
                   {countable && passScopeCount(payload, passId, DEFAULT_PASS_SCOPE, false) !== null
                     && ` — ${passScopeCount(payload, passId, DEFAULT_PASS_SCOPE, false)} image(s)`}
                 </p>
-                <DisabledNote>{spec.scopes}</DisabledNote>
               </div>
             )}
 
@@ -191,17 +173,10 @@ export default function PassDialog({
 
             {/* ③ the "do it again" line — where “Rescan all” went. */}
             {spec.redo && (
-              <label className="flex items-start gap-2 rounded-md border border-border bg-surface-raised p-2 text-sm">
-                <input type="checkbox" className="mt-1" checked={effectiveRedo} disabled={cropActive}
+              <label title={spec.redo.note} className="flex min-h-10 items-center gap-2 rounded-md border border-border bg-surface-raised p-2 text-sm">
+                <input type="checkbox" checked={effectiveRedo} disabled={cropActive}
                   onChange={(e) => setRedo(e.target.checked)} />
-                <span className="min-w-0">
-                  <span className="font-medium text-content">{spec.redo.label}</span>
-                  {spec.redo.note && (
-                    <span className="block text-2xs leading-snug text-content-subtle">
-                      {spec.redo.note}
-                    </span>
-                  )}
-                </span>
+                <span className="font-medium text-content">{spec.redo.label}</span>
               </label>
             )}
 
@@ -214,7 +189,7 @@ export default function PassDialog({
 
             {passId === 'framing' && <AutoCropOptions enabled={autoCrop} onEnabledChange={setAutoCrop}
               confidence={cropConfidence} onConfidenceChange={setCropConfidence} disabled={busy}
-              note="Saves full-subject crops in this scope. Includes already-classified images." />}
+              note="Saves crops, including already-classified images." />}
 
             {/* Per-pass options that belong to THIS RUN — the caption engine,
                 model, register and length live here now, not spread under the
@@ -224,42 +199,18 @@ export default function PassDialog({
               : children}
           </Block>
 
-          <Block title="Settings this pass reads"
-            subtitle="Only what the CALCULATION uses. These are global — the same for every bank — unless a line says otherwise.">
-            {wmRoute && (
-              <p className="m-0 rounded-md border border-indigo-400/40 bg-indigo-500/10 px-2 py-1.5 text-2xs leading-snug text-content-muted">
-                {wmRoute.route}
-              </p>
-            )}
-            {settings.length === 0 ? (
-              <p className="m-0 text-sm text-content-muted">
-                None — this pass reads no stored setting.
-              </p>
-            ) : (
-              <ul className="m-0 list-disc space-y-1 pl-5 text-sm text-content-muted">
-                {settings.map((s) => (
-                  <li key={s.name}>
-                    <span className="text-content">{s.name}</span>
-                    {s.note && (
-                      <span className="block text-2xs leading-snug text-content-subtle">{s.note}</span>
-                    )}
-                  </li>
-                ))}
+          {settings.length > 0 && (
+            <Block title="Saved Settings">
+              <ul className="m-0 grid list-disc gap-x-6 gap-y-1 pl-5 text-xs text-content-muted lg:grid-cols-2">
+                {settings.map((s) => <li key={s.name} title={s.note}>{s.name}</li>)}
               </ul>
-            )}
-          </Block>
-
-          <Block title="Not decided here"
-            subtitle="Re-read when the grid sorts and flags — retune them any time, no pass needed.">
-            <ul className="m-0 list-disc space-y-1 pl-5 text-sm text-content-muted">
-              {spec.notHere.map((n) => <li key={n}>{n}</li>)}
+            </Block>
+          )}
+          {spec.caveats?.length > 0 && (
+            <ul className="m-0 list-disc space-y-1 pl-5 text-xs text-amber-200/90">
+              {spec.caveats.map((c) => <li key={c}>{c}</li>)}
             </ul>
-            {!!(spec.caveats || []).length && (
-              <ul className="m-0 list-disc space-y-1 pl-5 text-sm text-amber-200/90">
-                {spec.caveats.map((c) => <li key={c}>{c}</li>)}
-              </ul>
-            )}
-          </Block>
+          )}
         </div>
 
         <div className="shrink-0 space-y-2 border-t border-border p-3">
@@ -270,7 +221,7 @@ export default function PassDialog({
                 {error}
               </span>
               <span className="mt-1 block text-2xs text-content-subtle">
-                Your choices are kept — adjust and try again.
+                Your choices are kept. Adjust and retry.
               </span>
             </div>
           )}
@@ -280,13 +231,13 @@ export default function PassDialog({
           {typeof secondary === 'function'
             ? secondary({ scope, redo, busy, close: onClose, fail: setError })
             : secondary}
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <button type="button" onClick={dismiss} disabled={busy}
-              className="min-h-10 rounded-md border border-border px-3 py-1.5 text-sm text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-50 lg:min-h-0">
+              className={`${btnClass()} !h-auto lg:!min-h-8`}>
               {launched ? 'Close' : 'Cancel'}
             </button>
             <button type="button" onClick={launch} disabled={busy || !!blocked}
-              className="min-h-10 rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-50 lg:min-h-0">
+              className={`${btnClass({ variant: 'primary' })} !h-auto !whitespace-normal lg:!min-h-8`}>
               {busy ? 'Starting' : runLabel}
             </button>
           </div>

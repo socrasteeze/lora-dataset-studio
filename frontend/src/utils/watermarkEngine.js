@@ -14,9 +14,9 @@
 import { activeLocalLlm, localLlmLabel } from './localLlm.js';
 
 export const WATERMARK_ENGINES = [
-  { id: 'auto', label: 'Auto — the detector when installed' },
-  { id: 'detector', label: 'Dedicated detector (SigLIP2 + Grounding DINO)' },
-  { id: 'vision', label: 'Vision model (your local LLM)' },
+  { id: 'auto', label: 'Auto' },
+  { id: 'detector', label: 'Dedicated Detector' },
+  { id: 'vision', label: 'Vision Model' },
 ];
 
 /** Where the detector installs from — the backend names the same route. */
@@ -38,28 +38,20 @@ export function watermarkEngineStatus(choice, caps = {}) {
   const installed = !!caps.watermark_detect;
   const llm = activeLocalLlm(caps);
   const model = llm.vision_model || 'the loaded model';
-  const visionLine = `Runs on the vision model — ${model} via ${localLlmLabel(caps)}. `
-    + 'Slower (~seconds per image) but needs no extra install, and you can swap '
-    + 'the model from Settings ▸ Local tools.';
+  const visionLine = `Vision model: ${model} via ${localLlmLabel(caps)}.`;
   if (picked === 'vision') {
     return { runs: 'vision', line: visionLine, warn: false };
   }
   if (installed) {
     return {
       runs: 'detector', warn: false,
-      line: 'Runs on the dedicated detector — SigLIP2 scores every image, '
-        + 'Grounding DINO hunts the zones at up to three scales (full frame + '
-        + 'tiles, so small repeated logos are found too) and keeps a zone only '
-        + 'when two phrasings agree on it. Roughly 10× faster than the vision '
-        + 'route, and the threshold below applies.',
+      line: 'Detector: SigLIP2 + Grounding DINO.',
     };
   }
   if (picked === 'detector') {
     return {
       runs: 'vision', warn: true,
-      line: 'The detector is pinned but not installed — this run takes the '
-        + `vision route instead. Install it from ${DETECTOR_INSTALL_ROUTE}. `
-        + visionLine,
+      line: `Using vision model. Install the detector in ${DETECTOR_INSTALL_ROUTE}.`,
     };
   }
   return { runs: 'vision', warn: false, line: visionLine };

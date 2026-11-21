@@ -15,7 +15,7 @@ import { useEffect, useRef, useState } from 'react';
 import { putJson } from '../../api/fetchClient';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import DatasetZonesPreview from './DatasetZonesPreview.jsx';
-import { btnClass, btnShape } from '../common/controls';
+import { btnClass } from '../common/controls';
 
 export default function TextScanDialog({
   onClose, onLaunch, toRead = 0, rereadable = 0, sensitivity = 0.5, live = false,
@@ -82,51 +82,33 @@ export default function TextScanDialog({
     <div className="fixed inset-0 z-[9991] flex items-center justify-center bg-black/80 p-3 sm:p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Find text"
-        className="w-full max-w-lg space-y-3 overflow-y-auto rounded-xl border border-border bg-surface p-4 shadow-xl"
+        className="w-full max-w-lg lg:max-w-3xl xl:max-w-4xl space-y-3 overflow-y-auto rounded-xl border border-border bg-surface p-4 shadow-xl"
         style={{ maxHeight: 'min(38rem, calc(100vh - 2rem))' }}>
         <h2 className="m-0 text-base font-bold text-content">🔤 Find text</h2>
-        <p className="m-0 text-2xs leading-snug text-content-subtle">
-          Reads burned-in text — speech bubbles, subtitles, captions, sound effects —
-          and marks each zone so 🧽 Clean can repaint it. CPU only, never the GPU.
-        </p>
-        <p className="m-0 rounded-md border border-border bg-surface-raised px-2 py-1.5 text-2xs leading-snug text-content-muted">
-          This run reads the <span className="font-semibold text-content">kept</span> images
-          that still need reading — <span className="font-semibold text-content">{toRead}</span> waiting.
-          Images you dismissed as “not watermarked” keep their ruling and are never re-examined.
-        </p>
+        <p className="m-0 text-xs text-content-muted">{toRead} kept image{toRead === 1 ? '' : 's'} to scan</p>
         <label className="flex items-start gap-2 text-2xs text-content-subtle">
           <input type="checkbox" className="mt-0.5" checked={redo}
             onChange={(e) => setRedo(e.target.checked)} disabled={live || busy} />
-          <span>
-            <span className="font-medium text-content">Also re-read images that were already scanned</span>
-            {' '}({rereadable} kept). With the sample below ticked, this re-reads the
-            SAME first images — the way to judge a new sensitivity on known pages.
-          </span>
+          <span className="font-medium text-content">Rescan Images ({rereadable})</span>
         </label>
         <div className="lds-section space-y-2 py-2">
           <p className="m-0 text-2xs font-semibold uppercase tracking-wide text-content-muted">
-            Options for this run
+            This Run
           </p>
-          <label className="flex items-start gap-2 text-2xs text-content-subtle">
-            <input type="checkbox" className="mt-0.5" checked={sampleOn}
-              onChange={(e) => setSampleOn(e.target.checked)} disabled={live || busy} />
-            <span>
-              <span className="font-medium text-content">Try on a sample first</span>
-              {' — read only the first '}
-              <input type="number" min="1" max="10000" value={sampleSize}
-                onChange={(e) => setSampleSize(e.target.value)}
-                disabled={live || busy || !sampleOn} aria-label="Sample size"
-                className="mx-1 w-16 rounded border border-border bg-app px-1 py-0.5 text-content" />
-              {' images. Judge the zones in the 🔍 review of flagged images, then '}
-              {'run again for the rest.'}
-            </span>
-          </label>
-          <label className="block text-2xs text-content-subtle">
+          <div className="flex min-h-10 flex-wrap items-center gap-2 text-xs">
+            <label className="inline-flex min-h-10 items-center gap-2 lg:min-h-7" title="Scan only the first images in scope.">
+              <input type="checkbox" checked={sampleOn}
+                onChange={(e) => setSampleOn(e.target.checked)} disabled={live || busy} />
+              Sample Run
+            </label>
+            <input type="number" min="1" max="10000" value={sampleSize}
+              onChange={(e) => setSampleSize(e.target.value)}
+              disabled={live || busy || !sampleOn} aria-label="Sample size"
+              title="Number of images in the sample" className="h-10 w-20 rounded border border-border bg-app px-2 text-content lg:h-7" />
+          </div>
+          <label className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 text-xs" title="Lower values detect fainter lettering and can add false zones. Shared by Bank and Dataset.">
             <span className="font-medium text-content">Sensitivity</span>
-            {' — the OCR confidence a line needs to become a zone. Lower catches '}
-            {'fainter or stylised lettering, at the cost of false zones. Stored: '}
-            {'the bank scan reads the same value.'}
-            <span className="mt-1 flex items-center gap-2">
+            <span className="flex flex-wrap items-center gap-2">
               <input type="range" min="0.30" max="0.70" step="0.05" value={level}
                 disabled={live || busy} aria-label="Text sensitivity"
                 onChange={(e) => setLevel(Number(e.target.value))}
@@ -155,11 +137,11 @@ export default function TextScanDialog({
               {error}
             </span>
             <span className="mt-1 block text-2xs text-content-subtle">
-              Your choices are kept — adjust and try again.
+              Your choices are kept. Adjust and retry.
             </span>
           </div>
         )}
-        <div className="flex items-center justify-end gap-2 pt-1">
+        <div className="grid grid-cols-2 gap-2 pt-1">
           <button type="button" onClick={onClose} disabled={busy}
             className={btnClass()}>
             {ran ? 'Close' : 'Cancel'}
@@ -167,7 +149,7 @@ export default function TextScanDialog({
           <button type="button" onClick={launch}
             disabled={busy || live || willRead === 0}
             title={willRead === 0 ? 'Nothing left to read in this scope.' : undefined}
-            className={`${btnShape()} bg-amber-500/90 font-bold text-black`}>
+            className={btnClass({ variant: 'primary' })}>
             {busy ? 'Scanning' : `Scan ${willRead} image${willRead === 1 ? '' : 's'}`}
           </button>
         </div>

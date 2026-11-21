@@ -70,7 +70,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "↩ Undo cleaning",
+    "↩ Undo Cleaning",
     1
   ],
   [
@@ -375,10 +375,6 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "fast",
-    1
-  ],
-  [
     "Filter the grid to this resolution tier (megapixels = width×height)",
     1
   ],
@@ -508,10 +504,6 @@ export const BANK_SURFACES = [
     3
   ],
   [
-    "Not decided here",
-    1
-  ],
-  [
     "one file only ✕",
     1
   ],
@@ -545,10 +537,6 @@ export const BANK_SURFACES = [
   ],
   [
     "Push “",
-    1
-  ],
-  [
-    "quality",
     1
   ],
   [
@@ -676,7 +664,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Settings this pass reads",
+    "Saved Settings",
     1
   ],
   [
@@ -696,7 +684,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "This run",
+    "This Run",
     1
   ],
   [

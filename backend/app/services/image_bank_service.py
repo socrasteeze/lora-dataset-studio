@@ -14886,8 +14886,12 @@ def subfolders_payload(user_id, bank_id) -> dict | None:
         if _rel_under_excluded(rel, excluded):
             continue
         counts[_subfolder_of(rel)] += 1
-    items = [{'name': name, 'count': n}
-             for name, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
+    # Keep the root first, then YYYY-MM folders and other names.
+    names = sorted(counts, key=lambda name: (
+        bool(name), re.fullmatch(r'[0-9]{4}-(?:0[1-9]|1[0-2])', name) is None,
+        name.casefold(), name,
+    ))
+    items = [{'name': name, 'count': counts[name]} for name in names]
     return {'subfolders': items, 'total': sum(counts.values())}
 
 

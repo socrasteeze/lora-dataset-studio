@@ -115,7 +115,7 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
             ))}
           </ul>
         )}
-        <ResetToDefault label="Model build" section="seedvr2" field="model" {...reset} />
+        <ResetToDefault label="Model build (optional)" section="seedvr2" field="model" {...reset} />
       </div>
 
       <div className="mt-3 sm:max-w-md">
@@ -126,6 +126,7 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
           id="seedvr2-vae"
           value={svr.vae ?? ''}
           onChange={(e) => setField('seedvr2', 'vae', e.target.value)}
+          title="Use Auto unless the VAE filename lacks “vae”."
           className={INPUT_CLASS}
         >
           <option value="">auto — ema_vae_fp16, or the first VAE in the folder</option>
@@ -136,14 +137,7 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
             </optgroup>
           )}
         </select>
-        <p className="mt-1 text-2xs text-content-subtle">
-          Leave it on auto unless your VAE file is named something with no
-          &ldquo;vae&rdquo; in it — that is the only case the automatic search misses, and
-          the reason the second group above is offered at all. Picking a DiT build here
-          fails inside the loader node, so choose from that group only if you know the
-          file is a VAE.
-        </p>
-        <ResetToDefault label="VAE build" section="seedvr2" field="vae" {...reset} />
+        <ResetToDefault label="VAE build (optional)" section="seedvr2" field="vae" {...reset} />
       </div>
 
       <div className="mt-3 sm:max-w-md">
@@ -161,14 +155,7 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
           <option value="never">Never tile</option>
         </select>
         <p className="mt-1 text-2xs text-content-subtle">
-          Needs the <code>Comfyui_TTP_Toolset</code> node pack; without it this has no
-          effect. Tiling is not only about memory: a tile is upscaled at the size the
-          model works well at, so a large frame keeps far more fine detail than one
-          processed whole — contributed and measured by SurpassHR (GitHub&nbsp;#32).
-          On <b>Tile when it helps</b> nothing is tiled at or below {tileAbove} px on the
-          short edge: the model is already in its comfortable range there and a grid would
-          only add seams. <b>Always</b> tiles any frame bigger than one tile; pick{' '}
-          <b>never</b> if you ever see a seam.
+          Requires <code>Comfyui_TTP_Toolset</code>. Auto tiles above {tileAbove} px on the short edge.
         </p>
         {laneLine && (
           <p className="mt-1 text-2xs text-sky-300">{laneLine}</p>
@@ -189,23 +176,15 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
           value={svr.tile_px ?? dflt('tile_px')}
           onChange={(e) => setField('seedvr2', 'tile_px',
             e.target.value === '' ? dflt('tile_px') : Number(e.target.value))}
+          title="Smaller tiles use less VRAM. Larger tiles reduce seams."
           className={INPUT_CLASS}
         />
-        <p className="mt-1 text-2xs text-content-subtle">
-          The memory dial of this engine: inference processes one tile at a time, so
-          <b> lower it if upscales run out of VRAM</b> (768 or 512 on an 8 GB card) and
-          raise it on a big card for fewer seams and more context per tile.
-          {' '}{dflt('tile_px')} px is the contributed default. It also sizes the model&rsquo;s
-          own tiled encode/decode, so it helps even <i>without</i> the tiling node
-          pack. Overlap can add passes and image-buffer memory; this size bounds each
-          inference, not the total memory used by the run.
-        </p>
-        <ResetToDefault label="Tile size" section="seedvr2" field="tile_px" {...reset} />
+        <ResetToDefault label="Tile size (px)" section="seedvr2" field="tile_px" {...reset} />
       </div>
 
       <div className="mt-3 sm:max-w-md">
         <label htmlFor="seedvr2-tile-threshold" className="block text-xs font-medium text-content">
-          Start tiling above (px on the short edge, 0 = automatic)
+          Tiling Threshold (px)
         </label>
         <input
           id="seedvr2-tile-threshold"
@@ -216,22 +195,15 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
           value={svr.tile_threshold ?? dflt('tile_threshold')}
           onChange={(e) => setField('seedvr2', 'tile_threshold',
             e.target.value === '' ? dflt('tile_threshold') : Number(e.target.value))}
+          title={`Zero uses ${Math.round(tilePx * SEEDVR2_TILE_ABOVE_FACTOR)} px (${SEEDVR2_TILE_ABOVE_FACTOR}× tile size). Applies in Auto mode.`}
           className={INPUT_CLASS}
         />
-        <p className="mt-1 text-2xs text-content-subtle">
-          Where <b>Tile when it helps</b> switches over. <b>0</b> (default) follows the tile
-          size — {SEEDVR2_TILE_ABOVE_FACTOR}&times; it, so {tilePx} px tiles start tiling
-          above {Math.round(tilePx * SEEDVR2_TILE_ABOVE_FACTOR)} px. Set a number to place
-          the crossover yourself: lower it to tile sooner (safer on a small card), raise it
-          to keep more targets in one fast pass. It has no effect on <b>always</b> or
-          <b> never</b>.
-        </p>
-        <ResetToDefault label="Start tiling above" section="seedvr2" field="tile_threshold" {...reset} />
+        <ResetToDefault label="Tiling Threshold (px)" section="seedvr2" field="tile_threshold" {...reset} />
       </div>
 
       <div className="mt-3 sm:max-w-md">
         <label htmlFor="seedvr2-resolution" className="block text-xs font-medium text-content">
-          Target resolution (short edge, px)
+          Short Edge (px)
         </label>
         <input
           id="seedvr2-resolution"
@@ -242,19 +214,15 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
           value={svr.resolution ?? dflt('resolution')}
           onChange={(e) => setField('seedvr2', 'resolution',
             e.target.value === '' ? dflt('resolution') : Number(e.target.value))}
+          title="Scales the short edge and keeps the aspect ratio."
           className={INPUT_CLASS}
         />
-        <p className="mt-1 text-2xs text-content-subtle">
-          The SHORT edge is scaled to this and the aspect ratio is kept, so 1080 on a 3:2
-          photo gives 1620&times;1080. LoRA training buckets rarely go above 1024&ndash;1280,
-          so higher mostly costs VRAM and time.
-        </p>
-        <ResetToDefault label="Target resolution" section="seedvr2" field="resolution" {...reset} />
+        <ResetToDefault label="Short Edge (px)" section="seedvr2" field="resolution" {...reset} />
       </div>
 
       <div className="mt-3 sm:max-w-md">
         <label htmlFor="seedvr2-max-resolution" className="block text-xs font-medium text-content">
-          Maximum long edge (px, 0 = no limit)
+          Long Edge Limit
         </label>
         <input
           id="seedvr2-max-resolution"
@@ -265,13 +233,10 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
           value={svr.max_resolution ?? dflt('max_resolution')}
           onChange={(e) => setField('seedvr2', 'max_resolution',
             e.target.value === '' ? dflt('max_resolution') : Number(e.target.value))}
+          title="Caps the long edge to limit memory use. Zero disables the cap."
           className={INPUT_CLASS}
         />
-        <p className="mt-1 text-2xs text-content-subtle">
-          The safety valve on a wide crop: at a 1080 short edge a 4:1 panorama becomes
-          4320 px across, which is where a run runs out of VRAM.
-        </p>
-        <ResetToDefault label="Maximum long edge" section="seedvr2" field="max_resolution" {...reset} />
+        <ResetToDefault label="Long Edge Limit" section="seedvr2" field="max_resolution" {...reset} />
       </div>
 
       <div className="mt-3 sm:max-w-md">
@@ -282,23 +247,17 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
           id="seedvr2-color"
           value={svr.color_correction ?? dflt('color_correction')}
           onChange={(e) => setField('seedvr2', 'color_correction', e.target.value)}
+          title="Lab preserves source colour. Wavelet preserves broad tones. None uses raw output."
           className={INPUT_CLASS}
         >
           {SEEDVR2_COLOR_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
-        <p className="mt-1 text-2xs text-content-subtle">
-          How the result is graded back onto the source&rsquo;s colours. <b>lab</b> is the
-          model&rsquo;s own default and the most conservative; <b>wavelet</b> holds broad tone
-          better on heavily degraded sources; <b>none</b> shows the raw output. Colour
-          fidelity is the reason this engine exists, so it is worth trying both ways on one
-          image before a big batch.
-        </p>
         <ResetToDefault label="Colour correction" section="seedvr2" field="color_correction" {...reset} />
       </div>
 
       <div className="mt-3 sm:max-w-md">
         <label htmlFor="seedvr2-swap" className="block text-xs font-medium text-content">
-          Blocks offloaded to system RAM
+          RAM Offload Blocks
         </label>
         <input
           id="seedvr2-swap"
@@ -309,21 +268,13 @@ export default function SeedVr2Card({ config, setField, configDefaults, caps }) 
           value={svr.blocks_to_swap ?? dflt('blocks_to_swap')}
           onChange={(e) => setField('seedvr2', 'blocks_to_swap',
             e.target.value === '' ? dflt('blocks_to_swap') : Number(e.target.value))}
+          title="Offload more blocks to reduce VRAM use at the cost of speed. Zero disables offload."
           className={INPUT_CLASS}
         />
-        <p className="mt-1 text-2xs text-content-subtle">
-          0 = none, and fastest. Raise it to fit a bigger build on a smaller card: it trades
-          speed for VRAM headroom and does not change the result.
-        </p>
-        <ResetToDefault label="Blocks offloaded" section="seedvr2" field="blocks_to_swap" {...reset} />
+        <ResetToDefault label="RAM Offload Blocks" section="seedvr2" field="blocks_to_swap" {...reset} />
       </div>
 
-      <p className="mt-3 text-2xs text-content-subtle">
-        <b>No batch size here, on purpose.</b> SeedVR2&rsquo;s batch size is a <i>video</i> window
-        whose frames share attention to stay coherent — feeding it unrelated photos would let
-        them bleed into each other. Dataset images are upscaled one per job; the throughput
-        comes from the normal generation queue.
-      </p>
+      <p className="mt-3 text-2xs text-content-subtle">One image per job.</p>
     </Card>
   )
 }

@@ -1453,8 +1453,7 @@ export default function SetupPage() {
           <Dna aria-hidden="true" className="mx-auto h-8 w-8 text-primary" />
           <h1 className="mt-2 text-2xl font-bold text-content">Optional tools</h1>
           <p className="mt-2 text-sm text-content-muted">
-            Choose a tool to configure or repair. None is required to use your LDS workspace.
-            Prepare installed plugins from their own settings in Plugins.
+            Prepare installed plugins in Plugins → Settings.
           </p>
         </div>
 
@@ -1630,9 +1629,7 @@ export default function SetupPage() {
           <div className="text-2xl" aria-hidden="true">⬇</div>
           <h1 className="mt-2 text-2xl font-bold text-content">Downloads &amp; Repair</h1>
           <p className="mt-2 text-sm text-content-muted">
-            Install only the tools you want to use. Each action lists what it adds;
-            local model downloads require a configured ComfyUI first.
-            Your LDS workspace does not need these downloads.
+Local model downloads require ComfyUI.
           </p>
         </div>
         <InstallEverything plan={installPlan} caps={caps} onDone={() => refresh(true)} />

@@ -93,7 +93,7 @@ export function TestButton({ target, onResult, beforeTest }) {
 export function Card({ title, help, children, id }) {
   return (
     <section id={id} className="lds-section scroll-mt-24 py-4">
-      <h2 className="text-base font-semibold text-content">{title}</h2>
+      <h2 className="text-base font-semibold text-content" title={typeof help === 'string' ? help : undefined}>{title}</h2>
       {help && <p className="mt-1 text-sm text-content-muted">{help}</p>}
       <div className="settings-fields mt-3 space-y-3">{children}</div>
     </section>
@@ -101,13 +101,12 @@ export function Card({ title, help, children, id }) {
 }
 
 /* `warn` (optional): an amber note UNDER the input, for a value that saves fine but
-   will not work — a folder that isn't on disk, say. Distinct from `help` (above the
-   input, always-on guidance) so a real problem can't read as documentation.
+   will not work — a folder that isn't on disk, say. Plain help stays on the label.
    `children` renders after it, for a field that needs its own action button. */
 export function TextField({ id, label, value, onChange, placeholder, help, warn, children, readOnly = false }) {
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-content">{label}</label>
+      <label htmlFor={id} title={typeof help === 'string' ? help : undefined} className="block text-sm font-medium text-content">{label}</label>
       {help && <p className="mb-1 text-xs text-content-muted">{help}</p>}
       <input
         id={id}
@@ -145,10 +144,11 @@ export function SecretField({
     <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
       <div className="w-full sm:w-auto sm:flex-1">
         <div className="flex items-center justify-between">
-          <label htmlFor={f.key} className="block text-sm font-medium text-content">{f.label}</label>
+          <label htmlFor={f.key} title={typeof f.help === 'string' ? f.help : undefined}
+            className="block text-sm font-medium text-content">{f.label}</label>
           <StatusBadge ok={!!secretsPresence[f.key]} />
         </div>
-        <p className="mb-1 text-xs text-content-muted">{f.help}</p>
+        {f.help && <p className="mb-1 text-xs text-content-muted">{f.help}</p>}
         {f.guide}
         {/* items-end: the input's mt-1 must not push it below the button. */}
         <div className="flex items-end gap-2">

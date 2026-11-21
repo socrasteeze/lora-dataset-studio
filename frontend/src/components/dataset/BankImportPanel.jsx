@@ -283,20 +283,15 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
           close
         </button>
       </div>
-      <p className="text-content-subtle text-2xs">
-        Choose a source, then click the images to copy here. Captions travel with them;
-        near-duplicates of what is already here are skipped. The source is left untouched.
-      </p>
 
       {loadingSources ? (
         <p className="text-content-subtle text-xs">Loading sources</p>
       ) : noSource ? (
         <p className="text-content-subtle text-xs">
-          No bank and no other dataset yet —{' '}
+          No import sources.{' '}
           <button type="button" onClick={() => navigate('/bank')} className="underline hover:text-content">
-            create a bank on the Bank page
-          </button>{' '}
-          to triage a big folder first.
+            Create Bank
+          </button>
         </p>
       ) : (
         <>

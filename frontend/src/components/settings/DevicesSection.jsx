@@ -245,18 +245,18 @@ export default function DevicesSection({ config, setField, handleSave, configDef
               ))}
             </ul>
           )}
-          <div className="settings-wide mt-3 flex flex-wrap items-end gap-2">
+          <div className="settings-wide mt-3 grid grid-cols-2 items-end gap-2">
             <div>
               <label htmlFor="backend-name" className="block text-xs text-content-muted">Name</label>
               <input id="backend-name" value={backendName}
                 onChange={(e) => setBackendName(e.target.value)}
-                className={`${INPUT_CLASS} max-w-[11rem]`} placeholder="Laptop 4090" />
+                className={INPUT_CLASS} placeholder="Laptop 4090" />
             </div>
             <div>
               <label htmlFor="backend-url" className="block text-xs text-content-muted">ComfyUI URL</label>
               <input id="backend-url" value={backendUrl}
                 onChange={(e) => { setBackendUrl(e.target.value); setBackendTest(null) }}
-                className={`${INPUT_CLASS} max-w-[16rem]`} placeholder="http://laptop:8188" />
+                className={INPUT_CLASS} placeholder="http://laptop:8188" />
             </div>
             <button type="button" disabled={busy || !backendUrl.trim()} onClick={testBackendUrl}
               className={`${SIDE_BUTTON_CLASS} disabled:opacity-50`}>
@@ -279,8 +279,8 @@ export default function DevicesSection({ config, setField, handleSave, configDef
           {/* The counterpart of the note on the backends card — the two are not
               interchangeable and the picker cannot show that on one line. */}
           <p className="mb-3 text-xs text-content-muted">
-            <strong className="text-content">Full app on the other machine.</strong> Score, Faces,
-            Framing, Watermarks and Captions can run there. Scan and auto-reject stay here.
+            Runs Score, Faces, Framing, Watermarks, and Captions on the peer.
+            Scan and auto-reject run here.
           </p>
           <div className="settings-wide flex flex-wrap items-end gap-2">
             <div>
@@ -295,7 +295,7 @@ export default function DevicesSection({ config, setField, handleSave, configDef
           </div>
           {minted?.token && (
             <div className="mt-3 rounded-md border border-border-strong bg-surface-raised p-3">
-              <p className="text-xs text-content-muted mb-1">Copy this once — it is not shown again after restart.</p>
+              <p className="text-xs text-content-muted mb-1">Copy before restarting.</p>
               <code className="block break-all text-sm text-content select-all">{minted.token}</code>
             </div>
           )}

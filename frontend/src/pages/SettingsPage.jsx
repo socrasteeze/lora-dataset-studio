@@ -496,13 +496,12 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
   return (
     <SettingsScopeContext value={plugin?.id || null}><div className="settings-page min-w-0 w-full [&_button]:min-h-10 lg:[&_button]:min-h-0">
       {missingFocus === `${location.key}|${focusId}` && <p role="status" className="mb-4 rounded-lg border border-border p-3 text-sm">
-        This setting is not available on this page. If it belongs to a plugin, open its settings from{' '}
+        Setting unavailable here. Check{' '}
         <Link to="/plugins?tab=installed" className="text-primary underline">Plugins</Link>.
       </p>}
       {plugin ? <div ref={panelRef} className="min-w-0 w-full space-y-4" data-plugin-settings={plugin.id}>
         <Link to="/plugins?tab=installed" className="inline-flex min-h-10 items-center text-sm text-primary hover:underline">← Plugins</Link>
-        <SectionHeader eyebrow="Plugin settings" title={plugin.name || plugin.id}
-          description="Changes are saved with this plugin. Your existing values are kept across updates and reinstallation." />
+        <SectionHeader eyebrow="Plugin settings" title={plugin.name || plugin.id} />
         <PluginSettingsGroups pluginId={plugin.id} groups={groups} {...sectionProps} />
       </div> : <>
       <div className="lg:grid lg:grid-cols-[230px_minmax(0,1fr)] lg:items-start lg:gap-6">

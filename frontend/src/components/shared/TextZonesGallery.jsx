@@ -14,7 +14,7 @@ export default function TextZonesGallery({
     if (live) {
       return (
         <p className="m-0 text-2xs leading-snug text-content-subtle">
-          Scanning — nothing flagged yet. Pages appear here as they are flagged.
+          Scanning. Nothing flagged yet.
         </p>
       )
     }
@@ -24,10 +24,8 @@ export default function TextZonesGallery({
   }
   return (
     <div className="space-y-1">
-      <p className="m-0 text-2xs leading-snug text-content-subtle">
-        <span className="font-medium text-content">Flagged pages and their zones</span>
+      <p className="m-0 text-xs font-medium text-content" title={reviewHint || undefined}>
         {galleryHeadline(items.length, total)}
-        {reviewHint ? `. ${reviewHint}` : '.'}
       </p>
       <ul className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1">
         {items.map((it) => (

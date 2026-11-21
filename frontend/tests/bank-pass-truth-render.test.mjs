@@ -21,6 +21,7 @@ import { renderToStaticMarkup, createElement } from './support/mountJsx.mjs'
 
 const { ProgressBar } = await import('../src/components/bank/BankProgress.jsx')
 const { default: PassDialog } = await import('../src/components/bank/PassDialog.jsx')
+const { default: AutoCropOptions } = await import('../src/components/dataset/AutoCropOptions.jsx')
 
 const text = (markup) => markup.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
 
@@ -78,10 +79,20 @@ test('the bin line, whose images ARE scored, gains nothing', () => {
   const seen = dialog('reject')
   // Scoped to THAT line: the other scopes in the same window do carry the note,
   // so a whole-markup assertion would prove nothing about this one.
-  assert.match(seen, /Unkept only \(the bin\) — 25464 images Images you already rejected/)
+  assert.match(seen, /Unkept only \(the bin\) — 25464 images/)
   assert.doesNotMatch(seen, /25464 images in scope, /)
+  assert.doesNotMatch(seen, /Images you already rejected/)
 })
 
 test('the window states the dependency on ✨ Score where the scope is chosen', () => {
-  assert.match(dialog(''), /Score never runs on the bin/)
+  assert.match(dialog(''), /The bin can use only scores saved before rejection/)
+})
+
+test('enabled auto-crop shows its consequence and confidence limit in visible text', () => {
+  const note = 'Saves crops, including already-classified images.'
+  const options = (enabled) => text(renderToStaticMarkup(createElement(AutoCropOptions, {
+    enabled, confidence: 90, onConfidenceChange: () => {}, note,
+  })))
+  assert.ok(options(true).includes(`${note} Confidence is uncalibrated.`))
+  assert.doesNotMatch(options(false), /already-classified images|Confidence is uncalibrated/)
 })

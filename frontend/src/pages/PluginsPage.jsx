@@ -17,7 +17,7 @@ export function PluginAdminLock({ value, onChange, onUnlock, checking, rejected 
     <section id="plugin-administration" aria-labelledby="plugin-administration-title"
       className="space-y-3 rounded-lg border border-primary/40 bg-primary/5 p-4 text-sm">
       <h2 id="plugin-administration-title" className="font-semibold">Plugin installation is locked</h2>
-      <p>This browser does not have permission to install or change plugins. This also applies when connecting from another computer on your local network.</p>
+      <p>Plugin changes require admin access.</p>
       <form onSubmit={onUnlock} className="space-y-2">
         <label htmlFor="plugin-admin-token" className="block font-medium">Plugin admin token</label>
         <div className="flex flex-wrap items-center gap-2">
@@ -30,7 +30,7 @@ export function PluginAdminLock({ value, onChange, onUnlock, checking, rejected 
             {checking ? 'Checking token' : 'Unlock plugin changes'}
           </button>
         </div>
-        <p id="plugin-admin-token-hint" className="text-xs text-content-muted">Use the separate plugin admin token, not an API key or the app access token. It is kept only until this page is reloaded.</p>
+        <p id="plugin-admin-token-hint" className="text-xs text-content-muted">Use the plugin admin token. Reloading clears it.</p>
         {rejected && <p role="alert" className="text-amber-500">This token was not accepted. Check that it matches LDS_PLUGIN_ADMIN_TOKEN on the computer running LDS.</p>}
       </form>
     </section>
@@ -59,7 +59,7 @@ export function PluginInstallConsent({ consent, busy = false, onInstall, onCance
       {blocked && issues.length === 0 && (
         <p role="alert" className="mt-3 text-sm text-amber-500">This plugin cannot be installed in the current app configuration.</p>
       )}
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-2">
         <button type="button" className={BTN_PRIMARY} disabled={busy || blocked} onClick={onInstall}>Install</button>
         <button type="button" className={BTN} disabled={busy} onClick={onCancel}>Cancel</button>
       </div>
@@ -181,8 +181,7 @@ export default function PluginsPage() {
   return (
     <div className="mx-auto w-full space-y-4" data-probe-panel="plugins" data-probe-content="plugins">
       <div className="space-y-2">
-        <SectionHeader eyebrow="Workspace" title="Plugins"
-          description="The plugins installed with this app." />
+        <SectionHeader eyebrow="Workspace" title="Plugins" />
         <p className="flex flex-wrap items-center gap-2 text-xs text-content-muted">
           <Puzzle aria-hidden="true" className="h-3.5 w-3.5" />
           Your data stays with LDS when a plugin is updated or removed.
@@ -207,7 +206,7 @@ export default function PluginsPage() {
               <RefreshCw aria-hidden="true" className={'mt-0.5 h-4 w-4 shrink-0' + (applying ? ' animate-spin' : '')} />
               <div>
                 <p className="font-medium">{applying ? 'Restarting LDS' : 'Changes ready to apply'}</p>
-                <p className="mt-1 text-content-muted">{applying ? 'Waiting for the new server. This page will reload when it is ready.' : 'Your choices are saved. The current features stay available until LDS restarts.'}</p>
+                <p className="mt-1 text-content-muted">{applying ? 'Waiting for LDS to restart.' : 'Restart LDS to apply changes.'}</p>
               </div>
             </div>
             {restart.can_apply && <button type="button" className={BTN_PRIMARY + ' shrink-0'} disabled={busy} onClick={apply}>Apply &amp; Restart</button>}

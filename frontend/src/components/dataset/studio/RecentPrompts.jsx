@@ -50,12 +50,6 @@ export default function RecentPrompts({
           </span>
         )}
       </div>
-      {batchable && (
-        <p className="m-0 text-content-subtle text-2xs">
-          Tick several prompts to generate them all in one run — same checkpoints,
-          same settings, one image set per prompt.
-        </p>
-      )}
 
       <div className="flex flex-wrap items-stretch gap-1.5">
         {items.slice(0, INLINE).map((item) => {

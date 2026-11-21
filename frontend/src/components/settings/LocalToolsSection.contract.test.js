@@ -35,6 +35,19 @@ test('classic Hugging Face token links directly to read-token creation', () => {
   assert.match(classicTokenGuide[0], /rel="noreferrer"/)
 })
 
+test('secret help renders markup as text and uses tooltips for plain strings', async () => {
+  const { createElement, renderToStaticMarkup } = await import('../../../tests/support/mountJsx.mjs')
+  const { SecretField } = await import('./primitives.jsx')
+  const render = (help) => renderToStaticMarkup(createElement(SecretField, {
+    field: { key: 'demo-key', label: 'Sample Key', help }, secretsPresence: {}, secretInputs: {},
+  }))
+  const rich = render(createElement('strong', null, 'Read access'))
+  assert.match(rich, /<p[^>]*><strong>Read access<\/strong><\/p>/)
+  assert.doesNotMatch(rich, /\[object Object\]/)
+  const plain = render('Read access')
+  assert.match(plain, /title="Read access"/)
+  assert.doesNotMatch(plain, />Read access</)
+})
 
 
 

@@ -71,24 +71,16 @@ export default function RunEverythingDialog({ capability, onClose, onLaunch }) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 sm:p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose?.() }}>
       <form onSubmit={submit}
-        className="flex w-full max-w-lg max-h-[92vh] flex-col overflow-hidden rounded-xl border border-border bg-surface-overlay shadow-2xl">
+        className="flex w-full max-w-lg lg:max-w-3xl xl:max-w-4xl max-h-[92vh] flex-col overflow-hidden rounded-xl border border-border bg-surface-overlay shadow-2xl">
         <header className="shrink-0 space-y-1 border-b border-border p-4">
           <h2 className="text-base font-bold text-content">▶ Run everything</h2>
-          <p className="text-sm text-content-muted">
-            The preparation passes, chained, in the order each one needs the
-            previous. Start it and walk away.
-          </p>
-          <p className="text-xs text-content-subtle">
-            🗣 Describe shots is not in here — its wording changes what the
-            captions say, so it stays its own button.
-          </p>
         </header>
 
-        <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto p-3 sm:p-4">
+        <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto p-3 sm:p-4 lg:grid-cols-2">
           {rows.map((r) => (
-            <label key={r.key}
+            <label key={r.key} title={r.why}
               className={`flex cursor-pointer items-start gap-2 rounded-md border border-border px-3 py-2 text-sm text-content ${
-                r.blocked ? 'opacity-60' : 'bg-surface-raised has-[:checked]:border-sky-400/70 has-[:checked]:bg-sky-500/10'}`}>
+                r.blocked ? 'opacity-60' : 'bg-surface-raised has-[:checked]:border-primary/60 has-[:checked]:bg-primary/10'}`}>
               <input type="checkbox" className="mt-0.5"
                 checked={picked.has(r.key) && !r.blocked}
                 disabled={r.locked || !!r.blocked}
@@ -98,7 +90,6 @@ export default function RunEverythingDialog({ capability, onClose, onLaunch }) {
                 {r.locked && (
                   <span className="ml-2 text-2xs text-content-subtle">always</span>
                 )}
-                <span className="block text-xs text-content-muted">{r.why}</span>
                 {r.blocked && (
                   <span className="block text-xs text-amber-300">{r.blocked.why}</span>
                 )}
@@ -108,8 +99,8 @@ export default function RunEverythingDialog({ capability, onClose, onLaunch }) {
         </div>
 
         <div className="shrink-0 border-t border-border p-3">
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="mr-auto text-xs text-content-subtle">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="col-span-2 text-xs text-content-subtle">
               {steps.length} pass(es) will run.
             </span>
             <button type="button" onClick={onClose} disabled={busy}

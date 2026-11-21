@@ -1,36 +1,4 @@
-/* WHAT EACH BANK PASS IS, told in the three blocks its launch window shows.
- *
- * WHY THREE BLOCKS AND NOT ONE "SETTINGS" PANEL. A window called "settings for
- * this pass" would be a lie, and it was measured: of the 12 knobs in 🎚 Filter
- * thresholds, the 🔎 Scan quality pass reads exactly ONE (dup_distance) — its
- * measuring code (services/image_quality.py) does not even import the config.
- * The other eleven decide how the GRID IS SORTED AND FLAGGED, and they re-sort on
- * save without any pass running. Mixing the two in one window would teach people
- * that nudging a slider costs a rescan, which is the opposite of true.
- *
- * So every window says three separate things:
- *   THIS RUN                 — where it runs and how big that is (the scope).
- *   SETTINGS THIS PASS READS — only what the CALCULATION consumes, and where
- *                              those values live (they are global — the same for
- *                              every bank — unless said otherwise).
- *   NOT DECIDED HERE         — what is re-read when the grid is sorted or
- *                              flagged, retunable with no pass at all.
- *
- * AND A FOURTH THING WHEN IT IS TRUE: `caveats`, for what the scope does NOT
- * cover. 🔎 Scan's duplicate re-grouping always covers the whole bank whatever
- * the scope; 🎨 Medium also runs chained inside ✨ Score with the default scope.
- * Both are stated rather than left for someone to discover.
- *
- * SCOPES THAT WOULD LIE ARE OFFERED DISABLED, WITH THE REASON. ✨ Score, 👥 Group
- * by person and ✂ Find crops & variants each produce a PARTITION of the whole
- * bank, renumbered on every run: handed a subset they would number a
- * sub-population from 1 and drop those ids on top of unrelated groups already in
- * the database. A wrong group is worse than a missing option — but a missing
- * option is worse than a disabled one, because the maintainer concluded a shipped
- * feature did not exist twice over from exactly that kind of silence.
- *
- * Plain .js (no JSX) so `node --test` can execute all of it.
- */
+/* Bank pass options, scope restrictions, saved settings, and run caveats. */
 import { PASS_SCOPE_OPTIONS } from './bankPassScope.js';
 import { normalizeSemanticEngine, semanticEngineLabel } from './bankSemanticEngine.js';
 
@@ -69,9 +37,8 @@ export const BANK_PASSES = {
     selection: true,
     redo: {
       key: 'rescan',
-      label: 'Also re-measure images that were already scanned',
-      note: 'This is where “Rescan all” went. It was never a second pass — it was '
-        + 'this scope, with a button of its own.',
+      label: 'Rescan Images',
+      note: 'Includes previously scanned images.',
     },
     settings: [
       { name: 'Duplicate distance (Filter thresholds ▸ dup_distance)',
@@ -84,9 +51,7 @@ export const BANK_PASSES = {
         + 'grid re-sorts on save; no rescan is needed.',
     ],
     caveats: [
-      'The scope chooses what is MEASURED. The duplicate grouping at the end of '
-        + 'the pass always covers the whole bank, because it works from the stored '
-        + 'hashes and renumbers all of them together.',
+      'Duplicate grouping still covers the entire Bank.',
     ],
     binCost: 'a rejected image is re-read from disk and re-measured',
   },
@@ -99,10 +64,10 @@ export const BANK_PASSES = {
     what: 'Aesthetics, NSFW and style groups from one CLIP pass.',
     scopes: PARTITION_REASON('The style grouping'),
     selection: PARTITION_REASON('The style grouping'),
-    fixedScopeLine: 'The whole bank except the bin — every kept and undecided image.',
+    fixedScopeLine: 'Kept + undecided',
     redo: {
       key: 'rescore',
-      label: 'Throw the cached embeddings away and recompute everything',
+      label: 'Recompute Scores',
       note: 'For a new model, or scores you no longer trust. Costs a full pass; '
         + 'without it the run resumes and skips what is already computed.',
     },
@@ -131,12 +96,12 @@ export const BANK_PASSES = {
     what: 'Builds the selected engine cache for search and crops.',
     scopes: SEMANTIC_INDEX_REASON,
     selection: SEMANTIC_INDEX_REASON,
-    fixedScopeLine: 'Every image in the Bank — one shared semantic space.',
+    fixedScopeLine: 'Entire Bank',
     countable: false,
     redo: {
       key: 'rescan',
       explicit: true,
-      label: 'Rebuild this engine’s semantic index from scratch',
+      label: 'Rebuild Index',
       note: 'Explicit reindex only. The other engine cache and the CLIP data '
         + 'owned by Score are preserved.',
     },
@@ -149,8 +114,7 @@ export const BANK_PASSES = {
       'Score’s aesthetic, NSFW, visual-style and Medium results — they stay on CLIP.',
     ],
     caveats: [
-      'A normal run resumes and fills only missing or stale rows. Tick rebuild only '
-        + 'when you deliberately want to recompute this engine’s entire cache.',
+      'A rebuild recomputes this engine’s entire cache.',
     ],
   },
 
@@ -162,9 +126,7 @@ export const BANK_PASSES = {
     what: 'Clusters the bank by person — no reference photo.',
     scopes: PARTITION_REASON('A person clustering'),
     selection: PARTITION_REASON('A person clustering'),
-    fixedScopeLine: 'The whole bank except the bin, minus the folders you declared '
-      + 'to be a single person (those are skipped — that is what the declaration '
-      + 'is for).',
+    fixedScopeLine: 'Kept + undecided · single-person folders excluded',
     redo: null,
     settings: [
       { name: 'Face threshold (Filter thresholds ▸ face_threshold)',
@@ -215,12 +177,10 @@ export const BANK_PASSES = {
     selection: true,
     redo: {
       key: 'rescan',
-      label: 'Also re-check images that were already scanned',
-      note: 'Images you dismissed as “not watermarked” are never re-examined, '
-        + 'whichever line you pick — that is why the two numbers here are not the '
-        + 'pile size.',
+      label: 'Rescan Images',
+      note: 'Includes prior scans. Dismissed flags stay dismissed.',
     },
-    settings: [],   // filled at render time: the ROUTE decides (see below)
+    settings: [],   // The launch dialog lists settings for the available detector route.
     notHere: [
       'Which watermarked images get rejected, and the crop / repaint levels — '
         + 'those are their own actions on the watermark panel.',
@@ -246,11 +206,8 @@ export const BANK_PASSES = {
     selection: true,
     redo: {
       key: 'rescan',
-      label: 'Also re-read images that were already scanned',
-      note: 'Images you dismissed as “not watermarked” keep their ruling — this '
-        + 'pass never re-examines them, whichever line you pick. With “Try on '
-        + 'a sample” ticked, this re-reads the SAME first images — the way to '
-        + 'judge a new sensitivity on known pages.',
+      label: 'Rescan Images',
+      note: 'Includes prior scans. Dismissed flags stay dismissed.',
     },
     settings: [
       { name: 'Sensitivity (this window — stored as a setting)',
@@ -261,12 +218,7 @@ export const BANK_PASSES = {
       'The repaint itself — 🧽 Inpaint on the Watermarks panel erases the '
         + 'zones this pass records.',
     ],
-    caveats: [
-      '“Try on a sample first” reads only the first N images of the scope — '
-        + 'deterministic, so a re-read hits the same pages. What the sample '
-        + 'does not reach simply stays unscanned; the 🔤 card then offers '
-        + '“Read the remaining ”.',
-    ],
+    caveats: [],
     binCost: 'each rejected image is read by the OCR engine',
   },
 
@@ -443,7 +395,7 @@ export const BANK_PASSES = {
     selection: true,
     redo: {
       key: 'rescan',
-      label: 'Also re-classify images that already have a framing',
+      label: 'Reclassify Images',
     },
     settings: [
       { name: 'Vision model + local LLM URL (Settings ▸ Local tools)' },
@@ -469,7 +421,7 @@ export const BANK_PASSES = {
     selection: true,
     redo: {
       key: 'rescan',
-      label: 'Also re-classify images that already have a verdict',
+      label: 'Reclassify Images',
     },
     settings: [
       { name: 'The decision margins — NOT configurable',
@@ -482,35 +434,21 @@ export const BANK_PASSES = {
         + 'call can be reconsidered without running this again.',
     ],
     caveats: [
-      'Score runs this pass automatically when it finishes, always with the '
-        + 'default scope — a scope picked here belongs to this run only and is '
-        + 'stored nowhere.',
-      // The dependency, stated where the scope is chosen. ✨ Score has NO scope
-      // control at all (its style grouping is one numbering of the bank, so it
-      // always runs on kept + undecided), which means the bin cannot be scored
-      // by asking for it — the images there carry an embedding only if they
-      // were scored BEFORE being rejected. Aiming this pass at the bin without
-      // that is a run that classifies nothing, and the scope lines now count
-      // exactly how many of the images they offer are in that state.
-      'This pass reads the embeddings Score cached and computes none of its '
-        + 'own. Score never runs on the bin, so a rejected image has an '
-        + 'embedding only if it was scored before you rejected it — aimed at '
-        + 'the bin, this pass answers for those and skips the rest.',
+      'Score also classifies kept and undecided images.',
+      'The bin can use only scores saved before rejection.',
     ],
     binFree: true,
   },
 
   semantic_dedup: {
     id: 'semantic_dedup',
-    label: 'Find crops & variants',
-    verb: 'Find crops & variants',
+    label: 'Find Crops & Variants',
+    verb: 'Find Crops & Variants',
     endpoint: 'semantic-dedup',
     what: 'Same-shot crops the hash missed. No GPU after the index exists.',
     scopes: PARTITION_REASON('The “same shot” grouping'),
     selection: PARTITION_REASON('The “same shot” grouping'),
-    fixedScopeLine: 'Every image the selected semantic engine has indexed — rejected '
-      + 'ones included. That pool lives in the engine cache, so this window cannot '
-      + 'put a number on it without inventing one.',
+    fixedScopeLine: 'All images indexed by the selected engine, including rejected. Count unavailable.',
     countable: false,
     redo: null,
     settings: [
@@ -576,9 +514,7 @@ export function bankPass(passId, { semanticEngine = 'clip' } = {}) {
   return {
     ...spec,
     what: `Same-shot crops from the ${label} semantic index.`,
-    fixedScopeLine: `Every image ${label} has indexed — rejected ones included. `
-      + 'That pool lives in the engine cache, so this window cannot put a number '
-      + 'on it without inventing one.',
+    fixedScopeLine: `All images indexed by ${label}, including rejected. Count unavailable.`,
     settings: engine === 'siglip2' ? [
       { name: 'SigLIP 2 same-shot threshold '
           + '(bank_semantic.siglip2_semantic_dup_threshold)',

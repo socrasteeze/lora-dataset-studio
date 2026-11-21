@@ -47,21 +47,21 @@ export default function ClassifyFramingButton({
         <HelpBadge topic="action-classify-framing" className="self-center" />
         {!s.running && !autoCrop && s.count > 0 && (
           <span className="text-content-subtle text-2xs min-w-0">
-            no shot type yet — imported without one, or cropped since they were last classified
+            Framing pending
           </span>
         )}
       </div>
       <AutoCropOptions enabled={autoCrop} onEnabledChange={setAutoCrop}
         confidence={cropConfidence} onConfidenceChange={setCropConfidence} disabled={busy || s.running}
-        note="Saves full-subject crops in this scope. Includes already-classified images." />
+        note="Saves crops, including already-classified images." />
       {autoCrop && <fieldset className="space-y-2" disabled={busy || s.running}>
-        <legend className="mb-2 text-xs font-semibold text-content">Scope</legend>
-        <PassScopeChoices payload={payload} passId="framing" scope={scope} redo
+        <legend title="Selections exclude rejected images. Choose a bin scope to include them."
+          className="mb-2 text-xs font-semibold text-content">Scope</legend>
+        <PassScopeChoices columns="sm:grid-cols-2" payload={payload} passId="framing" scope={scope} redo
           onScope={setScope} selectionSize={selectedIds.length}
           useSelection={useSelection} onUseSelection={setUseSelection} disabled={busy || s.running} />
-        <p className="m-0 text-2xs text-content-subtle">Selections exclude rejected images. Choose a bin scope to include them.</p>
         {binWarning && <p role="note" className="m-0 text-2xs text-amber-300/90">{binWarning}</p>}
-        {count === 0 && <p role="status" className="m-0 text-2xs text-content-subtle">No images in this scope. Choose another scope or change the selection.</p>}
+        {count === 0 && <p role="status" className="m-0 text-2xs text-content-subtle">No images in this scope.</p>}
       </fieldset>}
       {s.blocked && (
         <p className="m-0 text-amber-300/90 text-2xs">

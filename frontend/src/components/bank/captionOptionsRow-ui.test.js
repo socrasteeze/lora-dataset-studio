@@ -13,35 +13,17 @@ import { markdownHeadingId } from '../../utils/headingId.js';
 
 const ws = bankTreeSource();
 
-test('only the model select is width-capped, and the other four are not truncated', () => {
-  // A <select> sizes itself to its widest option and has min-width:auto, so it does not
-  // shrink; the ① Analyze zone has no overflow-x container, so an unbounded one pushes
-  // the whole page into a horizontal scroll on a phone. But the cap has a cost: at
-  // 11rem the vocabulary and length selects render "Use default (Settings ▸ Cap⌄" and
-  // "Standard — the prompt as⌄", and neither carried any bound before this row existed.
-  // Only the MODEL select needs it — Ollama refs run long and it overflows on its own
-  // (measured: 430 px asked at a 360 px width). The other four take max-w-full with a
-  // 16rem ceiling from sm up: never wider than the column, readable everywhere else.
-  // 'Caption scope' is no longer a <select>: it became the radio list in the
-  // window's THIS RUN block, where each pile carries its own count. The other four
-  // moved inside the window unchanged, keeping the width rules measured here.
-  const capped = { 'Caption vision model': /max-w-\[11rem\]/ };
+test('the caption selects fill equal columns and stay within their cell', () => {
+  const controls = ws.slice(ws.indexOf('const captionRunControls = ('));
+  assert.match(controls, /grid gap-2 sm:grid-cols-2/);
+  assert.match(ws, /const captionSelectClass = '[^']*w-full min-w-0 max-w-full/);
   for (const label of ['Caption engine', 'Caption vision model',
     'Caption vocabulary register', 'Caption length']) {
-    const i = ws.indexOf(`aria-label="${label}"`);
+    const i = controls.indexOf(`aria-label="${label}"`);
     assert.ok(i > 0, `${label} select is missing`);
-    // The className sits within the same element; look at the tag around it.
-    const tagStart = ws.lastIndexOf('<Select', i);
-    const tagEnd = ws.indexOf('>', ws.indexOf('className=', i));
-    const tag = ws.slice(tagStart, tagEnd);
-    if (capped[label]) {
-      assert.match(tag, capped[label], `${label} select lost its width bound`);
-    } else {
-      assert.ok(!/max-w-\[11rem\]/.test(tag),
-        `${label} select is capped at 11rem and truncates its own options`);
-      assert.match(tag, /sm:max-w-\[16rem\]/,
-        `${label} select has no width bound at all`);
-    }
+    const tag = controls.slice(controls.lastIndexOf('<Select', i),
+      controls.indexOf('>', controls.indexOf('className=', i)));
+    assert.match(tag, /className=\{captionSelectClass\}/);
   }
 });
 

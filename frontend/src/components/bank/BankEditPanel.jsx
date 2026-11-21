@@ -22,6 +22,7 @@
  * The "which engine can run, and why not" logic lives in the JSX-free
  * `bankEdits.js` so `node --test` covers it; this file is the shell.
  */
+import { SEGMENT_CLASS, SEGMENT_GROUP_CLASS, btnClass } from '../common/controls.js'
 import { useEffect, useRef, useState } from 'react'
 import { postJson } from '../../api/fetchClient'
 import PassDialog from './PassDialog.jsx'
@@ -136,14 +137,13 @@ export default function BankEditPanel({
       className="lds-section">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
         className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 py-3 text-left">
-        <span className="text-sm font-semibold text-content">✂ Edits</span>
+        <span className="text-sm font-semibold text-content" title="Open ▶ Review and press C to crop one image.">✂ Edits</span>
         <span className="text-2xs text-content-subtle">{editSummary(payload)}</span>
         <HelpBadge topic="action-bank-crop" />
         <span aria-hidden className="ml-auto text-xs text-content-subtle">{open ? '▲' : '▼'}</span>
       </button>
       {open && (
         <div className="space-y-2 pb-3">
-          <p className="text-xs text-content-subtle">To crop one image, open ▶ Review and press <b>C</b> or choose Crop.</p>
           <div className="lds-section py-2.5 space-y-1.5">
             <div className="flex items-baseline gap-1.5">
               <span className="text-sm font-semibold text-content">✨ Upscale &amp; improve</span>
@@ -157,13 +157,11 @@ export default function BankEditPanel({
               <span className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">
                 Engine
               </span>
-              <div className="flex items-center gap-1 rounded-lg border border-border bg-app/60 p-0.5 text-xs">
+              <div role="group" aria-label="Upscale engine" className={SEGMENT_GROUP_CLASS}>
                 {engines.map((e) => (
                   <button key={e.id} type="button" aria-pressed={picked?.id === e.id}
                     onClick={() => setEngine(e.id)} disabled={e.disabled} title={e.title}
-                    className={`min-h-10 rounded-md px-2.5 py-1 font-semibold disabled:opacity-40 lg:min-h-0 ${
-                      picked?.id === e.id
-                        ? 'bg-sky-500/25 text-sky-100' : 'text-content-subtle hover:text-content'}`}>
+                    className={SEGMENT_CLASS}>
                     {e.label}
                   </button>
                 ))}
@@ -176,29 +174,26 @@ export default function BankEditPanel({
             <button type="button" onClick={() => setImproveOpen(true)}
               disabled={!picked || picked.disabled}
               title={picked?.disabled ? picked.reason : (picked?.title || 'Upscale & improve')}
-              className="min-h-10 rounded-lg border border-sky-400/40 bg-sky-500/15 px-3 py-1.5 text-sm font-semibold text-sky-200 disabled:opacity-40 lg:min-h-0">
+              className={btnClass({ variant: 'primary' })}>
               ✨ Upscale &amp; improve
             </button>
-            {picked?.disabled && picked.reason && (
-              <p className="text-2xs text-content-subtle">{picked.reason}</p>
-            )}
           </div>
 
           {/* ↩ Only when there is something to take back. A revert button on a
               bank that has never been edited is a button that can only say "0". */}
           {counts.total > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={undo} disabled={live || busy}
                 title="Undo one crop or upscale per image, preserving earlier edits. History is available for edits made after this update."
-                className="rounded-md border border-border px-2 py-1 text-xs font-medium text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-40">
-                ↩ Undo last edit {selectedIds.length ? `of selection (${selectedIds.length})` : 'of each image'}
+                className={btnClass({ size: 'sm' })}>
+                ↩ Undo Edit{selectedIds.length > 0 && ` (${selectedIds.length})`}
               </button>
               <button type="button" onClick={revert} disabled={live || busy}
                 title={selectedIds.length
                   ? `Throw away the crops and upscales of the ${selectedIds.length} selected image(s) and go back to what this bank started from.`
                   : 'Throw away every ✂ crop and ✨ upscale made in this bank and go back to what it started from.'}
-                className="rounded-md border border-border px-2 py-1 text-xs font-medium text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-40">
-                ↩ Revert {selectedIds.length ? `selection (${selectedIds.length})` : `all (${counts.total})`}
+                className={btnClass({ size: 'sm' })}>
+                ↩ {selectedIds.length ? `Revert (${selectedIds.length})` : `Revert All (${counts.total})`}
               </button>
             </div>
           )}

@@ -103,13 +103,6 @@ export function SavedPromptsPanel({
             </span>
           )}
         </div>
-        {batchable && (
-          <p className="m-0 text-content-subtle text-2xs leading-snug">
-            Tick several prompts to generate them all in one run — same checkpoints,
-            same settings, one image set per prompt. Ticking writes nothing into the
-            prompt field; “⤵ Use prompt” does that.
-          </p>
-        )}
 
         <div className="min-h-0 flex-1 overflow-y-auto flex flex-col gap-2 pr-1">
           {shown.map((item) => {

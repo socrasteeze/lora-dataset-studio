@@ -48,14 +48,14 @@ export default function PluginSettingsGroups({ pluginId, groups, ...props }) {
   return <div className="space-y-4">
     {engines.length > 0 && <fieldset id="plugin-enabled-engines" className="lds-section py-4">
       <legend className="px-1 text-sm font-medium">Enabled engines</legend>
-      <div className="flex flex-wrap gap-4">{engines.map(engine => <label key={engine.id} className="inline-flex min-h-10 items-center gap-2 text-sm">
+      <div className="grid gap-2 sm:grid-cols-2">{engines.map(engine => <label key={engine.id} className="inline-flex min-h-10 items-center gap-2 text-sm">
         <input type="checkbox" checked={(props.config.engines?.enabled || []).includes(engine.id)}
           onChange={() => props.toggleEngine(engine.id)} />
         {engine.settingsLabel || engine.label}
       </label>)}</div>
     </fieldset>}
     {improves && <ImproveEnginePreference {...props} />}
-    {groups.length === 0 && !improves && preparation.length === 0 && installs.size === 0 && <p className="text-sm text-content-muted">This plugin has no global settings. Its tools expose their options where you use them.</p>}
+    {groups.length === 0 && !improves && preparation.length === 0 && installs.size === 0 && <p className="text-sm text-content-muted">No global settings.</p>}
     {(preparation.length > 0 || installs.size > 0) && <details id="plugin-preparation" aria-label="Preparation" className="lds-section space-y-4 py-4">
       <summary className="min-h-10 cursor-pointer text-base font-semibold">Preparation</summary>
       {installs.size > 0 && <PluginPreparation key={pluginId} pluginId={pluginId} items={[...installs.values()]} onPrepared={onPrepared} />}

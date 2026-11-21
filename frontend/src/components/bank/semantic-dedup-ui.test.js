@@ -5,7 +5,7 @@ import { bankTreeSource } from './bankTreeSource.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-import { BANK_PASSES } from './bankPasses.js';
+import { bankPass, BANK_PASSES } from './bankPasses.js';
 import { pipelineStepKeys } from './bankSemanticEngine.js';
 
 import { FALLBACK_ORDER, buildSteps, defaultChecked } from './pipelineSteps.js';
@@ -53,9 +53,10 @@ test('the ✂ Find crops button gates on selected semantic readiness', () => {
     ws.indexOf("onPassOpen('semantic_dedup')") + 900);
   assert.doesNotMatch(button, /scored\s*[=>]/);
   assert.match(button, /semanticState\.label/);
+  assert.ok(button.includes(BANK_PASSES.semantic_dedup.label.replace('&', '&amp;')));
 });
 
-test('✂ Find crops quotes NO number, and says why instead of inventing one', () => {
+test('✂ Find crops names the indexed pool and reports that its count is unavailable', () => {
   // Its pool is "every image the selected engine indexed" — that lives in an engine
   // cache, not in a column, so no honest count exists client-side. The rule on
   // this surface is that every number is one somebody measured, so this window shows
@@ -66,11 +67,14 @@ test('✂ Find crops quotes NO number, and says why instead of inventing one', (
   // sentence by one word turned it red without a single user-visible word changing.
   // The claim here is about what the window SAYS, so read what it says.
   const spec = BANK_PASSES.semantic_dedup;
-  assert.ok(spec, 'the ✂ spec is missing');
-  assert.equal(spec.countable, false);
-  assert.match(spec.fixedScopeLine, /rejected .*included/);
-  assert.match(spec.fixedScopeLine, /selected semantic engine/);
-  assert.match(spec.fixedScopeLine, /without inventing one/);
+  assert.match(spec.fixedScopeLine, /indexed by the selected engine/);
+  for (const [engine, label] of [['clip', 'CLIP'], ['siglip2', 'SigLIP 2']]) {
+    const run = bankPass('semantic_dedup', { semanticEngine: engine });
+    assert.equal(run.countable, false);
+    assert.ok(run.fixedScopeLine.includes(`indexed by ${label}`));
+    assert.match(run.fixedScopeLine, /including rejected/);
+    assert.match(run.fixedScopeLine, /Count unavailable/);
+  }
 });
 
 test('the resolution panel hits the semantic endpoints and uses same-shot wording', () => {

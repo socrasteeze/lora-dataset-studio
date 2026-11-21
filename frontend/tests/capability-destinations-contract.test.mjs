@@ -150,11 +150,7 @@ test('the accessible label says the state AND where the row leads', () => {
   assert.match(capabilityDestination(ready).announce, /^Klein \(local\) — ready, /)
 })
 
-test('every row says what it unlocks, and both screens show it', () => {
-  // A name alone did not: "Test Studio" read from a phone said nothing about
-  // test IMAGES (2026-09-03). One sentence per row, short enough to wrap on a
-  // 360 px tile, and rendered wherever the rows are — the Overview grid and
-  // the wizard's "What's unlocked" screen.
+test('both screens keep each capability description', () => {
   for (const [name, caps] of RIGS) {
     for (const row of deriveCapabilitySummary(caps)) {
       assert.ok(typeof row.what === 'string' && row.what.trim().length >= 20,
@@ -162,7 +158,7 @@ test('every row says what it unlocks, and both screens show it', () => {
       assert.ok(row.what.length <= 100, `${name}: "${row.label}" — the what-line is a paragraph`)
     }
   }
-  assert.match(read('src/components/settings/OverviewSection.jsx'), /\{s\.what && <span/)
+  assert.match(read('src/components/settings/OverviewSection.jsx'), /title=\{s\.what\}/)
   assert.match(read('src/pages/SetupPage.jsx'), /\{s\.what && <span/)
 })
 

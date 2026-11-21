@@ -594,7 +594,7 @@ const renderRunCard = (run, i) => {
         )}
 
         {!data && !loadError && <p className="text-sm text-content-subtle">Loading</p>}
-        {data && !data.local_active && !actives.length && <p className="text-sm text-content-subtle">No run in progress. Launch one from a dataset’s training panel.</p>}
+        {data && !data.local_active && !actives.length && <p className="text-sm text-content-subtle">No active runs.</p>}
         {cloud?.activeContent || actives.map(renderRunCard)}
       </div>
       {/* Recent history — one card per run, grouped by dataset. The pod-kept

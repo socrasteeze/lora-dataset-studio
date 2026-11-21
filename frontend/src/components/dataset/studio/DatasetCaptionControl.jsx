@@ -100,10 +100,6 @@ function DatasetCaptionDialog({ open, onClose, onChoose }) {
             <h2 id="caption-dataset-title" className="text-sm font-semibold text-content">
               <Dices aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Pick a caption source
             </h2>
-            <p className="mt-1 text-2xs leading-snug text-content-subtle">
-              A dataset or a bank. The choice stays locked for future runs; selecting one
-              draws a random kept caption now.
-            </p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close caption source picker"
             className="h-8 w-8 shrink-0 rounded-lg border border-border bg-app text-content-muted hover:text-content">

@@ -161,7 +161,7 @@ test('a bank that HAS edits opens itself, with both engines and the ↩ Revert',
   const html = panel({ payload: payload(12, 4) })
   assert.match(html, /aria-expanded="true"/)
   assert.match(html, /12 cropped · 4 improved/)
-  assert.match(html, /↩ Revert all \(16\)/)
+  assert.match(html, /↩ Revert All \(16\)/)
   // Klein is always offered; SeedVR2 only once this install can run it — the
   // shared rule, read from utils/improveEngines.js rather than re-decided here.
   assert.match(html, /✨ Klein/)
@@ -171,16 +171,15 @@ test('a bank that HAS edits opens itself, with both engines and the ↩ Revert',
   assert.doesNotMatch(html, /candidate/)
   // ✂ Crop is not a button here — it needs a full-size image — so the panel has
   // to SAY where it is. A feature nobody can find reads as one never shipped.
-  assert.match(html, /▶ Review/)
-  assert.match(html, /press <b>C<\/b>/)
+  assert.match(html, /title="Open ▶ Review and press C to crop one image\."/)
   // And it quotes the pool it would run on, from the server's own table.
   assert.match(html, /4 image\(s\) in this scope/)
 })
 
 test('a selection retargets ↩ Revert at the selection, not the whole bank', () => {
   const html = panel({ payload: payload(12, 4), selectedIds: [1, 2, 3] })
-  assert.match(html, /↩ Revert selection \(3\)/)
-  assert.doesNotMatch(html, /Revert all/)
+  assert.match(html, /↩ Revert \(3\)/)
+  assert.doesNotMatch(html, /Revert All/)
 })
 
 test('the feature is announced and documented', () => {

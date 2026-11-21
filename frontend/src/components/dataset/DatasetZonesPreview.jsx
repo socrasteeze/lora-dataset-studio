@@ -47,6 +47,6 @@ export default function DatasetZonesPreview({ datasetId, kind = 'text', live = f
   return (
     <TextZonesGallery items={items} total={data.total || 0} live={live}
       emptyLine={emptyLine}
-      reviewHint="Zones off? Open 🔍 Review flagged to fix them by hand" />
+      reviewHint="Edit zones in Review Flagged." />
   )
 }

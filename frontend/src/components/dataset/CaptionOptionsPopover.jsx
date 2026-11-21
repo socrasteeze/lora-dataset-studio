@@ -413,38 +413,19 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
             {/* Vocabulary preset (NSFW register) */}
             <div className="flex flex-col gap-1">
               <label htmlFor="cap-opt-vocab" className="text-sm font-medium text-content">Vocabulary</label>
-              <select id="cap-opt-vocab" value={vocabulary} onChange={(e) => setVocabulary(e.target.value)}
+              <select id="cap-opt-vocab" title="Explicit wording requires an uncensored vision model." value={vocabulary} onChange={(e) => setVocabulary(e.target.value)}
                 className={inputCls}>
                 {VOCABULARY_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
               </select>
-              <p className="text-xs text-content-subtle">
-                How the model names nude or sexual content. “Explicit” needs an uncensored
-                (abliterated) vision model — pull one above. The omission rules and leak
-                cleaners still run, so this changes wording, not what binds to the trigger.
-              </p>
             </div>
 
             {/* Caption length preset */}
             <div className="flex flex-col gap-1">
               <label htmlFor="cap-opt-length" className="text-sm font-medium text-content">Caption length</label>
-              <select id="cap-opt-length" value={length} onChange={(e) => setLength(e.target.value)}
+              <select id="cap-opt-length" title="Length is a target. Standard uses the engine default." value={length} onChange={(e) => setLength(e.target.value)}
                 className={inputCls}>
                 {CAPTION_LENGTH_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
               </select>
-              <p className="text-xs text-content-subtle">
-                How much the captioner writes. “Standard” leaves the prompt untouched.
-                “Concise” aims for one short sentence, “Detailed” for several — a target the
-                model follows loosely, not a hard cap. Measured on 18 photos with the default
-                vision model: median 24 / 88 / 126 words for Concise / Standard / Detailed;
-                another engine or model will land elsewhere. Both stay full prose, so a Concise
-                dataset still trains on prose-native families without forcing past the
-                caption-style check.
-              </p>
-              <p className="text-xs text-content-subtle">
-                Different axis from the long + short dual captions: the short one is derived
-                from the long caption and stored separately, while this changes the long
-                caption itself. You can use both.
-              </p>
             </div>
 
             {/* Appearance policy (character only): omit binds to the trigger,

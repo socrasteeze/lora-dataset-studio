@@ -110,10 +110,6 @@ export default function DescribeImageModal({ open, onClose, onResult }) {
           <button type="button" onClick={onClose} disabled={busy} aria-label="Close"
             className="w-8 h-8 rounded-lg border border-border bg-app text-content-muted hover:text-content disabled:opacity-40">×</button>
         </div>
-        <p className="text-content-subtle text-2xs leading-snug">
-          The vision model turns the image into a test prompt (scene, pose, framing, outfit).
-          It never names the person or adds the trigger word — the Studio handles those.
-        </p>
 
         <button type="button"
           onClick={() => { if (!busy) inputRef.current?.click(); }}

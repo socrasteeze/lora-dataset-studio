@@ -46,6 +46,6 @@ export default function BankZonesPreview({ bankId, kind = 'text', live = false }
   }))
   return (
     <TextZonesGallery items={items} total={data.total || 0} live={live}
-      reviewHint="Zones off? Open ▶ Review (flagged) to fix them by hand" />
+      reviewHint="Edit zones in Review (flagged)." />
   )
 }

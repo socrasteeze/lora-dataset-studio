@@ -1,3 +1,4 @@
+import { Button } from '../common/Controls.jsx'
 import {
   SEMANTIC_ENGINE_OPTIONS, semanticDeviceNote, semanticIndexActionLabel,
   semanticPrerequisite,
@@ -76,12 +77,11 @@ export default function BankSemanticEngine({ state, disabled = false,
             {deviceNote.text}
           </p>}
           {onPickPython && (
-            <button type="button" onClick={onPickPython}
+            <Button type="button" size="md" onClick={onPickPython}
               disabled={disabled || switching || live}
-              title="Inspect, test or change the Python used by the SigLIP 2 index"
-              className="min-h-10 lg:min-h-0 rounded-md border border-border px-2 py-1 text-xs font-medium text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-50">
+              title="Inspect, test or change the Python used by the SigLIP 2 index">
               Manage SigLIP 2 Python
-            </button>
+            </Button>
           )}
         </div>
       )}

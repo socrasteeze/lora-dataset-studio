@@ -10,7 +10,7 @@ const instructions = read('../common/PinokioUpdateInstructions.jsx');
 const startScript = read('../../../../start.js');
 
 test('the offline app offers manual updates without hosted update controls', () => {
-  assert.match(maintenance, /outside LDS, then restart/);
+  assert.match(maintenance, /Update LDS outside the app, then restart/);
   for (const source of [maintenance, app]) {
     assert.doesNotMatch(source, /\/api\/update\/(check|apply)/);
     assert.doesNotMatch(source, /lds:update-available/);

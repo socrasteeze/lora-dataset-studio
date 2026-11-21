@@ -142,13 +142,12 @@ export default function BankCollectionsDialog({ bankId, bankName, initialIds = [
     data-probe-chrome="bank-collections" data-probe-layer
     className="fixed inset-0 z-[70] flex min-h-0 flex-col bg-surface-overlay">
     <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
-      <h2 className="grow text-base font-semibold text-content">Collections</h2>
+      <h2 className="grow text-base font-semibold text-content" title="Collections store membership only.">Collections</h2>
       <Button disabled={busy} onClick={() => loadList().then(() => setVersion((old) => old + 1)).catch((failure) => setError(failure.message))}>Reload</Button>
       <IconButton label="Close collections" disabled={busy} onClick={close}>✕</IconButton>
     </header>
     <div className="min-h-0 flex-1 overflow-y-auto">
     <div className="shrink-0 space-y-2 border-b border-border p-3">
-      <p className="text-xs text-content-muted">Collections store membership only. Keep / Reject, captions, and source files stay independent.</p>
       <form className="flex flex-wrap gap-2" onSubmit={(event) => { event.preventDefault(); if (newName.trim()) apply('create'); }}>
         <Input aria-label="New collection name" placeholder="New collection name" maxLength={128}
           value={newName} onChange={(event) => setNewName(event.target.value)} disabled={busy}
@@ -168,7 +167,7 @@ export default function BankCollectionsDialog({ bankId, bankName, initialIds = [
     <div className="flex flex-col lg:flex-row">
       <aside className="max-h-36 shrink-0 overflow-y-auto border-b border-border p-2 lg:max-h-none lg:w-64 lg:border-b-0 lg:border-r">
         {!list && <p className="text-sm text-content-muted">Loading collections</p>}
-        {list && !collections.length && <p className="text-sm text-content-muted">No collections yet. Enter a name and select Create.</p>}
+        {list && !collections.length && <p className="text-sm text-content-muted">No collections yet.</p>}
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
           {collections.map((collection) => <Button key={collection.id} disabled={busy}
             aria-pressed={selectedId === collection.id}
@@ -204,7 +203,7 @@ export default function BankCollectionsDialog({ bankId, bankName, initialIds = [
         </div>}
         <div className="p-3">
           {current && !ready && <p className="text-sm text-content-muted">Loading members</p>}
-          {ready && count === 0 && <p className="text-sm text-content-muted">This collection is empty. Add the incoming selection or create a collection from a group.</p>}
+          {ready && count === 0 && <p className="text-sm text-content-muted">This collection is empty.</p>}
           {members.some((member) => member.missing || unavailable.has(member.id)) && <p className="mb-2 text-xs text-amber-300">Unavailable sources remain members. Promotion skips missing sources.</p>}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
             {members.map((member) => <label key={member.id} className="min-w-0 cursor-pointer overflow-hidden rounded border border-border">

@@ -84,25 +84,17 @@ export default function BankPassesPanel({
         {/* Analysis passes — individual, quieter than the primary actions. */}
         <div className="space-y-1.5">
           <GroupLabel>Analysis passes</GroupLabel>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {/* Every button OPENS ITS WINDOW instead of firing. The window is where
-                the scope, the counts, the settings the calculation really reads and
-                the things it does NOT decide finally have room to be said — and
-                where the launch button quotes the exact number it will move.
-
-                “Rescan all” is gone as a button on purpose: it was never a second
-                pass, it was a SCOPE wearing a button's clothes. It is now the last
-                line of 🔎 Scan's THIS RUN block, next to the piles it belongs with.
-                “Rescore all” went the same way, into ✨ Score's window. */}
+          <div className="grid auto-rows-fr grid-cols-2 gap-1.5 [&>*:last-child:nth-child(odd)]:col-span-2">
+            {/* Launch windows carry scope counts and rescan options. */}
             <PassButton onClick={() => onPassOpen('scan')} disabled={live}
               title="Measure sharpness, noise, flatness, size and detail, hash every image and group the exact duplicates — CPU only. Opens the launch window.">
-              <Search aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Scan quality
+              <Search aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Scan Quality
             </PassButton>
             <PassButton onClick={() => onPassOpen('faces')} disabled={live || !passGate.faces.ok}
               title={passGate.faces.reason || (passGate.faces.ok
                 ? 'Detect the dominant face of every non-rejected image and cluster the bank by person (no reference needed). CPU, can take a while on thousands of images. It samples your subfolders first and offers the ones that look like a single person, so you can skip them.'
                 : 'Install the Quality tools (Setup) to sort by person')}>
-              <Users aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Group by person
+              <Users aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Group by Person
             </PassButton>
             <PassButton onClick={() => onPassOpen('score')} disabled={live || !passGate.score.ok}
               title={passGate.score.reason || (passGate.score.ok
@@ -110,25 +102,25 @@ export default function BankPassesPanel({
                   !scoreDevice ? ', while its scoring device is being checked'
                     : holdsTheGpu(scoreDevice) ? ', and holds the GPU (ComfyUI is unloaded and training cannot start) for its duration' : ' on the CPU, leaving the GPU free'}.`
                 : 'Install the Bank scoring extra (Setup ▸ Quality tools) to score aesthetics / NSFW / style')}>
-              Score{!passGate.score.ok && ' (needs setup)'}
+              Score
             </PassButton>
             <PassButton onClick={() => onPassOpen('medium')} disabled={live || !caps.bank_scoring}
               title={caps.bank_scoring
                 ? 'Sort every scored image into photograph / anime / 3D render / illustration — read off the CLIP embeddings Score already computed, so no image is looked at again and the GPU stays free. It answers “unsure” rather than guessing: measured on a real 23 500-image bank, it named 2 anime drawings and no wrong verdict.'
                 : 'Install the Bank scoring extra (Setup ▸ Quality tools) — Medium reads the embeddings the Score pass produces'}>
-              <Palette aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Classify medium{!caps.bank_scoring && ' (needs setup)'}
+              <Palette aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Classify Medium
             </PassButton>
             <PassButton onClick={() => onPassOpen('framing')} disabled={live || !passGate.framing.ok}
               title={passGate.framing.reason || (passGate.framing.ok
                 ? 'Classify every non-rejected image by shot type — face close-up, bust, full body, back view — with the same Qwen3-VL classifier the datasets use. Powers the Framing filter and the coverage advice. GPU vision pass.'
                 : 'Pull the vision model (Settings ▸ Local tools) to classify framing')}>
-              <Ruler aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Classify framing{!passGate.framing.ok && ' (needs setup)'}
+              <Ruler aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Classify Framing
             </PassButton>
             {/* 🔖 Tags — the cheap pass that makes the expensive one optional for
                 triage. No device picker: it is local-only (see startTags). */}
             <PassButton onClick={onStartTags} disabled={live || tagsState.disabled}
               title={tagsState.title}>
-              {tagsLabel}{tagsState.blocked && ' (needs setup)'}
+              {tagsLabel}
             </PassButton>
             <PassButton onClick={onStartPixaiTags} disabled={live || capsLoading || !caps.pixai}
               title={caps.pixai
@@ -137,15 +129,11 @@ export default function BankPassesPanel({
                 : 'Install PixAI Tagger in Setup.'}>
               PixAI Pre-Tags{counts?.pixai_tagged > 0 && ` (${counts.pixai_tagged})`}
             </PassButton>
-            {!capsLoading && !caps.pixai && (
-              <a href="#/setup" className="text-sm text-accent underline">Install PixAI</a>
-            )}
             <PassButton onClick={() => onPassOpen('semantic_dedup')} disabled={live || !semanticReady}
               title={semanticReady
                 ? `Group crops and re-compressed variants of the SAME shot the exact-duplicate hash misses from the ${semanticState.label} semantic index. Review them under the ✂ Same shot chip.`
                 : semanticBlocked}>
-              ✂ Find crops &amp; variants{!semanticReady
-                && ` (needs ${semanticState.engine === 'clip' ? 'Score' : 'SigLIP 2 index'})`}
+              ✂ Find Crops &amp; Variants
             </PassButton>
             {/* The label QUOTES THE NUMBER IT WILL MOVE — the scope's uncaptioned rows,
                 or the selection when there is one. "Caption all" was the older, vaguer
@@ -165,7 +153,7 @@ export default function BankPassesPanel({
             </PassButton>
             <PassButton onClick={onImportCaptions} disabled={live || !onImportCaptions}
               title="Copy a same-name .txt file into each empty caption and mark it as written by you. Leaves stored captions and the files themselves unchanged.">
-              Import captions
+              Import Captions
             </PassButton>
             {/* ⤢ the opt-in angle backfill. Its own button and its own window, never
                 folded into 👥: it is hours of work on a big bank and nobody must pay
@@ -173,20 +161,25 @@ export default function BankPassesPanel({
             {(counts?.angle_backfillable || 0) > 0 && (
               <PassButton onClick={() => onPassOpen('angles')} disabled={live}
                 title="Measure the head angle of the images a previous build face-scanned without keeping it. Writes the angle and nothing else.">
-                ⤢ Measure head angles
+                ⤢ Measure Head Angles
               </PassButton>
             )}
+          </div>
+          {!capsLoading && !caps.pixai && (
+            <a href="#/setup" className="text-sm text-accent underline">Install PixAI</a>
+          )}
+          <div className="grid grid-cols-2 gap-1.5 empty:hidden [&>*:only-child]:col-span-2">
             {/* Which machine these passes run on. Launch all has offered this
                 for a while and these buttons ignored it entirely, so the same
                 five passes behaved differently depending on which button you
                 pressed. Self-hides with no peers. 🔎 Scan and 🔖 Tags are
                 absent from the gate on purpose: they never travel. */}
             <DevicePicker value={passDevice} onChange={onPassDevice}
-              onDevice={onPassDeviceObj} kind="bank-pass" size="md" />
+              onDevice={onPassDeviceObj} kind="bank-pass" size="md" className="[&>select]:max-w-none [&>select]:flex-1" />
             {/* Import detection cannot prove a CUDA calculation works. Keep the
                 recovery route accessible even when detection looks healthy. */}
             {onPickPython && (
-              <Button type="button" size="sm" onClick={() => onPickPython('scoring')}
+              <Button type="button" size="md" onClick={() => onPickPython('scoring')}
                 disabled={live || semanticOperationBusy}
                 title="Inspect, test or change the Python used by Score">
                 Manage Score Python
@@ -217,25 +210,16 @@ export default function BankPassesPanel({
           </Fold>
           {!capsLoading && !caps.bank_scoring && (
             <p className="text-xs text-content-muted">
-              Score needs its own packages (Setup ▸ Quality tools) — or an interpreter
-              that already has them{scoreGpuPresent
-                ? '. If you train LoRAs or run ComfyUI, this machine probably has one.'
-                : ', which saves installing them twice.'}
+              Install Score in Setup ▸ Quality Tools, or select a Python that has it.
             </p>
           )}
           {captionVocab === 'explicit' && !visionModelLooksUncensored && (
-            /* The old wording sent people to Settings ▸ Captioning & quality, which holds
-               the ENGINE selector — the vision model lives in Settings ▸ Local tools. Now
-               that the model is pickable right here, the sentence points at the control
-               on screen instead, and only mentions Settings for the case the picker
-               cannot solve: no uncensored model pulled on this machine at all. */
             <p className="text-xs text-amber-400/90">
-              ⚠️ Explicit captions need an uncensored (abliterated) {localLlmLabel(caps)} vision model
-              {visionModel ? ` — “${visionModel}” may refuse or soften explicit terms` : ''}.
-              Pick another one in <b>Caption vision model</b> above, or pull one from{' '}
+              ⚠️ Explicit captions need an uncensored {localLlmLabel(caps)} vision model.
+              {visionModel && ` ${visionModel} may refuse explicit terms.`}{' '}
               <SettingsLink section="local-tools" focus={visionModelFocus} tone="warning">
-                Settings ▸ Local tools
-              </SettingsLink>. Richer captions also feed the search.
+                Local Tools
+              </SettingsLink>
             </p>
           )}
         </div>

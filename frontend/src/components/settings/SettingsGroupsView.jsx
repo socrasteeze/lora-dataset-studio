@@ -39,12 +39,11 @@ export function SettingsGroupsToc({ sectionId, groups }) {
         {groups.map((g) => (
           <li key={g.id} className="m-0">
             <button type="button" onClick={() => jump(g.id)}
-              data-testid={`settings-toc-${g.id}`}
+              data-testid={`settings-toc-${g.id}`} title={g.blurb}
               className="min-h-10 lg:min-h-0 flex h-full w-full items-baseline gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-surface-raised">
               <g.icon aria-hidden="true" className="h-4 w-4 shrink-0" />
               <span className="min-w-0">
                 <span className="block text-sm font-medium text-content">{g.title}</span>
-                <span className="block text-xs text-content-muted">{g.blurb}</span>
               </span>
             </button>
           </li>
@@ -68,16 +67,13 @@ export function SettingsGroup({ sectionId, group, defaultOpen = false, children 
       onToggle={(e) => storeGroupToggle(
         localStorage, sectionId, group.id, e.currentTarget.open)}
       className="lds-section group scroll-mt-24">
-      <summary
+      <summary title={group.blurb}
         className="flex min-h-10 lg:min-h-0 cursor-pointer list-none items-baseline gap-2 py-2.5 hover:bg-surface-raised [&::-webkit-details-marker]:hidden">
         <span aria-hidden
           className="shrink-0 text-xs text-content-subtle transition-transform group-open:rotate-90">▸</span>
         <group.icon aria-hidden="true" className="h-4 w-4 shrink-0" />
         <span className="min-w-0">
           <span className="block text-sm font-semibold text-content">{group.title}</span>
-          {/* The blurb hides once the group is open — it described what you
-              would find, and you are now looking at it. */}
-          <span className="block text-xs text-content-muted group-open:hidden">{group.blurb}</span>
         </span>
       </summary>
       <div className="space-y-4 pb-2 sm:pb-3">

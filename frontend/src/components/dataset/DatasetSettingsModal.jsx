@@ -217,14 +217,14 @@ export default function DatasetSettingsModal({ d, busy, onSave, onClose }) {
           </div>
         )}
 
-        <div className="flex justify-end gap-2 pt-1">
+        <div className="grid grid-cols-2 gap-2 pt-1">
           <button type="button" onClick={onClose}
             className={btnClass()}>
             Cancel
           </button>
           <button type="button" onClick={save} disabled={!canSave || busy}
             className={btnClass({ variant: 'primary' })}>
-            {kindChanged ? 'Change kind & save' : 'Save'}
+            {kindChanged ? 'Change Kind & Save' : 'Save'}
           </button>
         </div>
       </div>

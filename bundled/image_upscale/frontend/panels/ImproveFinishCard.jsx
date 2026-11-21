@@ -27,20 +27,17 @@ export default function ImproveFinishCard({ config, setField, configDefaults }) 
     <Card
       id="improve-finish"
       title="Klein finishing pass"
-      help="Three small operations applied to the finished image by the app, not by ComfyUI: put the source's colours back, sharpen the finest detail, and add a little film grain. They are what separate a render that looks processed from one that looks photographed. Nothing to install — no model, no GPU, no node pack. All three ship off; the image you get today is byte-for-byte the one ComfyUI wrote."
+      help="Colour, sharpening, and grain run on the CPU."
     >
       {!anyOn && (
         <p className="rounded border border-border-subtle bg-surface-subtle px-2 py-1.5 text-2xs text-content-subtle">
-          Every stage is off — the finished image is left exactly as ComfyUI wrote it.
-          The reference workflow this was ported from runs colour match{' '}
-          {IMPROVE_REFERENCE.colour_match}, sharpen {IMPROVE_REFERENCE.sharpen}, grain{' '}
-          {IMPROVE_REFERENCE.grain}.
+          All finishing stages are off.
         </p>
       )}
 
       <div className="mt-3 sm:max-w-md">
         <label htmlFor="improve-colour-match" className="block text-xs font-medium text-content">
-          Put the source&rsquo;s colours back ({colour === 0 ? 'off' : colour})
+          Match Colours ({colour === 0 ? 'off' : colour})
         </label>
         <input
           id="improve-colour-match"
@@ -50,20 +47,10 @@ export default function ImproveFinishCard({ config, setField, configDefaults }) 
           step={0.05}
           value={colour}
           onChange={(e) => setField('improve', 'colour_match', Number(e.target.value))}
-          className="mt-1 w-full accent-violet-500"
+          title={`Restores the source colours. Reference: ${IMPROVE_REFERENCE.colour_match}.`}
+          className="mt-1 w-full accent-primary"
         />
-        <p className="mt-1 text-2xs text-content-subtle">
-
-            <>
-              A Klein improve keeps the content and loses the grade: skin warms or cools and
-              a dataset ends up holding two colour worlds depending on which images went
-              through. This measures the colours of the image as it was <b>before</b> the
-              pass and puts them back. {IMPROVE_REFERENCE.colour_match} is the reference
-              value; 1 forbids the pass any colour change at all.
-            </>
-
-        </p>
-        <ResetToDefault label="Put the source's colours back" section="improve"
+        <ResetToDefault label="Match Colours" section="improve"
           field="colour_match" {...reset} />
       </div>
 
@@ -79,13 +66,9 @@ export default function ImproveFinishCard({ config, setField, configDefaults }) 
           step={0.05}
           value={sharpen}
           onChange={(e) => setField('improve', 'sharpen', Number(e.target.value))}
-          className="mt-1 w-full accent-violet-500"
+          title={`Sharpens fine detail. Reference: ${IMPROVE_REFERENCE.sharpen}.`}
+          className="mt-1 w-full accent-primary"
         />
-        <p className="mt-1 text-2xs text-content-subtle">
-          Local contrast at a 1&nbsp;px radius — the finest octave, the one diffusion leaves
-          empty — not a global sharpness slider. {IMPROVE_REFERENCE.sharpen} is the reference
-          value; past about 1 the halo starts reading as an outline.
-        </p>
         <ResetToDefault label="Sharpen" section="improve" field="sharpen" {...reset} />
       </div>
 
@@ -101,15 +84,9 @@ export default function ImproveFinishCard({ config, setField, configDefaults }) 
           step={0.002}
           value={grain}
           onChange={(e) => setField('improve', 'grain', Number(e.target.value))}
-          className="mt-1 w-full accent-violet-500"
+          title={`Adds fine texture. Reference: ${IMPROVE_REFERENCE.grain}.`}
+          className="mt-1 w-full accent-primary"
         />
-        <p className="mt-1 text-2xs text-content-subtle">
-          Diffusion output is smooth in a way photographs are not — the model resolves
-          structure confidently and leaves the finest octave nearly empty. A very small
-          amount of noise refills it and the eye reads the result as a photograph.
-          The scale is deliberately tiny: {IMPROVE_REFERENCE.grain} is about ±2.5 levels of
-          an 8-bit image, seen as texture and never as noise.
-        </p>
         <ResetToDefault label="Film grain" section="improve" field="grain" {...reset} />
       </div>
 
@@ -119,7 +96,7 @@ export default function ImproveFinishCard({ config, setField, configDefaults }) 
           off. */}
       <div className="mt-3 sm:max-w-md">
         <label htmlFor="improve-grain-sat" className="block text-xs font-medium text-content">
-          How coloured that grain is ({grainSat})
+          Grain Colour ({grainSat})
         </label>
         <input
           id="improve-grain-sat"
@@ -129,13 +106,10 @@ export default function ImproveFinishCard({ config, setField, configDefaults }) 
           step={0.05}
           value={grainSat}
           onChange={(e) => setField('improve', 'grain_saturation', Number(e.target.value))}
-          className="mt-1 w-full accent-violet-500"
+          title="Zero is monochrome grain. Higher values add colour."
+          className="mt-1 w-full accent-primary"
         />
-        <p className="mt-1 text-2xs text-content-subtle">
-          0 puts identical noise on the three channels, which is what film does and what
-          reads as grain. 1 makes each channel independent, which reads as sensor noise.
-        </p>
-        <ResetToDefault label="How coloured that grain is" section="improve"
+        <ResetToDefault label="Grain Colour" section="improve"
           field="grain_saturation" {...reset} />
       </div>
     </Card>

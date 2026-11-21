@@ -794,14 +794,11 @@ export default function BankPage() {
           </div>
         </div>
         {foldersOpen && <section id="bank-import-subfolders" aria-label="Import Subfolders" className="space-y-3">
-          <label className="flex min-h-10 items-center gap-2 text-sm text-content-muted">
+          <label title="Create one bank per checked subfolder. Source files stay in place."
+            className="flex min-h-10 items-center gap-2 text-sm text-content-muted">
             <input type="checkbox" checked={splitMode} onChange={(event) => setSplitMode(event.target.checked)} />
             Separate Banks
           </label>
-          <p className="text-xs text-content-muted">
-            {splitMode ? 'Each checked subfolder becomes a separate bank.'
-              : 'Keep one bank. Uncheck subfolders to exclude them; source folders stay on disk.'}
-          </p>
         {splitMode && (
           <label className="flex items-center gap-1.5 text-sm text-content-muted">
             <input type="checkbox" checked={includeLoose}
@@ -893,7 +890,7 @@ export default function BankPage() {
         </div>
       ) : banks.length === 0 ? (
         <p className="text-sm text-content-muted">
-          No bank yet — create one above to start triaging a folder.
+          No banks yet.
         </p>
       ) : (
         <div className="space-y-3">

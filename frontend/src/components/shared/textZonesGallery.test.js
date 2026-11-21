@@ -25,7 +25,7 @@ test('zoneStyle turns a region into percentage geometry', () => {
 });
 
 test('the headline separates "shown" from "flagged"', () => {
-  assert.equal(galleryHeadline(12, 12), ' — 12 pages flagged');
-  assert.equal(galleryHeadline(12, 300), ' — 300 pages flagged, first 12 shown');
-  assert.equal(galleryHeadline(1, 1), ' — 1 page flagged');
+  assert.equal(galleryHeadline(12, 12), '12 pages flagged');
+  assert.equal(galleryHeadline(12, 300), '300 pages flagged, first 12 shown');
+  assert.equal(galleryHeadline(1, 1), '1 page flagged');
 });
