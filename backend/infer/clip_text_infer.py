@@ -50,6 +50,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 from _harness import _log
+from clip_local_weights import MODEL_NAME, PRETRAINED, resolve_clip_checkpoint
 
 # Library banners belong on the progress channel, not the result one: a bare
 # print() from a dependency used to land on stdout ahead of the JSON line and
@@ -59,10 +60,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from infer_io import claim_result_stream  # noqa: E402
 _OUT = claim_result_stream(__name__)
 import import_report  # noqa: E402
-
-# MUST match bank_score_infer.py — see the contract note above.
-MODEL_NAME = 'ViT-L-14'
-PRETRAINED = 'openai'
 
 
 def _emit(obj):
@@ -91,12 +88,8 @@ def main() -> int:
     device = 'cuda' if want_cuda and torch.cuda.is_available() else 'cpu'
     _log(f'[text] loading CLIP {MODEL_NAME}/{PRETRAINED} ({device})…')
     try:
-        # Same call, same cache_dir as bank_score_infer.py, so both halves resolve
-        # the SAME checkpoint out of the SAME directory — a bank that has been
-        # scored has already paid this download.
         model, _, _preprocess = open_clip.create_model_and_transforms(
-            MODEL_NAME, pretrained=PRETRAINED,
-            cache_dir=(os.path.join(models_root, 'open_clip') if models_root else None))
+            MODEL_NAME, pretrained=resolve_clip_checkpoint(models_root))
         model.to(device).eval()
         tokenizer = open_clip.get_tokenizer(MODEL_NAME)
     except Exception as e:  # noqa: BLE001

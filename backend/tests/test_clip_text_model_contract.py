@@ -13,9 +13,8 @@ and a ranking that is plausible at a glance but is noise. No exception, no
 crash, nothing in a log. It is the worst failure mode this feature has, so it
 gets a test of its own rather than a comment.
 
-The pair is asserted textually, on the source, because the only environment that
-can actually import open_clip is the ML interpreter — not the Flask venv the
-suite runs in. A textual contract still catches the realistic regression: someone
+The three worker calls are asserted on the source so this suite can run without
+open_clip. A textual contract still catches the realistic regression: someone
 "modernises" one script's model id (say to the `-quickgelu` variant that matches
 how the openai weights were really trained) and silently invalidates every
 comparison against every already-scored bank.
@@ -31,59 +30,45 @@ purpose, until that migration happens.
 import re
 from pathlib import Path
 
+import pytest
+
+from infer import clip_local_weights
+
 INFER = Path(__file__).resolve().parents[1] / 'infer'
 SCORE = INFER / 'bank_score_infer.py'
 TEXT = INFER / 'clip_text_infer.py'
 FRAMES = INFER / 'clip_image_embed_infer.py'
 
 
-def _score_spec():
-    """(model_name, pretrained) as bank_score_infer.py passes them."""
-    src = SCORE.read_text(encoding='utf-8')
-    m = re.search(r"create_model_and_transforms\(\s*'([^']+)'\s*,\s*"
-                  r"pretrained='([^']+)'", src)
-    assert m, 'could not find the CLIP model spec in bank_score_infer.py'
-    return m.group(1), m.group(2)
-
-
-def _declared_spec(path):
-    """(MODEL_NAME, PRETRAINED) as a warm-worker script declares them."""
+@pytest.mark.parametrize('path', [SCORE, TEXT, FRAMES], ids=lambda path: path.stem)
+def test_all_towers_load_the_same_local_checkpoint(path):
     src = path.read_text(encoding='utf-8')
-    name = re.search(r"^MODEL_NAME\s*=\s*'([^']+)'", src, re.M)
-    pre = re.search(r"^PRETRAINED\s*=\s*'([^']+)'", src, re.M)
-    assert name and pre, f'could not find the CLIP model spec in {path.name}'
-    return name.group(1), pre.group(1)
+    shared_import = re.search(r'^from clip_local_weights import (.+)$', src, re.M)
+    assert shared_import and {'MODEL_NAME', 'resolve_clip_checkpoint'} <= {
+        name.strip() for name in shared_import.group(1).split(',')}
+    assert re.findall(r'open_clip\.create_model_and_transforms\(\s*([^,]+),\s*'
+                      r'pretrained=([^\n]+)\)', src) == [
+        ('MODEL_NAME', 'resolve_clip_checkpoint(models_root)')], (
+        f'{path.name} must load the shared CLIP model and local checkpoint')
 
 
-def _text_spec():
-    return _declared_spec(TEXT)
+def test_clip_checkpoint_repo_and_exact_custom_cache_filenames(tmp_path):
+    assert clip_local_weights._HUB_REPO == 'models--timm--vit_large_patch14_clip_224.openai'
+    assert clip_local_weights._FILENAMES == (
+        'open_clip_model.safetensors',
+        'open_clip_pytorch_model.safetensors',
+        'open_clip_pytorch_model.bin',
+    )
+    cache = tmp_path / 'models' / 'open_clip'
+    cache.mkdir(parents=True)
+    (cache / 'unrelated.safetensors').write_bytes(b'placeholder')
+    with pytest.raises(FileNotFoundError):
+        clip_local_weights.resolve_clip_checkpoint(
+            cache.parent, env={'XDG_CACHE_HOME': str(tmp_path / 'empty-xdg')})
 
 
-def test_text_and_image_towers_load_the_same_checkpoint():
-    """The load-bearing assertion of the whole feature."""
-    assert _text_spec() == _score_spec(), (
-        'clip_text_infer.py and bank_score_infer.py must load the SAME CLIP '
-        'model/pretrained pair — otherwise text search ranks by a cosine '
-        'between incomparable vectors and silently returns nonsense.')
-
-
-def test_video_frames_are_embedded_by_the_same_checkpoint():
-    """🎬 Video search ranks frame vectors from ``clip_image_embed_infer.py``
-    against a query encoded by the text tower. A different checkpoint there and
-    every video search silently returns a ranking with no meaning — the same
-    invisible failure as above, on a lane where the user has no captions to
-    cross-check the answer against."""
-    assert _declared_spec(FRAMES) == _score_spec(), (
-        'clip_image_embed_infer.py must load the SAME CLIP model/pretrained pair '
-        'as bank_score_infer.py and clip_text_infer.py — otherwise a video search '
-        'ranks a cosine between incomparable vectors.')
-
-
-def test_the_frame_worker_uses_the_declared_constants_and_normalises():
+def test_the_frame_worker_normalises():
     src = FRAMES.read_text(encoding='utf-8')
-    assert re.search(r'create_model_and_transforms\(\s*\n?\s*MODEL_NAME\s*,\s*'
-                     r'pretrained=PRETRAINED', src), \
-        'clip_image_embed_infer.py must build its model from MODEL_NAME/PRETRAINED'
     assert re.search(r'emb\s*/\s*emb\.norm\(dim=-1,\s*keepdim=True\)', src), \
         'clip_image_embed_infer.py must L2-normalise its embeddings'
 
@@ -99,13 +84,8 @@ def test_the_frame_worker_can_be_kept_off_the_gpu_before_torch_loads():
         'CUDA must be hidden before torch is imported'
 
 
-def test_the_text_side_uses_the_declared_constants():
-    """The constants are not decoration: the actual call has to use them, or the
-    contract above would pass while the code loaded something else."""
+def test_the_text_side_uses_the_shared_model_tokenizer():
     src = TEXT.read_text(encoding='utf-8')
-    assert re.search(r'create_model_and_transforms\(\s*\n?\s*MODEL_NAME\s*,\s*'
-                     r'pretrained=PRETRAINED', src), \
-        'clip_text_infer.py must build its model from MODEL_NAME/PRETRAINED'
     # The tokenizer must come from the same model id — a mismatched tokenizer is
     # the same class of silent bug.
     assert 'get_tokenizer(MODEL_NAME)' in src
@@ -154,10 +134,10 @@ def test_the_aesthetic_head_gets_the_embedding_space_it_was_trained_on():
     looks like a score and is noise. Nothing raises, nothing logs, and every
     ✨ Score in every bank is quietly wrong.
 
-    The three tests above cannot catch it: they assert the CLIP call-sites
+    The tower tests above cannot catch it: they assert the CLIP call-sites
     agree with EACH OTHER, which stays true when all three are changed together
     to a model this head was never trained on."""
-    assert _score_spec() == _aesthetic_expects(), (
+    assert (clip_local_weights.MODEL_NAME, clip_local_weights.PRETRAINED) == _aesthetic_expects(), (
         'bank_score_infer.py loads a CLIP pair the aesthetic head was not '
         'trained on. The head will still return a plausible, meaningless '
         'score. Changing the scoring model requires replacing or retraining '

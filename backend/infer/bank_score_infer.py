@@ -74,6 +74,8 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 from _harness import _cancel_requested, _log, _write_count
+from clip_local_weights import MODEL_NAME, resolve_clip_checkpoint
+from local_hub_cache import cached_snapshots, hub_repo_dirs, main_snapshot
 from model_memo import memo
 from score_pipeline import native_thread_limits, predict_adaptive, score_plan
 from pass_resources import CACHE_SAVE_SECONDS
@@ -496,14 +498,43 @@ def _reason(exc) -> str:
     return f'{type(exc).__name__}: {msg}' if msg else type(exc).__name__
 
 
+def _has_nsfw_files(snapshot):
+    # Real Marqo snapshots are a timm layout: config.json + weights, no
+    # preprocessor_config.json (huggingface_hub even records that file as
+    # missing under .no_exist).
+    try:
+        return ((snapshot / 'config.json').is_file()
+                and any((snapshot / name).is_file()
+                        for name in ('model.safetensors', 'pytorch_model.bin')))
+    except OSError:
+        return False
+
+
+def _resolve_nsfw_hub_cache():
+    """Hub cache directory that already has the Marqo snapshot, if any."""
+    repo_name = 'models--' + _NSFW_MODEL.replace('/', '--')
+    for repo in hub_repo_dirs(repo_name):
+        preferred = main_snapshot(repo)
+        snapshots = [preferred] if preferred is not None else []
+        snapshots.extend(snapshot for snapshot in cached_snapshots(repo)
+                         if snapshot != preferred)
+        if any(_has_nsfw_files(snapshot) for snapshot in snapshots if snapshot is not None):
+            return str(repo.parent)
+    raise FileNotFoundError(f'No local {_NSFW_MODEL} snapshot has the model files. '
+                            'Inference is offline.')
+
+
 def _load_nsfw(device):
     """((model, processor, nsfw_index), ok, reason). Marqo NSFW classifier;
-    degrades to (None, False, why) so a fetch/load failure only drops the nsfw
+    degrades to (None, False, why) so a missing snapshot or load failure only drops the nsfw
     column — while still saying why (see _load_aesthetic_head)."""
     try:
+        cache_dir = _resolve_nsfw_hub_cache()
         from transformers import AutoImageProcessor, AutoModelForImageClassification
-        proc = AutoImageProcessor.from_pretrained(_NSFW_MODEL)
-        model = AutoModelForImageClassification.from_pretrained(_NSFW_MODEL)
+        proc = AutoImageProcessor.from_pretrained(
+            _NSFW_MODEL, cache_dir=cache_dir, local_files_only=True)
+        model = AutoModelForImageClassification.from_pretrained(
+            _NSFW_MODEL, cache_dir=cache_dir, local_files_only=True)
         model.to(device).eval()
         # Find the NSFW label index robustly (id2label wording varies by revision).
         id2label = getattr(model.config, 'id2label', {}) or {}
@@ -651,8 +682,7 @@ def _main() -> int:
     if work:
         def _load_clip():
             model, _, transform = open_clip.create_model_and_transforms(
-                'ViT-L-14', pretrained='openai',
-                cache_dir=(os.path.join(models_root, 'open_clip') if models_root else None))
+                MODEL_NAME, pretrained=resolve_clip_checkpoint(models_root))
             model.to(device).eval()
             return model, transform
 

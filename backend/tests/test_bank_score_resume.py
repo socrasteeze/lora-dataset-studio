@@ -137,6 +137,7 @@ def _install_stubs(monkeypatch, mod, calls, aes_ok=True, nsfw_ok=True,
         lambda *a, **k: (clip, None, _preprocess)
     monkeypatch.setitem(sys.modules, 'torch', torch)
     monkeypatch.setitem(sys.modules, 'open_clip', open_clip)
+    monkeypatch.setattr(mod, 'resolve_clip_checkpoint', lambda _root: 'fake.safetensors')
 
     def _aesthetic(emb):
         if 'aesthetic' in fail_heads:

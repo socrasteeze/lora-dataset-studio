@@ -257,6 +257,7 @@ def test_bank_score_does_not_commit_embedding_when_file_changes_during_clip(
     monkeypatch.setitem(sys.modules, 'open_clip', open_clip)
 
     module = _load_infer('bank_score_infer')
+    monkeypatch.setattr(module, 'resolve_clip_checkpoint', lambda _root: 'fake.safetensors')
     monkeypatch.setattr(module, '_load_aesthetic_head',
                         lambda *_args: (None, False, 'offline'))
     monkeypatch.setattr(module, '_load_nsfw',
@@ -340,6 +341,7 @@ def test_bank_score_marks_rejected_snapshot_error_without_second_pillow_open(
 
     monkeypatch.setattr(Image, 'open', tracking_open)
     module = _load_infer('bank_score_infer')
+    monkeypatch.setattr(module, 'resolve_clip_checkpoint', lambda _root: 'fake.safetensors')
     monkeypatch.setattr(module, '_load_aesthetic_head',
                         lambda *_args: (None, False, 'URLError: unreachable'))
     monkeypatch.setattr(module, '_load_nsfw',

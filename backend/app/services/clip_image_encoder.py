@@ -117,7 +117,7 @@ class ImageEncoder:
         # An unrelated package left there by another project is how this worker
         # failed to start 855 times in a row while every dependency it names was
         # correctly installed.
-        env = infer_env.worker_env(python, PYTHONUTF8='1')
+        env = infer_env.worker_env(python, PYTHONUTF8='1', **infer_env.score_hf_home_env())
         if not self.use_gpu:
             # Belt and braces with the child, which hides CUDA again before it
             # imports torch. Two locks on the same door because the failure this

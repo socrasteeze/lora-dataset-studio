@@ -8625,9 +8625,12 @@ def _drive_infer_subprocess(job, python, script, payload, cache_path,
         # While the bank queue drains, Score and Faces reuse a resident worker
         # with the model already loaded (infer_pool); otherwise a plain Popen.
         from . import infer_pool
+        extra_env = infer_worker_env()
+        if script == _SCORE_SCRIPT:
+            extra_env.update(infer_env.score_hf_home_env(extra=extra_env))
         proc = infer_pool.popen(
             _infer_subprocess_argv(python, script),
-            env=infer_env.worker_env(python, **infer_worker_env()))
+            env=infer_env.worker_env(python, **extra_env))
         killer = {'timer': None}
 
         def _cancel():

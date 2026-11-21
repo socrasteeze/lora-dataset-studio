@@ -70,6 +70,8 @@ import os
 import sys
 from pathlib import Path
 
+from .. import config as cfg
+
 _INFER_DIR = str(Path(__file__).resolve().parents[2] / 'infer')
 if _INFER_DIR not in sys.path:
     sys.path.append(_INFER_DIR)
@@ -110,6 +112,15 @@ def worker_argv(python, *args) -> list:
     if not is_borrowed(python):
         return [str(python), *rest]
     return [str(python), NO_USER_SITE_FLAG, *rest]
+
+
+def score_hf_home_env(*, base=None, extra=None) -> dict:
+    """Cache override for Score and its CLIP workers. Explicit values win."""
+    if ((base is not None and 'HF_HOME' in base)
+            or (extra is not None and 'HF_HOME' in extra)):
+        return {}
+    hf_home = cfg.aitoolkit_path('hf_home')
+    return {'HF_HOME': str(hf_home)} if hf_home is not None else {}
 
 
 def worker_env(python=None, base=None, *, limit_native_threads=True, **extra) -> dict:

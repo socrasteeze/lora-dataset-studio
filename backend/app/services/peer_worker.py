@@ -16,6 +16,7 @@ from urllib.parse import urljoin
 import requests
 
 from .. import config as cfg
+from . import infer_env
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,7 @@ _SCRIPT_ENV_RESOLVERS = {
 # JoyCaption: without it the 8B model resolves to the default HF cache and is
 # DOWNLOADED AGAIN on a machine that already has it (see infer_stream's note).
 _SCRIPT_ENV_VARS = {
+    'bank_score_infer.py': infer_env.score_hf_home_env,
     'joycaption_infer.py': lambda: {'HF_HOME': str(cfg.aitoolkit_path('hf_home')),
                                     'PYTHONIOENCODING': 'utf-8'},
 }

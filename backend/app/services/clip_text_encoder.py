@@ -44,13 +44,8 @@ before that window closes. CPU fallback workers retain the idle warm-cache
 behavior above, so searches remain available while another task owns the GPU.
 The historical CPU timings above are not measurements of the CUDA path.
 
-**No silent download.** open_clip fetches ~1.6 GB of ViT-L/14 weights on first
-use. Text search never triggers that on its own: it refuses outright unless the
-bank already HAS ✨ Score embeddings, which means this machine already downloaded
-this exact checkpoint to produce them. The one residual case — the user re-pointed
-``bank_scoring.python``/``models_root`` at an environment with a different cache
-since scoring — is reported by ``weights_warning()`` so the UI can warn BEFORE the
-click rather than stall for ten minutes.
+Text search loads the same local ViT-L/14 checkpoint as Score. The worker
+reports missing weights without trying to download them.
 """
 from __future__ import annotations
 
@@ -71,6 +66,7 @@ from ..utils.redact import redact_tokens, redact_user_paths
 from . import atomic_npz
 from . import infer_env
 from .inference_device import preferred_device
+from clip_local_weights import resolve_clip_checkpoint
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +74,9 @@ _SCRIPT = str(cfg.BACKEND_DIR / 'infer' / 'clip_text_infer.py')
 _SIGLIP2_SCRIPT = str(cfg.BACKEND_DIR / 'infer' / 'siglip2_text_infer.py')
 
 # A cold `import torch` alone can run tens of seconds on a fresh machine (native
-# DLLs + antivirus), and CLIP ViT-L/14 has ~1.6 GB of weights to read after that
-# — more if they still have to be downloaded. Generous on purpose: a timeout here
-# would read as "text search is broken" about an interpreter that was merely slow.
+# DLLs + antivirus), and CLIP ViT-L/14 has ~1.6 GB of weights to read after that.
+# A timeout here would read as "text search is broken" about an interpreter
+# that was merely slow.
 START_TIMEOUT = 900
 # Once warm, a query is ~20 ms. Anything past this means the worker is wedged.
 QUERY_TIMEOUT = 120
@@ -489,30 +485,18 @@ def unavailable_reason(engine='clip'):
 
 
 def weights_warning(engine='clip'):
-    """A warning string when the FIRST search might have to download the ~1.6 GB
-    ViT-L/14 checkpoint, else None.
-
-    Normally it cannot: text search requires ✨ Score embeddings to exist, and
-    producing those downloaded this very checkpoint. The exception is a
-    models_root that has been re-pointed since — we can see the configured folder
-    is empty of an open_clip cache and say so, instead of letting the user stare
-    at a spinner for ten minutes. Best effort by design: an unreadable folder
-    returns None (we do not cry wolf about a layout we could not inspect)."""
+    """Warn when the CLIP worker cannot find its local weights."""
     if _semantic_engine(engine) == 'siglip2':
-        # The SigLIP2 capability probe is local-only and reports missing weights
-        # as unavailability.  It can therefore never surprise-start a download.
+        # The SigLIP2 capability probe already reports missing weights.
         return None
     root = (cfg.get('bank_scoring.models_root') or '').strip()
-    if not root:
-        return None            # default HF cache — the Score pass filled it
     try:
-        d = os.path.join(root, 'open_clip')
-        if os.path.isdir(d) and any(os.scandir(d)):
-            return None
+        resolve_clip_checkpoint(root, env=dict(os.environ, **infer_env.score_hf_home_env()))
+    except FileNotFoundError as exc:
+        return redact_user_paths(str(exc).partition(' Searched ')[0])
     except OSError:
         return None
-    return ('the CLIP weights are not in the models folder currently configured '
-            'for ✨ Score — the first search may download ~1.6 GB')
+    return None
 
 
 # --- warm worker --------------------------------------------------------------
@@ -637,10 +621,10 @@ def _start_worker_locked(device='cpu'):
     """Spawn the child and block until it says it is ready. Caller holds the lock."""
     global _proc, _reaper
     python = cfg.get('bank_scoring.python') or sys.executable
-    env = dict(os.environ)
+    env = infer_env.worker_env(python, PYTHONUTF8='1', limit_native_threads=False,
+                               **infer_env.score_hf_home_env())
     if device == 'cpu':
         env['CUDA_VISIBLE_DEVICES'] = ''
-    env['PYTHONUTF8'] = '1'
     try:
         proc = subprocess.Popen(
             infer_env.worker_argv(python, _SCRIPT),

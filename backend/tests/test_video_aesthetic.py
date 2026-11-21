@@ -407,10 +407,11 @@ def test_the_worker_rates_with_the_head_that_matches_the_encoder():
     assert head_contract(packaged) == head_contract(score), 'the Video and Image heads must agree'
     expects = re.search(r"_AESTHETIC_EXPECTS = \('([^']+)', '([^']+)'\)", score)
     assert expects, 'could not find _AESTHETIC_EXPECTS in bank_score_infer.py'
+    from infer import clip_local_weights
     frames = _infer_source('clip_image_embed_infer.py')
-    name = re.search(r"^MODEL_NAME\s*=\s*'([^']+)'", frames, re.M)
-    pre = re.search(r"^PRETRAINED\s*=\s*'([^']+)'", frames, re.M)
-    assert (name.group(1), pre.group(1)) == expects.groups(), \
+    assert 'from clip_local_weights import' in frames
+    assert 'MODEL_NAME, pretrained=resolve_clip_checkpoint(models_root)' in frames
+    assert (clip_local_weights.MODEL_NAME, clip_local_weights.PRETRAINED) == expects.groups(), \
         ('the video frames are embedded by a checkpoint the aesthetic head was '
          'not fitted on — every rating would be plausible and meaningless')
 
