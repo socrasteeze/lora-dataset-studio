@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-20-bank-widen-ancestor',
+    date: '2026-11-20',
+    title: 'Widen a bank without losing your analysis',
+    blurb: 'Choose a parent folder in Move Folder and keep your scores, captions and decisions. Check for extra images and overlapping banks before you apply.',
+    to: '/bank',
+  },
+  {
     id: '2026-11-20-bank-clean-selected',
     date: '2026-11-20',
     title: 'Repaint Selected Bank Images',

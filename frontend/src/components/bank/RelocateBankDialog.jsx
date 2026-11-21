@@ -7,17 +7,7 @@ import {
   relocationReady, relocationSummary,
 } from './bankRelocate'
 
-/** 📦 Move a bank's folder — repoint a bank at the folder's NEW location after
- * the user moved it (another disk, a rename, a drive letter that changed).
- *
- * Every score, caption, duplicate group and keep/reject decision lives in the
- * database against the image row, and the file path stored on each row is
- * RELATIVE to the bank's folder — so a move costs nothing as long as the bank
- * is aimed at the right place. Which is why this dialog checks FIRST and always
- * shows two numbers before the apply button unlocks: how many of the bank's
- * images are in the candidate folder, and how many are not. A folder holding
- * none of them is refused (it is a different folder, not a moved one), and no
- * outcome — not even a partial match — ever deletes a row. */
+/** Check file counts before repointing or widening a bank. */
 export default function RelocateBankDialog({ bankId, bankName, sourcePath, onClose, onDone }) {
   const toast = useToast()
   const [folder, setFolder] = useState(sourcePath || '')
@@ -86,16 +76,16 @@ export default function RelocateBankDialog({ bankId, bankName, sourcePath, onClo
       <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-surface-overlay p-4 sm:p-5 shadow-2xl space-y-4">
         <h2 className="text-base font-bold text-content">📦 Move folder</h2>
         <p className="text-sm text-content-muted">
-          {bankName}: scores and decisions stay. The folder must contain this bank&apos;s images.
+          {bankName}. Scores and decisions stay.
         </p>
         <p className="text-xs text-content-subtle">
           Currently:{' '}
           <span className="font-mono text-content-muted break-all">{sourcePath}</span>
         </p>
-        <FolderPickerField id={`relocate-folder-${bankId}`} label="New folder"
+        <FolderPickerField id={`relocate-folder-${bankId}`} label="New Folder"
           value={folder}
           onChange={(v) => { setFolder(v); setPreview(null); setCheckedFor(null) }}
-          hint="The folder that contains the images — not its parent." />
+          hint="Choose the moved folder or a parent of the current folder." />
 
         {error && (
           <p className="rounded-md border border-rose-500/60 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
@@ -105,7 +95,10 @@ export default function RelocateBankDialog({ bankId, bankName, sourcePath, onClo
         {summary && current && (
           <div className={`rounded-md border px-3 py-2 text-sm space-y-1 ${tone}`}>
             <p className="font-semibold">{summary.headline}</p>
-            <p className="opacity-90">{summary.detail}</p>
+            <p className="break-words opacity-90">{summary.detail}</p>
+            {preview.overlaps?.length > 0 && (
+              <p className="break-words">Overlapping banks include {preview.overlaps.map((bank) => bank.name).join(', ')}.</p>
+            )}
             {preview.missing_sample?.length > 0 && (
               <ul className="mt-1 space-y-0.5 font-mono text-xs opacity-80">
                 {preview.missing_sample.map((rel) => (

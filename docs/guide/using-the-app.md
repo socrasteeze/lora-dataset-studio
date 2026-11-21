@@ -3370,8 +3370,14 @@ will use.
 - **Some found, some missing** → you can still confirm. Nothing is deleted:
   rows whose file didn't come along keep their analysis and simply read as
   missing until the file comes back.
-- **None found** → refused. That folder is a *different* folder, not a moved
-  one — the usual cause is picking the parent of the folder you moved.
+- **None found** → refused for a move to an unrelated folder. Choose the
+  folder that holds the moved bank images.
+
+To widen the bank, choose a parent of its current folder. The preview shows
+the path prefix and any overlapping banks. Apply keeps the existing analysis
+and files in place. A later refresh adds the extra images. Banks that only
+inventory their root files cannot widen. Existing folder groups keep their
+original scope and can be undone under **Group by Person → Folder Groups**.
 
 The app never deletes a row on its own, and an analysis pass run while the files
 are away no longer degrades them either: a file that is *absent* is not a file

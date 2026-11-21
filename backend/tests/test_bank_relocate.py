@@ -175,6 +175,214 @@ def test_relocate_keeps_every_analysis_and_serves_from_the_new_path(
     assert client.get(f'/api/bank/{bank_id}/file/{one}').status_code == 200
 
 
+@pytest.mark.parametrize('levels', [1, 2])
+def test_widen_rebases_paths_and_keeps_analysis(client, app, tmp_path, levels):
+    import json
+
+    from app.models import BankImage, ImageBank, db
+    from app.services import image_bank_service as banks
+
+    target = tmp_path / 'library'
+    old_parent = target if levels == 1 else target / 'nested'
+    rels = ['a.png', 'sub/b.png', 'sub/deep/c.png', 'd.png']
+    bank_id, src = _mkbank(client, old_parent, rels)
+    _analyse(client, app, bank_id)
+    prefix = os.path.relpath(src, target) + os.sep
+    (src / 'a.txt').write_text('test caption', encoding='utf-8')
+    _save(str(target / 'extra.png'), photo())
+
+    def analysis_rows():
+        return {row.id: {col.name: getattr(row, col.name)
+                         for col in BankImage.__table__.columns if col.name != 'relpath'}
+                for row in BankImage.query.filter_by(bank_id=bank_id)}
+
+    with app.app_context():
+        banks.refresh_bank('local', bank_id, force=True)
+        bank = _get(ImageBank, bank_id)
+        bank.excluded_folders = json.dumps(['sub/deep'])
+        db.session.commit()
+        before = analysis_rows()
+        image_id = BankImage.query.filter_by(bank_id=bank_id, relpath='a.png').one().id
+        assert bank_id in banks._folder_sync
+
+    url = f'/api/bank/{bank_id}/relocate'
+    request = {'folder': f'"{target}{os.sep}"'}
+    r = client.post(url, json=request)
+    body = r.get_json()
+    assert r.status_code == 200, body
+    assert (body['mode'], body['prefix'], body['applied']) == ('widen', prefix, False)
+    assert (body['found'], body['total'], body['missing'], body['extra']) == (4, 4, 0, 1)
+    with app.app_context():
+        assert _get(ImageBank, bank_id).source_path == os.path.realpath(src)
+
+    r = client.post(url, json={**request, 'confirm': True})
+    assert r.status_code == 200 and r.get_json()['applied'] is True, r.get_json()
+    with app.app_context():
+        bank = _get(ImageBank, bank_id)
+        assert bank.source_path == os.path.realpath(target)
+        assert json.loads(bank.excluded_folders) == [prefix.replace(os.sep, '/') + 'sub/deep']
+        assert analysis_rows() == before
+        assert {r.relpath for r in BankImage.query.filter_by(bank_id=bank_id)} == {
+            prefix + os.path.normpath(rel) for rel in rels}
+        assert bank_id not in banks._folder_sync
+
+    file = client.get(f'/api/bank/{bank_id}/file/{image_id}')
+    assert file.status_code == 200 and file.data == (src / 'a.png').read_bytes()
+    assert (src / 'a.txt').read_text(encoding='utf-8') == 'test caption'
+    with app.app_context():
+        banks.refresh_bank('local', bank_id, force=True)
+        assert BankImage.query.filter_by(bank_id=bank_id, relpath='extra.png').count() == 1
+        assert BankImage.query.filter_by(bank_id=bank_id).count() == 5
+
+
+@pytest.mark.parametrize('present', [0, 1])
+def test_widen_with_missing_files_keeps_all_rows(client, app, tmp_path, present):
+    target = tmp_path / 'library'
+    bank_id, src = _mkbank(client, target, ['a.png', 'b.png'])
+    (src / 'b.png').unlink()
+    if not present:
+        (src / 'a.png').unlink()
+    url = f'/api/bank/{bank_id}/relocate'
+    request = {'folder': str(target)}
+    r = client.post(url, json=request)
+    assert r.status_code == 200, r.get_json()
+    body = r.get_json()
+    assert body['found'] == present and body['missing'] == 2 - present
+    assert body['needs_confirm'] is True and body['applied'] is False
+    assert body['missing_sample'][-1] == os.path.join('src', 'b.png')
+    assert [r[0] for r in _statuses(app, bank_id)] == ['a.png', 'b.png']
+    r = client.post(url, json={**request, 'confirm': True})
+    assert r.status_code == 200 and r.get_json()['applied'] is True
+    assert [r[0] for r in _statuses(app, bank_id)] == ['src/a.png', 'src/b.png']
+
+
+def test_widen_reports_nested_banks_and_keeps_read_only_protection(client, app, tmp_path):
+    from app.models import ImageBank, db
+    from app.services import bank_jobs
+
+    target = tmp_path / 'library'
+    bank_id, src = _mkbank(client, target, ['a.png'])
+    other_id, other = _mkbank(client, target / 'sibling', ['b.png'], name='Other bank')
+    with app.app_context():
+        _get(ImageBank, bank_id).read_only = True
+        db.session.commit()
+    url = f'/api/bank/{bank_id}/relocate'
+    request = {'folder': str(target)}
+    overlap = {'id': other_id, 'name': 'Other bank',
+               'source_path': os.path.realpath(other), 'relation': 'child'}
+    r = client.post(url, json=request)
+    assert r.status_code == 200 and r.get_json()['overlaps'] == [overlap]
+    with bank_jobs.mutation_lease(other_id, 'test-overlap'):
+        assert client.post(url, json={**request, 'confirm': True}).status_code == 409
+    with app.app_context():
+        assert _get(ImageBank, bank_id).source_path == os.path.realpath(src)
+    r = client.post(url, json={**request, 'confirm': True})
+    assert r.status_code == 200 and r.get_json()['overlaps'] == [overlap]
+    with app.app_context():
+        assert _get(ImageBank, bank_id).read_only is True
+
+
+def test_widen_refuses_an_ancestor_already_in_another_bank(client, tmp_path):
+    target = tmp_path / 'library'
+    bank_id, _ = _mkbank(client, target, ['a.png'])
+    assert client.post('/api/bank/create', json={
+        'name': 'Existing bank', 'folder': str(target)}).status_code == 200
+    r = client.post(f'/api/bank/{bank_id}/relocate', json={'folder': str(target), 'confirm': True})
+    assert r.status_code == 400 and 'Existing bank' in r.get_json()['error']
+
+
+def test_widen_refuses_an_ancestor_with_dataset_storage(client, app, tmp_path):
+    from app.models import FaceDataset, db
+
+    target = tmp_path / 'library'
+    bank_id, _ = _mkbank(client, target, ['a.png'])
+    storage = target / 'reserved'
+    storage.mkdir()
+    with app.app_context():
+        db.session.add(FaceDataset(user_id='local', name='Test dataset', trigger_word='test_token',
+                                   storage_root=str(storage)))
+        db.session.commit()
+    r = client.post(f'/api/bank/{bank_id}/relocate', json={'folder': str(target)})
+    assert r.status_code == 400 and 'dataset' in r.get_json()['error'].lower()
+
+
+def test_widen_refuses_a_root_only_bank(client, app, tmp_path):
+    from app.models import ImageBank, db
+
+    target = tmp_path / 'library'
+    bank_id, src = _mkbank(client, target, ['a.png'])
+    with app.app_context():
+        _get(ImageBank, bank_id).root_only = True
+        db.session.commit()
+    r = client.post(f'/api/bank/{bank_id}/relocate', json={'folder': str(target), 'confirm': True})
+    assert r.status_code == 400 and 'root-only' in r.get_json()['error']
+    with app.app_context():
+        assert _get(ImageBank, bank_id).source_path == os.path.realpath(src)
+        assert _get(ImageBank, bank_id).root_only is True
+
+
+def test_widen_rolls_back_when_a_path_rewrite_fails(client, app, tmp_path, monkeypatch):
+    from app.models import BankImage, ImageBank
+    from app.services import folder_person, image_bank_service as banks
+
+    target = tmp_path / 'library'
+    bank_id, src = _mkbank(client, target, ['a.png'])
+
+    def fail(bank_id, prefix):
+        assert BankImage.query.filter_by(bank_id=bank_id).one().relpath == prefix + 'a.png'
+        raise RuntimeError('rewrite failed')
+
+    monkeypatch.setattr(folder_person, 'widen_scopes', fail)
+    with app.app_context():
+        with pytest.raises(RuntimeError, match='rewrite failed'):
+            banks.relocate_bank('local', bank_id, str(target), confirm=True)
+        assert _get(ImageBank, bank_id).source_path == os.path.realpath(src)
+        assert BankImage.query.filter_by(bank_id=bank_id).one().relpath == 'a.png'
+
+
+def test_widen_preserves_exact_folder_groups_and_probe_history(client, app, tmp_path):
+    from app.models import BankFolderProbe, BankImage, db
+    from app.services import folder_person, image_bank_service as banks
+
+    target = tmp_path / 'library'
+    bank_id, src = _mkbank(client, target / 'middle', ['a.png', 'group/b.png', 'other/c.png'])
+    root_scope = os.path.join('middle', 'src') + os.sep
+    child_scope = root_scope + 'group'
+    with app.app_context():
+        root_id = folder_person.assert_single_person('local', bank_id, '')['cluster_id']
+        child_id = folder_person.assert_single_person('local', bank_id, 'group')['cluster_id']
+        root = folder_person.assertion_for(bank_id, '')
+        root.sample_report = '{"note": "test evidence"}'
+        db.session.add(BankFolderProbe(bank_id=bank_id, subfolder='other',
+                                      verdict='mixed', note='test probe'))
+        db.session.commit()
+
+    url = f'/api/bank/{bank_id}/relocate'
+    for parent in (target / 'middle', target):
+        r = client.post(url, json={'folder': str(parent), 'confirm': True})
+        assert r.status_code == 200, r.get_json()
+    _save(str(src / 'new.png'), photo())
+    _save(str(src / 'group' / 'new.png'), photo())
+    _save(str(target / 'middle' / 'sibling.png'), photo())
+    with app.app_context():
+        root = folder_person.assertion_for(bank_id, root_scope)
+        assert (root.cluster_id, root.sample_report) == (root_id, '{"note": "test evidence"}')
+        assert folder_person.assertion_for(bank_id, child_scope).cluster_id == child_id
+        probe = folder_person.probe_for(bank_id, root_scope + 'other')
+        assert (probe.verdict, probe.note) == ('mixed', 'test probe')
+        assert folder_person._folder_rows_q(bank_id, root_scope).count() == 1
+        banks.refresh_bank('local', bank_id, force=True)
+        clusters = {r.relpath: r.face_cluster for r in BankImage.query.filter_by(bank_id=bank_id)}
+        assert clusters[root_scope + 'new.png'] == root_id
+        assert clusters[child_scope + os.sep + 'new.png'] == child_id
+        assert clusters[os.path.join('middle', 'sibling.png')] is None
+        with pytest.raises(ValueError, match='overlapping folder group'):
+            folder_person.assert_single_person('local', bank_id, 'middle')
+        assert folder_person.revoke('local', bank_id, root_scope)['cleared'] == 2
+        assert folder_person._folder_rows_q(bank_id, child_scope).filter_by(
+            face_cluster=child_id).count() == 2
+
+
 def test_relocate_refuses_a_folder_that_is_not_this_bank(client, app, tmp_path):
     rels = ['a.png', 'b.png', 'c.png']
     bank_id, src = _mkbank(client, tmp_path, rels)
@@ -241,6 +449,20 @@ def test_relocate_rejects_an_unknown_folder(client, tmp_path):
                     json={'folder': str(tmp_path / 'nope'), 'confirm': True})
     assert r.status_code == 400
     assert 'not found' in (r.get_json().get('error') or '').lower()
+
+
+def test_widen_rejects_an_unreadable_ancestor(client, tmp_path, monkeypatch):
+    from app.services import image_bank_service as banks
+
+    target = tmp_path / 'library'
+    bank_id, _src = _mkbank(client, target, ['a.png'])
+
+    def unreadable(folder, *, onerror):
+        onerror(PermissionError(13, 'Permission denied', folder))
+
+    monkeypatch.setattr(banks, '_walk_image_relpaths', unreadable)
+    r = client.post(f'/api/bank/{bank_id}/relocate', json={'folder': str(target)})
+    assert r.status_code == 400 and 'not readable' in r.get_json()['error']
 
 
 @pytest.mark.parametrize('folder', ['', '   '])

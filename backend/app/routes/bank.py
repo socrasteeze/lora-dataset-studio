@@ -580,10 +580,9 @@ def banks_import_caption_sidecars():
 
 @bp.post('/bank/<int:bank_id>/relocate')
 def bank_relocate(bank_id):
-    """Point a bank at a new folder after the user moved it (another disk, a
-    rename). Two-step ON PURPOSE: {folder} alone only REPORTS how many of the
-    bank's files are in there, {folder, confirm: true} applies it. 400 when the
-    folder holds none of them (that is a different folder, not a moved one),
+    """Repoint a bank after a move or widen it to an ancestor folder.
+
+    {folder} reports file counts. {folder, confirm: true} applies the change.
     The preview stays readable while a pass runs; only a confirmed write returns
     409. Nothing is ever deleted — a partial match keeps every row and its
     analysis."""
@@ -600,12 +599,7 @@ def bank_relocate(bank_id):
             out = banks.relocate_preview(LOCAL_USER, bank_id, data.get('folder'))
             out['needs_confirm'] = out['missing'] > 0
             out['applied'] = False
-            if out['total'] and not out['found']:
-                raise banks.BankRelocateMismatch(
-                    'none of this bank\'s '
-                    f"{out['total']} image(s) are in that folder — it does not look "
-                    'like this bank. Pick the folder that CONTAINS the images '
-                    '(the one you moved), not its parent.', out)
+            banks.require_relocate_match(out)
     except bank_jobs.BankJobBusy as e:
         return _busy(e)
     except banks.BankRelocateMismatch as e:

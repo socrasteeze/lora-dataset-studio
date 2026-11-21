@@ -10,14 +10,12 @@
  * with `found` / `missing` counts, and the user confirms an actual number
  * rather than a hopeful "Move". Nothing is ever deleted on either side. */
 
-/** Is this preview safe to apply? A folder holding NONE of the bank's files is
- * a different folder, not a moved one — the backend refuses it outright, and
- * the button is disabled before the user can get that far. */
+/** An ancestor has a verified path relationship even if its files are missing. */
 export function canApplyRelocation(preview) {
   if (!preview) return false
   const total = Number(preview.total) || 0
   const found = Number(preview.found) || 0
-  return total === 0 || found > 0
+  return preview.mode === 'widen' || total === 0 || found > 0
 }
 
 const sameText = (a, b) => String(a ?? '').trim().toLowerCase()
@@ -59,12 +57,11 @@ export function relocationSummary(preview) {
   const found = Number(preview.found) || 0
   const missing = Number(preview.missing) || 0
   const extra = Number(preview.extra) || 0
-  if (total > 0 && found === 0) {
+  if (preview.mode !== 'widen' && total > 0 && found === 0) {
     return {
       tone: 'error',
       headline: `None of this bank's ${total} image(s) are in that folder.`,
-      detail: 'That looks like a different folder. Pick the one that CONTAINS '
-        + 'the images — usually the folder you moved, not its parent.',
+      detail: 'That looks like a different folder. Choose the folder that holds the bank images.',
     }
   }
   if (preview.same_folder) {
@@ -76,18 +73,20 @@ export function relocationSummary(preview) {
   }
   const extraNote = extra > 0
     ? ` ${extra} extra image(s) in there will be added on the next refresh.` : ''
+  const widenNote = preview.mode === 'widen'
+    ? `Widen paths with the prefix ${preview.prefix}. ` : ''
   if (missing === 0) {
     return {
       tone: 'ok',
       headline: `All ${found} image(s) of this bank are in that folder.`,
-      detail: 'Every score, caption and keep/reject decision is kept.'
+      detail: widenNote + 'Every score, caption and keep/reject decision is kept.'
         + extraNote,
     }
   }
   return {
     tone: 'warn',
     headline: `${found} of ${total} image(s) found — ${missing} are not there.`,
-    detail: 'You can still repoint the bank: nothing is deleted, the missing '
+    detail: widenNote + 'You can still repoint the bank: nothing is deleted, the missing '
       + 'rows keep their analysis and simply read as missing until their files '
       + 'come back.' + extraNote,
   }
@@ -98,6 +97,7 @@ export function relocationSummary(preview) {
  * folder that only matched 12). */
 export function relocationApplyLabel(preview) {
   if (!preview) return 'Repoint this bank'
+  if (preview.mode === 'widen') return 'Widen Bank'
   // 'en-US' explicitly: the UI is English everywhere, and the runtime locale
   // would otherwise group thousands differently from the rest of the app.
   const found = Number(preview.found) || 0

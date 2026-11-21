@@ -2598,7 +2598,7 @@ const TOPICS = [
     ['bank', 'move', 'moved', 'relocate', 'repoint', 'folder', 'new location', 'another disk',
      'other drive', 'external drive', 'unplugged', 'disconnected', 'renamed', 'drive letter',
      'path changed', 'source folder', 'unavailable', 'missing images', 'keep analysis',
-     'keep decisions', 'lost my scores', 'rescan'],
+     'keep decisions', 'lost my scores', 'rescan', 'widen bank', 'parent folder'],
     '/bank', 'using-the-app', 'move-a-bank-folder-to-another-disk'),
   action('bank-exclude-folder', 'Hide a folder inside a bank',
     ['exclude folder', 'hide folder', 'hide nested folder', 'uncheck folder',

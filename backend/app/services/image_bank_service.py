@@ -1087,7 +1087,7 @@ def _require_writable_source(bank):
 
 
 @contextmanager
-def _source_protection_change(bank):
+def _source_protection_change(bank, target=None):
     """A successful protection change cannot race a writer in an overlapping Bank.
 
     The caller owns this Bank (or has not committed its new row yet). Acquire
@@ -1095,7 +1095,7 @@ def _source_protection_change(bank):
     These leases refuse immediately when busy; they never wait on another job.
     """
     with ExitStack() as leases:
-        for other in overlapping_banks(bank.user_id, bank.id):
+        for other in _overlaps_for_source(bank.user_id, bank.id, target or bank.source_path):
             leases.enter_context(bank_jobs.mutation_lease(other['id'], 'source_protection'))
         yield
 
@@ -1717,8 +1717,8 @@ def relocate_preview(user_id, bank_id, folder) -> dict:
     Nothing is written. Every known relpath is looked up under the candidate
     folder (one os.walk, matched case-insensitively through normcase — same
     keying as refresh_bank, so a drive letter or a folder re-created in another
-    case still counts as the same tree). Returns {folder, total, found, missing,
-    missing_sample, extra, same_folder}; ValueError on an unknown bank/folder.
+    case still counts as the same tree). An ancestor is checked against the
+    paths the existing rows would have after widening.
 
     The point of the two numbers is that the user decides: a bank moved whole
     reads 29 759 found / 0 missing, and a mistyped folder reads 0 / 29 759 — a
@@ -1733,11 +1733,24 @@ def relocate_preview(user_id, bank_id, folder) -> dict:
     if other is not None and other.id != bank.id:
         raise ValueError(f'that folder is already the bank "{other.name}" — open '
                          'that bank instead of pointing a second one at it')
+    source = os.path.realpath(bank.source_path) if bank.source_path else None
+    prefix = ''
+    if source and Path(target) in Path(source).parents:
+        if bank.root_only:
+            raise ValueError('A root-only bank cannot widen to an ancestor folder.')
+        prefix = os.path.relpath(source, target) + os.sep
+
     known = {}
     for (rel,) in db.session.query(BankImage.relpath).filter_by(bank_id=bank_id):
-        known.setdefault(os.path.normcase(rel), rel)
+        candidate = prefix + (rel.replace(os.altsep, os.sep) if prefix and os.altsep else rel)
+        known.setdefault(os.path.normcase(candidate), candidate)
+
+    def check_walk_error(error):
+        if error.filename is None or Path(error.filename) == Path(target):
+            raise ValueError(f'folder not found or not readable: {target}') from error
+
     seen = {os.path.normcase(rel) for rel in
-            _walk_image_relpaths(target, onerror=lambda _e: None)}
+            _walk_image_relpaths(target, onerror=check_walk_error)}
     hit = seen & set(known)
     gone = sorted(known[k] for k in set(known) - hit)
     return {
@@ -1747,9 +1760,34 @@ def relocate_preview(user_id, bank_id, folder) -> dict:
         'missing': len(gone),
         'missing_sample': gone[:_MISSING_SAMPLE],
         'extra': len(seen - hit),
-        'same_folder': os.path.normcase(target) == os.path.normcase(
-            os.path.realpath(bank.source_path or '')),
+        'same_folder': source is not None and Path(target) == Path(source),
+        'mode': 'widen' if prefix else 'relocate',
+        'prefix': prefix,
+        'overlaps': _overlaps_for_source(user_id, bank_id, target) if prefix else [],
     }
+
+
+def require_relocate_match(preview):
+    if preview['mode'] != 'widen' and preview['total'] and not preview['found']:
+        raise BankRelocateMismatch(
+            f"None of this bank's {preview['total']} images are in that folder. "
+            'Choose the folder that holds the bank images.', preview)
+
+
+def _widen_bank_paths(bank, prefix):
+    import json
+
+    from . import folder_person
+
+    excluded = _excluded_prefixes(bank.id)
+    if excluded:
+        bank.excluded_folders = json.dumps([_posix_rel(prefix) + folder for folder in excluded])
+    relpath = BankImage.relpath
+    if os.altsep:
+        relpath = func.replace(relpath, os.altsep, os.sep)
+    BankImage.query.filter_by(bank_id=bank.id).update(
+        {BankImage.relpath: literal(prefix) + relpath}, synchronize_session=False)
+    folder_person.widen_scopes(bank.id, prefix)
 
 
 @_serialized_bank_mutation('relocate')
@@ -1757,32 +1795,25 @@ def relocate_bank(user_id, bank_id, folder, confirm=False, *,
                   _bank_lease=None) -> dict:
     """Point a bank at a NEW folder, keeping every row and every analysis.
 
-    Moving a bank costs nothing by construction: BankImage.relpath is relative
-    to source_path, and scores / dhash / duplicate groups / face verdicts /
-    captions / keep-reject decisions all hang off the row id. So this only
-    rewrites ONE string — the danger is never the write, it is aiming it wrong.
-
-    Hence: no call applies anything without ``confirm``; a folder that holds
-    NONE of the bank's files is refused outright (that is a different folder,
-    not a moved one); and a partial match goes through but deletes nothing —
-    rows whose file did not come along keep their analysis and simply read as
-    missing in the folder-sync note. Returns the preview dict plus
-    {'applied', 'needs_confirm', 'overlaps'}."""
+    Confirmation updates the root and, for an ancestor, rebases stored paths.
+    Files are untouched and missing rows keep their analysis."""
     out = relocate_preview(user_id, bank_id, folder)
     out['needs_confirm'] = out['missing'] > 0
     out['applied'] = False
-    if out['total'] and not out['found']:
-        raise BankRelocateMismatch(
-            'none of this bank\'s '
-            f"{out['total']} image(s) are in that folder — it does not look "
-            'like this bank. Pick the folder that CONTAINS the images '
-            '(the one you moved), not its parent.', out)
+    require_relocate_match(out)
     if not confirm:
         return out
     bank = get_bank(user_id, bank_id)
-    bank.source_path = out['folder']
-    with _source_protection_change(bank) if bank.read_only else ExitStack():
-        db.session.commit()
+    target = out['folder']
+    try:
+        with _source_protection_change(bank, target) if bank.read_only else ExitStack():
+            if out['prefix']:
+                _widen_bank_paths(bank, out['prefix'])
+            bank.source_path = target
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
     _folder_sync.pop(bank_id, None)     # next walk must see the new folder
     out['applied'] = True
     out['overlaps'] = overlapping_banks(user_id, bank_id)
@@ -8105,10 +8136,14 @@ def overlapping_banks(user_id, bank_id) -> list:
     [{'id', 'name', 'source_path', 'relation'}] with relation 'parent' (it
     contains us) or 'child' (it sits inside us)."""
     bank = get_bank(user_id, bank_id)
-    if not bank or not bank.source_path:
+    return _overlaps_for_source(user_id, bank_id, bank.source_path) if bank else []
+
+
+def _overlaps_for_source(user_id, bank_id, source_path) -> list:
+    if not source_path:
         return []
     try:
-        mine = os.path.normcase(os.path.realpath(bank.source_path))
+        mine = os.path.normcase(os.path.realpath(source_path))
     except (OSError, ValueError):
         return []
     out = []

@@ -22,6 +22,25 @@ test('the mismatch verdict names the count and says what to pick instead', () =>
   assert.equal(s.tone, 'error');
   assert.match(s.headline, /None of this bank's 10 image\(s\)/);
   assert.match(s.detail, /different folder/);
+  assert.doesNotMatch(s.detail, /not its parent/);
+});
+
+test('a verified parent path enables Apply and shows the prefix', () => {
+  const folder = 'D:\\Library';
+  const answer = preview({ folder, mode: 'widen', prefix: 'nested\\bank\\', extra: 2 });
+  assert.equal(relocationReady(answer, folder, folder), true);
+  assert.equal(relocationApplyLabel(answer), 'Widen Bank');
+  const summary = relocationSummary(answer);
+  assert.equal(summary.tone, 'ok');
+  assert.ok(summary.detail.includes('Widen paths with the prefix nested\\bank\\'));
+  assert.match(summary.detail, /2 extra image/);
+});
+
+test('a verified ancestor with missing files keeps the confirmation available', () => {
+  const answer = preview({ mode: 'widen', prefix: 'bank/', found: 0, missing: 10 });
+  assert.equal(relocationReady(answer, answer.folder, answer.folder), true);
+  assert.equal(relocationSummary(answer).tone, 'warn');
+  assert.match(relocationSummary(answer).detail, /Widen paths with the prefix bank\//);
 });
 
 test('a full match promises the analysis is kept', () => {

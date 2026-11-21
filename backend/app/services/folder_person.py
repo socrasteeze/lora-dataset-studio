@@ -210,12 +210,37 @@ def _report_of(row) -> dict | None:
 
 
 def _folder_rows_q(bank_id, subfolder):
-    """Every image row of one TOP-LEVEL subfolder — the same set the Subfolder
-    filter scopes to, expressed the same way (prefix match, '' = bank root)."""
+    """An empty or slash-terminated scope covers direct files only."""
     q = BankImage.query.filter_by(bank_id=bank_id)
-    if (subfolder or '') == '':
-        return q.filter(~BankImage.relpath.contains(os.sep))
-    return q.filter(BankImage.relpath.startswith(subfolder + os.sep))
+    prefix = _scope_prefix(subfolder)
+    if prefix:
+        q = q.filter(func.substr(BankImage.relpath, 1, len(prefix)) == prefix)
+    if not subfolder or subfolder.endswith(os.sep):
+        q = q.filter(~func.substr(BankImage.relpath, len(prefix) + 1).contains(os.sep))
+    return q
+
+
+def _scope_prefix(subfolder):
+    return subfolder.rstrip(os.sep) + os.sep if subfolder else ''
+
+
+def _in_scope(relpath, subfolder):
+    if os.altsep:
+        relpath = relpath.replace(os.altsep, os.sep)
+    prefix = _scope_prefix(subfolder)
+    return relpath.startswith(prefix) and (
+        (subfolder and not subfolder.endswith(os.sep))
+        or os.sep not in relpath[len(prefix):])
+
+
+def widen_scopes(bank_id, prefix):
+    """Rebase exact scopes. The old root now covers direct files under prefix."""
+    for model in (BankFolderPerson, BankFolderProbe):
+        scopes = db.session.query(model.subfolder).filter_by(bank_id=bank_id).all()
+        # A rebased key can be an existing key. Move the longer one first.
+        for (scope,) in sorted(scopes, key=lambda row: len(row[0]), reverse=True):
+            model.query.filter_by(bank_id=bank_id, subfolder=scope).update(
+                {model.subfolder: prefix + scope}, synchronize_session=False)
 
 
 def _to_check(bank_id, subfolder) -> list:
@@ -311,6 +336,13 @@ def assert_single_person(user_id, bank_id, subfolder, *,
         raise ValueError('this subfolder has no images')
     row = assertion_for(bank_id, sub)
     if row is None:
+        prefix = _scope_prefix(sub)
+        for existing in asserted_subfolders(bank_id):
+            existing_prefix = _scope_prefix(existing)
+            if ((sub and not sub.endswith(os.sep) and existing_prefix.startswith(prefix))
+                    or (existing and not existing.endswith(os.sep)
+                        and prefix.startswith(existing_prefix))):
+                raise ValueError('Undo the overlapping folder group before grouping this folder.')
         row = BankFolderPerson(bank_id=bank_id, subfolder=sub,
                                cluster_id=_next_cluster_id(bank_id))
         db.session.add(row)
@@ -369,10 +401,16 @@ def stamp_new_rows(bank_id, rows) -> int:
               BankFolderPerson.query.filter_by(bank_id=bank_id).all()}
     if not by_sub:
         return 0
-    banks = _svc()
     stamped = 0
     for row in rows:
-        cid = by_sub.get(banks._subfolder_of(row.get('relpath') or ''))
+        relpath = row.get('relpath') or ''
+        if os.altsep:
+            relpath = relpath.replace(os.altsep, os.sep)
+        folder, separator, _ = relpath.rpartition(os.sep)
+        cid = by_sub.get(folder + separator)
+        while cid is None and folder:
+            cid = by_sub.get(folder)
+            folder = folder.rpartition(os.sep)[0]
         # Both keys are written on EVERY row, not only the matching ones: these
         # dicts go to one executemany, which takes its column list from the first
         # of them — a half-stamped batch would drop the ids of all the others.
@@ -560,7 +598,7 @@ def _sample_job(bank_id, subfolder):
             live = banks._live_image(image_id)
             res = results.get(p) or {}
             if (live is None or live.status == 'reject'
-                    or banks._subfolder_of(live.relpath) != subfolder
+                    or not _in_scope(live.relpath, subfolder)
                     or not banks._prepare_analysis_write(
                         live, p, res.get('fingerprint'))):
                 sample_valid = False
@@ -857,7 +895,7 @@ def _apply_probe_results(bank_id, state, results) -> dict:
             live = banks._live_image(image_id)
             res = results.get(p) or {}
             if (live is None or live.status == 'reject'
-                    or banks._subfolder_of(live.relpath) != s['name']
+                    or not _in_scope(live.relpath, s['name'])
                     or not banks._prepare_analysis_write(
                         live, p, res.get('fingerprint'))):
                 folder_valid = False

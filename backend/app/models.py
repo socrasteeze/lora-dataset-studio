@@ -924,9 +924,9 @@ class BankFolderPerson(db.Model):
     that subfolder gets a person id immediately, at zero GPU cost, and the
     embeddings pass then SKIPS those images entirely.
 
-    Keyed on (bank_id, subfolder) — the TOP-LEVEL subfolder, exactly the string the
-    Subfolder filter uses ('' = the bank root), so the assertion and the scoping
-    facet always talk about the same set of files. It is a rule, not a stamp: it
+    Keyed on (bank_id, subfolder). New groups use the Subfolder filter's top-level
+    names. Widened banks preserve the original scope as a relative path. Empty
+    and trailing-separator scopes cover only direct files. It is a rule: it
     survives re-scans, and an image that lands in the folder later joins the group
     on insert. Revoking deletes the row and clears the ids it wrote, putting those
     images back in the way of normal clustering.
@@ -940,8 +940,7 @@ class BankFolderPerson(db.Model):
     bank_id = db.Column(
         Integer, db.ForeignKey('image_bank.id', ondelete='CASCADE'),
         nullable=False, index=True)
-    # Top-level subfolder name, '' for the bank root. Stored verbatim — it is a
-    # user path fragment and is never shown outside this install.
+    # A bank-relative scope, with '' for direct files in the bank root.
     subfolder = db.Column(Text, nullable=False, default='')
     # The bank-local person id this folder owns. Allocated once, above every id in
     # use at that moment, and NEVER reallocated while the assertion stands — the
