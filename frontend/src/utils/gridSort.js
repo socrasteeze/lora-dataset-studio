@@ -65,6 +65,18 @@ const measure = (key, label, pass, hi, lo) => [
 export const BANK_SORTS = [
   { id: 'default', label: 'Default', group: '',
     title: 'The bank\'s own order (or the worst-first order of the active flag chip)' },
+  { id: 'added_desc', label: 'Newest first', group: '',
+    title: 'Review the images most recently added to this bank' },
+  { id: 'added_asc', label: 'Oldest first', group: '',
+    title: 'Review the images first added to this bank' },
+  { id: 'name_asc', label: 'Name A→Z', group: '',
+    title: 'Find images by file name across all folders, ignoring case' },
+  { id: 'name_desc', label: 'Name Z→A', group: '',
+    title: 'Find images from the end of the file name list, ignoring case' },
+  { id: 'folder_asc', label: 'Folder A→Z', group: '',
+    title: 'Keep full folder paths together, then file names, with root files first' },
+  { id: 'folder_desc', label: 'Folder Z→A', group: '',
+    title: 'Reverse the full folder path and file name order, with root files last' },
   ...measure('res', 'Resolution', FILE,
     'Biggest first, in megapixels (width × height)',
     'Smallest first — surfaces the thumbnails hiding in a big dump'),
@@ -186,7 +198,7 @@ export function bankSortOptions(counts) {
  * in first-appearance order). Eleven measures × two directions is a long flat
  * list; grouped by the pass that MEASURED them, it is a short list of familiar
  * names — and it tells the user which pass to run to unlock a whole section.
- * The ungrouped head (Default) comes back with group ''.
+ * Default and the date and path sorts come back with group ''.
  */
 export function bankSortGroups(counts) {
   const groups = [];

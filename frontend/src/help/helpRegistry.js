@@ -713,8 +713,9 @@ const TOPICS = [
      'red banner', 'red error', '409', 'how many groups', 'result', 'outcome',
      'did it work', 'no feedback', 'no progress', 'bank', 'triage'],
     '/bank', 'using-the-app', 'why-a-re-run-button-is-greyed-out'),
-  action('bank-sort-grid', 'Sort a bank by anything a pass measured',
+  action('bank-sort-grid', 'Sort Bank Images',
     ['sort', 'order', 'ordering', 'reorder', 'rank', 'ranking', 'best first',
+     'newest', 'oldest', 'date added', 'file name', 'folder name', 'alphabetical',
      'worst first', 'aesthetic', 'aesthetic score', 'score', 'sharpness', 'blur',
      'blurry', 'sharpest', 'resolution', 'megapixels', 'largest', 'smallest',
      // The measures the menu gained — each one is what someone types when they

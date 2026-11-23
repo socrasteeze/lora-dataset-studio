@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-23-bank-grid-sorts',
+    date: '2026-11-23',
+    title: 'Find bank images by date, name or folder',
+    blurb: 'Sort a bank\'s images by newest or oldest added, file name, or full folder path. These orders work before any scan or scoring pass.',
+    to: '/bank',
+  },
+  {
     id: '2026-11-22-watermark-scope-budget',
     date: '2026-11-22',
     title: 'Scan Every Selection',

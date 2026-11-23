@@ -3073,6 +3073,10 @@ def _res_bucket_counts(bank_id) -> dict:
 # (framing, origin, cluster and group ids, watermark/quality state). Those are
 # facets — ordering by an id number means nothing to a reviewer.
 _SORT_KEYS = {
+    'added': lambda: BankImage.created_at,
+    'name': lambda: func.path_basename_key(BankImage.relpath),
+    'folder': lambda: (func.path_dirname_key(BankImage.relpath),
+                       func.path_basename_key(BankImage.relpath)),
     'aesthetic': lambda: BankImage.aesthetic_score,
     'sharp': lambda: BankImage.blur_score,
     'res': lambda: BankImage.width * BankImage.height,
@@ -3096,8 +3100,8 @@ _SORT_KEYS = {
 }
 # Menu order (the UI renders it in this order); ids are stored query values, so a
 # key may be added here but never renamed without an alias.
-_SORT_ORDER = ('res', 'size', 'aesthetic', 'nsfw', 'sharp', 'noise', 'flat',
-               'detail', 'bars', 'jpeg', 'face', 'yaw', 'medium_conf')
+_SORT_ORDER = ('added', 'name', 'folder', 'res', 'size', 'aesthetic', 'nsfw',
+               'sharp', 'noise', 'flat', 'detail', 'bars', 'jpeg', 'face', 'yaw', 'medium_conf')
 GRID_SORTS = tuple(f'{k}_{d}' for k in _SORT_ORDER for d in ('desc', 'asc'))
 
 
@@ -3111,9 +3115,12 @@ def _sort_order(sort):
     key, _, direction = (sort or '').rpartition('_')
     if direction not in ('asc', 'desc') or key not in _SORT_KEYS:
         return None
-    col = _SORT_KEYS[key]()
-    ranked = col.desc() if direction == 'desc' else col.asc()
-    return (col.is_(None).asc(), ranked, BankImage.id.asc())
+    columns = _SORT_KEYS[key]()
+    if not isinstance(columns, tuple):
+        columns = (columns,)
+    return tuple(step for col in columns for step in (
+        col.is_(None).asc(), col.desc() if direction == 'desc' else col.asc()
+    )) + (BankImage.id.asc(),)
 
 
 def _flag_counts(bank_id, th) -> tuple[dict, dict]:

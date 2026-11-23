@@ -254,6 +254,21 @@ def _busy_timeout_ms() -> int:
     return _positive_env_int('LDS_SQLITE_BUSY_TIMEOUT_MS', SQLITE_BUSY_TIMEOUT_MS)
 
 
+
+def _path_basename_key(path):
+    """Case-folded file name of a bank-relative path, or NULL when missing."""
+    if path is None:
+        return None
+    return str(path).replace('\\', '/').rsplit('/', 1)[-1].casefold()
+
+
+def _path_dirname_key(path):
+    """Case-folded parent of a bank-relative path, or NULL when missing."""
+    if path is None:
+        return None
+    return str(path).replace('\\', '/').rpartition('/')[0].casefold()
+
+
 def _configure_sqlite_connection(dbapi_con, _connection_record):
     """Apply the app's SQLite guarantees to every newly-opened connection.
 
@@ -263,6 +278,10 @@ def _configure_sqlite_connection(dbapi_con, _connection_record):
     """
     if not isinstance(dbapi_con, sqlite3.Connection):
         return
+    dbapi_con.create_function('path_basename_key', 1, _path_basename_key,
+        deterministic=True)
+    dbapi_con.create_function('path_dirname_key', 1, _path_dirname_key,
+        deterministic=True)
     cur = dbapi_con.cursor()
     try:
         cur.execute('PRAGMA foreign_keys=ON')

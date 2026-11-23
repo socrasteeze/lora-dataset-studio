@@ -2345,9 +2345,17 @@ have a **Sort** control, and it changes nothing but the order — the same image
 match, the counts stay put, and every bulk action keeps operating on exactly
 what the filters left.
 
-In a **bank** (View ▸ Sort, next to the tile size) you can order by *anything the
-passes measured*, either way. The menu is grouped by the pass that produces the
-figure, so a greyed-out section also tells you which pass to run:
+In a **bank** (View ▸ Sort, next to the tile size), the entries after Default
+work before any pass:
+
+- **Newest first / Oldest first** use the time each image entered the bank,
+  not the file's modification time. Images without that time go last both ways.
+- **Name A→Z / Name Z→A** order by file name across all folders, ignoring case.
+- **Folder A→Z / Folder Z→A** order by the full parent path, then file name,
+  ignoring case. Root files come first on A→Z and last on Z→A.
+
+The remaining entries order by *anything the passes measured*, either way.
+They are grouped by pass, so a greyed-out section tells you which pass to run:
 
 - **📁 File** — **Resolution ↓ / ↑** (megapixels, so a 900×900 outranks a wider
   1200×300) and **File size ↓ / ↑** (bytes on disk — the one figure no filter

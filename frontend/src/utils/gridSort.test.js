@@ -188,6 +188,7 @@ test('bank sort ids are the ones the server accepts (never rename: they are stor
   // matching the server, which would drop back to the default without a word.
   assert.deepEqual(BANK_SORTS.map((s) => s.id), [
     'default',
+    'added_desc', 'added_asc', 'name_asc', 'name_desc', 'folder_asc', 'folder_desc',
     'res_desc', 'res_asc', 'size_desc', 'size_asc',
     'aesthetic_desc', 'aesthetic_asc', 'nsfw_desc', 'nsfw_asc',
     'sharp_desc', 'sharp_asc', 'noise_desc', 'noise_asc',
@@ -214,17 +215,37 @@ test('bank sort ids are the ones the server accepts (never rename: they are stor
 
 test('bank menu groups by pass, keeps every option, and heads with Default', () => {
   const groups = bankSortGroups({ scanned: 1, scored: 1, faces: 1 });
-  assert.deepEqual(groups[0], {
-    group: '',
-    options: [{ id: 'default', group: '', label: 'Default', disabled: false,
-      title: groups[0].options[0].title }],
-  });
+  assert.equal(groups[0].group, '');
+  assert.deepEqual(groups[0].options.map((o) => [o.id, o.label, o.disabled]), [
+    ['default', 'Default', false],
+    ['added_desc', 'Newest first', false],
+    ['added_asc', 'Oldest first', false],
+    ['name_asc', 'Name A→Z', false],
+    ['name_desc', 'Name Z→A', false],
+    ['folder_asc', 'Folder A→Z', false],
+    ['folder_desc', 'Folder Z→A', false],
+  ]);
   assert.deepEqual(groups.map((g) => g.group),
     ['', 'File', 'Score', 'Scan quality', 'Faces', 'Medium']);
   // Grouping is a RE-ARRANGEMENT: no option invented, none lost, none duplicated.
   const flat = groups.flatMap((g) => g.options.map((o) => o.id));
   assert.deepEqual(flat.slice().sort(), BANK_SORTS.map((s) => s.id).slice().sort());
   assert.equal(new Set(flat).size, flat.length);
+});
+
+test('date and path sorts stay enabled before any pass and persist per bank', () => {
+  const ids = ['added_desc', 'added_asc', 'name_asc', 'name_desc', 'folder_asc', 'folder_desc'];
+  for (const counts of [null, {}, { scanned: 0, scored: 0, faces: 0 }]) {
+    const head = bankSortGroups(counts)[0].options.slice(1);
+    assert.deepEqual(head.map((o) => o.id), ids);
+    assert.ok(head.every((o) => !o.disabled));
+  }
+  for (const id of ids) {
+    assert.equal(BANK_SORTS.find((o) => o.id === id).needs, undefined);
+    const store = fakeStore();
+    saveBankSort(7, id, store);
+    assert.equal(loadBankSort(7, store), id);
+  }
 });
 
 // ---- the chosen order is remembered PER BANK -------------------------------

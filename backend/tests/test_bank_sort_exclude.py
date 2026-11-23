@@ -22,6 +22,10 @@ checklist. What must hold:
   * the curation pool sees it too — hiding an image in the grid must keep it out
     of "pick 60 diverse".
 """
+from datetime import datetime
+
+import pytest
+
 from app.extensions import db
 from app.models import BankImage
 from app.services import image_bank_service as banks
@@ -99,6 +103,82 @@ def test_the_menu_and_the_server_advertise_the_same_ids():
     assert len(set(banks.GRID_SORTS)) == len(banks.GRID_SORTS)
     for sort_id in banks.GRID_SORTS:
         assert banks._sort_order(sort_id) is not None, sort_id
+
+
+@pytest.mark.parametrize('sort, expected', [
+    ('added_desc', ['a.png', 'b.png', 'c.png']),
+    ('added_asc', ['b.png', 'a.png', 'c.png']),
+])
+def test_added_sorts_use_inventory_timestamps_and_sink_nulls(
+        client, tmp_path, app, sort, expected):
+    bank_id = _mk3(client, tmp_path)
+    _set(app, bank_id, {
+        'a.png': {'created_at': datetime(2025, 2, 3, 4, 5, 6)},
+        'b.png': {'created_at': datetime(2024, 6, 7, 8, 9, 10)},
+        'c.png': {'created_at': None},
+    })
+    names, total = _names(client, bank_id, sort=sort)
+    assert names == expected
+    assert total == 3
+    assert _names(client, bank_id, sort=sort, limit=1, offset=1) == ([expected[1]], 3)
+
+
+@pytest.mark.parametrize('sort', ['added_desc', 'added_asc'])
+def test_added_timestamp_ties_use_id_order(client, tmp_path, app, sort):
+    bank_id = _mk3(client, tmp_path)
+    _set(app, bank_id, {name: {'created_at': datetime(2025, 1, 1)}
+                        for name in ('a.png', 'b.png', 'c.png')})
+    assert _names(client, bank_id, sort=sort) == (['a.png', 'b.png', 'c.png'], 3)
+
+
+@pytest.mark.parametrize('sort', ['name_asc', 'name_desc', 'folder_asc', 'folder_desc'])
+def test_path_sorts_use_basename_and_full_parent_without_changing_membership(
+        client, tmp_path, app, sort):
+    paths = ['Zulu.png', 'Bravo.png', 'z/alpha.png', 'A/deep-b/first.png',
+             'a/deep-a/Zebra.png', 'a/deep-a/beta.png', 'B/ALPHA.png',
+             'c/ÉCHO.png', 'd/écho.png']
+    bank_id, _src = _mkbank(client, tmp_path, {p: flat() for p in paths})
+    with app.app_context():
+        rows = BankImage.query.filter_by(bank_id=bank_id).order_by(BankImage.id).all()
+        inventoried = {row.relpath.replace('\\', '/').casefold(): row.id for row in rows}
+        ids = {path: inventoried[path.casefold()] for path in paths}
+        # Stored paths can use either separator, even within the same parent.
+        for index, row in enumerate(rows):
+            path = row.relpath.replace('\\', '/')
+            row.relpath = path if index % 2 else path.replace('/', '\\')
+        db.session.commit()
+
+    alpha = sorted([ids['z/alpha.png'], ids['B/ALPHA.png']])
+    echo = sorted([ids['c/ÉCHO.png'], ids['d/écho.png']])
+    expected = {
+        'name_asc': alpha + [ids[p] for p in (
+            'a/deep-a/beta.png', 'Bravo.png', 'A/deep-b/first.png',
+            'a/deep-a/Zebra.png', 'Zulu.png')] + echo,
+        'name_desc': echo + [ids[p] for p in (
+            'Zulu.png', 'a/deep-a/Zebra.png', 'A/deep-b/first.png',
+            'Bravo.png', 'a/deep-a/beta.png')] + alpha,
+        'folder_asc': [ids[p] for p in (
+            'Bravo.png', 'Zulu.png', 'a/deep-a/beta.png', 'a/deep-a/Zebra.png',
+            'A/deep-b/first.png', 'B/ALPHA.png', 'c/ÉCHO.png', 'd/écho.png', 'z/alpha.png')],
+        'folder_desc': [ids[p] for p in (
+            'z/alpha.png', 'd/écho.png', 'c/ÉCHO.png', 'B/ALPHA.png',
+            'A/deep-b/first.png', 'a/deep-a/Zebra.png', 'a/deep-a/beta.png',
+            'Zulu.png', 'Bravo.png')],
+    }[sort]
+    response = client.get(f'/api/bank/{bank_id}/images', query_string={'sort': sort})
+    assert response.status_code == 200, response.get_json()
+    body = response.get_json()
+    actual = [image['id'] for image in body['images']]
+    assert actual == expected
+    assert set(actual) == set(ids.values())
+    assert body['total'] == len(paths)
+    page = client.get(f'/api/bank/{bank_id}/images', query_string={
+        'sort': sort, 'offset': 2, 'limit': 3}).get_json()
+    assert [image['id'] for image in page['images']] == expected[2:5]
+    assert page['total'] == len(paths)
+    lean = client.get(f'/api/bank/{bank_id}/images', query_string={
+        'sort': sort, 'ids_only': '1'}).get_json()
+    assert lean == {'ids': expected}
 
 
 def test_an_unknown_or_stale_sort_id_degrades_to_the_default_order(
