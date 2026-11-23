@@ -104,6 +104,12 @@ export const WHATS_NEW = [
     to: '/bank',
   },
   {
+    id: '2026-11-23-studio-zimage-model-downloads', date: '2026-11-23',
+    title: 'Z-Image test models download in one click',
+    blurb: 'When the Test Studio is missing a Z-Image file, it now offers a Download button with the size and progress of the official file: the Z-Image Turbo model, its Qwen3 4B text encoder or its VAE. Settings offers the same downloads. LDS checks each file against its published size and fingerprint, puts it where the Studio finds it, and reuses a file you already have.',
+    to: '/settings/engines',
+  },
+  {
     id: '2026-11-22-watermark-scope-budget',
     date: '2026-11-22',
     title: 'Scan Every Selection',
