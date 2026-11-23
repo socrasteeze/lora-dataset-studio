@@ -34,6 +34,7 @@ from __future__ import annotations
 import hashlib
 import io
 import itertools
+import json
 import logging
 import math
 import os
@@ -4989,7 +4990,10 @@ def _scoped_pool(bank_id, statuses=None, ids=None):
     never widened, the same contract the caption pass has always had."""
     q = BankImage.query.filter(_processable(bank_id)).filter(_scope_clause(statuses))
     if ids:
-        q = q.filter(BankImage.id.in_([int(i) for i in ids][:_SQL_IN_CHUNK]))
+        selected_ids = list(dict.fromkeys(int(i) for i in ids))
+        # One JSON parameter keeps the whole statement below SQLite's bind limit.
+        selected = func.json_each(json.dumps(selected_ids)).table_valued('value')
+        q = q.filter(BankImage.id.in_(select(selected.c.value)))
     return q
 
 
@@ -10467,6 +10471,11 @@ def _watermark_detector_job(bank_id, rescan, statuses=None, ids=None, limit=None
                         vanished += 1
                         bank_jobs.bump(job)
                         continue
+                    if state == 'error' or not _valid_analysis_fingerprint(fingerprint):
+                        # No usable verdict: count the failure and leave the row retryable.
+                        errors += 1
+                        bank_jobs.bump(job)
+                        continue
                     if not _prepare_watermark_write(row, path, fingerprint):
                         stale += 1      # same silent skip as the vision route
                         bank_jobs.bump(job)
@@ -10479,11 +10488,7 @@ def _watermark_detector_job(bank_id, rescan, statuses=None, ids=None, limit=None
                     # this scan, a 'none' verdict never unflags them, and a
                     # found box folds into the regions they live in.
                     text_zones = row.text_state == 'detected'
-                    if state == 'error':
-                        # One bad file never sinks the pass, same as the vision route.
-                        row.watermark_state = 'error'
-                        errors += 1
-                    elif state == 'detected':
+                    if state == 'detected':
                         row.watermark_state = 'detected'
                         # watermark_bbox stays the child's FIRST box, most-
                         # peripheral-first (see _merge_boxes — "biggest" put a

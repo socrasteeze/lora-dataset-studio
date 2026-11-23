@@ -1,5 +1,19 @@
 # HANDOFF
 
+## Watermark scope and image budget repair (2026-11-22)
+
+Scoped Bank queries now deduplicate IDs and use one JSON parameter instead of
+truncating selections at 500. Detector workers receive the configured image
+budget. Child errors and invalid fingerprints count as unreadable and leave
+rows retryable; valid fingerprint mismatches still count as changed images.
+The Dataset consumer already preserves retryable state on child errors.
+
+Validation: 438 tests passed across watermark, Bank-pass, image-input-budget and
+caption oversized-image suites with isolated state. Changed-file Ruff, frontend
+build and privacy inspection passed. Whole-repo Ruff still reports the existing
+F841 in `backend/tests/test_bank_watermark_clean_scope.py:337`; ESLint reports
+zero errors and three existing warnings. Live servers were not exercised.
+
 ## Plan: bank-native training and the LoRA archive (2026-11-17)
 
 Planning only. No code changed. Owner decisions from 2026-11-17. Build each phase through

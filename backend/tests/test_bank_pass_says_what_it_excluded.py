@@ -73,6 +73,38 @@ def test_an_empty_grouping_names_the_reason():
 
 # --- what the scope left out (pure) -------------------------------------------
 
+def test_scoped_pool_honours_large_selections_and_still_composes(app, client, tmp_path):
+    import sqlite3
+
+    bank_id, _ = _mkbank(client, tmp_path, {'0.png': flat()})
+    with app.app_context():
+        first = BankImage.query.filter_by(bank_id=bank_id).one()
+        first.status = 'keep'
+        rows = [BankImage(bank_id=bank_id, relpath=f'{i}.png', status='keep')
+                for i in range(1, 1100)]
+        rejected = BankImage(bank_id=bank_id, relpath='1100.png', status='reject')
+        unselected = BankImage(bank_id=bank_id, relpath='1101.png', status='keep')
+        other_bank = banks.ImageBank(user_id='local', name='other', source_path=str(tmp_path))
+        db.session.add(other_bank)
+        db.session.flush()
+        foreign = BankImage(bank_id=other_bank.id, relpath='0.png', status='keep')
+        db.session.add_all([*rows, rejected, unselected, foreign])
+        db.session.commit()
+        wanted = [first.id, *(row.id for row in rows)]
+        ids = wanted + [str(first.id)] * 600 + [rejected.id, foreign.id]
+        connection = db.session.connection().connection.driver_connection
+        previous = connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 999)
+        try:
+            q = banks._scoped_pool(bank_id, ['keep'], ids)
+            assert q.count() == len(wanted)
+            assert [row.id for row in q.order_by(BankImage.id).all()] == wanted
+            assert q.filter(BankImage.id > wanted[499]).count() == 600
+            assert q.order_by(BankImage.id.desc()).limit(1).one().id == wanted[-1]
+            assert banks._watermark_scan_query(bank_id, False, ['keep'], ids).count() == 1100
+        finally:
+            connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, previous)
+
+
 def test_scope_left_out_names_the_pile_the_default_scope_drops():
     """The measured bank: 25 464 rejected images with no medium, 2 undecided."""
     n, words = banks.scope_left_out(

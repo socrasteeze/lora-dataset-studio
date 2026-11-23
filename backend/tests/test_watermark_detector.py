@@ -195,6 +195,31 @@ def _fake_popen(lines):
     return factory
 
 
+@pytest.mark.parametrize('locate', [False, True])
+@pytest.mark.parametrize('max_side,max_pixels', [(32768, 128 * 1024 * 1024), (0, 0)])
+def test_detector_worker_receives_configured_image_budget(
+        app, monkeypatch, locate, max_side, max_pixels):
+    from app.services import infer_pool
+
+    captured = {}
+
+    def popen(*args, **kwargs):
+        captured.update(kwargs['env'])
+        return _FakeProc([
+            json.dumps({'path': '0.png', 'state': 'none', 'score': 0.1}) + '\n',
+            json.dumps({'summary': {'ok': True}}) + '\n',
+        ])
+
+    monkeypatch.setattr(infer_pool, 'popen', popen)
+    with app.app_context():
+        cfg.save_config({'image_input': {'max_side': max_side, 'max_pixels': max_pixels}})
+        list(wd.scan(['0.png'], locate=locate))
+    assert captured['LDS_INFER_MAX_SIDE'] == str(max_side)
+    assert captured['LDS_INFER_MAX_PIXELS'] == str(max_pixels)
+    assert captured['PYTHONUTF8'] == '1'
+    assert captured['PYTHONIOENCODING'] == 'utf-8'
+
+
 def test_the_devices_the_child_ran_on_is_reported_not_dropped(monkeypatch):
     """The child has always said which device it ranked on; the parent used to
     read the summary only on failure, which is how a 4090 machine scanned tens

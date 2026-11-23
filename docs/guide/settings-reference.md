@@ -790,6 +790,11 @@ interpreter that cannot import the app or its config, so their shared guard
 8192 px ceiling unless the lane that launched it passes this budget down as
 environment.
 
+**Watermark detection also receives the configured budget.** Both ranking and
+localization use the current side and pixel limits, including `0` for no limit.
+Unreadable images remain eligible for a later scan and count as unreadable,
+rather than as images that changed during the pass.
+
 **JoyCaption captioning does.** It was the lane where the split actually hurt: an
 image this budget accepts imports, displays and trains normally, but the
 captioner refused it one by one — a 89-image dataset of camera masters came back
@@ -1790,7 +1795,7 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `paths.video_datasets_dir` | Legacy video datasets and the fallback without an installation destination. Each contains `.mp4` clips with homonym `.txt` captions. Empty string defaults to `<data dir>/video_datasets`. |
 | `dataset_import.max_side` | Longest side for opt-in WebP normalization (default `1024`; `0` = original size). It is ignored by the default `preserve` mode; ratio is always preserved, never enlarged, and normalized paths clamp at 8192 px. Every source must still fit `image_input.*` below; a larger one is rejected and must be resized before import (or the budget raised). Not retroactive. Editable in Settings → Captioning & quality. |
 | `dataset_import.encoding` | How an un-cropped imported image is written: `preserve` (default; original JPG/JPEG, PNG, WebP or BMP bytes with the matching extension, HEIC/HEIF and static AVIF as a lossless PNG), or the opt-in WebP modes `standard` (q92), `high` (q100), and `lossless`. Auto head-crop is always a derived WebP. The `image_input.*` budget applies to every mode. Editable in Settings → Captioning & quality. |
-| `image_input.max_pixels` | Largest source image any lane may decode, in pixels (default `67108864` = 64 Mi-pixels; `0` = no limit). A memory budget: ~3 bytes per decoded RGB pixel, and an edit or analysis pass can hold a second copy. Read by dataset import, ZIP/scrape ingest, Bank scan and thumbnails, edits, ComfyUI staging and Ollama vision. Bank *inference workers* keep their own fixed 16 Mi-pixel guard. Editable in Settings → Captioning & quality. |
+| `image_input.max_pixels` | Largest source image any lane may decode, in pixels (default `67108864` = 64 Mi-pixels; `0` = no limit). A memory budget: ~3 bytes per decoded RGB pixel, and an edit or analysis pass can hold a second copy. Read by dataset import, ZIP/scrape ingest, Bank scan and thumbnails, edits, ComfyUI staging, Ollama vision and watermark detection. Inference workers use a fixed 16 Mi-pixel guard unless their launcher forwards the configured budget. Editable in Settings → Captioning & quality. |
 | `image_input.max_side` | Largest side of a source image, in px (default `16384`; `0` = no limit). Separate from `max_pixels` because a wide panorama can sit inside the pixel budget and still exceed a side limit. Editable in Settings → Captioning & quality. |
 | `image_sources.hidden` | **Hide Image Sources** (default `false`). While `true`, the Bank and dataset pages do not show the Image Sources panel. Jobs, credentials and `image_sources.extractors_dir` are kept. Editable in Settings → Shared Service Access. |
 | `comfyui.api_url` | Base URL of your ComfyUI instance (default `http://127.0.0.1:8188`). |

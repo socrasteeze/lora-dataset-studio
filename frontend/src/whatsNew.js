@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-22-watermark-scope-budget',
+    date: '2026-11-22',
+    title: 'Scan Every Selection',
+    blurb: 'Bank passes include every selected image, even above 500. Watermark detection uses your image budget and reports unreadable images without hiding them from a retry.',
+  },
+  {
     id: '2026-11-20-klein-workflow-picker',
     date: '2026-11-20',
     title: 'Choose a Klein workflow in Watermarks',

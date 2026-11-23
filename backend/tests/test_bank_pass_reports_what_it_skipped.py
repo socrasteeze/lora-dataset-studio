@@ -253,6 +253,52 @@ def test_a_cancelled_caption_pass_names_the_images_it_did_not_write(bank_ctx,
         + repr(job['detail']))
 
 
+@pytest.mark.parametrize('state,fingerprint', [
+    ('error', None), ('error', 'current'), ('none', None), ('detected', 'invalid'),
+])
+def test_detector_child_errors_are_unreadable_and_remain_retryable(
+        bank_ctx, monkeypatch, state, fingerprint):
+    from app.models import BankImage
+    from app.services import image_bank_service as banks, watermark_detector
+
+    def scan(paths, **kwargs):
+        for path in paths:
+            measured = (banks.bank_transfer_metadata.content_fingerprint_path(path)
+                        if fingerprint == 'current' else fingerprint)
+            yield path, state, None, [], measured, 'decode failed'
+
+    monkeypatch.setattr(watermark_detector, 'scan', scan)
+    monkeypatch.setattr('app.capabilities.watermark_detect_gpu_available', lambda: False)
+    job = _new_job('watermark')
+    banks._watermark_detector_job(bank_ctx, False)(job)
+
+    assert job['done'] == job['total'] == 12
+    assert '12 unreadable' in job['detail']
+    assert 'changed while the pass ran' not in job['detail']
+    assert banks._watermark_scan_query(bank_ctx, False).count() == 12
+    for row in BankImage.query.filter_by(bank_id=bank_ctx):
+        assert row.watermark_state is None
+        assert row.watermark_fingerprint is None
+        assert row.watermark_source is None
+
+
+def test_detector_changed_fingerprint_is_still_reported_as_stale(bank_ctx, monkeypatch):
+    from app.services import image_bank_service as banks, watermark_detector
+
+    def scan(paths, **kwargs):
+        for path in paths:
+            yield path, 'none', 0.1, [], 'a' * 64, None
+
+    monkeypatch.setattr(watermark_detector, 'scan', scan)
+    monkeypatch.setattr('app.capabilities.watermark_detect_gpu_available', lambda: False)
+    job = _new_job('watermark')
+    banks._watermark_detector_job(bank_ctx, False)(job)
+
+    assert job['done'] == job['total'] == 12
+    assert '12 skipped (the image changed while the pass ran)' in job['detail']
+    assert 'unreadable' not in job['detail']
+
+
 def test_a_cancelled_watermark_scan_names_what_it_could_not_read(bank_ctx,
                                                                  monkeypatch):
     from app.services import bank_jobs, image_bank_service as banks
