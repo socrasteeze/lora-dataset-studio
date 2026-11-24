@@ -107,6 +107,13 @@ export const WHATS_NEW = [
     blurb: 'Choose a profile to stop running work and open that profile without a confirmation prompt.',
   },
   {
+    id: '2026-11-24-krea-comfyui-too-old-named', date: '2026-11-24',
+    title: 'Krea 2 Edit says when ComfyUI is too old for it',
+    blurb: 'A ComfyUI older than Krea 2 support lacks the "krea2" text encoder type. Setup and the engine picker '
+      + 'used to show Krea 2 Edit as ready there, and the first edit was refused. They now say to update ComfyUI '
+      + 'before you launch anything.',
+  },
+  {
     id: '2026-11-23-iphone-status-bar',
     date: '2026-11-23',
     title: 'Solid iPhone Status Bar',
