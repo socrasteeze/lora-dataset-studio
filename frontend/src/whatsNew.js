@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-24-zzzz-datasets-studio-plugins-fixes', date: '2026-11-24',
+    title: 'Fixes for the Studio and plugin engines',
+    blurb: 'When a model folder moved while ComfyUI was running, the Studio now asks you to restart ComfyUI instead of updating it. A plugin engine with a damaged package is repaired with one verified retry.',
+    to: '/studio',
+  },
+  {
     id: '2026-11-24-video-sparse-attention-current-pack', date: '2026-11-24',
     title: 'Sparse attention works with current H3-Optimizations releases',
     blurb: 'From version 0.2.31, H3-Optimizations renamed the backend LDS asks for and added required settings, so '
