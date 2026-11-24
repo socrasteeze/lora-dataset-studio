@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 # refusal can never drift apart.
 GPU_FLAGS = ('training_in_progress', 'vision_in_progress')
 
-# How long a cancelled bank pass is given to unwind before the flags are cleared
+# How long a cancelled pass is given to unwind before the flags are cleared
 # anyway. Cancels are cooperative — the pass notices at its next item boundary —
 # so a short settle turns "cancelled, flag still set" into "cancelled and clean"
 # in the ordinary case. It is deliberately NOT a condition: a wedged pass is the
@@ -161,8 +161,7 @@ def stop_everything(app, user_id) -> dict:
     try:
         ids = dataset_activity.active_dataset_ids()
         for dsid in ids:
-            dataset_activity.request_cancel(dsid, dataset_activity.CANCELLABLE_KINDS)
-            dataset_activity.request_cancel(dsid, dataset_activity.IMPROVE_KINDS)
+            dataset_activity.request_cancel(dsid, dataset_activity.STOPPABLE_KINDS)
         targets.append(_target(
             'Dataset batches', 'stopped' if ids else 'idle',
             f'{len(ids)} batch(es) asked to stop' if ids else 'nothing running'))
@@ -235,7 +234,9 @@ def stop_everything(app, user_id) -> dict:
     if _SETTLE_SECONDS:
         deadline = time.monotonic() + _SETTLE_SECONDS
         while time.monotonic() < deadline:
-            if not bank_jobs.live_bank_ids():
+            dataset_running = any(dataset_activity.running(dsid, dataset_activity.STOPPABLE_KINDS)
+                                  for dsid in dataset_activity.active_dataset_ids())
+            if not bank_jobs.live_bank_ids() and not dataset_running:
                 break
             time.sleep(0.25)
     still_live = bank_jobs.live_bank_ids()

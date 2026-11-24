@@ -148,10 +148,8 @@ def supervise(run_once, *, sleep=time.sleep, now=time.monotonic,
         # A stop the user asked for, however it is spelled.
         if code in (CLEAN_EXIT, CONTROL_C_EXIT):
             return CLEAN_EXIT
-        # Uptime is the whole guard: a backend that served for a while and then
-        # died hit a runtime fault and deserves another life, while one that
-        # dies on every boot is broken in a way relaunching cannot fix.
-        if now() - started >= HEALTHY_UPTIME:
+        # An intentional restart or healthy uptime resets the crash budget.
+        if code == RESTART_EXIT or now() - started >= HEALTHY_UPTIME:
             rapid_deaths = 0
         else:
             rapid_deaths += 1

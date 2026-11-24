@@ -7,10 +7,10 @@ from urllib.parse import urlsplit
 
 from flask import Blueprint, current_app, jsonify, request
 
-from instance_profiles import FileLease, ProfileError, ProfileStore, public_profile
+from instance_profiles import ProfileError, ProfileStore, public_profile
 from .. import config as cfg
 from ..netguard import _is_loopback, _LOOPBACK_HOSTS
-from ..plugins.restart import RestartBlocked, freeze_profile_work
+from ..plugins.restart import RestartBlocked, drain_for_profile_switch, freeze_profile_work
 
 bp = Blueprint('profiles', __name__, url_prefix='/api/profiles')
 
@@ -75,7 +75,7 @@ def profile_ready():
 
 @bp.post('/switch')
 def switch_profile():
-    from ..services import updater
+    from ..services import profile_switch_work, updater
     data = request.get_json(silent=True) or {}
     if not isinstance(data, dict):
         return jsonify(error='Send a JSON object.'), 400
@@ -84,8 +84,6 @@ def switch_profile():
         return jsonify(error='Start Studio with start.bat to enable controlled profile switching.'), 409
     store = ProfileStore()
     source = public_profile()['id']
-    gate = None
-    requested = False
     try:
         target = store.get(data.get('profile_id'))
         if target['id'] == source:
@@ -97,33 +95,28 @@ def switch_profile():
             if not _is_loopback(request.remote_addr):
                 return jsonify(error='The host uses a local-only address. Enable LAN access on the host, then restart Studio.'), 409
             needs_lan = False
-        gate = freeze_profile_work()
-        with FileLease(store.home / 'transition.lock'):
-            store.check_other_work(target['id'])
+        # The running server holds the active lease. The admission gate
+        # serializes switch requests without waiting on a Bank move's lease.
+        with drain_for_profile_switch():
+            store.check_other_instances()
             with store.enable_lan(target['id'], _profile_lan_host()) if needs_lan else nullcontext():
                 # The target opens on the shared port. Enabling LAN does not
                 # turn its access token on.
                 destination = store.browser_url(target['id'])
                 store.request_switch(source, target['id'])
-                requested = True
-                if not updater.schedule_restart(delay=0.3, block_during_update=True):
-                    raise ProfileError('A restart is already scheduled. Wait before switching again.')
+                try:
+                    profile_switch_work.stop_for_switch(current_app._get_current_object(), cfg.LOCAL_USER)
+                    if not updater.schedule_restart(delay=0.3, block_during_update=True):
+                        raise ProfileError('A restart is already scheduled. Wait before switching again.')
+                except Exception:
+                    _clear_switch(store)
+                    raise
     except (ProfileError, RestartBlocked, updater.UpdateInProgressError) as exc:
-        if gate is not None:
-            gate.release()
-        if requested:
-            _clear_switch(store)
         return jsonify(error=str(exc)), 409
     except Exception:
-        if gate is not None:
-            gate.release()
-        if requested:
-            _clear_switch(store)
         current_app.logger.warning('Profile switch could not be scheduled')
         return jsonify(error='The profile switch could not be scheduled. Your current profile stays selected.'), 409
-    response = jsonify(ok=True, profile_id=target['id'], port=target['port'], destination=destination)
-    response.call_on_close(gate.finished.wait)
-    return response
+    return jsonify(ok=True, profile_id=target['id'], port=target['port'], destination=destination)
 
 
 @bp.post('/banks/<int:bank_id>/move')

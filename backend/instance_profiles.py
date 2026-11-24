@@ -333,15 +333,19 @@ class ProfileStore:
         suffix = '?' + urlencode({'token': token}) if token else ''
         return f'http://{host}:{port}/{suffix}'
 
-    def check_other_work(self, ident):
+    def check_other_instances(self):
         from single_instance import pid_alive, read_lock
         for row in self.profiles():
             data = Path(row['paths']['LDS_DATA_DIR'])
             recorded = read_lock(data)
             if recorded and recorded['pid'] != os.getpid() and pid_alive(recorded['pid']):
-                raise ProfileError('Studio is already running. Finish its work and close its server before opening a profile.')
+                raise ProfileError('Studio is already running. Close its server before opening a profile.')
+
+    def check_other_work(self, ident):
+        self.check_other_instances()
+        for row in self.profiles():
             if row['id'] != ident:
-                _check_unfinished_work(data / 'studio.db')
+                _check_unfinished_work(Path(row['paths']['LDS_DATA_DIR']) / 'studio.db')
 
 
 def _check_unfinished_work(database):
@@ -383,7 +387,7 @@ def prepare_runtime():
     transition.__enter__()
     try:
         lease.__enter__()
-        store.check_other_work(ident)
+        store.check_other_instances()
         store.select(ident)
         os.environ.update(environment)
         os.environ.pop('LDS_ALLOW_SECOND_INSTANCE', None)

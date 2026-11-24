@@ -10,10 +10,10 @@ import profile_launcher as launcher
 def test_launcher_checks_safety_before_spawning(tmp_path, monkeypatch):
     store = profiles.ProfileStore(root=tmp_path, environ={})
     calls = []
-    monkeypatch.setattr(store, 'check_other_work', lambda ident: calls.append(('check', ident)))
+    monkeypatch.setattr(store, 'check_other_instances', lambda: calls.append(('check',)))
     monkeypatch.setattr(launcher.subprocess, 'Popen', lambda args, **kwargs: calls.append(('spawn', args, kwargs)))
     launcher.launch(store, 'default')
-    assert calls[0] == ('check', 'default')
+    assert calls[0] == ('check',)
     assert Path(calls[1][1][-1]).name == 'supervise.py'
     assert calls[1][2]['env']['LDS_PROFILE_ID'] == 'default'
 

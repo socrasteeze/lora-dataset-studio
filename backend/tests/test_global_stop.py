@@ -179,6 +179,19 @@ def test_an_unreachable_comfyui_is_never_counted_as_stopped(app):
         assert 'could not be reached' in t['detail']
 
 
+def test_stop_everything_signals_all_stoppable_dataset_batches(app):
+    from app.services import dataset_activity
+
+    with app.app_context():
+        for dataset_id, kind in enumerate(dataset_activity.STOPPABLE_KINDS, 1):
+            dataset_activity.begin(dataset_id, kind)
+
+        _stop(app)
+
+        for dataset_id, kind in enumerate(dataset_activity.STOPPABLE_KINDS, 1):
+            assert dataset_activity.cancel_requested(dataset_id, (kind,))
+
+
 def test_a_training_stop_that_cannot_be_verified_is_a_failure_and_holds_its_flag(app):
     from app.services import global_stop, lora_training
 

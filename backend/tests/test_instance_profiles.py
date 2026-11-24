@@ -17,6 +17,22 @@ def store(tmp_path):
     return profiles.ProfileStore(root=root, environ={})
 
 
+@pytest.fixture()
+def prepare_profile(store, monkeypatch):
+    monkeypatch.setattr(profiles.os, 'environ', {})
+    monkeypatch.setattr(profiles, 'ProfileStore', lambda: store)
+
+    def prepare(ident):
+        monkeypatch.setenv('LDS_PROFILE_ID', ident)
+        lease = profiles.prepare_runtime()
+        try:
+            assert store.selected() == ident
+        finally:
+            lease.__exit__()
+
+    return prepare
+
+
 def test_default_is_the_existing_instance_without_a_copy_or_migration(store):
     original = store.root / 'data'
     original.mkdir()
@@ -186,41 +202,41 @@ def test_os_lease_rejects_a_second_process_and_releases_after_exit(store):
     assert subprocess.run(command, cwd=Path(profiles.__file__).parent).returncode == 0
 
 
-def test_legacy_live_default_blocks_a_named_launch_before_app_import(store, monkeypatch):
+def test_legacy_live_default_blocks_a_named_launch_before_app_import(store, monkeypatch, prepare_profile):
     import single_instance
     named = store.create('Example')
     monkeypatch.setattr(single_instance, 'read_lock', lambda _path: {'pid': 424242})
     monkeypatch.setattr(single_instance, 'pid_alive', lambda _pid: True)
     with pytest.raises(profiles.ProfileError, match='already running'):
-        store.check_other_work(named['id'])
+        prepare_profile(named['id'])
 
 
 @pytest.mark.parametrize('key,value', [
     ('training_in_progress', True), ('training_pid', 424242),
     ('lora_train_queue', [{'dataset_id': 1}]), ('comfyui_stalled_barrier', True),
 ])
-def test_unfinished_default_work_blocks_switching_but_allows_recovery(store, key, value):
+def test_unfinished_default_work_allows_startup_of_another_profile(store, prepare_profile, key, value):
     import single_instance
     named = store.create('Example')
     data = Path(store.get('default')['paths']['LDS_DATA_DIR'])
     data.mkdir()
-    with sqlite3.connect(data / 'studio.db') as connection:
+    database = data / 'studio.db'
+    with sqlite3.connect(database) as connection:
         connection.execute('CREATE TABLE system_state (key TEXT PRIMARY KEY, value TEXT)')
         connection.execute('INSERT INTO system_state VALUES (?, ?)', (key, json.dumps({'v': value})))
-    with pytest.raises(profiles.ProfileError, match='unfinished work'):
-        store.check_other_work(named['id'])
+    original = database.read_bytes()
+    prepare_profile(named['id'])
+    assert database.read_bytes() == original
     assert single_instance.read_lock(data) is None
-    store.check_other_work('default')
 
 
-def test_unreadable_database_blocks_other_profiles_without_modifying_it(store):
+def test_unreadable_database_allows_startup_of_another_profile(store, prepare_profile):
     named = store.create('Example')
     data = Path(store.get('default')['paths']['LDS_DATA_DIR'])
     data.mkdir()
     database = data / 'studio.db'
     database.write_bytes(b'not a database')
-    with pytest.raises(profiles.ProfileError, match='checked safely'):
-        store.check_other_work(named['id'])
+    prepare_profile(named['id'])
     assert database.read_bytes() == b'not a database'
 
 
@@ -230,7 +246,6 @@ def test_runtime_keeps_supervised_restart_ownership(store, monkeypatch):
     monkeypatch.setenv('LDS_PROFILE_ID', 'default')
     monkeypatch.setenv('LDS_RESTART_MODE', 'supervisor')
     monkeypatch.setattr(profiles, 'ProfileStore', lambda: store)
-    monkeypatch.setattr(store, 'check_other_work', lambda _ident: None)
     lease = profiles.prepare_runtime()
     try:
         import os
@@ -258,17 +273,18 @@ def test_busy_runtime_does_not_change_paths_or_honor_the_old_bypass(store, monke
     ('image_generation_queue', "INSERT INTO image_generation_queue VALUES ('processing')"),
     ('bank_queue_entry', 'INSERT INTO bank_queue_entry VALUES (1)'),
 ])
-def test_persisted_work_queues_block_another_profile(store, table, statement):
+def test_persisted_work_queues_allow_startup_of_another_profile(store, prepare_profile, table, statement):
     named = store.create('Example')
     data = Path(store.get('default')['paths']['LDS_DATA_DIR'])
     data.mkdir()
-    with sqlite3.connect(data / 'studio.db') as connection:
+    database = data / 'studio.db'
+    with sqlite3.connect(database) as connection:
         column = 'status TEXT' if table == 'image_generation_queue' else 'id INTEGER'
         connection.execute(f'CREATE TABLE {table} ({column})')
         connection.execute(statement)
-    with pytest.raises(profiles.ProfileError):
-        store.check_other_work(named['id'])
-    store.check_other_work('default')
+    original = database.read_bytes()
+    prepare_profile(named['id'])
+    assert database.read_bytes() == original
 
 
 def test_profile_gate_precedes_every_application_import():

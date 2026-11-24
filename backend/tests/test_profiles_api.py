@@ -1,8 +1,8 @@
 """In-app profile actions use isolated registries and a stubbed restart."""
 import json
 from pathlib import Path
+import sqlite3
 import threading
-from types import SimpleNamespace
 
 import pytest
 
@@ -14,10 +14,12 @@ def profiles_app(tmp_path, monkeypatch):
     app = create_test_app(tmp_path / 'runtime', monkeypatch)
     from app import config as cfg
     from app.routes import profiles
+    from app.services import global_stop
     store = ProfileStore(root=tmp_path, environ={
         'LDS_DATA_DIR': str(cfg._data_dir()), 'LDS_CONFIG': str(cfg._config_path()),
         'LDS_ENV': str(cfg.ENV_PATH)})
     monkeypatch.setattr(profiles, 'ProfileStore', lambda: store)
+    monkeypatch.setattr(global_stop, 'stop_everything', lambda _app, _user_id: {'targets': []})
     monkeypatch.setenv('LDS_PROFILE_ID', 'default')
     monkeypatch.delenv('LDS_PROFILE_SWITCH_SUPPORTED', raising=False)
     try:
@@ -55,7 +57,6 @@ def test_an_old_supervisor_cannot_accept_a_switch(profiles_app, monkeypatch):
 
 @pytest.mark.parametrize('remote,host_override', [('127.0.0.1', None), ('198.51.100.9', '0.0.0.0')])
 def test_switch_records_the_target_before_scheduling_restart(profiles_app, monkeypatch, remote, host_override):
-    from app.routes import profiles
     from app.services import updater
     app, store = profiles_app
     target = store.create('Example')
@@ -63,10 +64,6 @@ def test_switch_records_the_target_before_scheduling_restart(profiles_app, monke
     monkeypatch.setenv('LDS_PROFILE_SWITCH_SUPPORTED', '1')
     if host_override:
         monkeypatch.setenv('LDS_HOST', host_override)
-    finished = threading.Event()
-    finished.set()
-    gate = SimpleNamespace(finished=finished, release=lambda: None)
-    monkeypatch.setattr(profiles, 'freeze_profile_work', lambda: gate)
     seen = []
 
     def schedule(**options):
@@ -87,32 +84,121 @@ def test_switch_records_the_target_before_scheduling_restart(profiles_app, monke
     response.close()
 
 
-def test_busy_profile_does_not_write_a_switch_request(profiles_app, monkeypatch):
-    from app.plugins.restart import RestartBlocked
-    from app.routes import profiles
+@pytest.mark.parametrize('stop_state', ['stopped', 'unconfirmed', 'failed', 'exception'])
+def test_switch_proceeds_with_queued_work_and_stuck_requests(profiles_app, monkeypatch, stop_state):
+    from app.config import LOCAL_USER
+    from app.plugins import restart
+    from app.services import global_stop, updater
+    from instance_profiles import FileLease
+    app, store = profiles_app
+    target = store.create('Example')
+    inactive = store.create('Inactive')
+    monkeypatch.setenv('LDS_RESTART_MODE', 'supervisor')
+    monkeypatch.setenv('LDS_PROFILE_SWITCH_SUPPORTED', '1')
+    monkeypatch.setattr(restart, '_READ_DRAIN_SECONDS', 0)
+    gate = app.extensions[restart._EXTENSION]
+    gate.writers.add(object())
+    gate.readers[object()] = '/api/example-poll'
+    gate.frozen = True
+    gate.message = 'Example profile move.'
+    source_db = Path(store.get('default')['paths']['LDS_DATA_DIR']) / 'studio.db'
+    with sqlite3.connect(source_db) as connection:
+        connection.execute('CREATE TABLE bank_queue_entry (bank_id INTEGER)')
+        connection.execute('INSERT INTO bank_queue_entry (bank_id) VALUES (1)')
+    inactive_db = Path(inactive['paths']['LDS_DATA_DIR']) / 'studio.db'
+    inactive_db.write_bytes(b'not a database')
+    seen = []
+
+    def stop(current, user_id):
+        assert current is app
+        assert user_id == LOCAL_USER
+        assert gate.switching
+        seen.append('stop')
+        if stop_state == 'exception':
+            raise RuntimeError('Example stop failure')
+        return {'targets': [{'name': 'Bank queue', 'state': stop_state}]}
+
+    def schedule(**_options):
+        assert gate.switching
+        assert gate.readers and gate.writers
+        seen.append('restart')
+        return True
+
+    monkeypatch.setattr(global_stop, 'stop_everything', stop)
+    monkeypatch.setattr(updater, 'schedule_restart', schedule)
+    with FileLease(store.home / 'transition.lock'):
+        response = app.test_client().post('/api/profiles/switch', json={'profile_id': target['id']})
+    assert response.status_code == 200
+    assert seen == ['stop', 'restart']
+    assert json.loads((store.home / 'switch.json').read_text())['target'] == target['id']
+    with sqlite3.connect(source_db) as connection:
+        assert connection.execute('SELECT bank_id FROM bank_queue_entry').fetchall() == [(1,)]
+    assert inactive_db.read_bytes() == b'not a database'
+
+
+def test_switch_stops_work_outside_the_shared_stop_path(profiles_app, monkeypatch):
+    from types import SimpleNamespace
+
+    from app.config import LOCAL_USER
+    from app.extensions import db
+    from app.models import ImageGenerationQueue, ImageSourceJob
+    from app.services import image_sources, profile_switch_work, updater
+
     app, store = profiles_app
     target = store.create('Example')
     monkeypatch.setenv('LDS_RESTART_MODE', 'supervisor')
     monkeypatch.setenv('LDS_PROFILE_SWITCH_SUPPORTED', '1')
+    control = image_sources.runtime(app)
+    control['active'] = 'example-active'
+    seen = []
+    app.extensions['video_auto_continue'] = SimpleNamespace(
+        lock=threading.RLock(), record={'state': {'id': 'example-auto', 'enabled': True}},
+        stop=lambda session: seen.append(session), thread=None,
+    )
+    with app.app_context():
+        for job_id, state in [('example-active', 'running'), ('example-waiting', 'queued')]:
+            db.session.add(ImageSourceJob(id=job_id, user_id=LOCAL_USER, state=state,
+                                          provider='example.invalid', url='https://example.invalid/',
+                                          destination='bank'))
+        db.session.add(ImageGenerationQueue(job_id='example-render', user_id=LOCAL_USER))
+        db.session.commit()
 
-    def busy():
-        raise RestartBlocked('Example work is running.')
+    def schedule(**_options):
+        assert control['cancel'].is_set()
+        assert db.session.get(ImageSourceJob, 'example-waiting').state == 'cancelled'
+        render = ImageGenerationQueue.query.filter_by(job_id='example-render').one()
+        assert render.status == 'cancelled'
+        assert render.error_message == 'Cancelled during a profile switch.'
+        seen.append('restart')
+        return True
 
-    monkeypatch.setattr(profiles, 'freeze_profile_work', busy)
+    monkeypatch.setattr(profile_switch_work, '_dispatch_auto_resolved_cancellation', seen.append)
+    monkeypatch.setattr(updater, 'schedule_restart', schedule)
     response = app.test_client().post('/api/profiles/switch', json={'profile_id': target['id']})
-    assert response.status_code == 409
-    assert not (store.home / 'switch.json').exists()
+    assert response.status_code == 200
+    assert seen == ['example-auto', 'example-render', 'restart']
+
+
+def test_switch_does_not_require_plugin_restart_safety(profiles_app, monkeypatch):
+    from app.plugins import restart
+    from app.services import updater
+    app, store = profiles_app
+    target = store.create('Example')
+    monkeypatch.setenv('LDS_RESTART_MODE', 'supervisor')
+    monkeypatch.setenv('LDS_PROFILE_SWITCH_SUPPORTED', '1')
+    monkeypatch.delitem(app.extensions, restart._EXTENSION)
+    monkeypatch.delitem(app.extensions, 'lds_plugins')
+    monkeypatch.setattr(updater, 'schedule_restart', lambda **_options: True)
+    assert app.test_client().post('/api/profiles/switch', json={'profile_id': target['id']}).status_code == 200
 
 
 @pytest.mark.parametrize('token', [None, 'example-target-token'])
-@pytest.mark.parametrize('outcome', ['scheduled', 'refused', 'failed', 'busy', 'target_busy'])
+@pytest.mark.parametrize('outcome', ['scheduled', 'refused', 'failed'])
 @pytest.mark.parametrize('remote,bound_host', [('198.51.100.9', '0.0.0.0'), ('127.0.0.1', '127.0.0.1')])
 def test_profile_switch_defaults_legacy_lan_and_rolls_back(profiles_app, monkeypatch, token, outcome, remote, bound_host):
     from urllib.parse import parse_qs, urlsplit
-    from instance_profiles import ProfileError
     from app import config as cfg
-    from app.plugins.restart import RestartBlocked
-    from app.routes import profiles
+    from app.plugins.restart import _EXTENSION
     from app.services import updater
     app, store = profiles_app
     cfg.save_config({'server': {'access_token': 'example-source-token'}})
@@ -129,20 +215,7 @@ def test_profile_switch_defaults_legacy_lan_and_rolls_back(profiles_app, monkeyp
     monkeypatch.delenv('LDS_HOST', raising=False)
     monkeypatch.setenv('LDS_RESTART_MODE', 'supervisor')
     monkeypatch.setenv('LDS_PROFILE_SWITCH_SUPPORTED', '1')
-    finished = threading.Event()
-    finished.set()
-    released = []
-    gate = SimpleNamespace(finished=finished, release=lambda: released.append(True))
-
-    def freeze():
-        if outcome == 'busy':
-            raise RestartBlocked('Example work is running.')
-        return gate
-
-    def check_target(_ident):
-        if outcome == 'target_busy':
-            raise ProfileError('Example target work is running.')
-
+    gate = app.extensions[_EXTENSION]
     seen = []
 
     def schedule(**_options):
@@ -151,8 +224,6 @@ def test_profile_switch_defaults_legacy_lan_and_rolls_back(profiles_app, monkeyp
             raise OSError('Example restart failure')
         return outcome == 'scheduled'
 
-    monkeypatch.setattr(profiles, 'freeze_profile_work', freeze)
-    monkeypatch.setattr(store, 'check_other_work', check_target)
     monkeypatch.setattr(updater, 'schedule_restart', schedule)
     response = app.test_client().post('/api/profiles/switch',
         json={'profile_id': target['id']},
@@ -173,13 +244,14 @@ def test_profile_switch_defaults_legacy_lan_and_rolls_back(profiles_app, monkeyp
             assert 'token' not in query
         assert saved['server'].get('access_token') != 'example-source-token'
         assert saved['example'] == settings['example']
-        assert not released
+        assert gate.switching
     else:
         assert response.status_code == 409
         assert saved == settings
         assert not (store.home / 'switch.json').exists()
-        assert released == ([] if outcome == 'busy' else [True])
-    assert len(seen) == (0 if outcome in ('busy', 'target_busy') else 1)
+        assert not gate.switching
+        assert app.test_client().get('/api/profiles').status_code == 200
+    assert len(seen) == 1
     response.close()
 
 
@@ -216,17 +288,11 @@ def test_profile_freeze_excludes_its_writer_but_refuses_inflight_reads():
     gate.release()
 
 
-def test_profile_freeze_waits_out_a_brief_concurrent_read():
-    """A dashboard poll overlapping the click must not refuse the switch.
-
-    The UI runs many short GET polls, so at any instant a read is likely in
-    flight. Refusing on contact made the button unusable; the freeze now waits
-    briefly for those reads to drain.
-    """
-    from app.plugins.restart import _Gate
-    gate = _Gate()
-    own, poll = object(), object()
-    gate.writers.add(own)
+def test_profile_switch_gives_a_brief_concurrent_read_time_to_finish(profiles_app):
+    from app.plugins.restart import _EXTENSION, drain_for_profile_switch
+    app, _store = profiles_app
+    gate = app.extensions[_EXTENSION]
+    poll = object()
     gate.readers[poll] = '/api/example-poll'
 
     def finish_poll():
@@ -234,14 +300,18 @@ def test_profile_freeze_waits_out_a_brief_concurrent_read():
             gate.readers.pop(poll, None)
             gate.lock.notify_all()
 
-    threading.Timer(0.05, finish_poll).start()
-    gate.freeze(own, 'Example profile change.')
-    assert gate.frozen is True
-    gate.release()
+    timer = threading.Timer(0.05, finish_poll)
+    timer.start()
+    try:
+        with app.test_request_context(), drain_for_profile_switch():
+            assert not gate.readers
+            assert app.test_client().get('/api/profiles').status_code == 503
+    finally:
+        timer.join()
 
 
 def test_profile_freeze_still_refuses_a_read_that_will_not_drain():
-    """A read that outlasts the grace period keeps its old refusal."""
+    """Bank moves still require an idle server."""
     from app.plugins.restart import RestartBlocked, _Gate
     gate = _Gate()
     own, stuck = object(), object()

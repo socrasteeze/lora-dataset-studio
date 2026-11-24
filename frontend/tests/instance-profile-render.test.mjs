@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { render } from './support/mountJsx.mjs';
 
 const { default: InstanceProfile } = await import('../src/components/common/InstanceProfile.jsx');
@@ -40,7 +41,13 @@ test('the in-app profile popup provides creation and a controlled switch', () =>
   assert.match(html, /aria-modal="true"/);
   assert.match(html, /Create Profile/);
   assert.match(html, /Switch Profile/);
-  assert.match(html, /One profile runs at a time/);
+  assert.match(html, /Studio stops running work before it opens the selected profile/);
+  assert.doesNotMatch(html, /after running work has finished/);
+});
+
+test('the switch control does not use the catalog capability as an admission gate', () => {
+  const source = readFileSync(new URL('../src/components/common/ProfileDialog.jsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /\bcan_switch\b/);
 });
 
 test('the Bank move popup explains file preservation before submission', () => {

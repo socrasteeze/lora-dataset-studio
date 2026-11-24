@@ -152,8 +152,10 @@ export default function ProfileDialog({ onClose, bank = null, banks = null, onMo
 
   const apply = async (profileId = selected) => {
     if (!profileId || busy || submitting.current) return
-    if (name.trim()) { setError('Create the new profile or clear its name first.'); return }
-    if (!(bulk && targetLocked) && hasUnsavedWork()) { setError('Save or discard open edits before changing profiles.'); return }
+    if (moving) {
+      if (name.trim()) { setError('Create the new profile or clear its name first.'); return }
+      if (!(bulk && targetLocked) && hasUnsavedWork()) { setError('Save or discard open edits before changing profiles.'); return }
+    }
     submitting.current = true
     setError(''); setBusy(moving ? 'moving' : 'switching')
     try {
@@ -207,7 +209,7 @@ export default function ProfileDialog({ onClose, bank = null, banks = null, onMo
         <h2 className="text-base font-bold text-content">{moving ? 'Move to Profile' : 'Profiles'}</h2>
         <p className="mt-2 text-sm text-content-muted">
           {moving ? 'Metadata, edits, groups and caches move together. Source images stay in place.'
-            : 'One profile runs at a time. Switching restarts Studio after running work has finished.'}
+            : 'Studio stops running work before it opens the selected profile.'}
         </p>
         <p className="mt-2 break-words text-xs text-content-subtle">Current: {current?.name || 'Loading'}</p>
         {bank && <p className="mt-2 break-words text-sm font-medium text-content">{bank.name}</p>}
@@ -225,7 +227,7 @@ export default function ProfileDialog({ onClose, bank = null, banks = null, onMo
           {catalog && !choices.length && <p className="mt-1 text-xs text-content-subtle">Create a profile below.</p>}
           <div className="mt-1 space-y-1">
             {choices.map((profile) => (
-              <Button key={profile.id} disabled={!!busy || !catalog.can_switch} className="min-h-10 w-full min-w-0 !justify-between"
+              <Button key={profile.id} disabled={!!busy} className="min-h-10 w-full min-w-0 !justify-between"
                 onClick={() => { setSelected(profile.id); setDestination(''); apply(profile.id) }}>
                 <span className="min-w-0 truncate">{profile.name}</span>
                 {busy === 'switching' && selected === profile.id && <span className="shrink-0 text-xs font-normal">Switching</span>}
@@ -243,9 +245,6 @@ export default function ProfileDialog({ onClose, bank = null, banks = null, onMo
             </Button>
           </div>
         </form>
-        {!moving && catalog && !catalog.can_switch && (
-          <p className="mt-3 text-xs text-amber-300">Start Studio with start.bat to enable controlled switching.</p>
-        )}
         {moving && <p className="mt-3 text-xs text-content-subtle">
           The Bank leaves this profile after verification. Existing promotions stay recorded as history. A recovery copy of the working cache is retained.
         </p>}

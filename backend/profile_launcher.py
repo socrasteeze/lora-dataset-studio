@@ -12,7 +12,7 @@ from instance_profiles import FileLease, ProfileError, ProfileStore
 def launch(store, ident):
     # The backend repeats this check while holding the OS lease before imports.
     with FileLease(store.home / 'active.lock'):
-        store.check_other_work(ident)
+        store.check_other_instances()
     environment = store.child_environment(ident)
     script = 'run.py' if environment.get('LDS_SUPERVISE') == '0' else 'supervise.py'
     return subprocess.Popen(
@@ -32,7 +32,7 @@ def show_picker(store):
     frame = ttk.Frame(window, padding=16)
     frame.pack(fill='both', expand=True)
     ttk.Label(frame, text='Profiles', font=('', 15, 'bold')).pack(anchor='w')
-    ttk.Label(frame, text='Finish work and close the server before switching.',
+    ttk.Label(frame, text='Close the active Studio server before opening a profile.',
               wraplength=390).pack(anchor='w', pady=(4, 12))
     choices = tk.Listbox(frame, exportselection=False, height=6)
     choices.pack(fill='both', expand=True)

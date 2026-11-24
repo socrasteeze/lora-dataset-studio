@@ -121,24 +121,22 @@ are blank uses them without running Setup again. A `*.python` or
 `*.models_root` setting you fill in for a profile still wins for that
 profile. The active profile name appears below the Studio title.
 
-Only one profile can run per installation. Save or discard open edits and finish
-or clear work queues before switching. The popup refuses a switch while work
-still needs the server. It then restarts Studio on the same port and opens the
-selected profile in the same browser tab. Switching does not stop jobs or
-cancel queues. Switching to an older local-only profile
+Only one profile can run per installation. Choose another profile to stop
+running or queued work without a confirmation prompt. Studio allows a short
+time for work to stop, then restarts on the same port and opens the selected
+profile in the same tab. If Studio cannot confirm a stop, it still switches.
+You may need to recover unfinished work when you reopen the original profile.
+Switching to an older local-only profile
 enables LAN access automatically. No extra checkbox or retry is required.
 Studio uses the running server's network bind address, or `0.0.0.0` when the
 current bind is local-only. Switching does not turn the access token on. A
 profile that already requires a token keeps that setting and its token. No other
-settings or credentials are copied. Busy work blocks the change before any
-settings change. If restart scheduling fails, Studio restores the target's
+settings or credentials are copied. If restart scheduling fails, Studio restores the target's
 previous settings.
 An explicit local-only `LDS_HOST` override still requires a host-side change.
 
-A live server, surviving training fence, unresolved generation or queued Bank
-work blocks another profile. Reopen the original profile to recover or clear
-that work. Other browser tabs stay on this same address. Each profile still
-has its own database and settings.
+A second Studio server blocks startup. Other browser tabs stay on the same
+address. Each profile has its own database and settings.
 
 Named profiles own their training export, output and generated-job directories.
 Their dataset/output overrides in **Local Tools** are read-only. Deployed LoRAs
@@ -155,9 +153,8 @@ in place. If the port is occupied, close the conflicting service before
 retrying; Studio does not silently move to another port.
 LAN access and token controls remain editable in **Server & Access**.
 
-After installing this change, fully stop Studio and run `start.bat` again so
-the supervisor can switch profiles. Restarting only the backend under an old
-supervisor does not enable switching.
+Start Studio with `start.bat` to use in-app switching. If an old supervisor
+is still running, close it and launch Studio with `start.bat` again.
 
 Terminal recovery does not require the in-app popup:
 

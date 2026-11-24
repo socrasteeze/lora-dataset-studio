@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-24-profile-switch-always',
+    date: '2026-11-24',
+    title: 'Profile Switches Stop Running Work',
+    blurb: 'Choose a profile to stop running work and open that profile without a confirmation prompt.',
+  },
+  {
     id: '2026-11-23-iphone-status-bar',
     date: '2026-11-23',
     title: 'Solid iPhone Status Bar',

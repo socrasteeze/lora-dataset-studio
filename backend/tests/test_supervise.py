@@ -70,6 +70,15 @@ def test_an_update_restart_relaunches_the_backend():
     assert len(runner.calls) == 2
 
 
+def test_rapid_intentional_restarts_do_not_exhaust_the_crash_budget():
+    clock = FakeClock()
+    count = supervise.MAX_RAPID_RESTARTS + 1
+    runner = make_runner([supervise.RESTART_EXIT] * count + [0], clock, uptime=0.5)
+
+    assert supervise.supervise(runner, sleep=lambda _s: None, now=clock) == 0
+    assert len(runner.calls) == count + 1
+
+
 def test_a_backend_that_dies_instantly_gives_up_instead_of_looping_forever():
     """The failure mode a supervisor INTRODUCES: a backend broken at boot (bad
     config, missing dependency, a port it can never bind) dies in a second, and

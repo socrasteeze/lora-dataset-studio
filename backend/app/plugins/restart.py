@@ -11,6 +11,7 @@ from ..timeout_settings import network_timeout
 import errno
 import logging
 import threading
+from contextlib import contextmanager
 from urllib.parse import urlsplit
 
 from flask import current_app, g, jsonify, request
@@ -21,8 +22,7 @@ _EXTENSION = 'lds_plugin_restart_gate'
 _TOKEN = '_lds_plugin_mutation'
 _BUSY = 'Work is still running or being admitted. Let it finish before applying plugin changes.'
 _RESTARTING = 'LDS is restarting. Wait for it to reconnect before making changes.'
-# Long enough for the dashboard's in-flight polls to return, short enough that
-# a genuinely stuck read still reports back inside the click's own request.
+# Bound how long a profile change waits for in-flight requests.
 _READ_DRAIN_SECONDS = 5.0
 # Read-only probes of the machine (installed tooling, GPU, reachable services)
 # that answer in milliseconds warm but take ten seconds or more on a cold cache.
@@ -49,6 +49,7 @@ class _Gate:
         self.readers = {}  # token -> request path, so a timeout can name it
         self.frozen = False
         self.draining = False
+        self.switching = False
         self.held = []
         self.finished = threading.Event()
         self.message = _RESTARTING
@@ -59,7 +60,7 @@ class _Gate:
 
     def freeze(self, own_token=None, message=_RESTARTING, drain_timeout=_READ_DRAIN_SECONDS):
         with self.lock:
-            if self.frozen:
+            if self.frozen or self.switching:
                 raise RestartBlocked(_RESTARTING)
             if self.draining:  # another change is already waiting out the reads
                 raise RestartBlocked(_BUSY)
@@ -113,6 +114,10 @@ def install_gate(app):
     @app.before_request
     def plugin_restart_admission():
         with gate.lock:
+            if gate.switching:
+                return jsonify(error=_RESTARTING, code='restarting'), 503
+            if request.method == 'POST' and request.path.rstrip('/') == '/api/profiles/switch':
+                return None  # The switch closes admissions and drains them itself.
             if gate.frozen and gate.message != _RESTARTING:
                 return jsonify(error=gate.message, code='restarting'), 503
             if request.method in ('GET', 'HEAD', 'OPTIONS') or request.path.rstrip('/') in _UNBLOCKING_READS:
@@ -145,8 +150,32 @@ def install_gate(app):
                 gate.lock.notify_all()  # a freeze may be draining these reads
 
 
+@contextmanager
+def drain_for_profile_switch():
+    """Close HTTP admissions for relaunch and give admitted requests time to finish."""
+    gate = current_app.extensions.get(_EXTENSION)
+    if gate is None:
+        gate = current_app.extensions.setdefault(_EXTENSION, _Gate())
+    reserved = False
+    try:
+        with gate.lock:
+            if gate.switching:
+                raise RestartBlocked(_RESTARTING)
+            gate.switching = True
+            reserved = True
+            gate.lock.wait_for(
+                lambda: not gate.writers and not gate.readers, _READ_DRAIN_SECONDS,
+            )
+        yield
+    except BaseException:
+        if reserved:
+            with gate.lock:
+                gate.switching = False
+        raise
+
+
 def freeze_profile_work():
-    """Use the shared admission gate for a profile move or controlled restart."""
+    """Reserve idle work lanes for a Bank move."""
     gate = current_app.extensions.get(_EXTENSION)
     registry = current_app.extensions.get('lds_plugins')
     if gate is None or registry is None:
