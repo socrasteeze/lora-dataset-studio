@@ -85,6 +85,14 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-24-video-h3-nodes-and-sageattention', date: '2026-11-24',
+    title: 'Video and Live: two Install buttons work, and SageAttention no longer breaks renders',
+    blurb: 'The MiniMax H3 block attention switch and the reference LoRA loader, two ComfyUI nodes LDS writes '
+      + 'itself, now come with LDS: their Install buttons used to fail. A ComfyUI that has KJNodes but not the '
+      + 'sageattention package no longer fails every Video and Live render either: LDS keeps the SageAttention '
+      + 'speed-up only when that ComfyUI can really load it, and renders without it otherwise.',
+  },
+  {
     id: '2026-11-24-profile-switch-always',
     date: '2026-11-24',
     title: 'Profile Switches Stop Running Work',
