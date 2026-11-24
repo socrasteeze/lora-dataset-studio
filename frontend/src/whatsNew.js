@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-23-datasets-sticky-toolbar',
+    date: '2026-11-23',
+    title: 'Keep Dataset Controls in View',
+    blurb: 'Search and library controls stay at the top as you scroll through datasets.',
+    to: '/datasets',
+  },
+  {
     id: '2026-11-23-bank-grid-sorts',
     date: '2026-11-23',
     title: 'Find bank images by date, name or folder',
