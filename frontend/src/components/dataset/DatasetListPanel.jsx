@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { familyBadge } from '../../utils/familyBadges';
 import { AlertTriangle, Download, Image as ImageIcon, LayoutGrid, Lightbulb, Palette, PenLine, PersonStanding, Plus, Save, Smile, Tags, Trash2, User, X } from 'lucide-react';
 import { datasetThumbUrl } from '../../utils/datasetThumbUrl';
@@ -418,7 +418,6 @@ function ListStatusNotice({ status, onRetry }) {
 export default function DatasetListPanel({
   datasets, listStatus = 'ready', onRetryList, onOpen, onCreate, onDelete, onRename, onRestore, onExportZip, onExportBackup, backup,
 }) {
-  const libraryRef = useRef(null);
   // Library-first: the creation form stays folded behind "+ New dataset" so the
   // page opens on the collection — except on an empty library, where creating
   // is the only meaningful action.
@@ -494,19 +493,15 @@ export default function DatasetListPanel({
   // hides matches would read as lost datasets. Folding resumes when cleared.
   const filterActive = Boolean(query.trim()) || activeKind !== 'all';
   return (
-    <div ref={libraryRef} className="flex flex-col gap-3">
-      {/* Blur only the background so Backup's fixed dialogs stay viewport-relative. */}
-      <div className="sticky top-[var(--app-header-h)] z-30 -mx-2 px-2 py-1.5 before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:rounded-lg before:border before:border-border before:bg-surface-overlay/85 before:backdrop-blur-md">
+    <div className="flex flex-col gap-3">
+      <div>
         <h1 className="sr-only">Datasets</h1>
-        <div className="relative grid items-center gap-2 lg:grid-cols-[8rem_8.5rem_8.5rem_minmax(0,1fr)_6.5rem_8rem_5.5rem]">
+        <div className="relative z-30 grid items-center gap-2 lg:grid-cols-[8rem_8.5rem_8.5rem_minmax(0,1fr)_6.5rem_8rem_5.5rem]">
           <div className="grid grid-cols-3 gap-2 lg:contents">
             <Button variant="primary" className="min-w-0 !px-1 !text-xs sm:!px-3 sm:!text-sm"
               onClick={() => {
                 if (soleForm) document.getElementById('new-dataset-name')?.focus();
-                else {
-                  if (!creating) libraryRef.current?.scrollIntoView({ block: 'start' });
-                  setCreating((v) => !v);
-                }
+                else setCreating((v) => !v);
               }}
               aria-expanded={soleForm ? undefined : formOpen}
               aria-controls={soleForm ? undefined : 'new-dataset-form'}>
@@ -554,10 +549,10 @@ export default function DatasetListPanel({
             </div>
           )}
         </div>
-      </div>
-      <div className="-mt-1 flex gap-2 empty:hidden">
-        <HelpBadge topic="page-datasets" />
-        <HelpBadge topic="library-backup" />
+        <div className="mt-2 flex gap-2 empty:hidden">
+          <HelpBadge topic="page-datasets" />
+          <HelpBadge topic="library-backup" />
+        </div>
       </div>
 
       {recaptioning && <ExternalRecaptionDialog onClose={() => setRecaptioning(false)} />}
