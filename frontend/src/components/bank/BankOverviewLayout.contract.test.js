@@ -109,7 +109,7 @@ test('the rail stays on screen while the grid scrolls under it', () => {
      rail just quietly scrolls away again and the layout loses its reason to
      exist. Deleting the token from index.css must break a test, not a screen. */
   const css = readFileSync(new URL('../../index.css', import.meta.url), 'utf8')
-  assert.match(css, /--app-header-h:\s*\d/)
+  assert.match(css, /--app-header-h:\s*calc\(var\(--app-header-base-h\)/)
   assert.match(workspace, /lg:top-\[calc\(var\(--app-header-h\)\+0\.75rem\)\]/)
 })
 

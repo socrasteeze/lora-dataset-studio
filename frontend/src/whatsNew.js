@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-23-iphone-status-bar',
+    date: '2026-11-23',
+    title: 'Solid iPhone Status Bar',
+    blurb: 'The header fills the area behind the iPhone status bar with a solid color.',
+  },
+  {
     id: '2026-11-23-bank-grid-sorts',
     date: '2026-11-23',
     title: 'Find bank images by date, name or folder',

@@ -29,9 +29,28 @@ test('anchors clear the sticky app bar', () => {
   const css = read('index.css')
   assert.match(css, /html \{\s*scroll-padding-top: var\(--app-header-h\);/)
   // Measured 2026-09-29: 64.8 px below 768 px wide, 101.6 px from 768 px up.
-  assert.match(css, /--app-header-h: 65px;/)
-  assert.match(css, /:root\[data-theme="dark"\] \{ --app-header-h: 102px; \}/)
+  assert.match(css, /--app-header-base-h: 65px;/)
+  assert.match(css, /@media \(min-width: 768px\) \{[\s\S]*?:root\[data-theme="dark"\] \{ --app-header-base-h: 102px; \}/)
+  assert.match(css, /--app-header-h: calc\(var\(--app-header-base-h\) \+ env\(safe-area-inset-top, 0px\)\);/)
   assert.doesNotMatch(read('components/common/Markdown.jsx'), /scroll-mt-/)
+})
+
+test('the sticky app bar paints the top safe area with its opaque surface', () => {
+  const css = read('index.css')
+  const header = css.match(/\.app-header \{([^}]+)\}/)?.[1] ?? ''
+  assert.match(header, /background: rgb\(var\(--surface-overlay\)\);/)
+  assert.match(header, /backdrop-filter: none;/)
+  assert.match(header, /padding-top: env\(safe-area-inset-top, 0px\);/)
+  assert.match(read('App.jsx'), /className="app-header [^"]*\bsticky top-0\b/)
+
+  const html = read('../index.html')
+  assert.match(html, /<meta name="viewport" content="[^"]*viewport-fit=cover/)
+  assert.doesNotMatch(html, /<meta name="apple-mobile-web-app-status-bar-style"/)
+  const manifest = JSON.parse(read('../public/manifest.webmanifest'))
+  assert.equal(manifest.display, 'standalone')
+  assert.match(css, /--surface-overlay: 33 33 36;/)
+  assert.match(html, /<meta name="theme-color" content="#212124"/)
+  assert.equal(manifest.theme_color, '#212124')
 })
 
 test('the Guide does not nest a second <main>, and its side menus can stick', () => {

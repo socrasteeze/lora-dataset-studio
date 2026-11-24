@@ -223,6 +223,7 @@
 .app-header {
   background: rgb(var(--surface-overlay));
   backdrop-filter: none;
+  padding-top: env(safe-area-inset-top, 0px);
 }
 .app-header-shell > a { letter-spacing: -0.025em; }
 /* The phone menu is position:fixed from the header's bottom (inline `top`,
@@ -324,7 +325,7 @@
     padding-top: 6px;
   }
   .app-header-tools > [data-testid="header-system-stats"] { margin-right: auto; }
-  :root[data-theme="dark"] { --app-header-h: 102px; }
+  :root[data-theme="dark"] { --app-header-base-h: 102px; }
 }
 @media (min-width: 768px) and (max-width: 1023px) {
   .app-header .app-header-shell {
@@ -333,7 +334,7 @@
     padding-top: 6px;
     padding-bottom: 4px;
   }
-  :root[data-theme="dark"] { --app-header-h: 102px; }
+  :root[data-theme="dark"] { --app-header-base-h: 102px; }
   .app-header-workspaces > a,
   .app-header-tools > button,
   .app-header-tools > .relative > button { min-height: 40px; min-width: 40px; }
@@ -407,18 +408,11 @@
      tailwind.config.js; keep the two in sync by hand). */
   --accent: 225 134 31;            /* #E1861F */
 
-  /* Height of the sticky top bar (App.jsx `<header className="… sticky top-0">`),
-     measured at ~65 px (64.8) on a phone (< 768 px); the taller two-row bar at
-     768 px and up is measured at ~102 px (101.6) and overrides this in the
-     `:root[data-theme="dark"]` rules above.
-     Anything else that pins itself to the top of the viewport has to clear it,
-     or it slides UNDER the bar and loses its own header — which is what the
-     Bank's filter rail did before this existed.
-     ⚠️ This is a measured constant, not a computed one: no test can catch the
-     bar growing (the suite runs on `node --test`, which has no layout engine).
-     If you change the bar's padding or type size, change this with it — this is
-     the single place that has to move. */
-  --app-header-h: 65px;
+  /* Measured header height before safe-area padding: 64.8 px below 768 px,
+     101.6 px at 768 px and up. Recheck those values if the header layout
+     changes. Anchors and sticky rails clear the header and its top inset. */
+  --app-header-base-h: 65px;
+  --app-header-h: calc(var(--app-header-base-h) + env(safe-area-inset-top, 0px));
 }
 
 
