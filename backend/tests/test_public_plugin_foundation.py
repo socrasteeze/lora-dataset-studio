@@ -266,7 +266,7 @@ def test_environment_repair_retries_only_failed_packages_once_without_cache(host
         if '--dry-run' in cmd:
             report = {'install': [
                 {'metadata': {'name': name, 'version': '1.0'},
-                 'download_info': {'url': f'https://lds.perfectgf.fr/models/tools/packages/{name}-1.0-py3-none-any.whl',
+                 'download_info': {'url': f'https://files.pythonhosted.org/packages/{name}-1.0-py3-none-any.whl',
                                    'archive_info': {'hashes': {'sha256': 'a' * 64}}}}
                 for name in ('sample', 'stable')]}
             Path(cmd[cmd.index('--report') + 1]).write_text(json.dumps(report))
