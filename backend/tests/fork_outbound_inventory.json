@@ -259,7 +259,7 @@
    "hosts": []
   },
   "backend/app/utils/comfyui.py": {
-   "calls": 12,
+   "calls": 13,
    "hosts": [
     "civitai.com",
     "github.com"
