@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-25-zz-late-comfyui-renders', date: '2026-11-25',
+    title: 'A render that finishes late is no longer lost',
+    blurb: 'When ComfyUI finishes an image or a clip after the waiting time, its result now joins its place by itself, even with the Studio page closed. If ComfyUI reports an error instead, you see which node failed.',
+    to: '/studio',
+  },
+  {
     id: '2026-11-24-zzzz-datasets-studio-plugins-fixes', date: '2026-11-24',
     title: 'Fixes for the Studio and plugin engines',
     blurb: 'When a model folder moved while ComfyUI was running, the Studio now asks you to restart ComfyUI instead of updating it. A plugin engine with a damaged package is repaired with one verified retry.',

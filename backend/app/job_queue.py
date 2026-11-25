@@ -178,22 +178,17 @@ def require_comfyui_enqueue_ready() -> None:
 
 
 # --- automatic recovery ------------------------------------------------------
-# One recovery case, and only one, is provable without a human: a *known prompt*
-# barrier whose id ComfyUI no longer knows. If ComfyUI answers and neither its
-# /queue nor its /history contains that prompt, the remote work is gone (the
-# ordinary "ComfyUI was restarted / the machine died" case) and keeping the
-# barrier only blocks every dataset in the app for a job nobody can act on.
-# The three refusals are deliberate, not conservatism for its own sake:
-#   * ComfyUI unreachable        -> no evidence at all, so no decision.
-#   * the prompt is still there  -> the job is ALIVE; clearing it would strand
-#                                   real GPU work whose outputs still arrive.
-#   * an unknown_submit barrier  -> no prompt id exists to ask about, and a
-#                                   timed-out POST can still land later; only a
-#                                   person who restarted ComfyUI can rule it out.
+# A known prompt can leave the queue after it finishes or after a restart.
+# Its exact history distinguishes a saved result from a lost prompt.
+COMFYUI_LOST_MESSAGE = (
+    'ComfyUI restarted while this was rendering, so the job was '
+    'lost — nothing failed in the graph. Launch it again.'
+)
 COMFYUI_AUTO_RESOLVED_MESSAGE = (
     'A stalled generation from a previous session was cleared automatically '
     '(ComfyUI was restarted).'
 )
+RECOVERY_PROBE_INTERVAL_SECONDS = 10
 AUTO_RECOVERY_NOTICE_TTL_SECONDS = 600
 _auto_recovery_notice = None
 _auto_recovery_notice_lock = threading.Lock()
@@ -246,6 +241,8 @@ def _dispatch_auto_resolved_cancellation(job_id) -> None:
     recovery. `_dispatch_completion` refuses a row still marked `stalled`, which
     is the guard that keeps this from touching anything unresolved.
     """
+    # Fork: upstream dropped this with its automatic recovery rework; the manual
+    # reconcile in routes/system.py and services/profile_switch_work.py still uses it.
     try:
         job = ImageGenerationQueue.query.filter_by(
             job_id=str(job_id), status='cancelled').first()
@@ -263,9 +260,7 @@ def _dispatch_auto_resolved_cancellation(job_id) -> None:
             # reaches the Test Studio grid, the video clips and the dataset
             # images without any of them learning about this path.
             if job.error_message in (None, '', 'generation failed'):
-                job.error_message = (
-                    'ComfyUI restarted while this was rendering, so the job was '
-                    'lost — nothing failed in the graph. Launch it again.')
+                job.error_message = COMFYUI_LOST_MESSAGE
                 db.session.commit()
             _dispatch_completion(job, None, True)
     except Exception:
@@ -314,8 +309,7 @@ def _retry_cancel_interrupt(job_id, prompt_id) -> bool:
 
 
 def probe_comfyui_barrier() -> ComfyBarrierProbe:
-    """Clear the recovery barrier when the remote prompt is PROVABLY gone, and
-    report what ComfyUI answered while being asked.
+    """Settle a known prompt from its history once it leaves the remote queue.
 
     Never raises: a failed probe is simply an absence of proof.
     """
@@ -345,32 +339,18 @@ def probe_comfyui_barrier() -> ComfyBarrierProbe:
             if absent is False and owner.get('cancel_requested') and not owner.get('interrupted'):
                 _retry_cancel_interrupt(owner['job_id'], prompt_id)
             return ComfyBarrierProbe(None, link)
-        # reconcile_stalled_comfy_job re-verifies queue absence on both sides of
-        # a /history read and refuses an unhealthy history. This is its only
-        # caller that runs without anyone asking, so it borrows those checks
-        # rather than repeating a weaker version of them.
-        if not queue_manager.reconcile_stalled_comfy_job(owner['job_id']):
-            # It can refuse for two very different reasons. Either the remote
-            # state is not settled after all — leave it alone — or there is no
-            # stalled row left to cancel, in which case the barrier is an orphan
-            # that nothing will ever clear. The prompt was just proven absent
-            # from ComfyUI, so the second case is safe to drop.
-            if not queue_manager.discard_orphan_comfyui_barrier():
+        if not queue_manager.reconcile_stalled_comfy_job(owner['job_id'], automatic=True):
+            if not queue_manager.discard_orphan_comfyui_barrier(expected_owner=owner):
                 return ComfyBarrierProbe(None, link)
         else:
-            # Unblocking the app is not the whole job: the dataset card that
-            # owns this generation is still drawn as "in progress". Route the
-            # cancellation through the normal completion seam so the tile
-            # settles too, instead of waiting for a Stop nobody knows to press.
-            _dispatch_auto_resolved_cancellation(owner['job_id'])
+            job = ImageGenerationQueue.query.filter_by(job_id=owner['job_id']).one()
+            logger.info('job_queue: recovered prompt %s as %s', prompt_id, job.status)
+            if job.error_message == COMFYUI_LOST_MESSAGE:
+                _record_auto_recovery_notice(owner)
+            _dispatch_completion(job, job.result_filename, job.status != 'completed')
     except Exception:
         logger.exception('job_queue: automatic ComfyUI recovery probe failed')
         return ComfyBarrierProbe(None, link)
-    logger.warning(
-        'job_queue: automatically cleared the ComfyUI recovery barrier for job %s — '
-        'prompt %s is absent from both /queue and /history (ComfyUI was restarted)',
-        owner.get('job_id'), prompt_id)
-    _record_auto_recovery_notice(owner)
     return ComfyBarrierProbe(owner, link)
 
 
@@ -589,20 +569,9 @@ def _poll_outputs(prompt_id, timeout=None):
                         job.error_message = detail
                         db.session.commit()
                 return None, True
-            for node_output in outputs.values():
-                # `images` is what SaveImage and SaveVideo report under.
-                # `gifs` is what VideoHelperSuite reports EVERY video under —
-                # the name is a leftover from its AnimateDiff days and covers
-                # mp4 just the same. Without it a VHS_VideoCombine job runs to
-                # completion in ComfyUI, writes its file, and is never claimed
-                # here: the card stays on "Rendering…" until the poll deadline
-                # (measured 2026-09-01 on the ↗ Smooth pass, which is the one
-                # graph in this app that ends on a VHS node).
-                for key in ('images', 'gifs'):
-                    for img in (node_output or {}).get(key) or []:
-                        if (isinstance(img, dict) and img.get('filename')
-                                and img.get('type', 'output') == 'output'):
-                            return img['filename'], False
+            filename = _history_output_filename(outputs)
+            if filename:
+                return filename, False
             # LoadVideo also reports its INPUT under `images`. A completed
             # history containing only inputs/previews/text has no saved result.
             if status.get('completed'):
@@ -623,6 +592,22 @@ def _poll_outputs(prompt_id, timeout=None):
             cancel_event.wait(POLL_INTERVAL_SECONDS)
     finally:
         _discard_cancel_event(prompt_id)
+
+
+def _history_output_filename(outputs) -> str | None:
+    # SaveImage / SaveVideo use images, VideoHelperSuite uses gifs even for MP4.
+    for node in outputs.values():
+        if not isinstance(node, dict):
+            continue
+        for key in ('images', 'gifs'):
+            values = node.get(key)
+            if not isinstance(values, list):
+                continue
+            for item in values:
+                if (isinstance(item, dict) and isinstance(item.get('filename'), str) and item['filename']
+                        and item.get('type', 'output') == 'output'):
+                    return item['filename']
+    return None
 
 
 def _execution_error_detail(status) -> str | None:
@@ -984,7 +969,7 @@ class JobQueueManager:
                 return False
             return True
 
-    def reconcile_stalled_comfy_job(self, job_id) -> bool:
+    def reconcile_stalled_comfy_job(self, job_id, *, automatic=False) -> bool:
         """Release only the exact stalled prompt after fresh remote proof."""
         from .utils.comfyui import (ComfyHistoryHealth, ComfyPromptState,
                                     cancel_comfyui_prompt_state,
@@ -1001,11 +986,16 @@ class JobQueueManager:
                     owner, self._barrier_owner(job, owner['prompt_id'])):
                 return False
 
+            outcome = 'cancelled'
+            filename = None
+            reason = None
             try:
-                state = cancel_comfyui_prompt_state(owner['prompt_id'], owner['client_id'])
+                # A passive recovery probe must never delete or interrupt a prompt.
+                state = None if automatic else cancel_comfyui_prompt_state(
+                    owner['prompt_id'], owner['client_id'])
                 if state is ComfyPromptState.DELETED:
                     safe = comfyui_prompt_is_absent(owner['prompt_id']) is True
-                elif state is ComfyPromptState.ABSENT:
+                elif automatic or state is ComfyPromptState.ABSENT:
                     # Empty/404 history is not enough. Verify queue absence on both
                     # sides of the history read, then accept only a terminal history.
                     if comfyui_prompt_is_absent(owner['prompt_id']) is not True:
@@ -1021,6 +1011,17 @@ class JobQueueManager:
                                 status.get('completed')
                                 or status.get('status_str') in ('success', 'error')):
                             return False
+                        if automatic and not owner.get('cancel_requested'):
+                            if status.get('status_str') == 'error':
+                                outcome = 'failed'
+                                reason = _execution_error_detail(status) or 'generation failed'
+                            else:
+                                filename = _history_output_filename(entry.get('outputs') or {})
+                                outcome = 'completed' if filename else 'failed'
+                                if not filename:
+                                    reason = 'ComfyUI finished without a saved output.'
+                    elif automatic and not owner.get('cancel_requested'):
+                        reason = COMFYUI_LOST_MESSAGE
                     safe = comfyui_prompt_is_absent(owner['prompt_id']) is True
                 else:
                     return False
@@ -1038,8 +1039,9 @@ class JobQueueManager:
             changed = (ImageGenerationQueue.query
                        .filter_by(job_id=str(job_id), status='stalled',
                                   comfyui_prompt_id=owner['prompt_id'])
-                       .update({'status': 'cancelled', 'completed_at': now,
-                                'last_heartbeat': now, 'error_message': None},
+                       .update({'status': outcome, 'completed_at': now,
+                                'last_heartbeat': now, 'result_filename': filename,
+                                'error_message': reason},
                                synchronize_session=False))
             if changed != 1:
                 return False
@@ -1050,7 +1052,7 @@ class JobQueueManager:
                 db.session.rollback()
                 return False
             try:
-                db.session.commit()  # old job cancellation + exact raw barrier delete
+                db.session.commit()  # terminal outcome and removal of its exact barrier
             except Exception:
                 db.session.rollback()
                 logger.exception('job_queue: could not finish stalled reconciliation')
@@ -1126,7 +1128,7 @@ class JobQueueManager:
                 return False
             return True
 
-    def discard_orphan_comfyui_barrier(self) -> bool:
+    def discard_orphan_comfyui_barrier(self, *, expected_owner=None) -> bool:
         """Delete a barrier that no longer guards anything.
 
         The barrier's whole job is to keep new work out while a queue row still
@@ -1144,6 +1146,8 @@ class JobQueueManager:
         with GPU_ARBITER_LOCK:
             _, raw, owner, valid = self._read_comfyui_stalled_barrier()
             if not valid or owner is None:
+                return False
+            if expected_owner is not None and not self._same_barrier_owner(owner, expected_owner):
                 return False
             still_owned = (ImageGenerationQueue.query
                            .filter_by(job_id=str(owner['job_id']))
@@ -1213,6 +1217,7 @@ class JobQueueManager:
 
     def _run_loop(self):
         next_reap = 0.0
+        next_recovery_probe = 0.0
         while self._running:
             try:
                 with self._app.app_context():
@@ -1230,6 +1235,10 @@ class JobQueueManager:
                             cluster_svc.reap_dead_peer_jobs()
                         except Exception:      # noqa: BLE001
                             logger.exception('job_queue: peer job reaper failed')
+                    if not worked and time.monotonic() >= next_recovery_probe:
+                        # Long renders must settle even with the studio tab closed.
+                        probe_comfyui_barrier()
+                        next_recovery_probe = time.monotonic() + RECOVERY_PROBE_INTERVAL_SECONDS
             except Exception:
                 logger.exception('job_queue: worker loop error')
                 worked = False
@@ -1634,7 +1643,8 @@ class JobQueueManager:
 
         with GPU_ARBITER_LOCK:
             db.session.refresh(job)
-            if job.status == 'stalled':
+            if job.status in ('stalled', 'completed', 'failed'):
+                # Recovery may already have settled this prompt and dispatched it.
                 return True
             if job.status == 'cancel_requested':
                 if submit_error is None:
