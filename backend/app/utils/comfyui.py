@@ -37,7 +37,7 @@ import threading
 import time
 from dataclasses import dataclass
 from enum import Enum
-from urllib.parse import urlencode, urljoin, urlsplit
+from urllib.parse import quote, urlencode, urljoin, urlsplit
 
 import requests
 from flask import current_app
@@ -1356,6 +1356,31 @@ def fetch_object_info_classes(timeout=None):
     install's number, and the payload grows with every node pack and every model
     file the user adds. See `object_info_timeout()`."""
     return _fetch_object_info(timeout)[0]
+
+
+def node_description_fails(class_type, timeout=10):
+    """True when the target ComfyUI HAS `class_type` but cannot describe it.
+
+    /object_info leaves such a node out exactly as it leaves out one it never had:
+    ComfyUI logs the error and builds the rest. A built-in loader goes missing that
+    way when a model folder ComfyUI had listed is moved or deleted while it runs —
+    its cached listing then raises on every description until ComfyUI restarts, and
+    updating ComfyUI fixes nothing. Asking for the one node tells the two apart: an
+    empty answer for a class this ComfyUI does not have, its own server error for
+    one it cannot describe.
+
+    False when the node is absent or described, None when the question got no answer
+    (a proxy's 502 included: that is not ComfyUI speaking)."""
+    try:
+        resp = requests.get(urljoin(api_address(), '/object_info/' + quote(str(class_type), safe='')),
+                            timeout=network_timeout((_OBJECT_INFO_CONNECT_TIMEOUT, timeout)),
+                            allow_redirects=False)
+    except Exception as e:  # noqa: BLE001 — could not ask: the caller keeps its own verdict
+        logger.debug('node description probe failed for %s: %s', class_type, e)
+        return None
+    if resp.status_code == 500:
+        return True
+    return False if resp.status_code == 200 else None
 
 
 def fetch_object_info_model_files(timeout=None):
@@ -3133,3 +3158,102 @@ def fetch_node_info(class_type, timeout=10, worker_url=None):
         return None
     entry = data.get(class_type) if isinstance(data, dict) else None
     return entry if isinstance(entry, dict) else None
+
+
+# LDS's own block-attention switch (backend/comfy_nodes/lds_h3_attention) and
+# the backend name it lists only when ComfyUI could import `sageattention`.
+ATTENTION_SWITCH_CLASS = 'LDSMiniMaxH3BlockAttentionSplit'
+SAGE_BACKEND = 'sage attention'
+
+
+def _input_choices(spec):
+    """The accepted values of one declared input, or None when it is not a combo.
+    Legacy nodes declare `[[choice, …], {…}]`, newer ones `["COMBO", {"options": […]}]`."""
+    if not isinstance(spec, (list, tuple)) or not spec:
+        return None
+    options = spec[0]
+    if options == 'COMBO' and len(spec) > 1 and isinstance(spec[1], dict):
+        options = spec[1].get('options')
+    return [o for o in options if isinstance(o, str)] if isinstance(options, list) else None
+
+
+def _input_default(spec):
+    extra = spec[1] if isinstance(spec, (list, tuple)) and len(spec) > 1 and isinstance(spec[1], dict) else {}
+    if 'default' in extra:
+        return extra['default']
+    choices = _input_choices(spec)
+    return choices[0] if choices else None
+
+
+def _combo_options(node_info, name):
+    return _input_choices((((node_info or {}).get('input') or {}).get('required') or {}).get(name)) or []
+
+
+_PRIMITIVE_INPUTS = ('INT', 'FLOAT', 'BOOLEAN', 'STRING')
+
+
+def fit_node_inputs(node_info, inputs, *, prefer=None, renames=None):
+    """`inputs` made valid for the release of a third-party node `node_info` describes.
+
+    A pack moves under a graph written for an older release: it renames a
+    choice, or makes a new control required, and ComfyUI refuses the whole
+    prompt ("Value not in list", "Required input is missing"). From the node's
+    /object_info entry: each `prefer` control the release declares takes that
+    value when it is one of its choices (the values that keep the behaviour
+    the graph was tuned on); a value the release no longer lists is replaced by
+    the first of its `renames` successors that it lists; any other required
+    input still missing takes the node's own default. A failed probe (None)
+    returns `inputs` unchanged, and ComfyUI decides, as before.
+    """
+    sections = node_info.get('input') if isinstance(node_info, dict) else None
+    if not isinstance(sections, dict):
+        return dict(inputs)
+    required = sections.get('required') if isinstance(sections.get('required'), dict) else {}
+    optional = sections.get('optional') if isinstance(sections.get('optional'), dict) else {}
+    declared = {**optional, **required}
+    out = dict(inputs)
+    for name, value in (prefer or {}).items():
+        if value in (_input_choices(declared.get(name)) or ()):
+            out[name] = value
+    for name, successors in (renames or {}).items():
+        choices = _input_choices(declared.get(name))
+        if choices and out.get(name) not in choices:
+            out[name] = next((s for s in successors if s in choices), out.get(name))
+    for name, spec in required.items():
+        if name in out:
+            continue
+        primitive = isinstance(spec, (list, tuple)) and spec and spec[0] in _PRIMITIVE_INPUTS
+        if primitive or _input_choices(spec) is not None:
+            default = _input_default(spec)
+            if default is not None:
+                out[name] = default
+    return out
+
+
+def sageattention_importable(classes, worker_url=None) -> bool:
+    """Can the target ComfyUI's Python import `sageattention`? False when nothing can tell.
+
+    KJNodes registers its SageAttention patch whether or not the package is
+    there, and imports it only when the patch runs: a render on a ComfyUI with
+    KJNodes and no package fails. ComfyUI tries the import itself at startup
+    (`SAGE_ATTENTION_IS_AVAILABLE` in comfy.ldm.modules.attention), and LDS's
+    block-attention switch lists "sage attention" only when that import worked,
+    so a registered switch answers. Without it, on the Windows portable whose
+    Python LDS manages and whose local server is the target, the package folder
+    in site-packages answers, read on disk, never run. Anywhere else: no.
+    """
+    if classes and ATTENTION_SWITCH_CLASS in classes:
+        info = fetch_node_info(ATTENTION_SWITCH_CLASS, worker_url=worker_url)
+        return SAGE_BACKEND in _combo_options(info, 'middle_backend')
+    if worker_url:
+        return False
+    try:
+        from pathlib import Path
+        from ..services import comfyui_control as control
+        layout = control._validated_portable_layout()
+        if layout is None or not control._safe_local_api_url(control.cfg.get('comfyui.api_url')):
+            return False
+        site = Path(layout.python_exe).parent / 'Lib' / 'site-packages'
+        return (site / 'sageattention' / '__init__.py').is_file()
+    except Exception:  # noqa: BLE001 — an unreadable layout is "cannot tell", never a yes
+        return False

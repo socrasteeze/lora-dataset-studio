@@ -1924,7 +1924,7 @@ const TOPICS = [
     ['enabled engines', 'engine', 'engines', 'show', 'hide', 'generate panel',
      'klein', 'krea', 'krea 2 edit', 'local']),
   setting('studio_models', 'engines', 'studio-models', 'Studio Image Models',
-    ['qwen', 'qwen-image 2.1', 'flux', 'anima', 'moss', 'moss-image', 'test image', 'studio', 'base model',
+    ['z-image', 'zimage', 'z-image turbo', 'qwen','qwen-image 2.1', 'flux', 'anima', 'moss', 'moss-image', 'test image', 'studio', 'base model',
      'text encoder', 'vae', 'install models', 'missing model', 'train then generate',
      'missing nodes', 'repair ComfyUI', 'update ComfyUI', 'check nodes again']),
   // Klein model-file pins (fork Divergence 2) — name the exact loader files.

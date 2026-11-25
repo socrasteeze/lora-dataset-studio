@@ -232,10 +232,23 @@ This section controls the shared local image engines, **Klein** and **Krea 2 Edi
 
 **Test Image / Studio** supports all seven image training families: Z-Image,
 SDXL, Krea 2, FLUX.1, FLUX.2 Klein, Anima and Qwen-Image 2.1. The **Trained image
-models** group, now labeled **Studio Image Models**, prepares FLUX.1, Anima,
-Qwen 2.1 and MOSS-Image using the same model selection that generation checks
-before launch. MOSS-Image uses **Base Model Only** in Test Studio; it does not
-add a training family or accept a LoRA.
+models** group, now labeled **Studio Image Models**, prepares Z-Image, FLUX.1,
+Anima, Qwen 2.1 and MOSS-Image using the same model selection that generation
+checks before launch. MOSS-Image uses **Base Model Only** in Test Studio; it does
+not add a training family or accept a LoRA.
+
+**Z-Image** shows what it found instead of file fields: its text encoder and VAE
+are detected automatically (pin one with `zimage.text_encoder` or `zimage.vae`, see
+*Config-file-only settings*) and you choose its base model in the Test Studio. When
+one of its three files is missing, the group and the Test Studio offer the official
+Z-Image Turbo files published by Comfy-Org: the base model (12.31 GB) into
+`models/diffusion_models/z image/`, the Qwen3 4B text encoder (8.04 GB) into
+`models/text_encoders/` and the VAE (335 MB) into `models/vae/z image/`. Each
+download is pinned to one revision of that repository and checked against the
+published size and SHA256 before it takes its place. A file you already have is
+used instead: any `ae.safetensors` serves as the VAE (FLUX.1 uses the same file),
+and a Z-Image model of your own stays the Studio's choice. A pinned file is never
+replaced by a download.
 
 Each family needs its own diffusion model, text encoder(s) and VAE. Leave a
 file field blank to detect compatible installed files, including shared
@@ -307,7 +320,9 @@ Good to know:
 
 The second local engine. Where Klein *restages* your reference with a general instruction-edit model, **Krea 2 Identity Edit** is trained specifically to keep an identity: from a **single** reference photo it holds the face, the body and the permanent markings while changing the angle, framing, light, background and clothes — **with no character LoRA**. That is what makes it useful *before* a LoRA exists, which is the whole point of building a dataset.
 
-It is not installed by the app. It needs, inside your own ComfyUI:
+**Setup installs it on request.** On the install screen of **Setup**, the **Krea 2 Edit** card has an **Install Krea 2 Edit** button that puts the node pack and the four model files below into your ComfyUI (about 20 GB), then asks you to restart ComfyUI so it loads the nodes. It is not part of **Install everything**, because a second local engine is a large download that a Klein user may not want. Setup fetches the LoRA from Civitai without an account first, and if Civitai asks for one, it says how to add a Civitai API key.
+
+To place the files yourself instead, the engine needs, inside your own ComfyUI:
 
 - the **[comfyui-krea2edit](https://github.com/lbouaraba/comfyui-krea2edit)** custom-node pack in `custom_nodes/` (no Python dependencies), then a ComfyUI restart;
 - a **Krea 2 Raw or Turbo** base model under a `krea`-named folder in `models/diffusion_models` (or `models/unet`) — from [Comfy-Org/Krea-2 ▸ diffusion_models](https://huggingface.co/Comfy-Org/Krea-2/tree/main/diffusion_models) (public, no account needed; `krea2_turbo_fp8_scaled.safetensors` is the usual pick);
@@ -1742,6 +1757,8 @@ re-sorts every bank instantly, without rescanning.
 Both are **blank by default, and blank is the right value** — the app finds them itself. It scans every registered `vae` / `text_encoders` folder (including the ones your `extra_model_paths.yaml` adds), sub-folders included, ignoring capitalisation and separators: `z_ae`, `z ae`, `z-ae`, and ComfyUI's own `ae.safetensors` all resolve, and `qwen_3_4b.safetensors` is found whether it sits at the root of `text_encoders/` or inside a folder called `Z image`, `Z Image` or `z-image`. It never picks a `.gguf` (the loader nodes cannot open one) and never picks Krea's `qwen3vl_4b` or Klein's `qwen_3_8b`, which live in the same folder and would fail at sample time.
 
 Set one of these **only** to override that search — for instance if your ComfyUI is shared with FLUX.1, whose VAE is also called `ae.safetensors`, and the app picked the wrong one. A value you set here is used exactly as written and is never second-guessed; if the file isn't there, the error names *your* file rather than silently substituting another.
+
+When nothing is found and nothing is pinned, the Test Studio and **Settings → Image engines → Studio Image Models** offer the official file as a one-click download (see *Trained image models*). A pinned file that is missing or damaged is reported in that group instead, and no download replaces it.
 
 | Key | Default | Role |
 |---|---|---|

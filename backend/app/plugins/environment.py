@@ -84,11 +84,17 @@ def environment_dir(record):
         # it must not take down the manager or the startup UI registry request.
         raise EnvironmentError(str(exc)) from exc
     if record.manifest.contract.get('schema_version', 1) >= 2:
-        # A different package/dependency set gets a different interpreter. Old
-        # environments remain usable after code rollback and are never repaired
-        # in place for the next release. Keep them out of mutable data snapshots.
-        key = hashlib.sha256(json.dumps(_signature(record), sort_keys=True).encode()).hexdigest()
-        return _inside(anchor / 'plugin-environments' / record.id / key, anchor)
+        # Code-only updates share an interpreter; dependency/runtime changes
+        # retain separate environments for rollback. Older LDS versions also
+        # keyed by plugin version: reuse their verified folders without copying
+        # packages, moving venvs or installing anything during a readiness probe.
+        signature = _signature(record)
+        key = hashlib.sha256(json.dumps(signature, sort_keys=True).encode()).hexdigest()
+        parent = _inside(anchor / 'plugin-environments' / record.id, anchor)
+        target = _inside(parent / key, anchor)
+        if target.exists():
+            return target
+        return _reusable_dir(parent, anchor, signature) or target
     return _inside(data / '.venv', anchor)
 
 
@@ -99,6 +105,40 @@ def _metadata(path):
         return json.loads(path.read_text(encoding='utf-8'))
     except (OSError, ValueError):
         return None
+
+
+def _matches_signature(receipt, signature):
+    if not isinstance(receipt, dict):
+        return False
+    if 'version' not in signature and isinstance(receipt.get('version'), str):
+        receipt = {key: value for key, value in receipt.items() if key != 'version'}
+    return receipt == signature
+
+
+def _reusable_dir(parent, anchor, signature):
+    from ..setup_installer import _venv_python
+
+    if not parent.is_dir():
+        return None
+    candidates = []
+    for child in parent.iterdir():
+        if not re.fullmatch(r'[0-9a-f]{64}', child.name):
+            continue
+        try:
+            child = _inside(child, anchor)
+            marker = _inside(child / MARKER, anchor)
+            receipt = _inside(child / RECEIPT, anchor)
+            config = _inside(child / 'pyvenv.cfg', anchor)
+            if (_metadata(marker) == {'plugin': signature['plugin']}
+                    and _matches_signature(_metadata(receipt), signature)
+                    and config.is_file() and config.stat().st_nlink == 1
+                    and Path(_venv_python(child)).is_file()):
+                candidates.append((receipt.stat().st_mtime_ns, child))
+        except (OSError, EnvironmentError):
+            # An unrelated incomplete/linked folder must not make a compatible
+            # owned environment unusable. Never modify a rejected candidate.
+            continue
+    return max(candidates)[1] if candidates else None
 
 
 def _owned_dir(record, *, create=False):
@@ -128,7 +168,8 @@ def interpreter(record, *, ready=True):
     python = Path(_venv_python(env_dir))
     if not python.is_file() or not (env_dir / 'pyvenv.cfg').is_file():
         raise EnvironmentError('No environment yet — install the Python environment on this plugin’s card in Setup ▸ Plugins.')
-    if ready and _metadata(_inside(env_dir / RECEIPT, env_dir.parent.parent)) != _signature(record):
+    if ready and not _matches_signature(_metadata(_inside(env_dir / RECEIPT, env_dir.parent.parent)),
+                                       _signature(record)):
         raise EnvironmentError('The plugin environment needs installation or repair from Setup ▸ Plugins.')
     return str(python)
 
@@ -177,6 +218,7 @@ def _signature(record):
                  'runtime_policy': CPU_RUNTIME_POLICY,
                  'requirements_sha256': hashlib.sha256(content.encode()).hexdigest()}
     if record.manifest.contract.get('schema_version', 1) >= 2:
+        signature.pop('version')
         signature['python_abi'] = sys.implementation.cache_tag
         signature['platform'] = sys.platform
     return signature
@@ -286,20 +328,17 @@ def _verify_interpreter(python, env_dir):
 # were deleted or changed, and pip check reads only metadata, so each package
 # is compared with the sizes and hashes pip wrote to its RECORD file. RECORD is
 # parsed directly: Distribution.files omits missing files on Python 3.12.
+# Resolve each requested distribution by its directory, not its METADATA name:
+# damaged metadata must trigger a reinstall rather than look like an absence.
 _INTEGRITY_PROBE = r'''
 import base64, csv, hashlib, json, re, sys
 from importlib import metadata
 norm = lambda name: re.sub(r'[-_.]+', '-', str(name or '')).lower()
-found = {}
-for dist in metadata.distributions():
-    try:
-        found.setdefault(norm(dist.metadata['Name']), dist)
-    except Exception:
-        continue
 def intact(dist):
     record = dist.read_text('RECORD')
-    if record is None:
+    if not record or '\x00' in record:
         return False
+    checked = 0
     for row in csv.reader(record.splitlines()):
         if len(row) < 2 or '=' not in row[1]:
             continue
@@ -316,12 +355,17 @@ def intact(dist):
                 digest.update(block)
         if base64.urlsafe_b64encode(digest.digest()).rstrip(b'=').decode() != value:
             return False
-    return True
+        checked += 1
+    return checked > 0
 def state(name):
-    if norm(name) not in found:
+    try:
+        dist = metadata.distribution(name)
+    except metadata.PackageNotFoundError:
         return 'absent'
     try:
-        return 'ok' if intact(found[norm(name)]) else 'damaged'
+        if norm(dist.metadata['Name']) != norm(name) or not dist.version:
+            return 'damaged'
+        return 'ok' if intact(dist) else 'damaged'
     except Exception:
         return 'damaged'
 print(json.dumps({name: state(name) for name in sys.argv[1:]}))
@@ -423,6 +467,7 @@ def install(action, record, *, extra_packages=(), extra_requirements=None):
                                        + ', '.join(sorted(damaged)))
                 # Only damaged packages are forced; intact ones keep pip's
                 # already-satisfied shortcut.
+                failed = set()
                 for force in (False, True):
                     lines = [line for name, line in plan if (name in damaged) == force]
                     if not lines:
@@ -432,12 +477,28 @@ def install(action, record, *, extra_packages=(), extra_requirements=None):
                     if run([python, '-I', '-m', 'pip', '--isolated', 'install', '--no-deps',
                             *(['--force-reinstall'] if force else []),
                             '--no-index', '--require-hashes', '-r', str(locked)]) != 0:
-                        return 1
+                        failed.update(name for name, _ in plan if (name in damaged) == force)
+                        break
                 broken = sorted(name for name, state in _package_states(python, names).items() if state != 'ok')
+                retry = failed | set(broken)
+                if retry:
+                    # Keep the exact CPU URLs and hashes approved above, but
+                    # discard cached downloads for one bounded repair attempt.
+                    si._append(action, 'Retrying failed packages once with fresh verified CPU downloads: '
+                                       + ', '.join(sorted(retry)))
+                    locked = Path(temp) / 'fresh-repair.txt'
+                    locked.write_text('\n'.join(line for name, line in plan if name in retry) + '\n',
+                                      encoding='utf-8')
+                    if run([python, '-I', '-m', 'pip', '--isolated', 'install', '--no-deps',
+                            '--force-reinstall', '--no-cache-dir', '--no-index', '--require-hashes',
+                            '-r', str(locked)]) != 0:
+                        si._append(action, 'The fresh-download repair failed. This environment has not been marked ready.')
+                        return 1
+                    broken = sorted(name for name, state in _package_states(python, names).items() if state != 'ok')
                 if broken:
-                    si._append(action, f'Installed files of {", ".join(broken)} are still missing or changed right after '
-                                       'installing. Security software or a failing disk can do this; check its quarantine, '
-                                       'then repair this environment again.')
+                    si._append(action, f'Installed files of {", ".join(broken)} still did not verify after the '
+                                       'fresh-download repair. This environment has not been marked ready. '
+                                       'Check file access, security-software quarantine and storage errors before retrying.')
                     return 1
     if run([python, '-I', '-m', 'pip', '--isolated', 'check']) != 0:
         return 1

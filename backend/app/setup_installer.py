@@ -445,6 +445,19 @@ _BUNDLED_NODE_PACKS = {
         'pack': 'Krea 2 preset sampler',
         'folder': 'lds_krea_sampler',
     },
+    # The MiniMax H3 block-attention switch (jacokon's FastH3 Live node,
+    # Apache-2.0, carried in backend/comfy_nodes/lds_h3_attention with its
+    # LICENSE and NOTICE). Live and Video graft it for speed, and its list of
+    # backends is ComfyUI's own answer to "can this Python import sageattention".
+    'h3_attention_nodes': {
+        'pack': 'MiniMax H3 block attention (after jacokon)',
+        'folder': 'lds_h3_attention',
+    },
+    # The reference LoRA loader for Ref4/Ref8 beside quantized H3 weights.
+    'h3_reference_nodes': {
+        'pack': 'MiniMax H3 reference LoRA loader',
+        'folder': 'lds_h3_reference',
+    },
 }
 
 # The stamp file written into a deployed folder. Its presence is ALSO the
@@ -2778,7 +2791,8 @@ def _resolver_backed_assets():
                 for a in _SEEDVR2_DOWNLOADS})
     from functools import partial
     from .services import trained_image_models as studio_models
-    for family, specs in studio_models.ASSET_SPECS.items():
+    for family, specs in ((studio_models.ZIMAGE, studio_models.ZIMAGE_ASSET_SPECS),
+                          *studio_models.ASSET_SPECS.items()):
         for slot in specs:
             out[studio_models.install_action(family, slot)] = (
                 partial(studio_models.missing_assets, family),

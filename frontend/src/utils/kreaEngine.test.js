@@ -201,3 +201,15 @@ test('grounding is described in words at every end of the range', () => {
   assert.match(groundingDescription(undefined), /default \(512\)/);
   assert.match(groundingDescription('nonsense'), /default \(512\)/);
 });
+
+test('a ComfyUI too old for the Krea 2 text encoder is named before anything else is blamed', () => {
+  const unsupportedEnums = [{ node_id: '2', class_type: 'CLIPLoader', input: 'type', value: 'krea2' }];
+  const reason = kreaUnavailableReason({ unsupportedEnums });
+  assert.match(reason, /type "krea2"/);
+  assert.match(reason, /update ComfyUI/);
+  // A pinned file that is absent still comes first: it is what the user typed.
+  const pinned = kreaUnavailableReason({
+    unsupportedEnums, pinGaps: [{ slot: 'base', key: 'krea.base_model', configured: 'gone.safetensors' }],
+  });
+  assert.doesNotMatch(pinned, /krea2/);
+});

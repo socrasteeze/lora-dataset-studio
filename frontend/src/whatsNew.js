@@ -85,10 +85,45 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-25-zz-late-comfyui-renders', date: '2026-11-25',
+    title: 'A render that finishes late is no longer lost',
+    blurb: 'When ComfyUI finishes an image or a clip after the waiting time, its result now joins its place by itself, even with the Studio page closed. If ComfyUI reports an error instead, you see which node failed.',
+    to: '/studio',
+  },
+  {
+    id: '2026-11-24-zzzz-datasets-studio-plugins-fixes', date: '2026-11-24',
+    title: 'Fixes for the Studio and plugin engines',
+    blurb: 'When a model folder moved while ComfyUI was running, the Studio now asks you to restart ComfyUI instead of updating it. A plugin engine with a damaged package is repaired with one verified retry.',
+    to: '/studio',
+  },
+  {
+    id: '2026-11-24-video-sparse-attention-current-pack', date: '2026-11-24',
+    title: 'Sparse attention works with current H3-Optimizations releases',
+    blurb: 'From version 0.2.31, H3-Optimizations renamed the backend LDS asks for and added required settings, so '
+      + 'ComfyUI refused every Video and Live render with sparse attention on. LDS now reads what your installed '
+      + 'release offers and fills those settings with the values that keep the clip LDS was tuned for: Early KV held, '
+      + 'the stock token order and one shared budget. Older releases get exactly the same graph as before.',
+  },
+  {
+    id: '2026-11-24-video-h3-nodes-and-sageattention', date: '2026-11-24',
+    title: 'Video and Live: two Install buttons work, and SageAttention no longer breaks renders',
+    blurb: 'The MiniMax H3 block attention switch and the reference LoRA loader, two ComfyUI nodes LDS writes '
+      + 'itself, now come with LDS: their Install buttons used to fail. A ComfyUI that has KJNodes but not the '
+      + 'sageattention package no longer fails every Video and Live render either: LDS keeps the SageAttention '
+      + 'speed-up only when that ComfyUI can really load it, and renders without it otherwise.',
+  },
+  {
     id: '2026-11-24-profile-switch-always',
     date: '2026-11-24',
     title: 'Profile Switches Stop Running Work',
     blurb: 'Choose a profile to stop running work and open that profile without a confirmation prompt.',
+  },
+  {
+    id: '2026-11-24-krea-comfyui-too-old-named', date: '2026-11-24',
+    title: 'Krea 2 Edit says when ComfyUI is too old for it',
+    blurb: 'A ComfyUI older than Krea 2 support lacks the "krea2" text encoder type. Setup and the engine picker '
+      + 'used to show Krea 2 Edit as ready there, and the first edit was refused. They now say to update ComfyUI '
+      + 'before you launch anything.',
   },
   {
     id: '2026-11-23-iphone-status-bar',
@@ -102,6 +137,12 @@ export const WHATS_NEW = [
     title: 'Find bank images by date, name or folder',
     blurb: 'Sort a bank\'s images by newest or oldest added, file name, or full folder path. These orders work before any scan or scoring pass.',
     to: '/bank',
+  },
+  {
+    id: '2026-11-23-studio-zimage-model-downloads', date: '2026-11-23',
+    title: 'Z-Image test models download in one click',
+    blurb: 'When the Test Studio is missing a Z-Image file, it now offers a Download button with the size and progress of the official file: the Z-Image Turbo model, its Qwen3 4B text encoder or its VAE. Settings offers the same downloads. LDS checks each file against its published size and fingerprint, puts it where the Studio finds it, and reuses a file you already have.',
+    to: '/settings/engines',
   },
   {
     id: '2026-11-22-watermark-scope-budget',
@@ -180,6 +221,12 @@ export const WHATS_NEW = [
     to: '/bank',
   },
   {
+    id: '2026-11-15-zzz-studio-runs-the-lora-you-pick', date: '2026-11-15',
+    title: 'The Studio runs the LoRA you pick',
+    blurb: 'LDS no longer refuses a LoRA because of the model family it reads in the file. Krea 2 LoRAs saved in the kohya naming were turned away as "SDXL" although ComfyUI loads them; they are now recognized, and no LoRA is refused on that reading, in a test or at import. A file that reads as another family keeps a warning badge, nothing more.',
+    to: '/studio',
+  },
+  {
     id: '2026-11-12-pillow-13-python-3-11', date: '2026-11-12',
     title: 'Image decoding security update, on Python 3.11 or newer',
     blurb: 'LDS now runs Pillow 13 and filelock 4.2, which fix the security advisories filed against image decoding and file locking. Both need Python 3.11 or newer. If your .venv is still on Python 3.10, start.bat rebuilds it on Python 3.11 or 3.12 and keeps datasets, settings and the Image Bank; optional ML extras installed in the old environment are installed again from Setup. Installed plugins keep working.',
@@ -232,6 +279,14 @@ export const WHATS_NEW = [
     blurb: 'With pyenv-win, or another tool whose python command is a .bat or .cmd file, start.bat could stop right after '
       + 'its Python check: back to the prompt, no message, no app. It now carries on. And when a step does fail, start.bat '
       + 'says which one and waits for a key, so a double-clicked window no longer closes before you can read why.',
+  },
+  {
+    id: '2026-11-08-zz-plugin-engine-reuse',
+    date: '2026-11-08',
+    title: 'Plugin updates keep compatible Python engines',
+    blurb: 'Updating a plugin no longer asks you to reinstall its CPU engine when its dependencies have not changed. '
+      + 'Compatible engines installed by earlier versions are reused automatically; different dependencies keep separate environments.',
+    to: '/plugins',
   },
   {
     id: '2026-11-08-z-diagnostic-report-firefox',
