@@ -1758,7 +1758,7 @@ Both are **blank by default, and blank is the right value** — the app finds th
 
 Set one of these **only** to override that search — for instance if your ComfyUI is shared with FLUX.1, whose VAE is also called `ae.safetensors`, and the app picked the wrong one. A value you set here is used exactly as written and is never second-guessed; if the file isn't there, the error names *your* file rather than silently substituting another.
 
-When nothing is found and nothing is pinned, the Test Studio and **Settings → Image engines → Test Studio image models** offer the official file as a one-click download (see *Trained image models*). A pinned file that is missing or damaged is reported in that group instead, and no download replaces it.
+When nothing is found and nothing is pinned, the Test Studio and **Settings → Image engines → Studio Image Models** offer the official file as a one-click download (see *Trained image models*). A pinned file that is missing or damaged is reported in that group instead, and no download replaces it.
 
 | Key | Default | Role |
 |---|---|---|

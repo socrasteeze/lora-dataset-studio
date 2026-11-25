@@ -203,8 +203,8 @@ def _studio_missing_response(e):
     invalid = getattr(e, 'invalid_files', None) or []
     msg = f"The {fam} test pipeline can't run. "
     if e.missing_files:
-        where = ('download them from the Test Studio or Settings → Image engines → Test Studio '
-                 'image models, or place them' if e.family == 'zimage' else 'place them')
+        where = ('download them from the Test Studio or Settings → Image engines → Studio '
+                 'Image Models, or place them' if e.family == 'zimage' else 'place them')
         msg += (f"{len(e.missing_files)} required model file(s) are missing — {where} "
                 f"at the shown path(s) inside your ComfyUI folder. ")
     if invalid:
