@@ -268,6 +268,18 @@ shared interval; Stop and normal completion always flush. A forced process kill
 can require recomputation since the last successful checkpoint. No speedup is
 qualified until the operator requests measurement.
 
+## Divergence 14: SageAttention follows KJNodes' class
+
+`sage_available` in `lds_sdk/h3_render.py` and `services/video_test_studio.py`
+keeps the Sage patch whenever the target ComfyUI registers
+`PathchSageAttentionKJ`. Upstream's `d96cc6aed` also required proof that the
+target's Python imports `sageattention`: LDS's own block-attention switch node,
+or the managed portable on exactly `127.0.0.1:8188`. Any other target, such as
+a tailnet or LAN address, answered no, so Sage was dropped from every H3 render
+on installs where it works. Operator decision, 2026-11-25. Keep
+`sageattention_importable` and its SDK export; do not call it from
+`sage_available` on a later pick.
+
 Dataset Framing uses the shared bounded vision pool after warming its provider
 once. Keep ORM work on the owning thread, recheck scope and source bytes before
 saving, and join submitted requests before releasing the model. The shared

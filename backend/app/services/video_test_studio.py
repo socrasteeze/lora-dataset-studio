@@ -341,7 +341,7 @@ def build_workflow(*, prompt, mode='i2v', image=None, seed=None, steps=None,
     `sage=False` takes SageAttention out. It is a speed patch that needs the
     `sageattention` GPU package, which LDS never installs, so the graph has to be
     able to do without it — the caller passes `sage_available()`, which keeps it
-    only when the target ComfyUI registers KJNodes' patch AND imports the package.
+    when the target ComfyUI registers KJNodes' patch.
     """
     wf = load_base_workflow()
     notes = []
@@ -1757,13 +1757,10 @@ def sage_available(classes=None) -> bool:
     """
     if classes is None:
         classes = registered_classes()
-    # KJNodes registers the patch without the `sageattention` package and
-    # imports it only when the patch runs: its class alone let every render fail
-    # on a ComfyUI that had KJNodes and not the package.
-    if not classes or SAGE_CLASS not in classes:
-        return False
-    from ..utils.comfyui import sageattention_importable
-    return sageattention_importable(classes)
+    # Fork (FORK_NOTES Divergence 14): KJNodes' class alone keeps Sage. Upstream's
+    # import proof answers no for any target other than 127.0.0.1:8188 without
+    # LDS's switch node, which dropped Sage on working remote/tailnet installs.
+    return bool(classes) and SAGE_CLASS in classes
 
 
 def studio_ready(missing=None) -> bool:

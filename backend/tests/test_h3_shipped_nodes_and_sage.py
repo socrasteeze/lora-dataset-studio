@@ -1,5 +1,6 @@
-"""LDS's own MiniMax H3 nodes ship with the core, and SageAttention stays in a
-render only when the target ComfyUI can import the `sageattention` package.
+"""LDS's own MiniMax H3 nodes ship with the core. `sageattention_importable` is
+kept for plugins, but the fork's `sage_available` keeps Sage on KJNodes' class
+alone (FORK_NOTES Divergence 14).
 
 Video and Live offered "Install" for the block-attention switch and the
 reference LoRA loader while no core carried them: every click failed. And the
@@ -114,28 +115,20 @@ def test_without_the_switch_and_without_a_managed_portable_nothing_can_tell(monk
 
 
 @pytest.mark.parametrize('module', [h3_render, legacy], ids=['sdk', 'legacy-core'])
-def test_sage_stays_only_with_kjnodes_and_an_importable_package(monkeypatch, module):
-    answers = []
-
-    def importable(classes, worker_url=None):
-        answers.append(classes)
-        return state['importable']
-
-    state = {'importable': True}
-    monkeypatch.setattr(comfyui, 'sageattention_importable', importable)
+def test_sage_stays_whenever_kjnodes_registers_it(monkeypatch, module):
+    """Fork (FORK_NOTES Divergence 14): the class alone keeps Sage. The import
+    probe is never consulted, so a tailnet target with the package keeps it."""
+    monkeypatch.setattr(comfyui, 'sageattention_importable',
+                        lambda *a, **k: pytest.fail('sage_available must not ask for import proof'))
     assert module.sage_available({module.SAGE_CLASS}) is True
-    state['importable'] = False
-    assert module.sage_available({module.SAGE_CLASS}) is False
-    # KJNodes absent, or /object_info unreadable: no question asked, no Sage.
-    answers.clear()
+    # KJNodes absent, or /object_info unreadable: no Sage.
     assert module.sage_available({'UNETLoader'}) is False
     assert module.sage_available(set()) is False
     monkeypatch.setattr(module, 'registered_classes', lambda: None)
     assert module.sage_available() is False
-    assert answers == []
 
 
 def test_a_render_without_sage_says_why():
     built = h3_render.build_workflow(prompt='a quiet street', mode='t2v', sage=False)
     assert h3_render.N_SAGE not in built['workflow']
-    assert any('sageattention package missing' in note for note in built['notes'])
+    assert any('sage: absent' in note for note in built['notes'])
