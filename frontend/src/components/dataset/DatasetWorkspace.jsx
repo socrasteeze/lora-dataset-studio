@@ -2405,7 +2405,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
           their chunk on that first click, a frame nobody can see. */}
       <Suspense fallback={null}>
       {cropImg && cropImg.filename && (
-        <CropModal imageUrl={`/api/dataset/${d.id}/img/${encodeURIComponent(cropImg.filename)}${
+        <CropModal usePreview imageUrl={`/api/dataset/${d.id}/img/${encodeURIComponent(cropImg.filename)}${
           ds.nonces?.[cropImg.id] ? `?v=${ds.nonces[cropImg.id]}` : ''}`}
           onCancel={() => setCropImg(null)}
           onConfirm={async (box) => { await ds.crop(cropImg.id, box); setCropImg(null); }} />
@@ -2414,7 +2414,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
         // Feed the crop editor the full-frame ORIGINAL (when kept) so the box can widen
         // back out — not just tighten the already-cropped square. Legacy datasets with
         // no stored original fall back to the cropped ref (can only tighten, as before).
-        <CropModal imageUrl={`/api/dataset/${d.id}/img/${encodeURIComponent(d.ref_original_filename || d.ref_filename)}`}
+        <CropModal usePreview imageUrl={`/api/dataset/${d.id}/img/${encodeURIComponent(d.ref_original_filename || d.ref_filename)}`}
           // 1:1 is the historical default; the editor itself still offers its ratio
           // buttons when a different manual crop is wanted.
           defaultAspect={1}
@@ -2447,7 +2447,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
         // when one is kept. No ratio preset: extras are bust/body shots kept in their
         // own aspect, and nothing downstream needs a square. No "Reset to auto" —
         // extras are deliberately imported without the head-crop vision pass.
-        <CropModal imageUrl={`/api/dataset/${d.id}/img/${encodeURIComponent(
+        <CropModal usePreview imageUrl={`/api/dataset/${d.id}/img/${encodeURIComponent(
           extraRefCropSource(d.ref_extra_filenames, d.ref_extra_crop_sources, extraRefCrop))}${
           ds.refNonce ? `?v=${ds.refNonce}` : ''}`}
           onCancel={() => setExtraRefCrop(null)}

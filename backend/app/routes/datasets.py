@@ -34,7 +34,7 @@ from ..services.face_variations import (NSFW_VARIATION_CATALOG, VARIATION_CATALO
                                         MAX_CUSTOM_SHOTS_PER_SUBJECT)
 from ..utils.comfyui import (KREA_ALLOWED_SAMPLERS, KREA_ALLOWED_SCHEDULERS,
                             KREA_SAMPLER_PRESETS, get_krea_loras)
-from ._common import (_map_error, _require_comfyui, _require_no_stalled_comfyui,
+from ._common import (_crop_preview_response, _map_error, _require_comfyui, _require_no_stalled_comfyui,
                       _studio_arch_mismatch_response, _studio_missing_response)
 
 logger = logging.getLogger(__name__)
@@ -2439,7 +2439,12 @@ def dataset_backup_import():
 def dataset_image_file(dataset_id, filename):
     if not svc.get_dataset(LOCAL_USER, dataset_id):
         return jsonify({'error': 'not found'}), 404
-    return send_from_directory(dataset_path(dataset_id), filename)
+    folder = dataset_path(dataset_id)
+    if request.args.get('crop_preview') == '1':
+        src = safe_join(folder, filename)
+        if src and os.path.isfile(src):
+            return _crop_preview_response(src)
+    return send_from_directory(folder, filename)
 
 
 @bp.get('/dataset/<int:dataset_id>/thumb/<path:filename>')

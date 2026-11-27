@@ -2527,14 +2527,17 @@ def _crop_resize_file(path, x, y, w, h, size=1024, dst=None):
         icc = _valid_icc_profile(opened.info.get('icc_profile'))
         # Browser crop coordinates describe the EXIF-oriented visual frame, not
         # the raw camera raster. Bake the orientation before interpreting x/y.
-        oriented = ImageOps.exif_transpose(opened)
+        ImageOps.exif_transpose(opened, in_place=True)
+        box = (max(0, int(x)), max(0, int(y)), min(opened.width, int(x + w)), min(opened.height, int(y + h)))
+        if box[2] <= box[0] or box[3] <= box[1]:
+            return False, None
         # Narrow the mode BEFORE resampling: Pillow silently drops to nearest-neighbour
         # on paletted images, which would undo the point of removing the lossy encoder.
-        src = oriented.convert(image_encoding.resample_mode(oriented))
-    box = (max(0, int(x)), max(0, int(y)), min(src.width, int(x + w)), min(src.height, int(y + h)))
-    if box[2] <= box[0] or box[3] <= box[1]:
-        return False, None
-    bw, bh = box[2] - box[0], box[3] - box[1]
+        cropped = opened.crop(box)
+        mode = image_encoding.resample_mode(opened)
+        if cropped.mode != mode:
+            cropped = cropped.convert(mode)
+    bw, bh = cropped.size
     # Normalise DOWN only: `long` is what we actually render, `size` stays the
     # reference the reported ratio is measured against (see the docstring).
     long = min(size, max(bw, bh))
@@ -2544,8 +2547,9 @@ def _crop_resize_file(path, x, y, w, h, size=1024, dst=None):
         out_w, out_h = max(1, round(long * bw / bh)), long
     scale = size / max(bw, bh)
     out = io.BytesIO()
-    image_encoding.save_edit(src.crop(box).resize((out_w, out_h), Image.LANCZOS),
-                             out, fmt, image_encoding.LOSSLESS, icc_profile=icc)
+    if cropped.size != (out_w, out_h):
+        cropped = cropped.resize((out_w, out_h), Image.LANCZOS)
+    image_encoding.save_edit(cropped, out, fmt, image_encoding.LOSSLESS, icc_profile=icc)
     with open(dst or path, 'wb') as fh:
         fh.write(out.getvalue())
     return True, scale

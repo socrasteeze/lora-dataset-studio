@@ -15,7 +15,7 @@ from ..services import bank_groups
 from ..services import bank_collections
 from ..services import bank_queue
 from ..services import bank_jobs, dataset_activity
-from ._common import _map_error, _require_no_stalled_comfyui
+from ._common import _crop_preview_response, _map_error, _require_no_stalled_comfyui
 # Keep the shared missing-engine recovery response before queuing an improve.
 from .datasets import _improve_engine_error
 from ..services import bank_filter_translator as translator
@@ -2185,7 +2185,8 @@ def bank_thumb(bank_id, image_id):
 
 @bp.get('/bank/<int:bank_id>/file/<int:image_id>')
 def bank_file(bank_id, image_id):
-    """The full-size image. Serves the watermark-cleaned version when one exists;
+    """The resolved image. Use ?crop_preview=1 for a bounded upright preview.
+    Serves the watermark-cleaned version when one exists;
     ?original=1 serves the untouched source instead — that pair IS the before/after
     comparison (no third lightbox needed)."""
     bank, row = _row_or_404(bank_id, image_id)
@@ -2206,6 +2207,8 @@ def bank_file(bank_id, image_id):
                 path = None
     if not path or not os.path.isfile(path):
         return jsonify({'error': 'file missing'}), 404
+    if request.args.get('crop_preview') == '1':
+        return _crop_preview_response(path)
     return send_file(path, max_age=0)
 
 

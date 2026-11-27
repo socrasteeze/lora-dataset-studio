@@ -8,9 +8,10 @@
  * Returns the box in NATURAL image pixels, same contract as before.
  * Custom implementation (no react-easy-crop): that lib pins a fixed frame and
  * moves the image under it — it cannot stretch the selection itself. */
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { postForm } from '../../api/fetchClient';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { fetchWithCsrfRetry, postForm } from '../../api/fetchClient';
 import { autoCenterCrop, cropPreviewBlob } from './autoCenterCrop.js';
+import { clampBox, cropDisplayBox, dragCropBox, readCropSourceSize, roundCropBox } from './cropGeometry.js';
 import AutoCropOptions, { DEFAULT_CROP_CONFIDENCE_PERCENT, validCropConfidence } from './AutoCropOptions.jsx';
 
 const ASPECTS = [
@@ -23,8 +24,6 @@ const ASPECTS = [
   ['3:2', 3 / 2],
   ['16:9', 16 / 9],
 ];
-const MIN_SIDE = 32;   // natural px — below this a crop is useless for training
-
 // Handles: name -> which box edges the drag moves.
 const HANDLES = [
   ['nw', { left: true, top: true }], ['n', { top: true }], ['ne', { right: true, top: true }],
@@ -42,12 +41,6 @@ const HANDLE_POS = {
   se: 'right-0 bottom-0 translate-x-1/2 translate-y-1/2 cursor-nwse-resize',
 };
 
-function clampBox(b, W, H) {
-  const w = Math.min(Math.max(b.w, MIN_SIDE), W);
-  const h = Math.min(Math.max(b.h, MIN_SIDE), H);
-  return { x: Math.min(Math.max(b.x, 0), W - w), y: Math.min(Math.max(b.y, 0), H - h), w, h };
-}
-
 // Best centered box of `ratio` (w/h) fitting inside W x H, centered on the current box.
 function ratioBox(cur, ratio, W, H) {
   let w = cur.w; let h = w / ratio;
@@ -58,8 +51,9 @@ function ratioBox(cur, ratio, W, H) {
 }
 
 export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
-                                    lockSquare = false, defaultAspect = null }) {
-  const [nat, setNat] = useState(null);        // {W, H} natural size
+                                    lockSquare = false, defaultAspect = null, usePreview = false }) {
+  const [preview, setPreview] = useState(null);
+  const [frame, setFrame] = useState(null);
   const [box, setBox] = useState(null);        // crop box in NATURAL px
   const [aspect, setAspect] = useState(lockSquare ? 1 : defaultAspect);   // null = free
   const [framing, setFraming] = useState('subject');
@@ -72,14 +66,50 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
   const framingId = useId();
   const imgRef = useRef(null);
   const viewportRef = useRef(null);
+  const selectionRef = useRef(null);
+  const sizeBadgeRef = useRef(null);
   const cancelRef = useRef(null);
-  const dragRef = useRef(null);                // {mode, start, startBox}
+  const dragRef = useRef(null);
   const requestRef = useRef(null);
   const requestVersion = useRef(0);
   const detection = useRef(null);
   const mounted = useRef(true);
   const savingRef = useRef(false);
   const busy = autoBusy || saving;
+  const activePreview = usePreview && preview?.imageUrl === imageUrl ? preview : null;
+  const shownUrl = usePreview ? activePreview?.url : imageUrl;
+  const nat = frame?.url === shownUrl ? frame?.size : null;
+
+  useEffect(() => {
+    if (!usePreview) return;
+    const controller = new AbortController();
+    let objectUrl;
+    async function loadPreview() {
+      try {
+        const url = new URL(imageUrl, window.location.origin);
+        url.searchParams.set('crop_preview', '1');
+        const response = await fetchWithCsrfRetry(url, { signal: controller.signal });
+        const size = readCropSourceSize(response.headers.get('X-Crop-Source-Size'));
+        // A downscaled response is usable only with an exact source size.
+        if (!response.ok || !size) {
+          response.body?.cancel().catch(() => {});
+          if (!controller.signal.aborted) setPreview({ imageUrl, url: imageUrl, size: null });
+          return;
+        }
+        const blob = await response.blob();
+        if (controller.signal.aborted) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPreview({ imageUrl, url: objectUrl, size });
+      } catch {
+        if (!controller.signal.aborted) setPreview({ imageUrl, url: imageUrl, size: null });
+      }
+    }
+    loadPreview();
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [imageUrl, usePreview]);
 
   useEffect(() => {
     mounted.current = true;
@@ -93,6 +123,37 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
     };
   }, [imageUrl]);
 
+  const paintBox = useCallback((selection, sourceSize) => {
+    if (!selectionRef.current || !sizeBadgeRef.current) return;
+    const { left, top, width, height } = cropDisplayBox(selection, sourceSize);
+    Object.assign(selectionRef.current.style, {
+      left: `${left * 100}%`, top: `${top * 100}%`, width: `${width * 100}%`, height: `${height * 100}%`,
+    });
+    const size = `${Math.round(selection.w)}×${Math.round(selection.h)}`;
+    if (sizeBadgeRef.current.textContent !== size) sizeBadgeRef.current.textContent = size;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (box && nat) paintBox(box, nat);
+  }, [box, nat, paintBox]);
+
+  const clearDrag = useCallback(() => {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    if (drag?.frame != null) cancelAnimationFrame(drag.frame);
+    return drag?.latest;
+  }, []);
+  useLayoutEffect(() => () => { clearDrag(); }, [shownUrl, clearDrag]);
+
+  const finishDrag = () => {
+    const selection = clearDrag();
+    if (selection) {
+      paintBox(selection, nat);
+      setBox(selection);
+    }
+    return selection;
+  };
+
   const autoCenter = async () => {
     if (!nat || requestRef.current || savingRef.current || !validCropConfidence(cropConfidence)) return;
     const minimum = Number(cropConfidence) / 100;
@@ -100,7 +161,7 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
     requestRef.current = controller;
     const version = ++requestVersion.current;
     setAutoBusy(true); setError(''); setSetupRequired(false);
-    dragRef.current = null;
+    finishDrag();
     try {
       let found = detection.current;
       if (!found || found.imageUrl !== imageUrl || found.framing !== framing) {
@@ -122,8 +183,7 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
       setBox(suggestion.box);
       requestRef.current = null;
       setAutoBusy(false);
-      await save(() => onConfirm({ x: Math.round(suggestion.box.x), y: Math.round(suggestion.box.y),
-        w: Math.round(suggestion.box.w), h: Math.round(suggestion.box.h) }));
+      await save(() => onConfirm(roundCropBox(suggestion.box)));
     } catch (failure) {
       if (mounted.current && version === requestVersion.current && failure.name !== 'AbortError') {
         setError(failure.body?.detail || failure.message || 'Auto-Crop failed. Adjust the crop manually.');
@@ -141,9 +201,9 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
     if (savingRef.current || requestRef.current) return;
     savingRef.current = true;
     setSaving(true); setError(''); setSetupRequired(false);
-    dragRef.current = null;
+    const selection = finishDrag() ?? box;
     try {
-      if (await action() === false) throw new Error('The crop was not saved. Your selection is still here.');
+      if (await action(selection) === false) throw new Error('The crop was not saved. Your selection is still here.');
     } catch (failure) {
       if (mounted.current) setError(failure.message || 'The crop was not saved. Your selection is still here.');
     } finally {
@@ -159,8 +219,8 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
   }, [onCancel]);
 
   const onImgLoad = (e) => {
-    const W = e.target.naturalWidth; const H = e.target.naturalHeight;
-    setNat({ W, H });
+    const { W, H } = activePreview?.size ?? { W: e.target.naturalWidth, H: e.target.naturalHeight };
+    setFrame({ url: shownUrl, size: { W, H } });
     // Initial box: largest centered box of the initial ratio, or 80% of the frame.
     const a = lockSquare ? 1 : defaultAspect;
     if (a) {
@@ -194,105 +254,71 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
     return () => { observer?.disconnect(); window.removeEventListener('resize', onResize); };
   }, []);
 
-  const scale = () => {
-    const el = imgRef.current;
-    return el && nat ? el.getBoundingClientRect().width / nat.W : 1;
-  };
-
   const startDrag = (e, mode) => {
-    if (busy) return;
+    if (busy || dragRef.current || e.button !== 0) return;
+    const { width, height } = imgRef.current.getBoundingClientRect();
+    if (!width || !height) return;
     e.preventDefault(); e.stopPropagation();
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-    dragRef.current = { mode, sx: e.clientX, sy: e.clientY, start: { ...box } };
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = {
+      pointerId: e.pointerId, edges: Object.fromEntries(HANDLES)[mode],
+      sx: e.clientX, sy: e.clientY, start: box, latest: box, width, height, frame: null,
+    };
   };
 
-  const onMove = useCallback((e) => {
-    const d = dragRef.current;
-    if (!d || !nat) return;
-    const s = scale();
-    const dx = (e.clientX - d.sx) / s;
-    const dy = (e.clientY - d.sy) / s;
-    const { W, H } = nat;
-    const b0 = d.start;
-    if (d.mode === 'move') {
-      setBox(clampBox({ ...b0, x: b0.x + dx, y: b0.y + dy }, W, H));
-      return;
+  const onMove = (e) => {
+    const drag = dragRef.current;
+    if (drag?.pointerId !== e.pointerId) return;
+    drag.latest = dragCropBox(drag, e.clientX, e.clientY, nat, lockSquare ? 1 : aspect);
+    if (drag.frame == null) {
+      drag.frame = requestAnimationFrame(() => {
+        drag.frame = null;
+        paintBox(drag.latest, nat);
+      });
     }
-    const edges = Object.fromEntries(HANDLES)[d.mode] || {};
-    let x1 = b0.x, y1 = b0.y, x2 = b0.x + b0.w, y2 = b0.y + b0.h;
-    if (edges.left) x1 = Math.min(Math.max(0, x1 + dx), x2 - MIN_SIDE);
-    if (edges.right) x2 = Math.max(Math.min(W, x2 + dx), x1 + MIN_SIDE);
-    if (edges.top) y1 = Math.min(Math.max(0, y1 + dy), y2 - MIN_SIDE);
-    if (edges.bottom) y2 = Math.max(Math.min(H, y2 + dy), y1 + MIN_SIDE);
-    let nb = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
-    const ratio = lockSquare ? 1 : aspect;
-    const horiz = !!(edges.left || edges.right);
-    const vert = !!(edges.top || edges.bottom);
-    if (ratio && horiz !== vert) {
-      // An edge's middle handle: the other side follows the ratio about the
-      // box's CENTRE, not from its top/left edge (which made the box spread to
-      // the right or downward). Capped by the frame; clampBox slides it inside.
-      if (horiz) {
-        nb.h = Math.min(nb.w / ratio, H); nb.w = nb.h * ratio;
-        if (edges.left) nb.x = x2 - nb.w;
-        nb.y = b0.y + b0.h / 2 - nb.h / 2;
-      } else {
-        nb.w = Math.min(nb.h * ratio, W); nb.h = nb.w / ratio;
-        if (edges.top) nb.y = y2 - nb.h;
-        nb.x = b0.x + b0.w / 2 - nb.w / 2;
-      }
-    } else if (ratio) {
-      // A corner: the dominant dragged dimension wins, the other follows;
-      // anchor on the opposite corner so the grab point tracks.
-      if (Math.abs(dx) >= Math.abs(dy)) nb.h = nb.w / ratio;
-      else nb.w = nb.h * ratio;
-      if (edges.left) nb.x = x2 - nb.w;
-      if (edges.top) nb.y = y2 - nb.h;
-      // keep inside the frame — shrink if the ratio pushed it out
-      if (nb.x < 0) { nb.w += nb.x; nb.h = nb.w / ratio; nb.x = 0; if (edges.top) nb.y = y2 - nb.h; }
-      if (nb.y < 0) { nb.h += nb.y; nb.w = nb.h * ratio; nb.y = 0; if (edges.left) nb.x = x2 - nb.w; }
-      if (nb.x + nb.w > W) { nb.w = W - nb.x; nb.h = nb.w / ratio; if (edges.top) nb.y = y2 - nb.h; }
-      if (nb.y + nb.h > H) { nb.h = H - nb.y; nb.w = nb.h * ratio; if (edges.left) nb.x = x2 - nb.w; }
-    }
-    setBox(clampBox(nb, W, H));
-    // scale() reads live refs: listing it would recreate the handler every render for the same
-    // value read during the drag.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nat, aspect, lockSquare]);
+  };
 
-  const endDrag = useCallback(() => { dragRef.current = null; }, []);
-  useEffect(() => {
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', endDrag);
-    return () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', endDrag); };
-  }, [onMove, endDrag]);
+  const endDrag = (e) => {
+    const drag = dragRef.current;
+    if (drag?.pointerId !== e.pointerId) return;
+    if (e.type === 'pointerup' && (e.clientX !== drag.sx || e.clientY !== drag.sy || drag.latest !== drag.start)) {
+      drag.latest = dragCropBox(drag, e.clientX, e.clientY, nat, lockSquare ? 1 : aspect);
+    }
+    finishDrag();
+  };
 
   const pickAspect = (value) => {
     if (busy) return;
     setError(''); setSetupRequired(false);
     setAspect(value);
-    if (value && box && nat) setBox(ratioBox(box, value, nat.W, nat.H));
+    const selection = finishDrag() ?? box;
+    if (value && selection && nat) setBox(ratioBox(selection, value, nat.W, nat.H));
   };
 
   const fit = nat && viewport.width && viewport.height
     ? Math.min(1, viewport.width / nat.W, viewport.height / nat.H) : null;
-  const s = fit ?? scale();
   return (
     <div role="dialog" aria-modal="true" aria-label="Crop image"
       data-probe-chrome="crop-editor" data-probe-layer
       className="fixed inset-0 z-[9995] bg-black/85 flex flex-col p-3 sm:p-4">
       <div ref={viewportRef} className="relative flex-1 min-h-0 w-full max-w-4xl mx-auto flex items-center justify-center overflow-hidden">
         <div className="relative inline-block max-h-full max-w-full"
+          onPointerMove={onMove} onPointerUp={endDrag} onPointerCancel={endDrag} onLostPointerCapture={endDrag}
           style={fit == null ? undefined : { width: nat.W * fit, height: nat.H * fit }}>
-          <img ref={imgRef} src={imageUrl} alt="to crop" onLoad={onImgLoad} draggable={false}
-            onError={() => { setNat(null); setBox(null); setError('The image could not load. Close the editor and try again.'); }}
-            className="max-h-full max-w-full object-contain select-none block"
-            style={fit == null ? undefined : { width: '100%', height: '100%' }} />
+          {shownUrl && <img key={shownUrl} ref={imgRef} src={shownUrl} alt="to crop" onLoad={onImgLoad}
+            decoding="async" draggable={false}
+            onError={() => {
+              setFrame(null); setBox(null);
+              if (activePreview && shownUrl !== imageUrl) setPreview({ imageUrl, url: imageUrl, size: null });
+              else setError('The image could not load. Close the editor and try again.');
+            }}
+            className="max-h-full max-w-full object-fill select-none block"
+            style={fit == null ? undefined : { width: '100%', height: '100%' }} />}
           {box && nat && (
             <div
+              ref={selectionRef}
               className="absolute border-2 border-indigo-400 cursor-move touch-none"
-              style={{ left: box.x * s, top: box.y * s, width: box.w * s, height: box.h * s,
-                       boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)' }}
+              style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)' }}
               onPointerDown={(e) => startDrag(e, 'move')}
               role="application" aria-label="Crop selection — drag to move, use the handles to stretch">
               {HANDLES.map(([name]) => (
@@ -300,9 +326,7 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
                   onPointerDown={(e) => startDrag(e, name)}
                   className={`absolute w-11 h-11 touch-none after:pointer-events-none after:absolute after:left-1/2 after:top-1/2 after:h-3.5 after:w-3.5 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:border-2 after:border-white/90 after:bg-indigo-400 ${HANDLE_POS[name]}`} />
               ))}
-              <span className="absolute -top-6 left-0 px-1.5 py-0.5 rounded bg-black/70 text-white text-2xs tabular-nums pointer-events-none">
-                {Math.round(box.w)}×{Math.round(box.h)}
-              </span>
+              <span ref={sizeBadgeRef} className="absolute -top-6 left-0 px-1.5 py-0.5 rounded bg-black/70 text-white text-2xs tabular-nums pointer-events-none" />
             </div>
           )}
         </div>
@@ -343,7 +367,7 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
         )}
         <div className="ml-auto grid w-full max-w-sm grid-flow-col auto-cols-fr gap-2">
           {onReset && (
-            <button type="button" onClick={() => save(onReset)} disabled={busy}
+            <button type="button" onClick={() => save(() => onReset())} disabled={busy}
               title="Re-run the automatic head-crop on the original image"
               className="min-h-11 min-w-0 px-2 py-2 rounded-lg bg-surface text-content-muted text-sm">
               ↺ Reset to auto
@@ -351,9 +375,8 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
           )}
           <button type="button" ref={cancelRef} onClick={cancel} disabled={saving}
             className="min-h-11 min-w-0 px-2 py-2 rounded-lg bg-surface text-content text-sm">Cancel</button>
-          <button type="button" disabled={!box || busy} aria-busy={saving}
-            onClick={() => save(() => onConfirm({ x: Math.round(box.x), y: Math.round(box.y),
-                                                 w: Math.round(box.w), h: Math.round(box.h) }))}
+          <button type="button" disabled={!box || !nat || busy} aria-busy={saving}
+            onClick={() => save((selection) => onConfirm(roundCropBox(selection)))}
             className="min-h-11 min-w-0 px-2 py-2 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
             {saving ? 'Saving...' : 'Crop'}
           </button>

@@ -583,12 +583,9 @@ export default function BankReviewLightbox({
           onClose={() => setMaskId(null)} />
       )}
 
-      {/* The SAME editor the datasets use, unchanged: it already returns the box
-          in natural image pixels, which is exactly the contract the bank's crop
-          route expects. `onReset` is deliberately absent — it re-runs the
-          dataset's automatic head-crop, and a bank has no such thing. */}
+      {/* The preview and the crop use the same resolved source. */}
       {cropId != null && (
-        <CropModal imageUrl={`/api/bank/${bankId}/file/${cropId}${imageVersionQuery(meta[cropId])}`}
+        <CropModal usePreview imageUrl={`/api/bank/${bankId}/file/${cropId}${imageVersionQuery(meta[cropId])}`}
           onCancel={() => setCropId(null)} onConfirm={cropCurrent} />
       )}
     </div>

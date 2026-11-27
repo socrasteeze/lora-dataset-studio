@@ -91,7 +91,7 @@ test('every bank image surface asks for the version key, edit generation include
   assert.match(lightbox, /\/file\/\$\{id\}\$\{imageVersionQuery\(img\)\}/)
   // The crop editor loads the SAME resolved image the server will cut, so the
   // box it returns means the same thing on both ends.
-  assert.match(lightbox, /CropModal[\s\S]{0,400}\/file\/\$\{cropId\}\$\{imageVersionQuery/)
+  assert.match(lightbox, /<CropModal usePreview[\s\S]{0,400}\/file\/\$\{cropId\}\$\{imageVersionQuery/)
 })
 
 test('a crop made in Review re-keys the tile behind it', () => {

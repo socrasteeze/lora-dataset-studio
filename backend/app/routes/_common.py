@@ -1,17 +1,31 @@
 """Helpers shared by more than one route blueprint."""
+import io
 import json
 import logging
 
-from flask import jsonify, request
+from flask import jsonify, request, send_file
 from sqlalchemy.exc import IntegrityError
 
 from .. import capabilities
 from ..gpu_window import GpuBusyError
 from ..job_queue import (ComfyUIRecoveryRequired, auto_resolve_comfyui_barrier,
                          require_comfyui_enqueue_ready)
+from ..services.crop_preview import load_crop_preview
 from ..services.vision_ollama import LocalOllamaFenceError
 
 logger = logging.getLogger(__name__)
+
+
+def _crop_preview_response(path):
+    result = load_crop_preview(path)
+    if result is None:
+        return '', 204
+    payload, (width, height), etag = result
+    response = send_file(io.BytesIO(payload), mimetype='image/webp', max_age=0, etag=etag)
+    response.cache_control.public = False
+    response.cache_control.private = True
+    response.headers['X-Crop-Source-Size'] = f'{width}x{height}'
+    return response
 
 
 # Every write route reads its body with `get_json(silent=True) or {}`: a body that

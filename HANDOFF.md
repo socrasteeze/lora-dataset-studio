@@ -1,5 +1,16 @@
 # HANDOFF
 
+## Crop editor performance (2026-11-27)
+
+Bank and Dataset use 1024 px upright previews with exact source dimensions.
+The crop box updates once per frame while dragging. Dataset crops cut before
+conversion and resize only above the existing cap.
+
+Synthetic JPEG and PNG previews used 98% fewer bytes. Median preview generation
+took 95–99 ms cold and 0.02 ms on a cache hit. Four Dataset crop cases saved
+byte-identical outputs in 7–13 ms less. Activation requires an LDS restart and
+a PWA hard refresh after the frontend build is deployed.
+
 ## Watermark scope and image budget repair (2026-11-22)
 
 Scoped Bank queries now deduplicate IDs and use one JSON parameter instead of
