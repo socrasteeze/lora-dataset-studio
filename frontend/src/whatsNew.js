@@ -87,7 +87,7 @@ export const WHATS_NEW = [
   {
     id: '2026-11-27-zz-ios-field-zoom', date: '2026-11-27',
     title: 'Steady iPhone Forms',
-    blurb: 'Text fields use at least 16 px on touch and small screens to prevent focus zoom. Pinch zoom still works.',
+    blurb: 'Text fields stay at 16 px on touch and small screens to prevent focus zoom. The app checks for a newer build when you return.',
   },
   {
     id: '2026-11-27-zz-bank-multi-person', date: '2026-11-27',

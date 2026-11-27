@@ -493,14 +493,16 @@
   }
 }
 
-/* iOS Safari can zoom on focus below 16px. Override small Tailwind text sizes
-   on touch screens and below the lg breakpoint. */
+/* iOS Safari can zoom on focus below 16px. Use the same specificity for
+   every editable control so important text utilities cannot shrink them. */
 @media (max-width: 1023px), (pointer: coarse) {
-  input:not([type="checkbox"], [type="radio"], [type="hidden"], [type="range"], [type="file"],
-    [type="button"], [type="submit"], [type="reset"], [type="image"], [type="color"]),
-  select,
-  textarea,
-  [contenteditable]:not([contenteditable="false"]) {
+  :root body :is(
+    input:not([type="checkbox"], [type="radio"], [type="hidden"], [type="range"], [type="file"],
+      [type="button"], [type="submit"], [type="reset"], [type="image"], [type="color"]),
+    select,
+    textarea,
+    [contenteditable]:not([contenteditable="false"])
+  ) {
     font-size: 16px !important;
   }
 }
