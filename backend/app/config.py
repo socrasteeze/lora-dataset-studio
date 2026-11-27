@@ -34,12 +34,19 @@ def _registered_default_data_dir():
     """The Default profile's data dir from the profile registry, for a named
     profile whose launcher predates LDS_SHARED_DATA_DIR (a plain restart keeps
     the supervisor's old environment). None outside a named profile."""
+    return _registered_default_path('LDS_DATA_DIR')
+
+
+def _registered_default_path(key: str):
+    """Read a path from the Default registry row for a named profile."""
     home = os.environ.get('LDS_PROFILES_HOME')
-    if not home or os.environ.get('LDS_PROFILE_ID', 'default') == 'default':
+    profile = os.environ.get('LDS_PROFILE_ID')
+    if not home or not profile or profile == 'default':
         return None
     try:
-        rows = json.loads((Path(home) / 'profiles.json').read_text(encoding='utf-8')).get('profiles', [])
-        return next((row['paths']['LDS_DATA_DIR'] for row in rows if row.get('id') == 'default'), None)
+        registry = json.loads((Path(home) / 'profiles.json').read_text(encoding='utf-8'))
+        return next((row['paths'][key] for row in registry['profiles']
+                     if isinstance(row, dict) and row.get('id') == 'default'), None)
     except (OSError, ValueError, KeyError, TypeError):
         return None
 
@@ -1746,8 +1753,31 @@ def aitoolkit_derived_python(root):
     return win if os.name == 'nt' else root / 'venv' / 'bin' / 'python'
 
 
+def _resolve_aitoolkit_hf_home(hf_home, root):
+    if isinstance(hf_home, str) and (hf_home := hf_home.strip()):
+        return Path(hf_home)
+    return Path(root) / 'hf-cache' / 'huggingface' if root else None
+
+
 def aitoolkit_path(kind: str):
     root = get('aitoolkit.dir') or ''
+    if kind == 'hf_home':
+        cache = _resolve_aitoolkit_hf_home(get('aitoolkit.hf_home'), root)
+        if cache is not None:
+            return cache
+        default_config = _registered_default_path('LDS_CONFIG')
+        if not default_config:
+            return None
+        try:
+            settings = json.loads(Path(default_config).read_text(encoding='utf-8'))['aitoolkit']
+            if not isinstance(settings, dict):
+                return None
+            default_root = settings.get('dir')
+            return _resolve_aitoolkit_hf_home(
+                settings.get('hf_home'), default_root.strip() if isinstance(default_root, str) else None,
+            )
+        except (OSError, ValueError, KeyError, TypeError):
+            return None
     if not root:
         return None
     root = Path(root)
@@ -1762,8 +1792,6 @@ def aitoolkit_path(kind: str):
         return Path(get('aitoolkit.datasets_dir') or root / 'datasets')
     if kind == 'output':
         return Path(get('aitoolkit.output_dir') or root / 'output')
-    if kind == 'hf_home':
-        return Path(get('aitoolkit.hf_home') or root / 'hf-cache' / 'huggingface')
     if kind == 'venv_python':
         # An explicit interpreter wins — installs WITHOUT a venv folder exist
         # in the wild (conda, uv, system python; user-reported from Reddit).

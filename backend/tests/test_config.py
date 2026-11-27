@@ -70,6 +70,57 @@ def test_comfyui_dir_derivation(tmp_path, monkeypatch):
     assert config.comfyui_dir('loras') == base / 'models' / 'loras'
     assert config.comfyui_dir('output') == base / 'output'
 
+def test_aitoolkit_hf_home_without_dir(tmp_path, monkeypatch):
+    config = _fresh(monkeypatch, tmp_path)
+    cache = tmp_path / 'cache'
+    config.save_config({'aitoolkit': {'dir': '', 'hf_home': f'  {cache}  '}})
+
+    assert config.aitoolkit_path('hf_home') == cache
+
+
+def test_aitoolkit_hf_home_derived_from_dir(tmp_path, monkeypatch):
+    config = _fresh(monkeypatch, tmp_path)
+    root = tmp_path / 'toolkit'
+    config.save_config({'aitoolkit': {'dir': str(root), 'hf_home': '  '}})
+
+    assert config.aitoolkit_path('hf_home') == root / 'hf-cache' / 'huggingface'
+
+
+def test_aitoolkit_hf_home_unconfigured(tmp_path, monkeypatch):
+    config = _fresh(monkeypatch, tmp_path)
+    monkeypatch.delenv('LDS_PROFILE_ID', raising=False)
+    config.save_config({'aitoolkit': {'dir': '', 'hf_home': ''}})
+
+    assert config.aitoolkit_path('hf_home') is None
+
+
+@pytest.mark.parametrize(('default_cache', 'named_cache', 'expected'), [
+    pytest.param('shared-cache', '', 'shared-cache', id='default-explicit'),
+    pytest.param('', '', 'toolkit/hf-cache/huggingface', id='default-derived'),
+    pytest.param('shared-cache', 'named-cache', 'named-cache', id='named-explicit'),
+])
+def test_aitoolkit_hf_home_named_profile(tmp_path, monkeypatch, default_cache, named_cache, expected):
+    config = _fresh(monkeypatch, tmp_path)
+    default_config = tmp_path / 'default' / 'config.json'
+    default_config.parent.mkdir()
+    default_aitoolkit = {'dir': str(tmp_path / 'toolkit')}
+    if default_cache:
+        default_aitoolkit['hf_home'] = f'  {tmp_path / default_cache}  '
+    default_config.write_text(json.dumps({'aitoolkit': default_aitoolkit}), encoding='utf-8')
+    (tmp_path / 'profiles.json').write_text(json.dumps({'profiles': [
+        {'id': 'named', 'paths': {'LDS_CONFIG': str(tmp_path / 'config.json')}},
+        {'id': 'default', 'paths': {'LDS_CONFIG': str(default_config)}},
+    ]}), encoding='utf-8')
+    monkeypatch.setenv('LDS_PROFILES_HOME', str(tmp_path))
+    monkeypatch.setenv('LDS_PROFILE_ID', 'named')
+    config.save_config({'aitoolkit': {
+        'dir': '',
+        'hf_home': str(tmp_path / named_cache) if named_cache else '',
+    }})
+
+    assert config.aitoolkit_path('hf_home') == tmp_path / expected
+
+
 def test_saved_secret_beats_a_stale_inherited_copy(tmp_path, monkeypatch):
     """start.bat's supervisor relaunches the server with the environment it
     started with. A secret replaced in Settings since then must come from .env,
