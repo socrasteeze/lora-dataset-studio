@@ -468,7 +468,7 @@ def probe_ollama_installed() -> dict:
             'detail': path or 'ollama binary not found (PATH or default install location)'}
 
 
-def _ollama_tags(url, timeout=3) -> list:
+def _ollama_tags(url, timeout=3, *, local_weights_only=False) -> list:
     """Model identifiers Ollama reports at /api/tags. Each entry is read from BOTH
     the `name` and `model` fields: across Ollama versions either one can be the field
     that carries the (namespaced) identifier, and builds exist that populate `model`
@@ -479,12 +479,17 @@ def _ollama_tags(url, timeout=3) -> list:
     try:
         from .utils.local_api import local_api_url
         url = local_api_url(url)
-        resp = requests.get(f'{url}/api/tags', timeout=network_timeout(timeout))
+        options = {'allow_redirects': False} if local_weights_only else {}
+        resp = requests.get(f'{url}/api/tags', timeout=network_timeout(timeout), **options)
         if resp.status_code >= 400:
             return []
         out, seen = [], set()
         for m in (resp.json().get('models') or []):
             if not isinstance(m, dict):
+                continue
+            if local_weights_only and (m.get('remote_host') or m.get('remote_model')
+                                       or not isinstance(m.get('size'), int)
+                                       or m['size'] < 1024 * 1024):
                 continue
             for key in ('name', 'model'):
                 v = (m.get(key) or '').strip()

@@ -50,7 +50,7 @@ test('the tag inspector is still a NAMED landmark, and still ahead of the grid',
   // inventory caught it. A screen reader must still reach the panel by name.
   assert.match(ws, /<section aria-label="Image tags"/);
   assert.ok(ws.indexOf('aria-label="Image tags"')
-    < ws.indexOf("{filter.flag === 'dups' ? ("),
+    < ws.indexOf('<DupGroupsPanel bankId='),
   'the tags landmark comes before the grid in reading order');
 });
 

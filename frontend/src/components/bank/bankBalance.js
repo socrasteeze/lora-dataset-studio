@@ -17,6 +17,12 @@ export const BALANCE_AXES = [
     hint: 'Also splits per person — for a bank that really holds several subjects' },
 ]
 export const BALANCE_DEFAULT_AXIS = 'framing'
+export const MULTI_PERSON_MODES = ['exclude', 'cap', 'allow']
+
+export function multiPersonSummary(result) {
+  if (!result?.multi_person) return ''
+  return `Multi-Person · ${result.multi_person_excluded} excluded · ${result.multi_person_capped} capped · ${result.multi_person_kept} kept · ${result.unknown_count} unknown`
+}
 
 const FRAMING_LABEL = { face: 'face', bust: 'bust', body: 'body', back: 'back' }
 

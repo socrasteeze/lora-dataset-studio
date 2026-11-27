@@ -893,7 +893,7 @@ def _normalized_semantic_cache(value):
 
 
 def _normalized_face_cache(value):
-    if not isinstance(value, dict) or set(value) != {
+    if not isinstance(value, dict) or set(value) - {'face_count'} != {
             'state', 'det', 'bbox_frac', 'yaw', 'embedding'}:
         return None
     try:
@@ -906,8 +906,14 @@ def _normalized_face_cache(value):
         emb = _normalized_vector(value.get('embedding'), 512)
         if emb is None:
             return None
-        return {'state': state, 'det': det, 'bbox_frac': bbox_frac,
-                'yaw': yaw, 'embedding': emb}
+        out = {'state': state, 'det': det, 'bbox_frac': bbox_frac,
+               'yaw': yaw, 'embedding': emb}
+        if 'face_count' in value:
+            count = value['face_count']
+            if type(count) is not int or not 0 <= count <= 2_147_483_647:
+                return None
+            out['face_count'] = count
+        return out
     except (TypeError, ValueError, OverflowError):
         return None
 
@@ -983,6 +989,8 @@ def write_cache_sidecar(root, cache_bundle) -> str | None:
         'face_emb': npz_transport.floats(
             face['embedding'] if face else (0.0,) * 512, (512,)),
     }
+    if face and 'face_count' in face:
+        arrays['face_count'] = npz_transport.int32([face['face_count']], (1,))
     if any(array is None for array in arrays.values()):
         return None
     try:
@@ -1009,9 +1017,10 @@ def write_cache_sidecar(root, cache_bundle) -> str | None:
 
 def _cache_bundle_from_arrays(arrays) -> dict | None:
     try:
-        if arrays is None or set(arrays) not in (_SIDECAR_KEYS_V1, _SIDECAR_KEYS):
+        keys = set(arrays or ()) - {'face_count'}
+        if keys not in (_SIDECAR_KEYS_V1, _SIDECAR_KEYS):
             return None
-        extended = set(arrays) == _SIDECAR_KEYS
+        extended = keys == _SIDECAR_KEYS
         shapes = {
             'score_present': (1,), 'score_state': (1,),
             'score_aes': (1,), 'score_nsfw': (1,), 'score_emb': (768,),
@@ -1088,8 +1097,13 @@ def _cache_bundle_from_arrays(arrays) -> dict | None:
                 'yaw': None if math.isnan(face_yaw) else face_yaw,
                 'embedding': face_embedding,
             }
+            if 'face_count' in arrays:
+                if arrays['face_count'].shape != (1,):
+                    return None
+                out['face']['face_count'] = arrays['face_count'].int32(0)
         elif (face_state or face_det != 0.0 or face_bfrac != 0.0
               or not math.isnan(face_yaw)
+              or 'face_count' in arrays
               or any(value != 0.0 for value in face_embedding)):
             return None
         return normalized_cache_bundle(out)
@@ -1239,15 +1253,18 @@ def load_runtime_cache_index(score_path=None, face_path=None, *, semantic_path=N
             # lands legacy-shaped and keeps the verdict it already holds, which
             # is exactly what a re-run would do with it anyway.
             and set(z).issubset(
-                face_required | {'yaws', 'bpx', 'sigs', 'hashes'})):
+                face_required | {'yaws', 'bpx', 'sigs', 'hashes', 'face_counts'})):
         try:
             paths, states, dets, bfracs, embs = (z[k] for k in ('paths', 'states', 'dets', 'bfracs', 'embs'))
             yaws, sigs = z.get('yaws'), z.get('sigs')
             hashes = z.get('hashes')
+            face_counts = z.get('face_counts')
             n = paths.shape[0] if len(paths.shape) == 1 else -1
             if (0 <= n <= _MAX_RUNTIME_CACHE_ENTRIES
                     and paths.shape == states.shape == dets.shape == bfracs.shape == (n,)
                     and (yaws is None or yaws.shape == (n,))
+                    and (face_counts is None or (
+                        face_counts.shape == (n,) and face_counts.descr == '<i4'))
                     and (sigs is None or sigs.shape == (n,))
                     and (hashes is None or (
                         hashes.shape == (n, 32) and hashes.descr == '|u1'))
@@ -1267,6 +1284,8 @@ def load_runtime_cache_index(score_path=None, face_path=None, *, semantic_path=N
                     sig = sigs.string(i) if sigs is not None else ''
                     digest = hashes.uint8_row(i) if hashes is not None else b''
                     if payload is not None and len(p) <= 4096 and len(sig) <= 128:
+                        if face_counts is not None and (count := face_counts.int32(i)) >= 0:
+                            payload['face_count'] = count
                         out.setdefault(p, {})['face'] = (payload, sig, digest)
         except (ValueError, TypeError, KeyError, IndexError, OverflowError, MemoryError):
             pass
@@ -1398,6 +1417,9 @@ def write_runtime_caches(score_path, face_path, entries, *, semantic_path=None,
                     (value for _, e in selected for value in e['embedding']),
                     (len(selected), 512)),
             }
+            if any('face_count' in entry for _, entry in selected):
+                arrays['face_counts'] = npz_transport.int32(
+                    [entry.get('face_count', -1) for _, entry in selected], (len(paths),))
         if (any(array is None for array in arrays.values())
                 or any(runtime_stat_signature(p) != sig
                        for p, sig in zip(paths, sigs))

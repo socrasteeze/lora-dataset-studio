@@ -78,8 +78,8 @@ test('Launch all only offers the SigLIP2 index step on a Bank actually using it'
   assert.equal(clip.includes('semantic_index'), false);
 });
 
-test('the progress bar understands the pipeline kind (step X/N + per-step chips)', () => {
-  assert.match(ws, /kind === 'pipeline' \? activity\.pipeline/);
+test('Launch all and Auto-Curate show step counts and completion chips', () => {
+  assert.match(ws, /kind === 'pipeline' \|\| kind === 'auto_curate' \? activity\.pipeline/);
   assert.match(ws, /step \$\{\(pipe\.index \?\? 0\) \+ 1\}\/\$\{pipe\.total_steps\}/);
   assert.match(ws, /const chips = pipe && Array\.isArray\(pipe\.results\) \? pipe\.results : \[\]/);
   assert.match(ws, /chips\.map/);

@@ -7,7 +7,7 @@
 // (2026-08-24, hook series wave 7).
 import { useEffect, useRef, useState } from 'react';
 import { apiFetch, postJson } from '../../api/fetchClient';
-import { BALANCE_DEFAULT_AXIS } from './bankBalance.js';
+import { BALANCE_DEFAULT_AXIS, MULTI_PERSON_MODES } from './bankBalance.js';
 import {
   semanticEnginePatchBody, semanticPayloadMatches,
 } from './bankSemanticEngine.js';
@@ -34,6 +34,13 @@ export function useCurationLanes({
   // Axis ids are persisted keys, never renamed (see bankBalance.js).
   const [balanceN, setBalanceN] = useState(60)
   const [balanceAxis, setBalanceAxis] = useState(BALANCE_DEFAULT_AXIS)
+  const [multiPerson, setMultiPerson] = useState(() => {
+    try {
+      const saved = localStorage.getItem('lds.bank.multiPerson')
+      if (MULTI_PERSON_MODES.includes(saved)) return saved
+    } catch { /* Use the default when storage is unavailable. */ }
+    return 'exclude'
+  })
   const [balanceBusy, setBalanceBusy] = useState(false)
   const [balanceResult, setBalanceResult] = useState(null)
   const [similarN, setSimilarN] = useState(60)
@@ -60,7 +67,7 @@ export function useCurationLanes({
   const [selectionResult, setSelectionResult] = useState(null)
   const selectionRunRef = useRef(0)
   const contextKey = selectionContextKey({ bankId, filter, engine: semanticState.engine,
-    modelKey: semanticState.modelKey, policy: curationPolicy })
+    modelKey: semanticState.modelKey, policy: curationPolicy }) + `/${multiPerson}`
   const selectionContextRef = useRef(contextKey)
   selectionContextRef.current = contextKey
 
@@ -82,6 +89,12 @@ export function useCurationLanes({
   }, [semanticState.engine, semanticState.modelKey])
   useEffect(() => { setSimilarLast(null); setSelectionResult(null) }, [contextKey])
 
+  const updateMultiPerson = (mode) => {
+    setMultiPerson(mode)
+    setBalanceResult(null)
+    try { localStorage.setItem('lds.bank.multiPerson', mode) } catch { /* Session choice still applies. */ }
+  }
+
   const updateCurationPolicy = (next) => {
     const value = next.resetKind ? policyForKind(curationPolicy, next.kind, curationMetadata) : next
     setCurationPolicy(value)
@@ -101,7 +114,7 @@ export function useCurationLanes({
     setDiverseBusy(true)
     try {
       const d = await postJson(`/api/bank/${bankId}/select-diverse`,
-        { n: diverseN, typicality: diverseTypicality,
+        { n: diverseN, typicality: diverseTypicality, multi_person: multiPerson,
           selection: selectionRequest(curationPolicy), ...filterParams(filter) })
       if (!selectionCurrent(request) || semanticEngineRef.current !== requestEngine
           || !semanticPayloadMatches(d, requestEngine, requestModelKey)) return
@@ -130,7 +143,7 @@ export function useCurationLanes({
     setBalanceBusy(true)
     try {
       const d = await postJson(`/api/bank/${bankId}/select-balanced`,
-        { n: balanceN, axis: balanceAxis, typicality: diverseTypicality,
+        { n: balanceN, axis: balanceAxis, typicality: diverseTypicality, multi_person: multiPerson,
           selection: selectionRequest(curationPolicy),
           ...filterParams(filter) })
       if (!selectionCurrent(request) || semanticEngineRef.current !== requestEngine
@@ -309,5 +322,6 @@ export function useCurationLanes({
     setTextStatus, textPending, textResult, setTextResult, pickDiverse,
     pickBalanced, findSimilar, openTextSearch, releaseTextEncoder,
     runTextSearch,
+    multiPerson, updateMultiPerson,
   };
 }

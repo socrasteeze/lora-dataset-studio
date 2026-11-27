@@ -90,6 +90,7 @@ export const STATUS_RING = {
 
 // Short pass names for the progress bar's pipeline readout.
 export const STEP_SHORT = {
+  balanced_pick: 'Balanced Pick',
   scan: 'Scan', auto_reject: '🧹 Auto-reject', score: 'Score',
   semantic_index: 'Semantic index',
   semantic_dedup: '✂ Crops', watermark: 'Watermarks', faces: 'Person',

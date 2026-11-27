@@ -255,7 +255,8 @@ def describe_image_ollama(image_bytes: bytes, prompt: str, *,
                           auto_start_local: bool = False,
                           think: bool | None = None,
                           max_side: int | None = None,
-                          timeout: tuple[float, float] | float = (10, 120)) -> str:
+                          timeout: tuple[float, float] | float = (10, 120),
+                          no_redirects: bool = False) -> str:
     """Describe an image via Ollama vision. Returns the caption text, or "" on
     failure for ordinary best-effort calls. With ``auto_start_local=True``, a
     stopped local server is started once and a persistent failure raises a
@@ -321,7 +322,9 @@ def describe_image_ollama(image_bytes: bytes, prompt: str, *,
         if think is not None:
             payload['think'] = bool(think)
         _admit_local_ollama(url, model_name, keep_alive=keep_alive)
-        resp = requests.post(f'{url}/api/generate', json=payload, timeout=network_timeout(timeout, processing=True))
+        options = {'allow_redirects': False} if no_redirects else {}
+        resp = requests.post(f'{url}/api/generate', json=payload,
+                             timeout=network_timeout(timeout, processing=True), **options)
         resp.raise_for_status()
         data = resp.json()
         caption = (data.get('response') or '').strip()

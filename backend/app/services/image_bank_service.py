@@ -5197,7 +5197,7 @@ def _folder_holds_scanned_images(bank, bank_id) -> bool:
 
 
 @shared_pass('scan')
-def _scan_job(bank_id, rescan, regroup=False, statuses=None, ids=None):
+def _scan_job(bank_id, rescan, regroup=False, statuses=None, ids=None, *, reject_unreadable=True):
     def run(job):
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
@@ -5323,7 +5323,7 @@ def _scan_job(bank_id, rescan, regroup=False, statuses=None, ids=None):
                 # memory, which is strictly MORE correct: the status is judged
                 # at write time, so a decision the user made during the pass
                 # can no longer be overwritten by a value read before it.
-                if res['quality_state'] == 'unreadable':
+                if reject_unreadable and res['quality_state'] == 'unreadable':
                     unreadable_ids.append(res['id'])
                 done += 1
                 if done % _COMMIT_EVERY == 0:
@@ -7215,18 +7215,19 @@ def _pool_query(bank_id, th, *, status=None, flag=None, cluster=None,
     return q
 
 
-def _pool_embeddings(bank, emb_by_path, filters):
+def _pool_embeddings(bank, emb_by_path, filters, *, rows=None):
     """(ids, E) for the filtered pool rows that HAVE a cached embedding: ids is a
     list ordered by image id (so every tie-break below is deterministic), E is the
     matching (m×d) float32 matrix, L2-normalised. Empty ids ⇒ E is None."""
     import numpy as np
-    rows = (_pool_query(bank.id, thresholds(), **filters)
-            .order_by(BankImage.id.asc()).all())
+    if rows is None:
+        rows = (_pool_query(bank.id, thresholds(), **filters)
+                .order_by(BankImage.id.asc()).all())
     base = os.path.realpath(bank.source_path)   # once, not once per row
     prefix = os.path.normcase(base + os.sep)
     ids, vecs = [], []
     for r in rows:
-        if r.watermark_clean_method or r.rotation or _reads_decoded_copy(r):
+        if r.edit_method or r.watermark_clean_method or r.rotation or _reads_decoded_copy(r):
             p = analysis_image_path(bank, r, materialize=False)
             emb = emb_by_path.get(p) if p else None
             if emb is not None:
@@ -7476,8 +7477,81 @@ def _curation_face_vectors(bank, rows):
         return {}
 
 
+def _selection_face_counts(bank, rows):
+    """Count current full-frame detections or proven distinct face regions."""
+    from collections import defaultdict
+    from zipfile import BadZipFile
+
+    import numpy as np
+
+    from ..models import IdentityEvidence, IdentitySubject
+    from . import identity_learning
+
+    counts = {}
+    cached = {}
+    cache_path = _face_cache_path(bank.id)
+    try:
+        if cache_path.is_file():
+            with np.load(cache_path, allow_pickle=False) as cache:
+                paths, hashes, states = cache['paths'], cache['hashes'], cache['states']
+                values = cache['face_counts'] if 'face_counts' in cache.files else None
+                if (hashes.shape == (len(paths), 32) and hashes.dtype == np.uint8
+                        and states.shape == paths.shape == (len(paths),)
+                        and (values is None or (values.shape == paths.shape and values.dtype.kind == 'i'))):
+                    for i, path in enumerate(paths):
+                        count = int(values[i]) if values is not None else -1
+                        if count < 0 and states[i] == 'no_face':
+                            count = 0
+                        if count >= 0:
+                            cached[str(path)] = (hashes[i].tobytes().hex(), count)
+    except (OSError, ValueError, KeyError, TypeError, BadZipFile):
+        pass
+
+    by_id = {row.id: row for row in rows}
+    evidence = defaultdict(list)
+    for subject, digest in (db.session.query(IdentitySubject, IdentityEvidence.content_hash)
+            .join(IdentityEvidence, IdentityEvidence.subject_id == IdentitySubject.id)
+            .filter(IdentitySubject.source == 'bank', IdentitySubject.scope_id == bank.id,
+                    IdentitySubject.scope_instance == bank.instance_id,
+                    IdentitySubject.user_id == bank.user_id, IdentitySubject.region.isnot(None),
+                    IdentityEvidence.model_key == identity_learning.FACE_MODEL)):
+        row = by_id.get(subject.image_id)
+        if row is not None and subject.image_instance == row.instance_id:
+            evidence[row.id].append((subject.region, digest))
+
+    for row in rows if cached else (row for row in rows if len(evidence.get(row.id, ())) > 1):
+        path = analysis_image_path(bank, row, materialize=False)
+        cached_digest, count = cached.get(path, (None, None))
+        regions = evidence.get(row.id, ())
+        if cached_digest is None and len(regions) < 2:
+            continue
+        digest = bank_transfer_metadata.content_fingerprint_path(path)
+        if digest and digest == cached_digest:
+            counts[row.id] = count
+        if not digest or counts.get(row.id, 0) > 1:
+            continue
+        boxes = []
+        for raw, recorded in regions:
+            if digest != recorded:
+                continue
+            try:
+                box = identity_learning.region(json.loads(raw))
+            except (TypeError, ValueError):
+                continue
+            if box is None:
+                continue
+            x, y, w, h = box
+            if any(x + w <= a or a + c <= x or y + h <= b or b + d <= y
+                   for a, b, c, d in boxes):
+                counts[row.id] = 2
+                break
+            boxes.append(box)
+    return counts
+
+
 def _curated_selection(user_id, bank_id, n, selection, filters, mode,
-                       typicality=_TYPICALITY_DEFAULT, ref_id=None, min_score=None):
+                       typicality=_TYPICALITY_DEFAULT, ref_id=None, min_score=None,
+                       multi_person=None, require_current=False):
     """Adapt the existing filtered, provenance-checked Bank pool to one policy."""
     policy = bank_curation.options(selection)
     if not policy['reference_ids'] and ref_id is not None:
@@ -7493,9 +7567,21 @@ def _curated_selection(user_id, bank_id, n, selection, filters, mode,
     if not embeddings:
         raise ValueError('run Score first' if engine == 'clip' else 'run Semantic index first')
     weight = bank_curation._number(typicality, 'typicality', 0, 1)
-    ids, E = _pool_embeddings(bank, embeddings, filters or {})
-    rows = _pool_query(bank_id, thresholds(), **(filters or {})).order_by(BankImage.id.asc()).all()
+    query = _pool_query(bank_id, thresholds(), **(filters or {}))
+    if require_current:
+        query = query.filter(_processable(bank_id))
+    rows = query.order_by(BankImage.id.asc()).all()
+    ids, E = _pool_embeddings(bank, embeddings, filters or {}, rows=rows)
     by_id = {row.id: row for row in rows}
+    if require_current and ids:
+        current = []
+        for pos, iid in enumerate(ids):
+            path = analysis_image_path(bank, by_id[iid], materialize=False)
+            expected = _semantic_embedding_fingerprint(bank, path) if path else None
+            if expected and bank_transfer_metadata.content_fingerprint_path(path) == expected:
+                current.append(pos)
+        ids, E = [ids[pos] for pos in current], E[current]
+    face_counts = _selection_face_counts(bank, [by_id[iid] for iid in ids]) if multi_person else {}
     reference_ids = policy['reference_ids']
     references = BankImage.query.filter(BankImage.bank_id == bank_id,
                                         BankImage.id.in_(reference_ids)).all() if reference_ids else []
@@ -7516,6 +7602,7 @@ def _curated_selection(user_id, bank_id, n, selection, filters, mode,
               'dup_group', 'semantic_dup_group')
     th = thresholds()
     items = [{**{key: getattr(by_id[iid], key) for key in fields},
+              'face_count': face_counts.get(iid),
               'flags': image_flags(by_id[iid], th)} for iid in ids]
     if E is None:
         import numpy as np
@@ -7523,7 +7610,7 @@ def _curated_selection(user_id, bank_id, n, selection, filters, mode,
     result = bank_curation.select(
         items, E, n, policy, mode=mode, isolation=_isolation_penalty,
         reference_vectors=reference_vectors, match_vectors=face_vectors,
-        distinct_pairs=_distinct_pairs(bank_id), typicality=weight)
+        distinct_pairs=_distinct_pairs(bank_id), typicality=weight, multi_person=multi_person)
     result.update(_verified_semantic_result_provenance(bank, engine, model_key))
     if ref_id is not None:
         result['ref_id'] = int(ref_id)
@@ -7531,7 +7618,7 @@ def _curated_selection(user_id, bank_id, n, selection, filters, mode,
 
 
 def select_diverse(user_id, bank_id, n=60, *, typicality=_TYPICALITY_DEFAULT,
-                    filters=None, selection=None):
+                    filters=None, selection=None, multi_person=bank_curation.MULTI_PERSON_DEFAULT):
     """Farthest-point sampling over the ✨ Score CLIP embeddings, tempered by a
     TYPICALITY guard: the ``n`` images of the (filtered) pool that best COVER the
     visual space — the antidote to a dump of 4 000 near-identical shots. Greedy
@@ -7574,8 +7661,10 @@ def select_diverse(user_id, bank_id, n=60, *, typicality=_TYPICALITY_DEFAULT,
     'typicality': w}. Raises ValueError (→400, "run ✨ Score first") when no
     embedding exists yet, so the UI shows the clear hint instead of an empty,
     unexplained selection."""
+    multi_person = bank_curation.multi_person_mode(multi_person)
     if selection is not None:
-        return _curated_selection(user_id, bank_id, n, selection, filters, 'diverse', typicality)
+        return _curated_selection(user_id, bank_id, n, selection, filters, 'diverse', typicality,
+                                  multi_person=multi_person)
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
@@ -7594,24 +7683,26 @@ def select_diverse(user_id, bank_id, n=60, *, typicality=_TYPICALITY_DEFAULT,
     except (TypeError, ValueError):
         w = _TYPICALITY_DEFAULT
     w = max(0.0, min(1.0, w))
-    ids, E = _pool_embeddings(bank, emb_by_path, filters or {})
+    rows = _pool_query(bank_id, thresholds(), **(filters or {})).order_by(BankImage.id.asc()).all()
+    ids, E = _pool_embeddings(bank, emb_by_path, filters or {}, rows=rows)
     m = len(ids)
-    if m <= n:                                   # whole pool already fits
-        provenance = _verified_semantic_result_provenance(
-            bank, engine, model_key)
-        return {'image_ids': sorted(ids), 'pool': m, 'requested': n,
-                'typicality': w, **provenance}
+    id_set = set(ids)
+    measured = _selection_face_counts(bank, [row for row in rows if row.id in id_set])
+    counts = {i: measured.get(iid) for i, iid in enumerate(ids)}
     # Novelty multiplier, in (0, 1] — never 0, so the -inf "already chosen"
     # sentinel below stays -inf (0 × -inf would be a NaN) and so even a fully
     # penalised row stays a last resort rather than an unpickable one.
     factor = None
-    if w > 0.0:
+    if w > 0.0 and m > n:
         factor = 10.0 ** (-_TYPICALITY_DECADES * w * _isolation_penalty(E))
-    chosen = _farthest_point(E, factor, n)
+    pool = _person_limited_buckets({'all': list(range(m))}, counts, n, multi_person, E, factor)
+    chosen = (_farthest_point(E, factor, n) if m > n and len(pool['all']) == m
+              else _sample_bucket(pool['all'], E, factor, n))
     provenance = _verified_semantic_result_provenance(
         bank, engine, model_key)
     return {'image_ids': sorted(ids[i] for i in chosen),
-            'pool': m, 'requested': n, 'typicality': w, **provenance}
+            'pool': m, 'requested': n, 'typicality': w,
+            **bank_curation.multi_person_report(multi_person, counts, chosen), **provenance}
 
 
 # --- balanced selection (coverage of the LABELS, not of the embedding space) --
@@ -7672,11 +7763,30 @@ def _balanced_quotas(sizes: dict, n: int) -> dict:
     return quota
 
 
-def _pool_labels(bank, filters) -> dict:
-    """{image_id: (framing, face_cluster)} for the same pool ``_pool_embeddings``
-    walks — one extra column read, no GPU."""
-    rows = _pool_query(bank.id, thresholds(), **(filters or {})).all()
-    return {r.id: (r.framing, r.face_cluster) for r in rows}
+def _sample_bucket(positions, E, factor, take):
+    if take >= len(positions):
+        return list(positions)
+    if take <= 0:
+        return []
+    subfactor = None if factor is None else factor[positions]
+    return [positions[i] for i in _farthest_point(E[positions], subfactor, take)]
+
+
+def _person_limited_buckets(buckets, counts, n, mode, E, factor):
+    multi = {pos for pos, count in counts.items() if count is not None and count > 1}
+    if not multi or mode == 'allow':
+        return buckets
+    allowed = set()
+    if mode == 'cap':
+        candidates = {key: [pos for pos in bucket if pos in multi]
+                      for key, bucket in buckets.items()}
+        sizes = {key: len(bucket) for key, bucket in candidates.items()}
+        other = sum(map(len, buckets.values())) - sum(sizes.values())
+        quotas = _balanced_quotas(sizes, bank_curation.multi_person_limit(n, other))
+        for key, positions in candidates.items():
+            allowed.update(_sample_bucket(positions, E, factor, quotas[key]))
+    return {key: [pos for pos in bucket if pos not in multi or pos in allowed]
+            for key, bucket in buckets.items()}
 
 
 def _balance_axis_hint(axis, m, unlabelled, unknown) -> str:
@@ -7698,7 +7808,8 @@ def _balance_axis_hint(axis, m, unlabelled, unknown) -> str:
 
 
 def select_balanced(user_id, bank_id, n=60, *, axis=_BALANCE_DEFAULT_AXIS,
-                    typicality=_TYPICALITY_DEFAULT, filters=None, selection=None):
+                    typicality=_TYPICALITY_DEFAULT, filters=None, selection=None,
+                    multi_person=bank_curation.MULTI_PERSON_DEFAULT, _require_current=False):
     """Select ``n`` images SPREAD OVER the labels of ``axis`` instead of taking
     the top of one ranking: an even split across framings (and optionally across
     people), each bucket filled with the same farthest-point + typicality
@@ -7721,9 +7832,10 @@ def select_balanced(user_id, bank_id, n=60, *, axis=_BALANCE_DEFAULT_AXIS,
     'buckets': [{key, framing, cluster, available, fair_share, selected, short}],
     'unlabelled', 'unknown', 'shortfall'}. Raises ValueError (→400) when Score
     has not run, or when nothing in the filter carries the axis label."""
+    multi_person = bank_curation.multi_person_mode(multi_person)
     if selection is not None:
-        return _curated_selection(user_id, bank_id, n, selection, filters, 'balanced', typicality)
-    import numpy as np
+        return _curated_selection(user_id, bank_id, n, selection, filters, 'balanced', typicality,
+                                  multi_person=multi_person, require_current=_require_current)
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
@@ -7744,16 +7856,18 @@ def select_balanced(user_id, bank_id, n=60, *, axis=_BALANCE_DEFAULT_AXIS,
     except (TypeError, ValueError):
         w = _TYPICALITY_DEFAULT
     w = max(0.0, min(1.0, w))
-    ids, E = _pool_embeddings(bank, emb_by_path, filters or {})
+    rows = _pool_query(bank_id, thresholds(), **(filters or {})).order_by(BankImage.id.asc()).all()
+    ids, E = _pool_embeddings(bank, emb_by_path, filters or {}, rows=rows)
     m = len(ids)
     if not m:
         raise ValueError('nothing to select from in the current filter')
 
-    labels = _pool_labels(bank, filters or {})
+    by_id = {row.id: row for row in rows}
+    measured = _selection_face_counts(bank, [by_id[iid] for iid in ids])
     buckets, meta = {}, {}
     unlabelled = unknown = 0
     for pos, iid in enumerate(ids):
-        fr, cl = labels.get(iid, (None, None))
+        fr, cl = by_id[iid].framing, by_id[iid].face_cluster
         if fr is None:
             unlabelled += 1
             continue
@@ -7773,28 +7887,21 @@ def select_balanced(user_id, bank_id, n=60, *, axis=_BALANCE_DEFAULT_AXIS,
     if not buckets:
         raise ValueError(_balance_axis_hint(axis, m, unlabelled, unknown))
 
+    counts = {pos: measured.get(iid) for pos, iid in enumerate(ids)}
+    factor = None
+    if w > 0.0:
+        factor = 10.0 ** (-_TYPICALITY_DECADES * w * _isolation_penalty(E))
+    buckets = _person_limited_buckets(buckets, counts, n, multi_person, E, factor)
     sizes = {k: len(v) for k, v in buckets.items()}
     quota = _balanced_quotas(sizes, n)
     # What a split with no ceiling WOULD have given each bucket — the yardstick
     # a shortfall is reported against ("back: 3 of an even 15").
     fair = _balanced_quotas({k: n for k in sizes}, n)
 
-    factor = None
-    if w > 0.0:
-        factor = 10.0 ** (-_TYPICALITY_DECADES * w * _isolation_penalty(E))
     chosen, report = [], []
     for key in sorted(sizes):
         pos = buckets[key]                   # ascending id order (pool order)
-        take = quota[key]
-        if take >= len(pos):
-            picked = list(pos)
-        elif take <= 0:
-            picked = []
-        else:
-            idx = np.asarray(pos)
-            sub = np.ascontiguousarray(E[idx])
-            subf = None if factor is None else np.ascontiguousarray(factor[idx])
-            picked = [pos[i] for i in _farthest_point(sub, subf, take)]
+        picked = _sample_bucket(pos, E, factor, quota[key])
         chosen.extend(picked)
         fr, cl = meta[key]
         report.append({'key': key, 'framing': fr, 'cluster': cl,
@@ -7810,7 +7917,8 @@ def select_balanced(user_id, bank_id, n=60, *, axis=_BALANCE_DEFAULT_AXIS,
             'pool': m, 'requested': n, 'selected': len(chosen),
             'typicality': w, 'axis': axis, 'buckets': report,
             'unlabelled': unlabelled, 'unknown': unknown,
-            'shortfall': max(0, n - len(chosen)), **provenance}
+            'shortfall': max(0, n - len(chosen)),
+            **bank_curation.multi_person_report(multi_person, counts, chosen), **provenance}
 
 
 def select_similar(user_id, bank_id, ref_id, n=60, min_score=None, *, filters=None, selection=None):
@@ -9970,7 +10078,7 @@ def _watermark_todo_clause():
                          BankImage.watermark_bbox.is_(None))))
 
 
-def _watermark_scan_query(bank_id, rescan, statuses=None, ids=None):
+def _watermark_scan_query(bank_id, rescan, statuses=None, ids=None, *, preserve_cleaned=False):
     """The rows the detection pass should look at.
 
     Not a rescan = "finish the job": rows never scanned, PLUS rows flagged
@@ -9981,6 +10089,8 @@ def _watermark_scan_query(bank_id, rescan, statuses=None, ids=None):
     on a rescan — same anti-frustration rule as the dataset detector."""
     q = _scoped_pool(bank_id, statuses, ids).filter(
         _watermark_not_dismissed(), _bank_watermark_can_rescan())
+    if preserve_cleaned:
+        q = q.filter(BankImage.watermark_clean_method.is_(None))
     if not rescan:
         q = q.filter(_watermark_todo_clause())
     return q
@@ -10085,9 +10195,11 @@ def start_watermark(app, user_id, bank_id, rescan=False, device_id=None,
 
 @shared_pass('watermark')
 def _watermark_job(bank_id, rescan, device_id=None, use_detector=False,
-                   statuses=None, ids=None, note='', limit=None):
+                   statuses=None, ids=None, note='', limit=None, *,
+                   preserve_cleaned=False, vision_target=None):
     if use_detector:
-        return _watermark_detector_job(bank_id, rescan, statuses, ids, limit=limit)
+        return _watermark_detector_job(bank_id, rescan, statuses, ids, limit=limit,
+                                       preserve_cleaned=preserve_cleaned)
 
 
     def run(job):
@@ -10105,7 +10217,9 @@ def _watermark_job(bank_id, rescan, device_id=None, use_detector=False,
         # same two reasons spelled out in _framing_job.
         source_path = bank.source_path
         root = os.path.realpath(source_path)
-        q = (_watermark_scan_query(bank_id, rescan, statuses, ids)
+        vision_options = {'loopback_target': vision_target} if vision_target else {}
+        q = (_watermark_scan_query(bank_id, rescan, statuses, ids,
+                                   preserve_cleaned=preserve_cleaned)
              .order_by(BankImage.id.asc())
              .with_entities(BankImage.id, BankImage.relpath,
                             BankImage.watermark_clean_method))
@@ -10183,7 +10297,7 @@ def _watermark_job(bank_id, rescan, device_id=None, use_detector=False,
             try:
                 raw = describe_image_ollama(
                     payload, WATERMARK_BBOX_PROMPT, num_predict=400,
-                    prefer_json=True, fmt='json', keep_alive='5m')
+                    prefer_json=True, fmt='json', keep_alive='5m', **vision_options)
                 return {'raw': raw, 'fingerprint': fingerprint, 'error': None}
             except Exception as exc:  # noqa: BLE001 — preserve per-image semantics
                 return {'raw': None, 'fingerprint': fingerprint,
@@ -10346,7 +10460,7 @@ def _watermark_job(bank_id, rescan, device_id=None, use_detector=False,
                     # something else. (It did: the finally sat outside the
                     # local/remote branch when the two sources were split.)
                     if not device_id:
-                        unload_vision_model()
+                        unload_vision_model(**vision_options)
         skipped = _skipped_note(vanished=vanished, missing=missing,
                                 unanswered=unanswered, stale=stale,
                                 unreadable=errors)
@@ -10365,7 +10479,8 @@ def _watermark_job(bank_id, rescan, device_id=None, use_detector=False,
     return run
 
 
-def _watermark_detector_job(bank_id, rescan, statuses=None, ids=None, limit=None):
+def _watermark_detector_job(bank_id, rescan, statuses=None, ids=None, limit=None, *,
+                            preserve_cleaned=False):
     """The same pass, run by the dedicated detector extra instead of the vision
     model. Deliberately the same SHAPE as the vision job above, because the two
     have to be interchangeable: same resume semantics, same per-image commit,
@@ -10387,7 +10502,8 @@ def _watermark_detector_job(bank_id, rescan, statuses=None, ids=None, limit=None
         bank = _detach_bank(db.session.get(ImageBank, bank_id))
         if not bank:
             return
-        q = _watermark_scan_query(bank_id, rescan, statuses, ids).order_by(BankImage.id.asc())
+        q = _watermark_scan_query(bank_id, rescan, statuses, ids,
+                                  preserve_cleaned=preserve_cleaned).order_by(BankImage.id.asc())
         rows = (q.limit(limit) if limit else q).all()
         bank_jobs.progress(job, done=0, total=len(rows), detail='watermark scan')
         if not rows:
@@ -12733,7 +12849,7 @@ _FRAMING_MAX_SIDE = 1024
 
 @shared_pass('framing')
 def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None, *,
-                 auto_crop=False, min_crop_confidence=None):
+                 auto_crop=False, min_crop_confidence=None, vision_target=None):
     def run(job):
         import contextlib
         from . import auto_crop as crop_service
@@ -12775,6 +12891,7 @@ def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None, *,
         stale = fenced = unanswered = 0
         fence_streak = 0
         pending = {}
+        vision_options = {'loopback_target': vision_target} if vision_target else {}
         fence_reason = ''      # the FIRST refusal's own sentence, for the last line
 
         def prepared():
@@ -12817,7 +12934,7 @@ def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None, *,
                 raw = describe_image_ollama(
                     payload, prompt, num_predict=650 if auto_crop else 400,
                     prefer_json=True, fmt='json', keep_alive='5m',
-                    max_side=None if auto_crop else _FRAMING_MAX_SIDE)
+                    max_side=None if auto_crop else _FRAMING_MAX_SIDE, **vision_options)
                 return {'raw': raw, 'fingerprint': fingerprint, 'error': None,
                         'fenced': False}
             except Exception as exc:  # noqa: BLE001 — one image, not the pass
@@ -12994,7 +13111,7 @@ def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None, *,
                     # something else. (It did: the finally sat outside the
                     # local/remote branch when the two sources were split.)
                     if not device_id:
-                        unload_vision_model()
+                        unload_vision_model(**vision_options)
         skipped = _skipped_note(vanished=vanished, missing=missing,
                                 unanswered=unanswered, fenced=fenced,
                                 fence_reason=fence_reason,
@@ -14484,6 +14601,124 @@ def start_pipeline(app, user_id, bank_id, steps=None, reject_flags=None,
         device_id=device_id if remote else None)
 
 
+def start_auto_curate(app, user_id, bank_id, n=60, *, multi_person=bank_curation.MULTI_PERSON_DEFAULT):
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        raise ValueError('bank not found')
+    n = bank_curation._number(n, 'image count', 1, _CURATION_MAX_N)
+    if not n.is_integer():
+        raise ValueError('image count must be a whole number')
+    mode = bank_curation.multi_person_mode(multi_person)
+    steps = ['scan', 'score', 'faces', 'framing', 'semantic_dedup', 'watermark', 'balanced_pick']
+    if _selected_semantic_engine(bank) == 'siglip2':
+        steps.insert(4, 'semantic_index')
+    return bank_jobs.start(app, bank_id, 'auto_curate', _pipeline_job(
+        user_id, bank_id, steps, (), False, auto_curate=(int(n), mode)))
+
+
+def _auto_curate_review(user_id, bank_id, n, multi_person):
+    """Propose a shortlist and rejects without changing review decisions."""
+    result = select_balanced(user_id, bank_id, n, multi_person=multi_person,
+                             selection={'axis': 'framing', 'duplicate_limit': 1},
+                             _require_current=True)
+    promote_ids = result['image_ids']
+    picked = set(promote_ids)
+    bank = db.session.get(ImageBank, bank_id)
+    pool = _scoped_pool(bank_id)
+    groups = {}
+    if picked:
+        for row in _scoped_pool(bank_id, ids=promote_ids).filter(BankImage.dup_group.isnot(None)):
+            groups.setdefault(row.dup_group, []).append(row.id)
+    distinct = _distinct_pairs(bank_id) if groups else set()
+    reject_ids = []
+    unreadable = duplicates = 0
+    candidate = BankImage.quality_state == 'unreadable'
+    if groups:
+        candidate = or_(candidate, BankImage.dup_group.isnot(None))
+    for row in pool.filter(BankImage.status == 'pending', candidate).order_by(BankImage.id):
+        if row.id in picked:
+            continue
+        if row.quality_state == 'unreadable':
+            path = analysis_image_path(bank, row, materialize=False)
+            if (not row.analysis_fingerprint or bank_transfer_metadata.content_fingerprint_path(path)
+                    != row.analysis_fingerprint):
+                continue
+            unreadable += 1
+        elif any(tuple(sorted((row.id, iid))) not in distinct for iid in groups.get(row.dup_group, ())):
+            duplicates += 1
+        else:
+            continue
+        if len(reject_ids) < _CURATION_MAX_N:
+            reject_ids.append(row.id)
+    summary = {key: result[key] for key in ('requested', 'selected', 'shortfall',
+                'multi_person', 'multi_person_excluded', 'multi_person_capped',
+                'multi_person_kept', 'unknown_count', 'unknown_count_kept')}
+    return {**summary, 'promote_ids': promote_ids, 'reject_ids': reject_ids,
+            'reject_count': unreadable + duplicates, 'unreadable': unreadable,
+            'duplicates': duplicates}
+
+
+def _run_auto_curate_step(job, user_id, bank_id, step, entry):
+    """Use only analysis passes and their resume paths before review."""
+    pool = _scoped_pool(bank_id)
+    pending = {
+        'scan': _scan_todo_clause,
+        'score': _unscored_clause,
+        'faces': lambda: and_(BankImage.face_state.is_(None), or_(
+            BankImage.face_cluster_origin.is_(None), BankImage.face_cluster_origin != 'asserted')),
+        'framing': PASS_PENDING['framing'],
+    }
+    if step in pending and pool.filter(pending[step]()).first() is None:
+        cache = {'score': _score_cache_path, 'faces': _face_cache_path}.get(step)
+        if cache is None or cache(bank_id).is_file() or pool.first() is None:
+            entry.update(status='skipped', reason='Already measured')
+            return
+    if step == 'scan':
+        _scan_job(bank_id, rescan=False, reject_unreadable=False)(job)
+    elif step == 'semantic_index':
+        bank = db.session.get(ImageBank, bank_id)
+        counts = semantic_counts(bank, engine='siglip2')
+        if counts['complete']:
+            entry.update(status='skipped', reason='Index current')
+            return
+        _run_pipeline_step(job, user_id, bank_id, step, (), False, entry)
+    elif step == 'semantic_dedup':
+        bank = db.session.get(ImageBank, bank_id)
+        threshold = _semantic_dup_threshold(_selected_semantic_engine(bank))
+        signature = _semantic_partition_signature(bank_id, threshold)
+        last = last_passes(bank).get(step) or {}
+        if signature and last.get('signature') == signature:
+            entry.update(status='skipped', reason='Groups current')
+            return
+        _run_pipeline_step(job, user_id, bank_id, step, (), False, entry)
+    elif step in ('framing', 'watermark'):
+        from . import vision_llm, watermark_detector
+
+        detector = False
+        if step == 'watermark':
+            if _watermark_scan_query(bank_id, False, preserve_cleaned=True).first() is None:
+                entry.update(status='skipped', reason='Already measured')
+                return
+            detector = watermark_detector.resolve_backend()['backend'] == 'detector'
+        if _step_declines(entry, None):
+            return
+        target = None if detector else vision_llm.loopback_vision_target()
+        if not detector and not target:
+            entry.update(status='skipped', reason='Local vision unavailable', blocked=True)
+            return
+        if step == 'watermark':
+            _watermark_job(bank_id, False, use_detector=detector, preserve_cleaned=True,
+                           vision_target=target)(job)
+        else:
+            _framing_job(bank_id, False, vision_target=target)(job)
+    elif step in ('score', 'faces'):
+        _run_pipeline_step(job, user_id, bank_id, step, (), False, entry)
+    else:
+        raise ValueError('invalid Auto-Curate step')
+    if entry['status'] == 'done':
+        entry['detail'] = job.get('detail')
+
+
 def _bank_counts(bank_id) -> dict:
     """Live headline counts used for the per-step tallies and the final report."""
     base = BankImage.query.filter_by(bank_id=bank_id)
@@ -14524,7 +14759,7 @@ def _bank_counts(bank_id) -> dict:
 
 
 def _pipeline_job(user_id, bank_id, steps, reject_flags, resolve_dups,
-                  device_id=None):
+                  device_id=None, *, auto_curate=None):
     def run(job):
         import json as _json
         import time as _time
@@ -14533,6 +14768,7 @@ def _pipeline_job(user_id, bank_id, steps, reject_flags, resolve_dups,
         if not bank:
             return
         results = []
+        review = None
         pipe = {'steps': list(steps), 'total_steps': len(steps),
                 'index': 0, 'current': steps[0], 'results': results}
 
@@ -14562,9 +14798,15 @@ def _pipeline_job(user_id, bank_id, steps, reject_flags, resolve_dups,
             entry = {'step': step, 'status': 'done', 'reason': None,
                      'detail': None, 'counts': {}, 'blocked': False}
             try:
-                _run_pipeline_step(job, user_id, bank_id, step,
-                                   reject_flags, resolve_dups, entry,
-                                   device_id=device_id)
+                if auto_curate and step == 'balanced_pick':
+                    review = _auto_curate_review(user_id, bank_id, *auto_curate)
+                    entry['detail'] = f"{review['selected']} picks · {review['reject_count']} proposed rejects"
+                elif auto_curate:
+                    _run_auto_curate_step(job, user_id, bank_id, step, entry)
+                else:
+                    _run_pipeline_step(job, user_id, bank_id, step,
+                                       reject_flags, resolve_dups, entry,
+                                       device_id=device_id)
             except GpuBusyError as e:
                 # A vision/training job grabbed the GPU mid-pipeline — skip this
                 # pass and keep going (never wake the user for a transient clash).
@@ -14615,6 +14857,10 @@ def _pipeline_job(user_id, bank_id, steps, reject_flags, resolve_dups,
             'steps': results,
             'counts': _bank_counts(bank_id),
         }
+        if auto_curate:
+            report['kind'] = 'auto_curate'
+            if review is not None and not cancelled:
+                report['review'] = review
         bank = db.session.get(ImageBank, bank_id)
         if bank is not None:
             bank.pipeline_report = _json.dumps(report)
@@ -14629,6 +14875,8 @@ def _pipeline_job(user_id, bank_id, steps, reject_flags, resolve_dups,
             tail += f', {err_n} errored'
         if cancelled:
             tail = f'cancelled — {done_n}/{len(steps)} steps ran'
+        elif auto_curate:
+            tail = 'Auto-Curate review ready' if review is not None else 'Auto-Curate needs attention'
         bank_jobs.progress(job, detail=tail)
     return run
 

@@ -101,8 +101,33 @@ def keep_warm_seconds(name: str | None = None) -> int:
         return 120
 
 
+def loopback_vision_target():
+    """Return a pinned Ollama endpoint and installed local model for automation."""
+    from urllib.parse import urlsplit
+
+    from ..capabilities import _model_present, _ollama_tags
+    from . import ollama_gpu_fence, vision_ollama
+
+    if provider() != OLLAMA:
+        return None
+    url = cfg.get('ollama.url') or 'http://127.0.0.1:11434'
+    scope, endpoint = ollama_gpu_fence._endpoint_scope(url)
+    if scope != 'local' or urlsplit(url.strip()).username is not None:
+        return None
+    model = vision_ollama.get_vision_model()
+    if (not isinstance(model, str) or 'cloud' in model.rsplit(':', 1)[-1].casefold()
+            or not _model_present(model, _ollama_tags(endpoint, local_weights_only=True))):
+        return None
+    return {'ollama_url': endpoint, 'model': model}
+
+
 def describe_image(image_bytes: bytes, prompt: str, **kw) -> str:
     """Image + prompt -> text, through whichever provider is configured."""
+    target = kw.pop('loopback_target', None)
+    if target:
+        from . import vision_ollama
+        return vision_ollama.describe_image_ollama(
+            image_bytes, prompt, **kw, **target, no_redirects=True)
     if provider() == LMSTUDIO:
         from . import vision_lmstudio
         return vision_lmstudio.describe_image(
@@ -175,6 +200,10 @@ def generate_text(prompt: str, **kw) -> str:
 
 def unload_vision_model(**kw) -> bool:
     """Release the resident model. For LM Studio this really frees the VRAM."""
+    target = kw.pop('loopback_target', None)
+    if target:
+        from . import ollama_gpu_fence
+        return bool(ollama_gpu_fence.release_owned_models(**target))
     if provider() == LMSTUDIO:
         from . import vision_lmstudio
         return vision_lmstudio.unload_vision_model(

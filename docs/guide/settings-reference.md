@@ -1090,6 +1090,9 @@ the dataset kind, source files, captions, image status or global quality cuts.
   Pins override ranking and quotas. A missing or unreadable pin is reported.
 - **Balance Axis / Target Weights**: choose measured or caption-derived coverage.
   Weights are relative, editable starting points. Unknowns have an explicit bucket.
+- **Multi-Person**: saved in this browser. Exclude is the default. Cap limits
+  multi-face images to about 10% of the pick. Allow permits any count. Balanced,
+  Diverse and Auto-Curate share this setting. A missing count stays eligible.
 
 See [Choose a selection policy](using-the-app.md#choose-a-selection-policy).
 

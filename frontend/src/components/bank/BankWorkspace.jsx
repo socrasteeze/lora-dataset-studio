@@ -126,7 +126,7 @@ import {
 // on purpose: the repartition is what has to be provable (node --test, no JSX).
 import {
   balanceNotes, balanceReadiness,
-  balanceRows, summarizeBalance,
+  balanceRows, summarizeBalance, MULTI_PERSON_MODES,
 } from './bankBalance.js'
 // 🎨 Medium + ⤢ Angle — buckets, tooltips and, above all, the LIMITS each row
 // has to print. Pure/testable: what matters is that we never claim more than we
@@ -1573,6 +1573,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     setTextStatus, textPending, textResult, setTextResult, pickDiverse,
     pickBalanced, findSimilar, openTextSearch, releaseTextEncoder,
     runTextSearch,
+    multiPerson, updateMultiPerson,
   } = useCurationLanes({
     bankId, filter, filterParams, selected, toast, showCuratedSelection,
     semanticState, semanticEngineRef, textStatusRequestRef,
@@ -2558,20 +2559,21 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                     pushes the page sideways), normal popover from sm up. */}
                 <div data-probe-chrome="curate-balanced" data-probe-panel="curate-balanced" data-probe-layer
                   className="fixed inset-x-4 bottom-4 z-50 max-h-[75vh] overflow-y-auto rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:mt-1 sm:w-80">
-                  <p className="text-xs text-content-muted">
-                    Uses target proportions for the selected LoRA kind. Character starts with framing,
-                    Concept with views, and Style with subject content. Unknown labels remain visible.
-                  </p>
                   <label className="flex items-center gap-2 text-sm text-content">
                     Image Count
                     <input type="number" min={1} max={2000} value={balanceN}
                       onChange={(e) => setBalanceN(Math.max(1, Math.min(2000, Number(e.target.value) || 1)))}
                       className="min-h-10 w-20 rounded-md border border-border bg-surface px-2 py-0.5 text-sm text-content lg:min-h-0 lg:h-8" />
                   </label>
-                  <p className="text-2xs leading-snug text-content-muted">
-                    Adjust the axis and weights in Selection Policy. Other groups can fill a shortage.
-                    The Outlier Guard uses {Math.round(diverseTypicality * 100)}% from Pick diverse.
-                  </p>
+                  <label className="flex items-center gap-2 text-sm text-content">
+                    Multi-Person
+                    <select value={multiPerson} onChange={(e) => updateMultiPerson(e.target.value)}
+                      className="min-h-10 rounded-md border border-border bg-surface px-2 py-0.5 text-sm text-content lg:min-h-0 lg:h-8">
+                      {MULTI_PERSON_MODES.map((mode) => <option key={mode} value={mode}>
+                        {mode[0].toUpperCase() + mode.slice(1)}
+                      </option>)}
+                    </select>
+                  </label>
                   <button type="button" onClick={pickBalanced} disabled={balanceBusy}
                     className="min-h-10 w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-gray-950 disabled:opacity-60">
                     {balanceBusy ? 'Sampling' : `Select ${balanceN} Images`}
@@ -2763,6 +2765,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             className={`${CURATE_BTN} col-span-2`}>
             <BarChart3 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Coverage advice{coverageOpen ? ' ▲' : ' ▼'}
           </button>
+          <button type="button" disabled={bankBusy || semanticOperationBusy || !counts?.total}
+            onClick={() => act(() => postJson(`/api/bank/${bankId}/auto-curate`, {
+              n: Math.floor(balanceN), multi_person: multiPerson,
+            }), null, { payloadLater: true })}
+            className={`${CURATE_BTN} col-span-2 whitespace-nowrap`}>
+            Auto-Curate
+          </button>
           </div>
           )}
         </div>
@@ -2871,17 +2880,18 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           {!live && payload?.pipeline_report
             && payload.pipeline_report.finished_at !== dismissedReportAt && (
             <PipelineReport report={payload.pipeline_report}
+              onReview={showCuratedSelection}
               onDismiss={() => setDismissedReportAt(
                 saveDismissedReport(bankId, payload.pipeline_report.finished_at))} />
           )}
 
-          {filter.flag === 'dups' ? (
+          {!showSelected && filter.flag === 'dups' ? (
             <DupGroupsPanel bankId={bankId} live={live} kind="exact"
               onCompareGroup={(groupId) => openComparison({ params: { group: String(groupId) }, kind: 'exact', groupId, title: `Duplicate Group ${groupId}` }).catch(() => {})}
               onSaveCollection={(groupId) => openGroupCollection({ group: String(groupId) })}
               notDuplicates={payload?.dup?.not_duplicates ?? 0}
               onChanged={async () => { await Promise.all([refreshPayload(), refreshImages()]) }} />
-          ) : filter.flag === 'semantic_dups' ? (
+          ) : !showSelected && filter.flag === 'semantic_dups' ? (
             <DupGroupsPanel bankId={bankId} live={live} kind="semantic"
               onCompareGroup={(groupId) => openComparison({ params: { semantic_group: String(groupId) }, kind: 'semantic', groupId, title: `Same Shot ${groupId}` }).catch(() => {})}
               onSaveCollection={(groupId) => openGroupCollection({ semantic_group: String(groupId) })}

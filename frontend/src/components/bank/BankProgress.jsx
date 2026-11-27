@@ -99,7 +99,7 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
   const eta = etaPhrase(activity)
   const asked = stopRequested(activity, stopAskedFor)
   const note = stopNote(activity, asked)
-  const pipe = kind === 'pipeline' ? activity.pipeline : null
+  const pipe = kind === 'pipeline' || kind === 'auto_curate' ? activity.pipeline : null
   const chips = pipe && Array.isArray(pipe.results) ? pipe.results : []
   return (
     <div className="space-y-2">
@@ -109,12 +109,12 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
         <span className={`col-span-2 min-w-0 max-w-full break-words text-content lg:flex-1 ${stale ? 'opacity-60' : ''}`}>
           <span aria-hidden>⏳</span>{' '}
           {pipe
-            ? `Launch all — step ${(pipe.index ?? 0) + 1}/${pipe.total_steps} · ${plainStepLabel(pipe.current) || pipe.current}`
+            ? `${kind === 'auto_curate' ? 'Auto-Curate' : 'Launch all'} · step ${(pipe.index ?? 0) + 1}/${pipe.total_steps} · ${plainStepLabel(pipe.current) || pipe.current}`
             : ({ scan: 'Quality scan', faces: 'Face pass', score: 'Scoring pass',
               semantic_index: 'Semantic index',
               semantic_dedup: 'Crops & variants', watermark: 'Watermark scan',
               framing: 'Framing pass', caption: 'Captioning',
-              caption_import: 'Importing captions', promote: 'Promotion',
+              caption_import: 'Importing captions', promote: 'Promotion', auto_curate: 'Auto-Curate',
               medium: 'Medium pass', angles: 'Measuring head angles',
               // The longest pass in the app (one GPU render per image). A run
               // that costs an hour must not sit under the anonymous fallback.

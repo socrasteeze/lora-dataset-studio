@@ -8,7 +8,7 @@ import test from 'node:test';
 
 import {
   BALANCE_AXES, BALANCE_DEFAULT_AXIS, balanceNotes, balanceReadiness,
-  balanceRows, bucketLabel, summarizeBalance,
+  balanceRows, bucketLabel, multiPersonSummary, summarizeBalance,
 } from './bankBalance.js';
 
 const ws = bankTreeSource();
@@ -27,6 +27,14 @@ const EVEN = {
   buckets: [bucket('face', 5, 10, 5), bucket('bust', 5, 30, 5),
     bucket('body', 5, 40, 5), bucket('back', 5, 5, 5)],
 };
+
+test('multi-person readout keeps cap, kept, and unknown counts visible', () => {
+  assert.equal(multiPersonSummary(EVEN), '');
+  assert.equal(multiPersonSummary({
+    multi_person: 'cap', multi_person_excluded: 0, multi_person_capped: 4,
+    multi_person_kept: 2, unknown_count: 3,
+  }), 'Multi-Person · 0 excluded · 4 capped · 2 kept · 3 unknown');
+});
 
 // --- the distribution is SAID, in numbers ------------------------------------
 test('the obtained distribution is announced as a sentence of counts', () => {

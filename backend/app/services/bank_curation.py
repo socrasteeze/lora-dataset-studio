@@ -21,6 +21,7 @@ TYPICALITY_DEFAULT = 0.5
 DEFAULT_AXIS = {'character': 'framing', 'concept': 'view', 'style': 'subject'}
 FRAMING_WEIGHTS = {'face': 4.0, 'bust': 3.0, 'body': 2.0, 'back': 1.0}
 TYPICALITY_DECADES = 3.0
+MULTI_PERSON_DEFAULT = 'exclude'
 AXES = ('framing', 'framing+person', 'subject', *caption_coverage.AXES)
 TECHNICAL_FLAGS = frozenset({'blur', 'noise', 'uniform', 'small', 'soft_detail',
                              'bars', 'watermark'})
@@ -168,8 +169,35 @@ def weighted_quotas(sizes, n, weights):
     return quota
 
 
+def multi_person_mode(value):
+    if value not in ('exclude', 'cap', 'allow'):
+        raise ValueError('multi_person must be exclude, cap or allow')
+    return value
+
+
+def multi_person_limit(requested, other):
+    # Round 10% of the final size to the nearest integer, with halves up.
+    # For m multi-person and s other picks, 10m <= s + m + 5.
+    return min((requested + 5) // 10, (other + 5) // 9)
+
+
+def multi_person_report(mode, counts, picked):
+    multi = {key for key, count in counts.items() if count is not None and count > 1}
+    unknown = {key for key, count in counts.items() if count is None}
+    kept = len(multi.intersection(picked))
+    return {
+        'multi_person': mode,
+        'multi_person_excluded': len(multi) if mode == 'exclude' else 0,
+        'multi_person_capped': len(multi) - kept if mode == 'cap' else 0,
+        'multi_person_kept': kept,
+        'unknown_count': len(unknown),
+        'unknown_count_kept': len(unknown.intersection(picked)),
+    }
+
+
 def select(items, E, n, policy, *, mode, isolation, reference_vectors=None,
-           match_vectors=None, distinct_pairs=(), typicality=TYPICALITY_DEFAULT):
+           match_vectors=None, distinct_pairs=(), typicality=TYPICALITY_DEFAULT,
+           multi_person=None):
     """Return a review selection and a bounded receipt; inputs are never mutated.
 
     The caller supplies provenance-checked vectors and current technical flags.
@@ -190,8 +218,6 @@ def select(items, E, n, policy, *, mode, isolation, reference_vectors=None,
     requested_locks = p['locked_ids']
     locked = [by_id[i] for i in requested_locks if i in by_id
               and 'unreadable' not in items[by_id[i]].get('flags', ())]
-    if len(locked) > n:
-        raise ValueError('the requested count is smaller than the available pinned selection')
     labels = [facets(item) for item in items]
     quality = np.array([
         0.5 ** len(TECHNICAL_FLAGS.intersection(item.get('flags', ())))
@@ -233,12 +259,25 @@ def select(items, E, n, policy, *, mode, isolation, reference_vectors=None,
     reference_below = sum(1 for j in positions if j not in eligible_set
                           and similarities is not None and np.isfinite(similarities[j])
                           and minimum is not None and similarities[j] < minimum)
+    counts = {j: items[j].get('face_count') for j in eligible} if multi_person else {}
+    multi = {j for j, count in counts.items() if count is not None and count > 1}
+    limit = len(multi)
+    if multi_person == 'exclude':
+        eligible = [j for j in eligible if j not in multi]
+        locked = [j for j in locked if j not in multi]
+    elif multi_person == 'cap':
+        limit = multi_person_limit(n, len(eligible) - len(multi))
+        multi_pins = set([j for j in locked if j in multi][:limit])
+        locked = [j for j in locked if j not in multi or j in multi_pins]
+    if len(locked) > n:
+        raise ValueError('the requested count is smaller than the available pinned selection')
     factor = quality.copy()
     if typicality > 0 and mode != 'similar' and len(eligible) > n:
         idx = np.asarray(eligible)
         factor[idx] *= 10.0 ** (-TYPICALITY_DECADES * typicality * isolation(E[idx]))
     picked = list(locked)
     picked_set = set(picked)
+    multi_picked = len(picked_set & multi)
     distinct = {tuple(sorted(pair)) for pair in distinct_pairs}
     group_members = defaultdict(list)
 
@@ -266,8 +305,10 @@ def select(items, E, n, policy, *, mode, isolation, reference_vectors=None,
         return True
 
     def add(j):
+        nonlocal multi_picked
         picked.append(j)
         picked_set.add(j)
+        multi_picked += j in multi
         register(j)
 
     axis = p['axis']
@@ -319,7 +360,8 @@ def select(items, E, n, policy, *, mode, isolation, reference_vectors=None,
                 explanations[items[j]['id']] = 'reference match'
     else:
         while len(picked) < n:
-            candidates = [j for j in eligible if j not in picked_set and allowed(j)]
+            candidates = [j for j in eligible if j not in picked_set
+                          and (j not in multi or multi_picked < limit) and allowed(j)]
             if not candidates:
                 break
             if mode == 'balanced':
@@ -345,6 +387,13 @@ def select(items, E, n, policy, *, mode, isolation, reference_vectors=None,
                 else ('target coverage' if mode == 'balanced' else 'visual coverage')
             min_distance = np.minimum(min_distance, 1.0 - E @ E[nxt])
             covered.update((aid, value) for aid in coverage_axes for value in labels[nxt].get(aid, ()))
+    if multi_person == 'cap':
+        actual_limit = multi_person_limit(n, len(picked) - multi_picked)
+        for j in [j for j in picked if j in multi][actual_limit:]:
+            picked.remove(j)
+            picked_set.remove(j)
+            for group in groups(j):
+                group_members[group].remove(j)
     reports = []
     for key in sorted(sizes):
         fr, _, person = key.partition('#')
@@ -382,4 +431,5 @@ def select(items, E, n, policy, *, mode, isolation, reference_vectors=None,
             'missing_locked': len(requested_locks) - len(locked),
             'duplicate_omitted': duplicate_omitted, 'below_minimum': reference_below,
             'quality_unknown': sum(item.get('quality_state') is None for item in items),
-            'caption_based': True, 'selection_only': True, 'policy': p}
+            'caption_based': True, 'selection_only': True, 'policy': p,
+            **(multi_person_report(multi_person, counts, picked) if multi_person else {})}

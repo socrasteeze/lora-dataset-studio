@@ -1466,7 +1466,7 @@ Balanced uses editable, relative **Target Weights** and fills the groups with
 diverse candidates under the shared policy. Character starts with framing weights
 4 face, 3 bust, 2 body and 1 back. These are starting heuristics, not validated
 optimal training ratios. Concept starts with caption view labels. Style starts
-with broad caption/tag subject categories. Neither applies a face constraint.
+with broad caption/tag subject categories.
 
 - **Balance Axis** also offers lighting, setting, outfit, expression and camera
   labels. Framing × Person is Character-only. It can be sparse or unreliable
@@ -1479,12 +1479,32 @@ with broad caption/tag subject categories. Neither applies a face constraint.
   can still leave a shortfall. The report shows actual, available and target counts.
 - **Unknowns remain reviewable.** Unlabelled images enter an explicit Unknown group.
   Run Framing or Caption to improve the relevant labels. Its weight is editable.
+- **Multi-Person** defaults to Exclude. Cap allows about 10% of the final pick,
+  rounded to the nearest image with halves rounded up. Allow removes this limit.
+  The guard also applies to pins and to Diverse picks. Images without a current
+  face count remain eligible. Faces can be missed, especially in drawn scenes
+  and photos with small or obscured faces. The browser remembers the setting.
 - **Other Coverage** reports variation outside the main axis. It avoids a sparse
   quota for every possible combination. The outlier penalty is measured across
   the whole eligible pool and then applied to candidates within each allocation.
 
 Like the other selectors it honours the current filter and search, and it only
 **selects** — nothing is kept, rejected or deleted.
+
+## Auto-Curate a Bank
+
+Open **Curate** and choose **Auto-Curate**. The job uses the whole eligible Bank
+after folder exclusions. It uses the Balanced image count and the saved
+Multi-Person setting. It runs available local quality, score, faces, framing,
+deduplication and watermark analysis. It reports skipped passes before offering
+a shortlist.
+
+Choose **Review Picks** to inspect the selection, then use **Promote** and confirm
+the destination. Choose **Review Rejects** to inspect unreadable images and
+potential duplicates of a pick. Explicitly use **Reject** to mark them in the
+Bank. The report shows up to 2,000 proposed rejects. Other unselected images
+stay in their existing state. Cropping, upscaling and dataset captioning remain
+explicit actions. Training starts from the Dataset training controls.
 
 ## Is this image really what it says it is?
 

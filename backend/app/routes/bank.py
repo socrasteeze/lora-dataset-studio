@@ -1975,7 +1975,8 @@ def bank_select_diverse(bank_id):
         typ = banks._TYPICALITY_DEFAULT
     try:
         out = banks.select_diverse(LOCAL_USER, bank_id, n=n, typicality=typ,
-                                   filters=_curation_filters(data), selection=data.get('selection'))
+                                   filters=_curation_filters(data), selection=data.get('selection'),
+                                   **_multi_person_option(data))
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, **out})
@@ -2004,10 +2005,28 @@ def bank_select_balanced(bank_id):
         out = banks.select_balanced(LOCAL_USER, bank_id, n=n,
                                     axis=data.get('axis') or 'framing',
                                     typicality=typ,
-                                    filters=_curation_filters(data), selection=data.get('selection'))
+                                    filters=_curation_filters(data), selection=data.get('selection'),
+                                    **_multi_person_option(data))
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, **out})
+
+
+def _multi_person_option(data):
+    return {'multi_person': data['multi_person']} if 'multi_person' in data else {}
+
+
+@bp.post('/bank/<int:bank_id>/auto-curate')
+def bank_auto_curate(bank_id):
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'JSON body must be an object'}), 400
+    try:
+        banks.start_auto_curate(_app(), LOCAL_USER, bank_id, data.get('n', 60),
+                                **_multi_person_option(data))
+    except (TypeError, ValueError) as error:
+        return jsonify({'error': str(error)}), 400
+    return jsonify({'ok': True}), 202
 
 
 @bp.post('/bank/<int:bank_id>/select-similar')

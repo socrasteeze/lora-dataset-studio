@@ -85,6 +85,18 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-27-zz-bank-multi-person', date: '2026-11-27',
+    title: 'Control how many group shots make the cut',
+    blurb: 'Balanced and Diverse picks can exclude, cap, or allow images with multiple detected faces. The report counts images without a face count.',
+    to: '/bank',
+  },
+  {
+    id: '2026-11-27-zy-bank-auto-curate', date: '2026-11-27',
+    title: 'Review a Bank shortlist after one click',
+    blurb: 'Auto-Curate runs available local passes, uses saved results, and brings picks and proposed rejects into the Bank for review.',
+    to: '/bank',
+  },
+  {
     id: '2026-11-27-review-crop-controls', date: '2026-11-27',
     title: 'Even review and crop controls on phones',
     blurb: 'Short labels stay on one line. Bank Review keeps edit history on its own row after a crop.',

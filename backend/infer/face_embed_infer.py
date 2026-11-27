@@ -18,8 +18,8 @@ Protocol (same family as face_score_infer.py):
             drive the UI progress bar).
 
 Embeddings are CACHED in the .npz (parallel arrays paths/embs/states/dets/
-bfracs/yaws/bpx/sigs/hashes). Periodic full-cache writes require CACHE_EVERY new
-images and the shared checkpoint interval. Stop and completion always flush;
+bfracs/yaws/bpx/face_counts/sigs/hashes). Periodic full-cache writes require
+CACHE_EVERY new images and the shared checkpoint interval. Stop and completion always flush;
 an abrupt process kill can lose work since the last successful checkpoint.
 Re-clustering at another threshold reuses the saved embeddings.
 
@@ -155,7 +155,7 @@ def _file_hash(path):
 
 
 def _load_cache(path):
-    """{path: (state, det, bbox_frac, emb, yaw, sig, hash, face_px)}. A cache
+    """{path: (state, det, bbox_frac, emb, yaw, sig, hash, face_px[, count])}. A cache
     written before the yaw or the bpx array existed loads that slot as NaN —
     additive, so no user ever has to re-embed a bank just because a new number
     was added to the tuple."""
@@ -174,6 +174,10 @@ def _load_cache(path):
             # with yaw = NaN, reported as "not measured" rather than a false 0.0.
             yaws = z['yaws'] if 'yaws' in z.files else None
             bpx = z['bpx'] if 'bpx' in z.files else None
+            face_counts = z['face_counts'] if 'face_counts' in z.files else None
+            if face_counts is not None and (face_counts.shape != paths.shape
+                                            or face_counts.dtype.kind != 'i'):
+                face_counts = None
             sigs = z['sigs'] if 'sigs' in z.files else None
             hashes = z['hashes'] if 'hashes' in z.files else None
             if (hashes is not None
@@ -189,6 +193,8 @@ def _load_cache(path):
                            float(yaws[i]) if yaws is not None else float('nan'),
                            str(sigs[i]) if sigs is not None else '', digest,
                            float(bpx[i]) if bpx is not None else float('nan'))
+            if face_counts is not None:
+                out[str(p)] += (int(face_counts[i]),)
     except Exception as e:  # noqa: BLE001 — a corrupt cache = recompute, never fatal
         _log(f'[embed] cache unreadable, recomputing: {e}')
         return {}
@@ -213,6 +219,8 @@ def _save_cache(path, cache):
         bfracs=np.array([cache[p][2] for p in paths], dtype='float32'),
         yaws=np.array([cache[p][4] for p in paths], dtype='float32'),
         bpx=np.array([_cache_px(cache[p]) for p in paths], dtype='float32'),
+        face_counts=np.array([cache[p][8] if len(cache[p]) > 8 else -1 for p in paths],
+                             dtype='int32'),
         embs=np.stack([cache[p][3] for p in paths]).astype('float32'),
         sigs=np.array([_cache_sig(cache[p]) for p in paths]),
         hashes=np.frombuffer(b''.join(
@@ -494,30 +502,31 @@ def main() -> int:
                               signature, payload_hash, float('nan'))
                 else:
                     h, w = img.shape[:2]
-                    f = biggest(app.get(img))
+                    detected = app.get(img)
                     padded = False
                     pad_scale = 1.0    # padded/original AREA ratio (bbox_frac only)
                     lin_scale = 1.0    # linear upscale of the 2x retry below
-                    if f is None:   # padding rescue: SCRFD misses full-frame closeups
+                    if not detected:   # padding rescue: SCRFD misses full-frame closeups
                         pad = int(0.25 * max(h, w))
-                        f = biggest(app.get(cv2.copyMakeBorder(
-                            img, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=(0, 0, 0))))
-                        if f is not None:
+                        detected = app.get(cv2.copyMakeBorder(
+                            img, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=(0, 0, 0)))
+                        if detected:
                             padded = True
                             pad_scale = (w + 2 * pad) * (h + 2 * pad) / (w * h)
-                    if f is None and max(h, w) > ZOOM_RETRY_MIN_SIDE:
+                    if not detected and max(h, w) > ZOOM_RETRY_MIN_SIDE:
                         # Nothing at det_size(640). On a frame this big that is
                         # usually the downscale rather than the absence of a
                         # face — a head in a full-body shot is a few pixels once
                         # the whole frame is squeezed into 640 (mirrors
                         # face_score_infer.analyze).
-                        f = biggest(app.get(cv2.resize(
+                        detected = app.get(cv2.resize(
                             img, None, fx=2.0, fy=2.0,
-                            interpolation=cv2.INTER_CUBIC)))
+                            interpolation=cv2.INTER_CUBIC))
                         lin_scale = 2.0
+                    f = biggest(detected)
                     if f is None:
                         result = ('no_face', 0.0, 0.0, zero, float('nan'),
-                                  signature, payload_hash, float('nan'))
+                                  signature, payload_hash, float('nan'), 0)
                     else:
                         # Sides in SOURCE pixels: /lin_scale undoes the 2x retry.
                         # The padding rescue needs no correction here — it ADDS
@@ -564,7 +573,7 @@ def main() -> int:
                         result = (state, round(det, 3), round(bbox_frac, 4),
                                   f.normed_embedding.astype('float32'),
                                   yaw if yaw != yaw else round(yaw, 2), signature,
-                                  payload_hash, round(face_px, 1))
+                                  payload_hash, round(face_px, 1), len(detected))
                 # Inference may be much slower than the validated read.  Commit
                 # its local result only while the live path still identifies
                 # the bytes captured above.

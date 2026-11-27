@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { captionStepNote } from './pipelineVerdict.js'
 import { reportHeadline, splitStepNote, stepView } from './pipelineReportView.js'
 import { Button, IconButton } from '../common/Controls.jsx'
+import { multiPersonSummary } from './bankBalance.js'
 
 /** The morning-after summary of the last "Launch all" run — one row per
  * requested pass (done / skipped-with-reason / error / cancelled) plus the
@@ -19,6 +20,7 @@ import { Button, IconButton } from '../common/Controls.jsx'
  * the omission invisible, so pipelineStepLabels.contract.test.js now fails if a
  * step ships without its label rather than letting the fallback absorb it. */
 export const STEP_LABEL = {
+  balanced_pick: 'Balanced Pick',
   scan: 'Scan quality', auto_reject: 'Auto-reject',
   score: 'Score', semantic_index: 'Build semantic index',
   semantic_dedup: '✂ Find crops & variants',
@@ -30,7 +32,7 @@ function fmtWhen(ts) {
   try { return new Date(ts * 1000).toLocaleString() } catch { return '' }
 }
 
-export default function PipelineReport({ report, onDismiss }) {
+export default function PipelineReport({ report, onDismiss, onReview }) {
   // One line by default; opened only when the run needs a look (a pass errored,
   // the run was stopped, or a pass ran short). Open, it was ~300 px above the
   // grid on every visit.
@@ -43,6 +45,8 @@ export default function PipelineReport({ report, onDismiss }) {
   // had just done the work. See pipelineReportView.js.
   const { covered, total, stopped, icon, redone, attentionLabel } = reportHeadline(report)
   const c = report.counts || {}
+  const autoCurate = report.kind === 'auto_curate'
+  const review = report.review
 
   return (
     <div className="rounded-lg border border-border bg-surface-raised">
@@ -54,7 +58,9 @@ export default function PipelineReport({ report, onDismiss }) {
           className="min-w-0 flex-1 justify-start overflow-hidden font-semibold text-content">
           <span aria-hidden className="shrink-0">{icon}</span>
           <span className="min-w-0 truncate">
-            Last Launch-all run — {covered}/{total} passes ran
+            <span hidden={autoCurate}>Last Launch-all run — </span>
+            <span hidden={!autoCurate}>Auto-Curate · </span>
+            {covered}/{total} passes ran
             {redone > 0 && (
               <span className="text-content-subtle"> ({redone} re-run since)</span>
             )}
@@ -68,6 +74,17 @@ export default function PipelineReport({ report, onDismiss }) {
           <IconButton size="md" label="Dismiss the report" onClick={onDismiss}>✕</IconButton>
         )}
       </div>
+      {review && <section aria-label="Curation Review" className="space-y-2 px-3 pb-3 text-xs text-content-muted">
+        <p role="status">{review.selected} of {review.requested} Picks · {review.reject_count} Proposed Rejects</p>
+        <p>{multiPersonSummary(review)}</p>
+        <div className="grid grid-cols-2 gap-2">
+          <Button className="min-w-0 whitespace-nowrap" disabled={!review.promote_ids.length}
+            onClick={() => onReview(review.promote_ids)}>Review Picks</Button>
+          <Button className="min-w-0 whitespace-nowrap" disabled={!review.reject_ids.length}
+            onClick={() => onReview(review.reject_ids)}>Review Rejects</Button>
+        </div>
+        {review.reject_count > review.reject_ids.length && <p>{review.reject_ids.length} Rejects Shown</p>}
+      </section>}
       {open && (
         <div className="px-3 pb-2 space-y-2">
           <p className="text-xs text-content-subtle sm:hidden">{fmtWhen(report.finished_at)}</p>

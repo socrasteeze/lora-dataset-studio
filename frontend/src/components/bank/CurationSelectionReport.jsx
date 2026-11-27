@@ -1,4 +1,5 @@
 import { curationSummary } from './curationPolicy.js'
+import { multiPersonSummary } from './bankBalance.js'
 
 export default function CurationSelectionReport({ result, selected, onDismiss, onReviewUnknown }) {
   if (!result) return null
@@ -12,6 +13,7 @@ export default function CurationSelectionReport({ result, selected, onDismiss, o
         <button type="button" className="min-h-10 shrink-0 rounded-md border border-border px-2 lg:min-h-0 lg:h-8"
           onClick={onDismiss}>Dismiss</button>
       </div>
+      {result.multi_person && <p className="text-content-muted">{multiPersonSummary(result)}</p>}
       <p className="text-content-muted">Selection only. Image status and source files stay unchanged.</p>
       {!unchanged && <p className="text-content-muted">The current selection has {selected?.size || 0} images. This report describes the last shortlist.</p>}
       {result.shortfall > 0 && <p className="text-amber-300">{result.shortfall} slots remain empty after the current constraints.</p>}
