@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-27-review-crop-controls', date: '2026-11-27',
+    title: 'Even review and crop controls on phones',
+    blurb: 'Short labels stay on one line. Bank Review keeps edit history on its own row after a crop.',
+  },
+  {
     id: '2026-11-27-faster-crop-editor', date: '2026-11-27',
     title: 'Smoother crop controls on phones',
     blurb: 'Bank and Dataset crop editors load smaller previews and redraw the box as you drag. Saved crops use the full-resolution image.',

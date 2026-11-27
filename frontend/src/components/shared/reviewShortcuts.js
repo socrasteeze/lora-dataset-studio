@@ -7,8 +7,7 @@
  * now speaks the same one — reading it from HERE rather than from a second
  * hand-written copy. Two copies is precisely how ✓ ends up on K in one screen
  * and on Enter in the other, and a reflex that is right half the time is worse
- * than no reflex at all. The printed hint comes from here too, so what the UI
- * PROMISES cannot drift from what the handler does either.
+ * than no reflex at all.
  *
  * Pure and DOM-free on purpose: `node --test` cannot render JSX, so the part
  * worth testing — which keystroke means what, and which keystrokes must be left
@@ -19,10 +18,6 @@
  * module answers the shared question only, and returns null for everything else
  * so the caller can go on reading the event.
  */
-
-/** The shortcut line printed under the buttons, in both lightboxes. */
-export const REVIEW_SHORTCUT_HINT = 'K keep · R reject · S skip';
-export const REVIEW_ARROW_HINT = '← reject · → keep · ↓ back';
 
 /**
  * Does the focused element own this keystroke?

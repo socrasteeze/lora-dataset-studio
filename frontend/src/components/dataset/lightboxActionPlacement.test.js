@@ -201,11 +201,11 @@ test('tab order follows the eye: one DOM order, no CSS reordering', () => {
   };
   const order = [
     'const alt = displayLabel',      // the meta group is first in both modes
-    '⧉ Compare with original',
+    '⧉ Original',
     '✂ Crop',
-    '⇆ Mirror horizontally',
-    'Rotate left',
-    'Rotate right',
+    '⇆ Mirror',
+    'Rotate Left',
+    'Rotate Right',
     // The improve actions are now rendered from a list (one button per engine),
     // so the DOM-order anchor is the map that emits them rather than one label.
     'improveButtons.map',
@@ -221,8 +221,8 @@ test('tab order follows the eye: one DOM order, no CSS reordering', () => {
 });
 
 test('the rail keeps words — these actions rotate, recrop and spend GPU time', () => {
-  for (const label of ['✂ Crop', '⇆ Mirror horizontally', 'Rotate left',
-    'Rotate right']) {
+  for (const label of ['✂ Crop', '⇆ Mirror', 'Rotate Left',
+    'Rotate Right']) {
     assert.ok(lightbox.includes(label), `${label} must stay spelled out`);
   }
   // The improve labels are built in improveEngines.js ('✨ Improve via Klein',

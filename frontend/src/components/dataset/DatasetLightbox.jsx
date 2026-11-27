@@ -30,14 +30,11 @@ import SourceAttribution from './SourceAttribution';
 import {
   freshLightboxImageState, lightboxImageState, lightboxNeighbours, stampedPatch,
 } from './lightboxNavigation';
-import {
-  REVIEW_ARROW_HINT, REVIEW_SHORTCUT_HINT, reviewKeyAction,
-} from '../shared/reviewShortcuts';
+import { reviewKeyAction } from '../shared/reviewShortcuts';
 import ShortcutKey from '../shared/ShortcutKey';
 import { useReviewImagePreload } from '../shared/useReviewImagePreload.js';
 import { watermarkMaskButtonLabel } from '../../utils/watermarkRegions';
 
-const COMPARE_HELP = 'Show the original this image was made from, next to it, at the same scale.';
 /* The verdict this image currently carries, in the SAME words and the same
    colours as the Bank's review chips: green means kept in both screens, and a
    dataset image that has never been judged says so rather than looking kept. */
@@ -47,13 +44,6 @@ const VERDICT_CHIP = {
   pending: { text: '· undecided', cls: 'bg-white/10 text-white/60' },
   failed: { text: '⚠ failed', cls: 'bg-amber-500/25 text-amber-200' },
 };
-/* The SECOND comparison, and deliberately a second BUTTON rather than a picker:
-   an improved image can answer both questions and a selector would hide one of
-   them behind the other. The two modes are mutually exclusive though — two
-   pairs side by side stop showing anything at all — so one state holds which
-   reading is on screen. */
-const REFERENCE_COMPARE_HELP = 'Show the dataset\'s reference photo next to this image — '
-  + 'the framings differ, so each pane fits its own image.';
 
 /**
  * One half of the comparison. The two panes are cells of the SAME grid, so they
@@ -567,49 +557,41 @@ export default function DatasetLightbox({
              colours and same keys, because the two screens ask the user the
              very same question and a learned reflex must not be right in only
              one of them. Each verdict then MOVES ON, which is what turns the
-             lightbox from a viewer into a way through 300 pictures.
-             The keys are printed on the buttons AND spelled out below: a
-             shortcut nobody can discover is folklore. */
-          <div className={`flex items-stretch gap-2 ${rail ? 'w-full flex-col' : 'w-full sm:w-auto'}`}>
+             lightbox from a viewer into a way through 300 pictures. */
+          <div className={`grid gap-2 ${rail ? 'w-full grid-cols-1' : 'w-full grid-cols-3 sm:w-auto'}`}>
             <button type="button" onClick={() => decide('reject')} disabled={deciding || curationRefused}
               aria-label={refused || `Reject ${alt} and move to the next image`}
-              title={refused || 'Reject this image and move on (R or ←). Nothing is deleted from disk.'}
+              title={refused || 'Reject (R or ←)'}
               aria-keyshortcuts="R ArrowLeft"
-              className="review-decision-button min-h-10 lg:min-h-9 flex-1 rounded-lg border border-rose-400/60 bg-rose-500/20 px-4 py-1.5 text-xs font-semibold text-rose-100 hover:bg-rose-500/30 disabled:cursor-not-allowed disabled:opacity-45">
+              className="review-decision-button min-h-11 min-w-0 whitespace-nowrap rounded-lg border border-rose-400/60 bg-rose-500/20 px-2 py-1.5 text-xs font-semibold text-rose-100 hover:bg-rose-500/30 disabled:cursor-not-allowed disabled:opacity-45 lg:min-h-9">
               ✕ Reject<ShortcutKey>R</ShortcutKey>
             </button>
             <button type="button" onClick={skipImage} disabled={!nextImage || !onNavigate}
               aria-label={nextImage
                 ? `Skip ${alt} and move to the next image`
                 : nav.nextReason || 'There is no next image to skip to'}
-              title={nextImage
-                ? 'Decide later (S) — moves on and leaves this image exactly as it is'
-                : nav.nextReason || 'There is no next image to skip to'}
-              className="review-decision-button min-h-10 lg:min-h-9 flex-1 rounded-lg border border-white/25 px-4 py-1.5 text-xs font-semibold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45">
+              title={nextImage ? 'Skip (S)' : nav.nextReason || 'There is no next image to skip to'}
+              aria-keyshortcuts="S"
+              className="review-decision-button min-h-11 min-w-0 whitespace-nowrap rounded-lg border border-white/25 px-2 py-1.5 text-xs font-semibold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45 lg:min-h-9">
               ⏭ Skip<ShortcutKey>S</ShortcutKey>
             </button>
             <button type="button" onClick={() => decide('keep')} disabled={deciding || curationRefused}
               aria-label={refused || `Keep ${alt} and move to the next image`}
-              title={refused || 'Keep this image and move on (K or →). Kept images are captioned, exported and trained on.'}
+              title={refused || 'Keep (K or →)'}
               aria-keyshortcuts="K ArrowRight"
-              className="review-decision-button min-h-10 lg:min-h-9 flex-1 rounded-lg border border-emerald-400/60 bg-emerald-500/20 px-4 py-1.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-45">
+              className="review-decision-button min-h-11 min-w-0 whitespace-nowrap rounded-lg border border-emerald-400/60 bg-emerald-500/20 px-2 py-1.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-45 lg:min-h-9">
               ✓ Keep<ShortcutKey>K</ShortcutKey>
             </button>
           </div>
         )}
-        {onStatus && (
-          <div className={`min-h-5 text-xs ${rail || sheet ? 'w-full' : ''}`}>
+        {onStatus && (decisionError || deciding) && (
+          <div className={`text-xs ${rail || sheet ? 'w-full' : ''}`}>
             {decisionError ? <p role="alert" className="text-rose-300">
               {decisionError.id === imageId ? `${decisionError.message} Try again.`
                 : `Image ${decisionError.id}: ${decisionError.message} Go back to retry.`}
             </p>
-              : <p role="status" className="text-white/60">{deciding ? 'Saving' : '\u00a0'}</p>}
+              : <p role="status" className="text-white/60">Saving</p>}
           </div>
-        )}
-        {onStatus && (
-          <p className={`text-2xs text-white/45 ${rail || sheet ? 'w-full' : ''}`}>
-            {REVIEW_SHORTCUT_HINT}<span className="hidden lg:inline"> · {REVIEW_ARROW_HINT}</span> · Esc close
-          </p>
         )}
   </>);
 
@@ -748,40 +730,34 @@ export default function DatasetLightbox({
                 fits its own image at its own scale. Reusing "same scale" there
                 would have been a sentence the pixels contradict. */}
             {compareMode === 'derived' && inCompare
-              ? 'same scale — exit comparison to zoom to 100 %'
+              ? 'Same scale · Zoom unavailable'
               : compareMode === 'reference' && inCompare
-                ? 'different framings — each pane fits its own image; exit comparison to zoom to 100 %'
+                ? 'Separate scales · Zoom unavailable'
                 : full ? '100 % — click image to fit' : 'fitted — click image for 100 %'}
           </span>
         </div>
         {(!sheet || panelOpen) && reviewControls}
-        {canCompare && (
-          <button type="button" aria-pressed={compareMode === 'derived'}
-            onClick={toggleCompare('derived')}
-            aria-label={compareMode === 'derived'
-              ? `Hide the original next to ${alt}`
-              : `Show the original next to ${alt}`}
-            title={COMPARE_HELP}
-            className="min-h-10 lg:min-h-9 w-full sm:w-auto px-3 py-1.5 rounded-lg border border-indigo-400/50 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-100 text-xs font-semibold">
-            {compareMode === 'derived' ? '⊟ Exit comparison' : '⧉ Compare with original'}
-          </button>
-        )}
-        {/* TWO buttons, not a picker. On an improved image both questions are
-            live — "is it sharper than what it came from" and "is it still the
-            same person" — and a selector would have hidden one behind the
-            other. On a plainly generated variation only this one exists, which
-            is the whole reason it was added: until now that image, the bulk of
-            a character dataset, had no comparison at all. */}
-        {canCompareRef && (
-          <button type="button" aria-pressed={compareMode === 'reference'}
-            onClick={toggleCompare('reference')}
-            aria-label={compareMode === 'reference'
-              ? `Hide the reference photo next to ${alt}`
-              : `Show the reference photo next to ${alt}`}
-            title={REFERENCE_COMPARE_HELP}
-            className="min-h-10 lg:min-h-9 w-full sm:w-auto px-3 py-1.5 rounded-lg border border-sky-400/50 bg-sky-500/20 hover:bg-sky-500/30 text-sky-100 text-xs font-semibold">
-            {compareMode === 'reference' ? '⊟ Exit comparison' : '◐ Compare with reference'}
-          </button>
+        {(canCompare || canCompareRef) && (
+          <div className={`grid grid-flow-col auto-cols-fr gap-2 ${rail || sheet ? 'w-full' : 'w-full sm:w-auto'}`}>
+            {canCompare && (
+              <button type="button" aria-pressed={compareMode === 'derived'}
+                onClick={toggleCompare('derived')}
+                aria-label={compareMode === 'derived' ? 'Close original comparison' : 'Compare with original'}
+                title={compareMode === 'derived' ? 'Close comparison' : 'Compare with original'}
+                className="min-h-11 min-w-0 whitespace-nowrap rounded-lg border border-indigo-400/50 bg-indigo-500/20 px-3 py-1.5 text-xs font-semibold text-indigo-100 hover:bg-indigo-500/30 lg:min-h-9">
+                {compareMode === 'derived' ? '⊟ Close' : '⧉ Original'}
+              </button>
+            )}
+            {canCompareRef && (
+              <button type="button" aria-pressed={compareMode === 'reference'}
+                onClick={toggleCompare('reference')}
+                aria-label={compareMode === 'reference' ? 'Close reference comparison' : 'Compare with reference'}
+                title={compareMode === 'reference' ? 'Close comparison' : 'Compare with reference'}
+                className="min-h-11 min-w-0 whitespace-nowrap rounded-lg border border-sky-400/50 bg-sky-500/20 px-3 py-1.5 text-xs font-semibold text-sky-100 hover:bg-sky-500/30 lg:min-h-9">
+                {compareMode === 'reference' ? '⊟ Close' : '◐ Reference'}
+              </button>
+            )}
+          </div>
         )}
         {refCompare && !refCompare.available && (
           <span role="note"
@@ -800,7 +776,7 @@ export default function DatasetLightbox({
         )}
         {onCrop && (
           <button type="button" onClick={() => onCrop(img)} disabled={pixelEditRefused}
-            title={pixelEditReason || 'Open the crop editor for this image (stretchable box, any ratio)'}
+            title={pixelEditReason || 'Crop image'}
             aria-label={pixelEditReason || 'Open the crop editor for this image'}
             className="min-h-10 lg:min-h-9 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45">
             ✂ Crop
@@ -814,7 +790,7 @@ export default function DatasetLightbox({
             and ↩ Undo is the way back. */}
         {onMarkWatermark && img?.watermark_state !== 'cleaned' && (
           <button type="button" onClick={() => onMarkWatermark(img)} disabled={curationRefused}
-            title={refused || 'Draw the watermark zones on this image — works even when the scan found nothing. What you draw becomes the flag, and 🧽 Clean then repaints exactly that.'}
+            title={refused || 'Edit watermark mask'}
             aria-label={refused || watermarkMaskButtonLabel(img)}
             className="min-h-10 lg:min-h-9 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45">
             <FlagIcon aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{watermarkMaskButtonLabel(img)}
@@ -828,7 +804,7 @@ export default function DatasetLightbox({
             until now, which made the pair look like a duplicate. */}
         {onRepair && (
           <button type="button" onClick={() => patchImageState({ repairOpen: true })} disabled={curationRefused}
-            title={refused || 'Repaint part of this image from your own description — draw a box or paint over the thing with the brush, say what should be there ("remove the necklace"), and everything outside it stays byte-identical.'}
+            title={refused || 'Repair part of this image'}
             aria-label={refused || 'Repair an area of this image'}
             className="min-h-10 lg:min-h-9 px-3 py-1.5 rounded-lg bg-sky-500/25 hover:bg-sky-500/35 text-sky-50 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45">
             ✦ Repair
@@ -839,35 +815,24 @@ export default function DatasetLightbox({
             aria-busy={mirrorBusy}
             aria-label={pixelEditReason
               || (mirrorBusy ? `Mirroring ${alt} horizontally` : `Mirror ${alt} horizontally`)}
-            title={refused
-              || (mirrorBusy ? 'Mirroring horizontally' : 'Mirror horizontally (flip left and right)')}
-            className="min-h-10 lg:min-h-9 w-full sm:w-auto px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45">
-            {mirrorBusy ? '⇆ Mirroring' : '⇆ Mirror horizontally'}
+            title={pixelEditReason || 'Mirror horizontally'}
+            className="min-h-10 lg:min-h-9 w-full sm:w-auto whitespace-nowrap px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45">
+            {mirrorBusy ? '⇆ Mirroring' : '⇆ Mirror'}
           </button>
         )}
         {onRotate && (
-          /* The pair shares ONE row even on a 400 px screen: two full-width
-             rows for two halves of the same gesture would push everything else
-             below the fold. In the rail the same row spans its full width —
-             `sm:flex-none` would otherwise leave them huddled on the left,
-             reading as a different kind of control than their neighbours.
-             Emoji stay aria-hidden — the label is the text. */
-          <div className={`flex items-stretch gap-2 ${rail ? 'w-full' : 'w-full sm:w-auto'}`}>
+          <div className={`grid grid-cols-2 gap-2 ${rail || sheet ? 'w-full' : 'w-full sm:w-auto'}`}>
             <button type="button" onClick={rotate(270)} disabled={pixelEditRefused || mirrorBusy}
               aria-busy={mirrorBusy} aria-label={pixelEditReason || `Rotate ${alt} 90 degrees left`}
-              title={pixelEditReason
-                || "Rotate 90° left (counter-clockwise) — keeps the file's format; four turns come back round"}
-              className={`min-h-10 lg:min-h-9 flex-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-45 ${
-                rail ? '' : 'sm:flex-none'}`}>
-              <span aria-hidden="true">↺</span> Rotate left
+              title={pixelEditReason || 'Rotate 90° left'}
+              className="min-h-11 min-w-0 whitespace-nowrap rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-45 lg:min-h-9">
+              <span aria-hidden="true">↺</span> Rotate Left
             </button>
             <button type="button" onClick={rotate(90)} disabled={pixelEditRefused || mirrorBusy}
               aria-busy={mirrorBusy} aria-label={pixelEditReason || `Rotate ${alt} 90 degrees right`}
-              title={pixelEditReason
-                || "Rotate 90° right (clockwise) — keeps the file's format; four turns come back round"}
-              className={`min-h-10 lg:min-h-9 flex-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-45 ${
-                rail ? '' : 'sm:flex-none'}`}>
-              <span aria-hidden="true">↻</span> Rotate right
+              title={pixelEditReason || 'Rotate 90° right'}
+              className="min-h-11 min-w-0 whitespace-nowrap rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-45 lg:min-h-9">
+              <span aria-hidden="true">↻</span> Rotate Right
             </button>
           </div>
         )}

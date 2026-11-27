@@ -130,9 +130,7 @@ export const BANK_IMPROVE_PROMISE =
 export function cropOutcomeMessage(state) {
   const w = Number(state?.width) || 0;
   const h = Number(state?.height) || 0;
-  const size = w && h ? ` — now ${w}×${h}` : '';
-  return `Cropped${size}. Your own file was not modified, and every measurement`
-    + ' taken from the old framing was cleared, so the next pass re-reads this image.';
+  return w && h ? `Cropped ${w}×${h}` : 'Cropped';
 }
 
 /** The ↩ Revert confirmation. `ids` empty = the whole bank, which is a different

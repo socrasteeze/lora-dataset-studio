@@ -51,7 +51,7 @@ test('lightbox mirrors without closing and remains touch friendly on mobile', ()
   // two diverging is what makes a live button that does nothing.
   assert.match(lightbox, /if \(!onMirror \|\| pixelEditRefused \|\| mirrorBusy\) return/);
   assert.match(lightbox, /aria-busy=\{mirrorBusy\}/);
-  assert.match(lightbox, /⇆ Mirror horizontally/);
+  assert.match(lightbox, /'⇆ Mirroring' : '⇆ Mirror'/);
   assert.match(lightbox, /min-h-9 w-full sm:w-auto/);
 });
 

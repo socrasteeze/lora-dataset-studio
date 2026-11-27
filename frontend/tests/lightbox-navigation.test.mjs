@@ -306,18 +306,21 @@ test('the review bar appears only when a verdict can actually be written', () =>
   for (const label of ['✓ Keep', '✕ Reject', '⏭ Skip']) {
     assert.ok(html.includes(label), `${label} must be on screen`)
   }
-  // The keys are printed on the caps AND spelled out under them.
+  // The keys are printed on the action buttons.
   assert.match(html, /<kbd[^>]*>K<\/kbd>/)
   assert.match(html, /<kbd[^>]*>R<\/kbd>/)
   assert.match(html, /<kbd[^>]*>S<\/kbd>/)
-  assert.ok(html.includes('K keep · R reject · S skip'))
-  // …and in the tooltip AND the aria-label of each button, not in one channel:
-  // a title is invisible to a screen reader and unreachable on a touch screen.
+  assert.doesNotMatch(html, /K keep · R reject · S skip/)
   const keep = buttonAround(html, '✓ Keep')
-  assert.match(keep, /title="Keep this image and move on \(K or →\)/)
+  assert.match(keep, /title="Keep \(K or →\)"/)
+  assert.match(keep, /aria-keyshortcuts="K ArrowRight"/)
   assert.match(keep, /aria-label="Keep bust and move to the next image"/)
-  assert.match(buttonAround(html, '✕ Reject'), /title="Reject this image and move on \(R or ←\)/)
-  assert.match(buttonAround(html, '⏭ Skip'), /title="Decide later \(S\)/)
+  const reject = buttonAround(html, '✕ Reject')
+  assert.match(reject, /title="Reject \(R or ←\)"/)
+  assert.match(reject, /aria-keyshortcuts="R ArrowLeft"/)
+  const skip = buttonAround(html, '⏭ Skip')
+  assert.match(skip, /title="Skip \(S\)"/)
+  assert.match(skip, /aria-keyshortcuts="S"/)
 })
 
 test('the chip says which verdict the image already carries', () => {

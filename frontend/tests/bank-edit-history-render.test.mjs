@@ -10,13 +10,14 @@ test('Review offers undo and comparison for saved history, not legacy edits', ()
   const image = { id: 7, name: 'sample.webp', edit_method: 'improve', edit_generation: 2 }
   const props = { bankId: 1, ids: [7], seedImages: [image] }
   const legacy = render(BankReviewLightbox, props)
-  assert.doesNotMatch(legacy, /Undo last edit|Compare before \/ after/)
-  assert.match(legacy, /Revert all edits/)
+  assert.doesNotMatch(legacy, />\s*(?:↩ Undo|Compare)<\/button>/)
+  assert.match(legacy, />\s*Revert<\/button>/)
   const current = render(BankReviewLightbox, {
     ...props, seedImages: [{ ...image, edit_history_count: 2, edit_sequence: 2 }],
   })
-  assert.match(current, /Undo last edit/)
-  assert.match(current, /Compare before \/ after/)
+  assert.match(current, />\s*↩ Undo<\/button>/)
+  assert.match(current, />Compare<\/button>/)
+  assert.match(current, />\s*Revert<\/button>/)
 })
 
 test('comparison loads the last input, not the uncropped original', () => {

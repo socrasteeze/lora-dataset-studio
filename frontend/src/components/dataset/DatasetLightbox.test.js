@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { canRegenerateGeneric } from './improveRerun.js';
-import { REVIEW_SHORTCUT_HINT } from '../shared/reviewShortcuts.js';
 
 const lightbox = readFileSync(new URL('./DatasetLightbox.jsx', import.meta.url), 'utf8');
 const workspace = readFileSync(new URL('./DatasetWorkspace.jsx', import.meta.url), 'utf8');
@@ -49,16 +48,14 @@ test('a derived image can be inspected next to the original it came from', () =>
   assert.doesNotMatch(lightbox, /max-h-full max-w-full select-none object-contain/);
   // Real button, pressed state carried by aria (not colour alone).
   assert.match(lightbox, /aria-pressed=\{compareMode === 'derived'\}/);
-  assert.match(lightbox, /Compare with original/);
-  assert.match(lightbox, /Exit comparison/);
-  // Full-width control at phone width, like the other lightbox actions.
-  assert.match(lightbox, /w-full sm:w-auto[^]{0,400}Compare with original/);
+  assert.match(lightbox, /'⊟ Close' : '⧉ Original'/);
+  assert.match(lightbox, /grid grid-flow-col auto-cols-fr gap-2/);
   // Each pane names its side in TEXT — from whichever descriptor is on screen.
   assert.match(lightbox, /activeCompare\.beforeLabel/);
   assert.match(lightbox, /activeCompare\.afterLabel/);
   // Zoom is not silently broken: comparison says, in the same hint slot, that
   // 100 % lives outside the comparison.
-  assert.match(lightbox, /exit comparison to zoom/i);
+  assert.match(lightbox, /Same scale · Zoom unavailable/);
   // A vanished original explains itself instead of leaving a dead button.
   assert.match(lightbox, /compare && !compare\.available/);
   assert.match(lightbox, /\{compare\.reason\}/);
@@ -73,9 +70,8 @@ test('any dataset image can be inspected next to the reference photo', () => {
   assert.match(lightbox, /describeReferenceComparison\(img, refFilename\)/);
   // Its own button, next to the other one — not a mode picker that would hide
   // one question behind the other on an improved image.
-  assert.match(lightbox, /Compare with reference/);
+  assert.match(lightbox, /'⊟ Close' : '◐ Reference'/);
   assert.match(lightbox, /aria-pressed=\{compareMode === 'reference'\}/);
-  assert.match(lightbox, /w-full sm:w-auto[^]{0,400}Compare with reference/);
   // ONE state for both readings ⇒ entering either leaves the other; two
   // booleans would have allowed two pairs of panes at once. And it lives in the
   // id-stamped slot so late image callbacks cannot change the current view.
@@ -91,7 +87,7 @@ test('any dataset image can be inspected next to the reference photo', () => {
   // "same scale" is TRUE of the derived pair and FALSE here (a square head
   // reference against a body plan): the hint is per mode, not shared.
   assert.match(lightbox, /compareMode === 'derived' && inCompare/);
-  assert.match(lightbox, /different framings — each pane fits its own image/);
+  assert.match(lightbox, /Separate scales · Zoom unavailable/);
   // A reference recorded without a usable file states why, like the other mode.
   assert.match(lightbox, /refCompare && !refCompare\.available/);
   assert.match(lightbox, /\{refCompare\.reason\}/);
@@ -117,9 +113,7 @@ test('the dataset lightbox offers Keep / Reject / Skip on the Bank keys', () => 
   // "kept" for captioning, export and training to disagree with.
   assert.match(lightbox, /await onStatus\(imageId, status, \{ onAccepted \}\)/);
   assert.match(workspace, /onStatus=\{viewImgLive\._rescueReviewPreview \? null : ds\.setStatus\}/);
-  // Printed, not folklore — from the same constant the handler is built on.
-  assert.match(lightbox, /\{REVIEW_SHORTCUT_HINT\}.*\{REVIEW_ARROW_HINT\}.*Esc close/);
-  assert.equal(REVIEW_SHORTCUT_HINT, 'K keep · R reject · S skip');
+  assert.doesNotMatch(lightbox, /REVIEW_SHORTCUT_HINT|K keep · R/);
 });
 
 test('✦ Repair owns every shortcut while it is open, not just Escape', () => {

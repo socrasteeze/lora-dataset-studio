@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Flag as FlagIcon, PartyPopper, Shuffle } from 'lucide-react';
+import { useToast } from '../common/Toast'
 import PluginSlot from '../../plugins/PluginSlot.jsx'
 import { contributionKey, createLayerTracker } from '../../plugins/layerTracker.js'
 import { apiFetch, postJson } from '../../api/fetchClient'
@@ -35,9 +36,7 @@ import SourceAttribution from '../dataset/SourceAttribution'
 import { canEditMask, maskButtonLabel } from './bankWatermarkMask.js'
 import { dupStateSuffix } from './bankDupBadge.js'
 import { cropOutcomeMessage, imageVersionQuery } from './bankEdits.js'
-import {
-  ownsTypedKeys, reviewKeyAction, REVIEW_ARROW_HINT, REVIEW_SHORTCUT_HINT,
-} from '../shared/reviewShortcuts.js'
+import { ownsTypedKeys, reviewKeyAction } from '../shared/reviewShortcuts.js'
 import { useReviewImagePreload } from '../shared/useReviewImagePreload.js'
 import ShortcutKey from '../shared/ShortcutKey'
 import BankEditComparison from './BankEditComparison.jsx'
@@ -45,6 +44,8 @@ import BankEditComparison from './BankEditComparison.jsx'
 // How many upcoming images we pull metadata for in one go (the decision helpers
 // below the image). The grid page only holds the ids it rendered.
 const META_WINDOW = 40
+const EDIT_BUTTON = 'inline-flex min-h-11 min-w-0 items-center justify-center whitespace-nowrap rounded-lg border px-1 py-2 text-xs leading-tight disabled:opacity-50 sm:text-sm lg:min-h-9'
+const EDIT_TONE = 'border-white/25 text-white hover:bg-white/10'
 
 const FLAG_TEXT = {
   blur: 'Blurry', noise: 'Noisy', uniform: 'Flat', small: 'Small',
@@ -132,11 +133,7 @@ export default function BankReviewLightbox({
   })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
-  /* What an edit just did, said HERE rather than as a toast: the review runs
-     full-screen over the workspace, and a toast fired behind it is a report the
-     user never reads. Cleared as soon as the cursor moves — it describes the
-     image on screen, not the session. */
-  const [notice, setNotice] = useState(null)
+  const toast = useToast()
   // 🚩 Which image's watermark mask is open, if any. Review is where a flagged
   // image is actually LOOKED at, so it is where a wrong detection box gets
   // fixed — until now that was only possible inside a dataset (Qeeyana, Reddit).
@@ -198,7 +195,6 @@ export default function BankReviewLightbox({
     decisionInFlight.current = true
     setBusy(true)
     setError(null)
-    setNotice(null)
     try {
       const result = await postJson(`/api/bank/${bankId}/images/status`, {
         ids: [target], status, ...(collectionId != null ? { collection_id: collectionId } : {}),
@@ -282,7 +278,7 @@ export default function BankReviewLightbox({
     try {
       const d = await postJson(`/api/bank/${bankId}/image/${target}/crop`, box)
       applyEdit(target, d)
-      setNotice(cropOutcomeMessage(d))
+      toast.success(cropOutcomeMessage(d))
       setCropId(null)
     } catch (e) {
       setError(e?.message || 'Could not crop that image — it was NOT changed.')
@@ -290,32 +286,31 @@ export default function BankReviewLightbox({
     } finally {
       setBusy(false)
     }
-  }, [applyEdit, bankId, busy, cropId])
+  }, [applyEdit, bankId, busy, cropId, toast])
 
   const undoCurrent = useCallback(async () => {
     const target = currentId(session)
     if (target == null || busy) return
     setBusy(true)
     setError(null)
-    setNotice(null)
     try {
       const d = await postJson(`/api/bank/${bankId}/edits/undo`, { image_ids: [target] })
       const state = d?.images?.find((row) => row.id === target)
       if (!state) throw new Error('The previous version is unavailable. Nothing was changed.')
       applyEdit(target, state)
       setCompareKey(null)
-      setNotice('Last edit undone. Earlier edits have been kept.')
+      toast.success('Last edit undone.')
     } catch (e) {
       setError(e?.message || 'Could not undo the last edit.')
     } finally {
       setBusy(false)
     }
-  }, [applyEdit, bankId, busy, session])
+  }, [applyEdit, bankId, busy, session, toast])
 
   const revertCurrent = useCallback(async () => {
     const target = currentId(session)
     if (target == null || busy) return
-    if (!window.confirm('Revert all edits on this image? Earlier crops and upscales will also be removed.')) return
+    if (!window.confirm('Revert all edits on this image?')) return
     setBusy(true)
     setError(null)
     try {
@@ -325,14 +320,13 @@ export default function BankReviewLightbox({
       // about what reverting should have produced.
       applyEdit(target, (d?.images || []).find((r) => r.id === target)
         || { edit_method: null, edit_generation: 0 })
-      setNotice('Back to the image this bank started from — the rotation the edit'
-        + ' had absorbed is yours again.')
+      toast.success('Edits reverted.')
     } catch (e) {
       setError(e?.message || 'Could not revert that image — it was NOT changed.')
     } finally {
       setBusy(false)
     }
-  }, [applyEdit, bankId, busy, session])
+  }, [applyEdit, bankId, busy, session, toast])
 
   const restoreOriginal = useCallback(async () => {
     if (!canRestore || busy) return
@@ -342,7 +336,6 @@ export default function BankReviewLightbox({
     }
     setBusy(true)
     setError(null)
-    setNotice(null)
     try {
       const result = await postJson(`/api/bank/${bankId}/watermark/undo`, { image_ids: [id] })
       if (!result.restored) throw new Error('The original could not be restored.')
@@ -353,18 +346,18 @@ export default function BankReviewLightbox({
         return next
       })
       setCompareKey(null)
-      setNotice('Original restored.')
+      toast.success('Original restored.')
     } catch (e) {
       setError(e?.message || 'Could not restore the original.')
     } finally {
       setBusy(false)
     }
-  }, [bankId, busy, canRestore, id, restoreBlock])
+  }, [bankId, busy, canRestore, id, restoreBlock, toast])
 
   // Moving forward without judging IS a skip: it stays undecided in the DB and
   // is not proposed again in this session (S and ⏭ are the same).
-  const doSkip = useCallback(() => { setError(null); setNotice(null); setSession((s) => skip(s)) }, [])
-  const goBack = useCallback(() => { setError(null); setNotice(null); setSession((s) => back(s)) }, [])
+  const doSkip = useCallback(() => { setError(null); setSession((s) => skip(s)) }, [])
+  const goBack = useCallback(() => { setError(null); setSession((s) => back(s)) }, [])
   const toggleShuffle = useCallback(() => setSession((s) => setShuffle(s, !s.shuffle)), [])
 
   useEffect(() => {
@@ -425,8 +418,7 @@ export default function BankReviewLightbox({
           {done ? `${p.total} / ${p.total}` : `${p.position} / ${p.total}`}
         </span>
         <span className="text-white/50">{summary}</span>
-        <label className="flex items-center gap-1.5 text-xs text-white/80"
-          title="Walk what's left in random order instead of folder order — on a big dump that shows you a representative sample straight away instead of 200 near-identical shots. Nothing you have already seen comes back.">
+        <label className="flex items-center gap-1.5 text-xs text-white/80">
           <input type="checkbox" checked={session.shuffle} onChange={toggleShuffle} />
           <Shuffle aria-hidden="true" className="h-3.5 w-3.5" /> Random order
         </label>
@@ -443,16 +435,16 @@ export default function BankReviewLightbox({
           </p>
           {busy && <p role="status" className="text-sm text-white/60">Saving</p>}
           {error && <p role="alert" className="text-sm text-rose-300">{error} Go back to retry.</p>}
-          <div className="flex flex-wrap items-center justify-center gap-2">
+          <div className="grid grid-flow-col auto-cols-fr gap-2">
             {p.total > 0 && (
               <button type="button" onClick={goBack}
-                className="rounded-lg border border-white/25 px-4 py-2 text-sm text-white hover:bg-white/10">
+                className={`${EDIT_BUTTON} ${EDIT_TONE}`}>
                 ↓ Back
               </button>
             )}
             <button type="button" onClick={onClose}
-              className="rounded-lg bg-gradient-primary px-5 py-2 text-sm font-semibold text-gray-950">
-              Back to the grid
+              className={`${EDIT_BUTTON} border-transparent bg-gradient-primary font-semibold text-gray-950`}>
+              Back to Grid
             </button>
           </div>
         </div>
@@ -470,24 +462,14 @@ export default function BankReviewLightbox({
 
       {!done && (
         <div className="bank-review-controls min-h-0 overflow-y-auto overscroll-contain space-y-2 bg-black/60 px-4 pt-2.5">
-          <div className="min-h-5 text-center text-xs">
-            {error ? <p role="alert" className="text-rose-300">{error} Try again.</p>
-              : <p role="status" className="text-white/60">{busy ? 'Saving' : (
-                <span>
-                  {canRestore ? 'K keep · R restore · S skip' : <>{REVIEW_SHORTCUT_HINT}</>}
-                  <span className="hidden lg:inline"> · {REVIEW_ARROW_HINT}</span>
-                </span>
-              )}</p>}
-          </div>
-          {notice && !error && (
-            <p role="status" className="text-center text-sm text-sky-200">✂ {notice}</p>
-          )}
+          {error ? <p role="alert" className="text-center text-xs text-rose-300">{error} Try again.</p>
+            : busy && <p role="status" className="text-center text-xs text-white/60">Saving</p>}
           <Facts img={img} />
           {canRestore && (
             <div className="flex flex-wrap items-center justify-center gap-2">
               <button type="button" onClick={restoreOriginal} disabled={busy || !!restoreBlock}
-                aria-keyshortcuts="R" title={restoreBlock || 'Restore this image to its state before cleaning.'}
-                className="inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border border-white/25 px-3 py-2 text-sm text-white disabled:opacity-50 hover:bg-white/10">
+                aria-keyshortcuts="R" title={restoreBlock || 'Restore original (R)'}
+                className={`${EDIT_BUTTON} ${EDIT_TONE} px-3`}>
                 ↩ Restore original{shortcut('R')}
               </button>
               {restoreBlock && <span className="self-center text-xs text-amber-200">{restoreBlock}</span>}
@@ -496,81 +478,80 @@ export default function BankReviewLightbox({
           {canEditMask(img) && (
             <div className="flex justify-center">
               <button type="button" onClick={() => setMaskId(id)} disabled={busy}
-                title="Draw the watermark zones on this image (M) — decides nothing. Works even when the scan found nothing: what you draw becomes the flag, and Inpaint then repaints exactly that."
-                className="inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100 disabled:opacity-50 hover:bg-amber-500/20">
+                title="Edit watermark mask (M)"
+                className={`${EDIT_BUTTON} gap-1 border-amber-400/40 bg-amber-500/10 px-3 text-amber-100 hover:bg-amber-500/20`}>
                 <FlagIcon className="h-4 w-4" />{maskButtonLabel(img)}{shortcut('M')}
               </button>
             </div>
           )}
-          <div className="flex w-full gap-2">
+          <div className="grid grid-cols-4 gap-2">
             <button type="button" onClick={goBack} disabled={session.pos === 0}
-              title="Previous image (↓). Its saved decision stays in place."
+              title="Previous image (↓)"
               aria-keyshortcuts="ArrowDown"
-              className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-white/20 px-3 py-2 text-sm text-white disabled:opacity-35 hover:bg-white/10">
+              className={`${EDIT_BUTTON} ${EDIT_TONE}`}>
               Back{shortcut('↓')}
             </button>
             <button type="button" onClick={() => rotateCurrent(-90)} disabled={busy}
               aria-label="Rotate this image 90 degrees left"
-              title="Rotate 90° left ([) — decides nothing. Your own file is never modified: the turn is stored and applied to what you see and to what gets promoted."
-              className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-white/20 px-3 py-2 text-sm text-white disabled:opacity-35 hover:bg-white/10 lg:min-h-0">
+              title="Rotate 90° left ([)"
+              className={`${EDIT_BUTTON} ${EDIT_TONE}`}>
               <span aria-hidden="true">↺</span><span className="sr-only">Rotate left</span>
             </button>
             <button type="button" onClick={() => rotateCurrent(90)} disabled={busy}
               aria-label="Rotate this image 90 degrees right"
-              title="Rotate 90° right (]) — decides nothing. Your own file is never modified: the turn is stored and applied to what you see and to what gets promoted."
-              className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-white/20 px-3 py-2 text-sm text-white disabled:opacity-35 hover:bg-white/10 lg:min-h-0">
+              title="Rotate 90° right (])"
+              className={`${EDIT_BUTTON} ${EDIT_TONE}`}>
               <span aria-hidden="true">↻</span><span className="sr-only">Rotate right</span>
             </button>
-            {/* ✂ and ↩ sit with the rotate pair, not with the decisions: everything
-                on this row CHANGES THE IMAGE and advances nothing. */}
             <button type="button" onClick={() => setCropId(id)} disabled={busy || id == null}
-              title="Crop this image (C) — decides nothing. Nothing is resampled: a Bank sits upstream of the training resolution, so the cut keeps its pixels and a dataset decides the size when it imports. Your own file is never modified, and ↩ Revert brings the original framing back."
-              className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-sky-400/60 bg-sky-500/20 px-3 py-2 text-sm font-semibold text-sky-100 disabled:opacity-50 hover:bg-sky-500/30 lg:min-h-0">
+              title="Crop (C)" aria-keyshortcuts="C"
+              className={`${EDIT_BUTTON} border-sky-400/60 bg-sky-500/20 font-semibold text-sky-100 hover:bg-sky-500/30`}>
               ✂ Crop{shortcut('C')}
             </button>
-            {img?.edit_method && (
-              <>
+          </div>
+          {img?.edit_method && (
+            <div className="grid grid-flow-col auto-cols-fr gap-2">
               {img.edit_history_count > 0 && <>
                 <button type="button" onClick={undoCurrent} disabled={busy}
-                  title="Undo only the last crop or upscale, keeping earlier edits."
-                  className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-white/25 px-3 py-2 text-sm text-white disabled:opacity-50 hover:bg-white/10 lg:min-h-0">
-                  ↩ Undo last edit
+                  title="Undo last edit"
+                  className={`${EDIT_BUTTON} ${EDIT_TONE}`}>
+                  ↩ Undo
                 </button>
                 <button type="button" onClick={() => setCompareKey(comparing ? null : editKey)}
                   disabled={busy} aria-pressed={!!comparing}
-                  title="Compare the current result with the image just before its last edit."
-                  className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-white/25 px-3 py-2 text-sm text-white disabled:opacity-50 hover:bg-white/10 lg:min-h-0">
-                  {comparing ? 'Close comparison' : 'Compare before / after'}
+                  title={comparing ? 'Close comparison' : 'Compare with prior version'}
+                  className={`${EDIT_BUTTON} ${EDIT_TONE} aria-pressed:bg-white/20`}>
+                  {comparing ? 'Close' : 'Compare'}
                 </button>
               </>}
               <button type="button" onClick={revertCurrent} disabled={busy}
-                title="Throw away the ✂ crop / upscale made in this bank and go back to the image it started from. Only a copy made by the app is deleted — your own file was never modified."
-                className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-white/25 px-3 py-2 text-sm text-white disabled:opacity-50 hover:bg-white/10 lg:min-h-0">
-                Revert all edits
+                title="Revert all edits"
+                className={`${EDIT_BUTTON} ${EDIT_TONE}`}>
+                Revert
               </button>
-              </>
-            )}
-            {/* Verbs the plugins contribute (lightbox.action, bank surface). */}
+            </div>
+          )}
+          <div className="grid grid-flow-col auto-cols-fr gap-2 empty:hidden">
             <PluginSlot slot="lightbox.action" surface="bank" img={img} bankId={bankId}
               disabled={busy}
               itemProps={(item) => ({ onLayer: pluginLayersRef.current.onLayerFor(contributionKey(item)) })} />
           </div>
-          <div className="flex w-full gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button type="button" onClick={() => sendDecision('reject')} disabled={busy}
-              title="Reject and move on."
+              title={canRestore ? 'Reject (←)' : 'Reject (R or ←)'}
               aria-keyshortcuts={canRestore ? 'ArrowLeft' : 'R ArrowLeft'}
-              className="review-decision-button inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-rose-400/60 bg-rose-500/20 px-3 py-2 text-sm font-semibold text-rose-100 disabled:opacity-50 hover:bg-rose-500/30 lg:min-h-0">
+              className={`review-decision-button ${EDIT_BUTTON} border-rose-400/60 bg-rose-500/20 font-semibold text-rose-100 hover:bg-rose-500/30`}>
               ✕ Reject{shortcut(canRestore ? '←' : 'R')}
             </button>
             <button type="button" onClick={doSkip}
-              title="Decide later (S) — stays undecided and is not shown again in this review"
-              className="review-decision-button inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-white/25 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-white/10 lg:min-h-0">
+              title="Skip (S)" aria-keyshortcuts="S"
+              className={`review-decision-button ${EDIT_BUTTON} ${EDIT_TONE} font-semibold`}>
               ⏭ Skip{shortcut('S')}
             </button>
             <button type="button" onClick={() => sendDecision('keep')} disabled={busy}
-              title="Keep this image and move on (K or →)"
+              title="Keep (K or →)"
               aria-keyshortcuts="K ArrowRight"
-              className="review-decision-button inline-flex min-h-10 min-w-0 flex-1 items-center justify-center text-center leading-tight rounded-lg border border-emerald-400/60 bg-emerald-500/20 px-3 py-2 text-sm font-semibold text-emerald-100 disabled:opacity-50 hover:bg-emerald-500/30 lg:min-h-0">
+              className={`review-decision-button ${EDIT_BUTTON} border-emerald-400/60 bg-emerald-500/20 font-semibold text-emerald-100 hover:bg-emerald-500/30`}>
               ✓ Keep{shortcut('K')}
             </button>
           </div>

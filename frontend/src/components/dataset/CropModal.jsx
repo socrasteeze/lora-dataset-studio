@@ -341,13 +341,13 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
             <option value="head">Face &amp; Head</option>
           </select>
           <button type="button" onClick={autoCenter} disabled={!nat || busy || !validCropConfidence(cropConfidence)} aria-busy={autoBusy}
-            title="Find and save a crop with your configured local vision model."
-            className="min-h-11 min-w-0 rounded-lg bg-white/10 px-2 py-2 text-sm font-semibold text-white disabled:opacity-40">
-            {autoBusy ? 'Finding Subject...' : 'Auto-Crop'}
+            title="Find and save a crop"
+            className="min-h-11 min-w-0 whitespace-nowrap rounded-lg bg-white/10 px-2 py-2 text-sm font-semibold text-white disabled:opacity-40">
+            {autoBusy ? 'Detecting' : 'Auto-Crop'}
           </button>
         </div>
         <AutoCropOptions enabled confidence={cropConfidence} onConfidenceChange={setCropConfidence}
-          disabled={busy} note="Auto-Crop saves immediately when confidence meets this minimum." />
+          disabled={busy} note="Auto-Crop saves immediately if confidence meets the minimum." />
         {error && <p role="alert" className="break-words text-sm text-rose-200">{error}</p>}
         {setupRequired && <a href="/#/setup" target="_blank" rel="noopener noreferrer"
           className="flex min-h-10 items-center text-sm text-white underline">Open Setup</a>}
@@ -357,7 +357,7 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
             {ASPECTS.map(([label, value]) => (
               <button key={label} type="button" onClick={() => pickAspect(value)} disabled={busy}
                 aria-pressed={aspect === value}
-                className={`min-h-11 w-12 min-w-12 shrink-0 px-2 py-0.5 rounded text-xs font-semibold ${aspect === value
+                className={`min-h-11 w-12 min-w-12 shrink-0 whitespace-nowrap px-2 py-0.5 rounded text-xs font-semibold ${aspect === value
                   ? 'bg-indigo-500 text-gray-950'
                   : 'bg-white/10 text-white/80 hover:bg-white/20'}`}>
                 {label}
@@ -368,17 +368,17 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
         <div className="ml-auto grid w-full max-w-sm grid-flow-col auto-cols-fr gap-2">
           {onReset && (
             <button type="button" onClick={() => save(() => onReset())} disabled={busy}
-              title="Re-run the automatic head-crop on the original image"
-              className="min-h-11 min-w-0 px-2 py-2 rounded-lg bg-surface text-content-muted text-sm">
-              ↺ Reset to auto
+              title="Reset to the automatic crop"
+              className="min-h-11 min-w-0 whitespace-nowrap px-2 py-2 rounded-lg bg-surface text-content text-sm disabled:opacity-40">
+              ↺ Reset
             </button>
           )}
           <button type="button" ref={cancelRef} onClick={cancel} disabled={saving}
-            className="min-h-11 min-w-0 px-2 py-2 rounded-lg bg-surface text-content text-sm">Cancel</button>
+            className="min-h-11 min-w-0 whitespace-nowrap px-2 py-2 rounded-lg bg-surface text-content text-sm disabled:opacity-40">Cancel</button>
           <button type="button" disabled={!box || !nat || busy} aria-busy={saving}
             onClick={() => save((selection) => onConfirm(roundCropBox(selection)))}
-            className="min-h-11 min-w-0 px-2 py-2 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
-            {saving ? 'Saving...' : 'Crop'}
+            className="min-h-11 min-w-0 whitespace-nowrap px-2 py-2 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
+            {saving ? 'Saving' : 'Crop'}
           </button>
         </div>
       </div>

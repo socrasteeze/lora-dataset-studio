@@ -16,7 +16,7 @@ import { WHATS_NEW_ARCHIVE } from '../src/whatsNewArchive.js'
 // (see whatsNew.js, rule "Keep the list tidy") — search the union.
 const ALL_WHATS_NEW = [...WHATS_NEW, ...WHATS_NEW_ARCHIVE]
 import { getHelpTopic } from '../src/help/helpRegistry.js'
-import { REVIEW_SHORTCUT_HINT, ownsTypedKeys } from '../src/components/shared/reviewShortcuts.js'
+import { ownsTypedKeys } from '../src/components/shared/reviewShortcuts.js'
 
 const read = readSource
 const lightbox = read('src/components/bank/BankReviewLightbox.jsx')
@@ -29,9 +29,10 @@ const workspace = read('src/components/bank/BankWorkspace.jsx')
 const tile = read('src/components/bank/BankTile.jsx')
 
 test('the lightbox offers Keep, Reject and Skip with their K/R/S shortcuts', () => {
-  assert.match(lightbox, /✓ Keep/)
-  assert.match(lightbox, /✕ Reject/)
-  assert.match(lightbox, /⏭ Skip/)
+  assert.match(lightbox, /✓ Keep\{shortcut\('K'\)\}/)
+  assert.match(lightbox, /✕ Reject\{shortcut\(canRestore \? '←' : 'R'\)\}/)
+  assert.match(lightbox, /⏭ Skip\{shortcut\('S'\)\}/)
+  assert.match(lightbox, /const shortcut = \(label\) => <ShortcutKey>\{label\}<\/ShortcutKey>/)
   // The keys themselves now come from the SHARED grammar (unit-tested in
   // src/components/shared/reviewShortcuts.test.js) — the same module the
   // dataset lightbox reads, so the two review surfaces cannot drift apart. What
@@ -43,10 +44,7 @@ test('the lightbox offers Keep, Reject and Skip with their K/R/S shortcuts', () 
   assert.match(lightbox, /action === 'skip'[^\n]*doSkip\(\)/)
   assert.match(lightbox, /action === 'back'[^\n]*goBack\(\)/)
   assert.match(lightbox, /action === 'close'[^\n]*onClose\(\)/)
-  // Discoverable, not folklore: the shortcuts are printed in the UI, from the
-  // same constant the handler is built around.
-  assert.match(lightbox, /\{REVIEW_SHORTCUT_HINT\}/)
-  assert.equal(REVIEW_SHORTCUT_HINT, 'K keep · R reject · S skip')
+  assert.doesNotMatch(lightbox, /REVIEW_SHORTCUT_HINT|K keep · R/)
 })
 
 test('the shortcuts survive the focus trap landing on the 🎲 checkbox', () => {
@@ -82,7 +80,7 @@ test('the lightbox renders the FULL file, never the grid thumbnail', () => {
 
 test('the end-of-pool state is explicit and closable', () => {
   assert.match(lightbox, /All \{p\.total\.toLocaleString\(\)\} image/)
-  assert.match(lightbox, /Back to the grid/)
+  assert.match(lightbox, /Back to Grid/)
 })
 
 test('random order is a shuffle of the remaining ids, not a random draw', () => {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { REVIEW_ARROW_HINT, REVIEW_SHORTCUT_HINT, ownsTypedKeys, reviewKeyAction, selectionKeyAction } from './reviewShortcuts.js';
+import { ownsTypedKeys, reviewKeyAction, selectionKeyAction } from './reviewShortcuts.js';
 
 const press = (key, extra = {}) => ({ key, target: null, ...extra });
 
@@ -74,11 +74,6 @@ test('only TEXT entry swallows the shortcuts', () => {
 test('Escape answers even from inside a caption field', () => {
   // A field focused inside an overlay must never be able to trap the user in it.
   assert.equal(reviewKeyAction(press('Escape', { target: { tagName: 'TEXTAREA' } })), 'close');
-});
-
-test('the printed hint is the one the handler implements', () => {
-  assert.equal(REVIEW_SHORTCUT_HINT, 'K keep · R reject · S skip');
-  assert.equal(REVIEW_ARROW_HINT, '← reject · → keep · ↓ back');
 });
 
 test('full-screen culling uses Left reject, Right keep and Down back', () => {

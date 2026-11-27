@@ -59,13 +59,10 @@ test('the dataset lightbox offers both directions, labelled and keyboard reachab
   assert.match(lightbox, /aria-label=\{pixelEditReason \|\| `Rotate \$\{alt\} 90 degrees right`\}/);
   assert.match(lightbox, /onClick=\{rotate\(270\)\}/);
   assert.match(lightbox, /onClick=\{rotate\(90\)\}/);
-  assert.ok(lightbox.includes('<span aria-hidden="true">↺</span> Rotate left'));
-  // 400 px: the pair shares ONE row instead of stacking two full-width buttons.
-  // The bar can now also live in a side rail (lightboxActionPlacement.js), but
-  // that placement is unreachable below 1024 px, so the phone branch is still
-  // the `w-full sm:w-auto` one and both buttons still flex to share the row.
-  assert.match(lightbox, /flex items-stretch gap-2 \$\{rail \? 'w-full' : 'w-full sm:w-auto'\}/);
-  assert.match(lightbox, /min-h-9 flex-1 rounded-lg[\s\S]*rail \? '' : 'sm:flex-none'/);
+  assert.ok(lightbox.includes('<span aria-hidden="true">↺</span> Rotate Left'));
+  // The pair shares equal columns on both the phone and the side rail.
+  assert.match(lightbox, /grid grid-cols-2 gap-2 \$\{rail \|\| sheet \? 'w-full' : 'w-full sm:w-auto'\}/);
+  assert.match(lightbox, /title=\{pixelEditReason \|\| 'Rotate 90° left'\}\s+className="min-h-11 min-w-0 whitespace-nowrap/);
   assert.match(workspace, /onRotate=\{viewImgLive\._rescueReviewPreview \? undefined : ds\.rotateImage\}/);
 });
 
@@ -115,8 +112,7 @@ test('the bank review lightbox rotates without deciding, and updates the tile be
   assert.doesNotMatch(bankReview, /\[ \] rotate/);
   assert.match(bankReview, />\s*Back\{shortcut\('↓'\)\}\s*</);
   assert.doesNotMatch(bankReview, /Mark a watermark/);
-  assert.match(bankReview, /REVIEW_SHORTCUT_HINT/);
-  const decisions = bankReview.slice(bankReview.indexOf('Reject this image and move on'));
+  const decisions = bankReview.slice(bankReview.indexOf("sendDecision('reject')} disabled={busy}"));
   assert.ok(decisions.indexOf('✕ Reject') < decisions.indexOf('⏭ Skip'));
   assert.ok(decisions.indexOf('⏭ Skip') < decisions.indexOf('✓ Keep'));
   assert.match(bankWorkspace, /onRotated=\{onReviewRotated\}/);

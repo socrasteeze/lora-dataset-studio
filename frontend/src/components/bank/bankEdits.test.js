@@ -113,13 +113,9 @@ test('the bank promise is NOT the dataset promise', () => {
 
 /* --- what the actions report ---------------------------------------------- */
 
-test('cropOutcomeMessage: quotes the new size and the re-analysis', () => {
-  const msg = cropOutcomeMessage({ width: 1200, height: 800 });
-  assert.match(msg, /1200×800/);
-  assert.match(msg, /not modified/i);
-  assert.match(msg, /re-reads/i);
-  // A row whose size could not be measured still gets an honest sentence.
-  assert.doesNotMatch(cropOutcomeMessage({}), /×/);
+test('cropOutcomeMessage: confirms the crop with its size when available', () => {
+  assert.equal(cropOutcomeMessage({ width: 1200, height: 800 }), 'Cropped 1200×800');
+  assert.equal(cropOutcomeMessage({ width: 1200 }), 'Cropped');
 });
 
 test('revertConfirmMessage: bank-wide and per-selection are different promises', () => {
