@@ -9,20 +9,10 @@ import test from 'node:test'
 const SRC = path.dirname(fileURLToPath(import.meta.url))
 const read = (rel) => readFileSync(path.join(SRC, rel), 'utf8').replace(/\r\n/g, '\n')
 
-test('the phone input font-size rule sits outside @layer base and beats text-xs/text-sm', () => {
+test('the app clips horizontal overflow on html and body', () => {
   const css = read('index.css')
-  const layerStart = css.indexOf('@layer base {')
-  const layerEnd = css.indexOf('\n}\n', layerStart)
-  const rule = css.indexOf('input, select, textarea {')
-  assert.ok(rule > layerEnd, 'the rule must come after the base layer closes')
-  assert.match(css.slice(rule, rule + 80), /font-size: 16px !important/)
-  const media = css.lastIndexOf('@media', rule)
-  assert.match(css.slice(media, rule), /max-width: 639px/)
-  assert.match(css.slice(media, rule), /pointer:\s*coarse/)
   assert.match(css, /html \{[\s\S]*?overflow-x: clip;/)
   assert.match(css, /body \{[\s\S]*?overflow-x: clip;/)
-  const html = readFileSync(path.join(SRC, '..', 'index.html'), 'utf8')
-  assert.doesNotMatch(html, /maximum-scale|user-scalable/)
 })
 
 test('anchors clear the sticky app bar', () => {

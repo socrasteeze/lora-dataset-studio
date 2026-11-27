@@ -493,31 +493,14 @@
   }
 }
 
-/* iOS Safari auto-zooms the page on focusing any text-like input whose
-   EFFECTIVE font-size is under 16px — and the zoom-in/zoom-out transition
-   is how a pre-existing horizontal overflow elsewhere on the page (an
-   absolutely-positioned element escaping a `position: static` scroller, a
-   popover anchored with no left/right offset — see
-   tests/mobile-rail-containing-block.test.mjs and the Bank curate-popover
-   fix) gets "stuck" as a persistently scrollable page: the browser
-   recomputes its fit-to-width scale during the transition, using whatever
-   the document's width happens to be at that moment. Belt-and-suspenders:
-   even with every known overflow source fixed, this stops the TRIGGER
-   itself below the app's own `sm` breakpoint (640px), so a future overflow
-   slip can't reproduce the same stuck-zoom symptom.
-   This sits OUTSIDE `@layer base` and is `!important` on purpose. Inside the
-   base layer an element selector (specificity 0,0,1) loses to every Tailwind
-   `text-xs` / `text-sm` class (0,1,0) on the input, so nearly every field in
-   the app kept its small size on a phone and still triggered the zoom. Source
-   order alone cannot fix that (specificity comes first), hence `!important`.
-   It applies below 640px AND on any touch-first screen (`pointer: coarse`).
-   The width bound alone missed a phone held sideways (844 px) and every
-   iPad, where the type-DELETE field in Delete rejected was still 14px. iOS
-   zoomed in on focus and an installed (standalone) app has no browser chrome
-   to zoom back out. A desktop with a mouse keeps every text-xs/text-sm
-   control exactly as it was. */
-@media (max-width: 639px), (pointer: coarse) {
-  input, select, textarea {
+/* iOS Safari can zoom on focus below 16px. Override small Tailwind text sizes
+   on touch screens and below the lg breakpoint. */
+@media (max-width: 1023px), (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="hidden"], [type="range"], [type="file"],
+    [type="button"], [type="submit"], [type="reset"], [type="image"], [type="color"]),
+  select,
+  textarea,
+  [contenteditable]:not([contenteditable="false"]) {
     font-size: 16px !important;
   }
 }

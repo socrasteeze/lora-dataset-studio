@@ -85,6 +85,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-27-zz-ios-field-zoom', date: '2026-11-27',
+    title: 'Steady iPhone Forms',
+    blurb: 'Text fields use at least 16 px on touch and small screens to prevent focus zoom. Pinch zoom still works.',
+  },
+  {
     id: '2026-11-27-zz-bank-multi-person', date: '2026-11-27',
     title: 'Control how many group shots make the cut',
     blurb: 'Balanced and Diverse picks can exclude, cap, or allow images with multiple detected faces. The report counts images without a face count.',
