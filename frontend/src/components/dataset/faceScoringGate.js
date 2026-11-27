@@ -7,13 +7,13 @@
 // same rule then drives the button, the batch endpoint and the two other scoring
 // lanes, and a second reason added server-side is honoured here for free.
 
-const SCORE_TITLE = "Scores each image's facial resemblance vs the reference — kept images AND "
+const SCORE_TITLE = "Scores each image's facial resemblance vs the reference · kept images AND "
   + 'the ones still waiting for a ✓/✕ (deletes nothing)';
 const NO_REF_TITLE = 'Set a reference photo first';
 // insightface + onnxruntime + antelopev2 are an OPTIONAL extra, absent from
 // plenty of installs. Without them the pass can only fail after the click, with
 // a toast — so the button says what is missing and where to get it instead.
-const NOT_INSTALLED = 'Face scoring is not installed — Setup ▸ Quality tools '
+const NOT_INSTALLED = 'Face scoring is not installed · Setup ▸ Quality tools '
   + '(installs InsightFace + the antelopev2 model)';
 
 /** {disabled, title, blocked, reason, setupRoute} for the 🎭 Analyze faces button.
@@ -96,21 +96,21 @@ export function autoTriageEmptyReason(visible, all = null) {
   if (hidden > 0) {
     return { kind: 'hidden_by_filter', count: hidden,
              message: hidden === 1
-               ? '1 scored image is still undecided, but the current filter hides it.'
-               : `${hidden} scored images are still undecided, but the current filter hides them.` };
+               ? '1 scored image is hidden.'
+               : `${hidden} scored images are hidden.` };
   }
   const rows = pool.filter((i) => i && i.filename);
   if (!rows.length || !rows.some((i) => i.face_state != null)) {
     return { kind: 'never_scored', count: 0,
-             message: 'No image carries a face score yet — run Analyze faces to unlock auto-triage.' };
+             message: 'No face scores. Run Analyze faces.' };
   }
   if (!rows.some(triageScorable)) {
     // The case the Discord report was really about: a set of wide shots came
     // back entirely unscorable, so the tool that could have sorted it was not
     // merely empty — it was gone.
     return { kind: 'none_scorable', count: 0,
-             message: 'None of these images could be scored (face too small, no face found, or a profile) — judge those by eye.' };
+             message: 'No scorable faces.' };
   }
   return { kind: 'all_decided', count: 0,
-           message: 'Every scored image already carries your ✓/✕ — nothing left to auto-triage.' };
+           message: 'All scored images reviewed.' };
 }

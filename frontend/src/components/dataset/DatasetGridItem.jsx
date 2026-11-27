@@ -45,7 +45,7 @@ const STATUS_CLS = {
 // Settings can adjust face_scoring.green/orange; these are fallback values only.
 const DEFAULT_FACE_VALID = 0.50, DEFAULT_FACE_ORANGE = 0.45;
 const GREY_LABEL = { no_face: 'no face detected', low_det: 'low detection',
-  too_small: 'face too small', extreme_pose: 'profile — not scored',
+  too_small: 'face too small', extreme_pose: 'profile · not scored',
   unreadable: 'unreadable', error: 'error' };
 
 // Return {border, icon, cls, label} from face_state/face_score, or null if not analyzed. Border
@@ -74,15 +74,15 @@ function faceBadge(img, thresholds) {
 // payload carries the exact route (watermark_route, computed backend-side from the
 // dims) the detected tooltip names the precise action, else it lists the possibilities.
 const WATERMARK_ROUTE_HINT = {
-  crop: 'Overlaid watermark on the border — Clean will crop it off',
-  lama: 'Small off-center watermark — Clean will inpaint it (LaMa)',
-  review: 'Watermark on the subject — Clean flags it for manual review (auto crop/inpaint would damage the photo); reject or crop manually',
+  crop: 'Overlaid watermark on the border · Clean will crop it off',
+  lama: 'Small off-center watermark · Clean will inpaint it (LaMa)',
+  review: 'Watermark on the subject · Clean flags it for manual review (auto crop/inpaint would damage the photo); reject or crop manually',
 };
 const WATERMARK_BADGE = {
   detected: { icon: Flag, cls: 'text-amber-300', text: 'watermark',
-    label: 'Overlaid watermark detected — Clean will crop the border, inpaint a small mark, or flag it for manual review (V2 handles on-subject watermarks)' },
+    label: 'Overlaid watermark detected · Clean will crop the border, inpaint a small mark, or flag it for manual review (V2 handles on-subject watermarks)' },
   dismissed: { icon: '⊘', cls: 'text-content-subtle', text: 'not a watermark',
-    label: 'You marked this “not a watermark” — future 🧽 Find passes skip it' },
+    label: 'You marked this “not a watermark” · future 🧽 Find passes skip it' },
   cleaned: { icon: Sparkles, cls: 'text-emerald-300', text: 'watermark', label: 'Watermark removed (original kept as a .orig backup)' },
   failed: { icon: '⚠', cls: 'text-red-300', text: 'watermark', label: 'Watermark removal failed' },
 };
@@ -167,7 +167,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
   const pixelEditRefused = curationRefused || upscaleRendering;
   const pixelEditReason = curationRefusedReason
     || (upscaleRendering
-      ? 'An upscale of this image is still rendering — it would come back as an '
+      ? 'An upscale of this image is still rendering · it would come back as an '
         + 'upscale of the version from before your edit. It will be available '
         + 'again once that result arrives.'
       : null);
@@ -320,7 +320,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
         </div>
         {fb && (
           <span className={`${FACE_BADGE_CLASS} px-1.5 py-0.5 rounded bg-black/70 ${fb.cls}`}
-            title={`Resemblance to the reference face — ${fb.label}`}>
+            title={`Resemblance to the reference face · ${fb.label}`}>
             {typeof fb.icon === 'string' ? fb.icon : <fb.icon aria-hidden="true" className="mr-0.5 inline h-3 w-3 align-[-1px]" />} {fb.label}
           </span>
         )}
@@ -411,7 +411,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
                 // Rejecting a GENERATED image offers an immediate retry of the same
                 // variation (in place, new seed) so the composition stays on target.
                 if (canRegenerate && img.status !== 'reject' && img.filename && onRegenerate
-                    && window.confirm('Photo rejected — regenerate a new attempt of this variation?\n(OK = replace with a new attempt · Cancel = reject only)')) {
+                    && window.confirm('Photo rejected · regenerate a new attempt of this variation?\n(OK = replace with a new attempt · Cancel = reject only)')) {
                   onRegenerate(img.id);
                   return;
                 }

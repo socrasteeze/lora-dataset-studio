@@ -20,14 +20,14 @@ test('partial progress retains failures by filename and duplicate/small-image wa
   assert.match(html, /1 imported/);
   assert.match(html, /1 duplicates skipped/);
   assert.match(html, /broken.png/);
-  assert.match(html, /small image/);
+  assert.match(html, /1 image below 768 px/);
   assert.match(html, />Resume<\/button>/);
   assert.match(html, />Cancel Remaining<\/button>/);
 });
 
 test('an active request offers pause but cannot discard its recovery record', () => {
   const html = render(ImportQueuePanel, { queue: queue({ running: true }) });
-  assert.match(html, />Pause After File<\/button>/);
+  assert.match(html, /title="Pause after this file\.">Pause<\/button>/);
   assert.match(html, /<button[^>]+disabled=""[^>]*>Cancel Remaining<\/button>/);
   assert.doesNotMatch(html, />Resume<\/button>/);
 });

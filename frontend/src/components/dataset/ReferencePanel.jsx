@@ -35,7 +35,7 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
             ? <img src={imgUrl(refFilename)} alt="ref" className="w-full h-full object-cover" />
             : <span className="text-content-subtle text-xs">none</span>}
         </div>
-        <div className="flex flex-col gap-1">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-content text-sm font-medium">Reference photo</span>
             {waiting && (
@@ -49,11 +49,10 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
               </button>
             )}
           </div>
-          <span className="text-content-subtle text-2xs">source of Klein variations — crop with ✂ after upload</span>
-          <div className="flex gap-1.5 items-center flex-wrap">
+          <div className={`grid items-center gap-1.5 ${refFilename ? (onEditRef ? 'grid-cols-3' : 'grid-cols-2') : 'grid-cols-1'}`}>
             <button type="button" onClick={() => inp.current?.click()} disabled={importBusy}
               className={btnClass({ size: 'sm' })}>
-              {refFilename ? 'Change' : 'Set'} reference
+              {refFilename ? 'Change' : 'Set Reference'}
             </button>
             {refFilename && (
               <button type="button" onClick={onCropRef} disabled={busy}
@@ -61,14 +60,14 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
             )}
             {refFilename && onEditRef && (
               <button type="button" onClick={onEditRef} disabled={busy}
-                title={`Edit the reference with a prompt (${editEngineNames()}) — compare before/after, then Keep or Discard`}
+                title={`Edit with ${editEngineNames()}.`}
                 className={btnClass({ size: 'sm' })}>✦ Edit</button>
             )}
-            <label className="flex items-center gap-1 text-2xs text-content-muted cursor-pointer"
-              title={visionBusy ? 'Auto head-crop is unavailable during local generation; the reference imports with a centered crop.' : 'ON: a vision pass finds the head and crops around it (slower, pauses ComfyUI). OFF (default): instant centered square — adjust with ✂ Crop, usually faster.'}>
+            <label className="col-span-full flex min-h-10 items-center gap-1 text-xs text-content-muted cursor-pointer lg:min-h-0"
+              title={visionBusy ? 'Unavailable during generation.' : 'Crop around the face. Pauses ComfyUI.'}>
               <input type="checkbox" checked={autoCrop} disabled={visionBusy} onChange={(e) => setAutoCrop(e.target.checked)}
                 className="accent-indigo-500 w-3 h-3" />
-              ✂ Auto head-crop{visionBusy ? ' — unavailable during local generation' : ''}
+              ✂ Auto head-crop{visionBusy ? ' (generation active)' : ''}
             </label>
           </div>
           <input ref={inp} type="file" accept="image/*" className="hidden" disabled={importBusy}
@@ -84,7 +83,7 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
       {refFilename && (
         <div className="flex items-center gap-2 flex-wrap border-t border-border pt-2">
           <span className="text-content-subtle text-2xs">
-            Extra refs <span className="opacity-70">(more angles of this face — identity lock)</span>
+            Extra References
           </span>
           {extraRefs.map((fn) => (
             <div key={fn} className="relative w-12 h-12 rounded-lg overflow-hidden bg-black shrink-0">
@@ -99,7 +98,7 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
                   diagonally apart never overlap and stay reachable. */}
               <button type="button" onClick={() => onCropExtraRef?.(fn)} disabled={busy}
                 aria-label="Crop this extra reference"
-                title="Crop this extra reference — the full frame stays kept, so you can widen it back out later"
+                title="Crop extra reference."
                 className="absolute bottom-0 left-0 w-4 h-4 flex items-center justify-center rounded-tr bg-black/70 text-white text-2xs leading-none disabled:opacity-40">
                 ✂
               </button>
@@ -108,14 +107,14 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
           {extraRefs.length < MAX_EXTRA_REFS && (
             <button type="button" onClick={() => inpExtra.current?.click()} disabled={importBusy}
               aria-label="Add an extra reference photo (other angles of the same face)"
-              title="Add an extra reference photo — Klein uses these together to lock identity on every generation. Krea 2 Edit does not read them: its second image is added inside the ✦ Edit reference dialog and is meant to be a different subject."
+              title="Add a reference for Klein."
               className="w-12 h-12 rounded-lg border border-dashed border-border-strong text-content-muted text-xl leading-none disabled:opacity-40">
               +
             </button>
           )}
           <button type="button" onClick={() => setPromptModal(true)}
             aria-label="Edit the identity instruction used with multiple references"
-            title="Edit the identity instruction sent with multiple references — one box per engine family, for this dataset's subject type"
+            title="Edit identity instructions."
             className="w-6 h-6 rounded-lg border border-border-strong text-content-muted text-xs leading-none hover:bg-surface-raised">
             ✎
           </button>

@@ -54,13 +54,9 @@ for (const [file, label] of RAILS) {
   })
 }
 
-test('the destinations rail under the dataset sections is covered too', () => {
-  // It carries no badge today, so it cannot be caught by symptom — only by rule.
-  // (The rail also folds on a phone held sideways — ≤ 500 px of fold — which is
-  // the responsive probe's finding, not this test's: here only `relative` and
-  // the rail's existence are the contract.)
+test('dataset destinations stay inside the section scroller', () => {
   const src = read('src/components/dataset/DatasetWorkspace.jsx')
-  assert.match(src, /className="relative -mx-3 overflow-x-auto px-3 pb-1 sm:-mx-4 sm:px-4 lg:hidden \[@media\(max-height:500px\)\]:hidden"/)
+  assert.match(src, /data-probe-chrome="sections"[\s\S]*?dataset-mobile-panels-[\s\S]*?<\/nav>/)
 })
 
 test('the reason is written down where the class is', () => {

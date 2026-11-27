@@ -43,15 +43,15 @@ export default function CompositionBar({ composition, upscaled, bodyFidelity = f
       {missing.length > 0 ? (
         <p className="m-0 text-amber-300/90 text-2xs">
           ⚠ Missing: {missing.map((m) => `${m.n} ${LABEL[m.k].toLowerCase()}`).join(' · ')}
-          <span className="text-content-subtle"> — generate or import these types (target ≈25 balanced)</span>
+          <span className="text-content-subtle"> · generate or import these types (target ≈25 balanced)</span>
         </p>
       ) : (
-        <p className="m-0 text-green-300/80 text-2xs">✓ Target composition reached — ready to caption/export</p>
+        <p className="m-0 text-green-300/80 text-2xs">✓ Target composition reached · ready to caption/export</p>
       )}
       {upscaleHeavy.length > 0 && (
         <p className="m-0 text-amber-300/90 text-2xs">
           ⚠ Under training resolution: {upscaleHeavy.map((m) => `${m.n}/${m.of} ${LABEL[m.k].toLowerCase()}`).join(' · ')}
-          <span className="text-content-subtle"> — these tiles were cropped in from a small area, so they carry far less real detail than a native shot at that framing; add native shots instead of only cropping in</span>
+          <span className="text-content-subtle"> · these tiles were cropped in from a small area, so they carry far less real detail than a native shot at that framing; add native shots instead of only cropping in</span>
         </p>
       )}
     </div>

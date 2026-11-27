@@ -64,7 +64,7 @@ export function recaptionConfirmation(kind = 'character', count = 0, asserted = 
   // captions are spared by the server, so quoting them here would announce work
   // the pass refuses to do.
   const overwrite = asserted > 0
-    ? `Re-captioning overwrites the ${count} machine-written caption(s) — your ${asserted} hand-written one(s) are kept.`
+    ? `Re-captioning overwrites the ${count} machine-written caption(s) · your ${asserted} hand-written one(s) are kept.`
     : `Re-captioning overwrites the ${count} existing caption(s).`
   return `${overwrite} ${rule} Continue?`
 }

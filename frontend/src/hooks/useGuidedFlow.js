@@ -19,9 +19,6 @@ export function deriveSteps(d, caps, checkpointCount = 0) {
     ...(character ? [{ id: 'reference', label: 'Reference', targetId: 'gf-reference',
       done: hasReference, optional: true, subtitle: hasReference ? 'set' : 'for generation' }] : []),
     { id: 'generate', label: 'Add Images', targetId: 'ds-section-add-heading',
-      description: character
-        ? 'Import photos, bring in a Bank selection, or generate from a reference.'
-        : 'Import photos or bring in a Bank selection.',
       done: hasImages, subtitle: `${live.filter((image) => image.filename).length} images`, busy: generating.length > 0 },
     { id: 'curate', label: 'Curate', targetId: 'gf-images',
       done: live.length > 0 && triage.length === 0 && kept.length > 0,

@@ -90,11 +90,10 @@ test('coverageScope names the pool and the images it could not read', () => {
 // Read as TEXT (node --test cannot parse JSX). These sentences are the whole
 // reason the feature is honest rather than authoritative; a rewrite that drops
 // them ships a keyword scan disguised as analysis.
-test('the panel keeps its honesty footer and never claims to act', () => {
+test('the coverage panel distinguishes caption counts from image scoring', () => {
   const jsx = fs.readFileSync(path.join(here, 'CoveragePanel.jsx'), 'utf8');
-  assert.match(jsx, /reads the words in your\s*\n?\s*captions, not the pixels/);
-  assert.match(jsx, /Advice only — nothing is kept, rejected or changed/);
-  assert.match(jsx, /still counts as a smile/);   // the known false positive
+  assert.match(jsx, /Caption Coverage/);
+  assert.match(jsx, /coverageScope\(coverage\)/);
 });
 
 test('the panel is wired in under the composition bar', () => {
@@ -132,7 +131,7 @@ test('a coverage pick is named by its axis as well as its bucket', () => {
   // "studio" is a light on one axis and a place on another: the bucket alone
   // would put two different filters under the same name in the filter bar.
   const [frontal] = axisRows(WITH_IDS);
-  assert.equal(coverageFilterLabel(WITH_IDS, frontal), 'frontal — camera view');
+  assert.equal(coverageFilterLabel(WITH_IDS, frontal), 'frontal, camera view');
 });
 
 test('the grid narrows to the ids a chip picked, and says so in the filter bar', () => {

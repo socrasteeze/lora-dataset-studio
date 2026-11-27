@@ -105,7 +105,7 @@ export default function SmallImageRescueReview({
             ? 'Klein is generating the candidate'
             : phase === 'failed'
               ? (candidate.fail_reason || 'Klein could not generate this candidate.')
-              : 'Candidate ready — inspect it at full size before choosing.';
+              : 'Candidate ready · inspect it at full size before choosing.';
           return (
             <article key={candidate.id} aria-busy={resolving}
               className="min-w-0 rounded-lg border border-border bg-surface p-2.5">

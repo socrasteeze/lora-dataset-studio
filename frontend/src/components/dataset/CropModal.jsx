@@ -320,7 +320,7 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
               className="absolute border-2 border-indigo-400 cursor-move touch-none"
               style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)' }}
               onPointerDown={(e) => startDrag(e, 'move')}
-              role="application" aria-label="Crop selection — drag to move, use the handles to stretch">
+              role="application" aria-label="Crop selection · drag to move, use the handles to stretch">
               {HANDLES.map(([name]) => (
                 <span key={name}
                   onPointerDown={(e) => startDrag(e, name)}

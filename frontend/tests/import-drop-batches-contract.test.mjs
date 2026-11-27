@@ -28,9 +28,8 @@ test('imports persist originals and honor server limits before sequential upload
   assert.match(queue, /oversizedFilesMessage\(oversized, limits\)/);
 });
 
-test('the dropzone forwards policy and describes per-file recovery', () => {
+test('the dropzone forwards the live import policy', () => {
   assert.match(dropzone, /onImport\(files, \{ crop: [^}]*, policy: importPolicy \}\)/);
-  assert.match(dropzone, /Photos upload one at a time with recovery after each file/);
 });
 test('all dataset kinds share one dropzone that forwards the policy', () => {
   const sites = workspace.match(/<ImportDropzone[^>]*onImport=\{\(f, o\) => ds\.importFiles\(f, [^)]*\)\}/g) || [];

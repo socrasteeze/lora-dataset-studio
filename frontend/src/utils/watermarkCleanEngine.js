@@ -28,7 +28,7 @@ import { sentPromptLine } from './kleinCleanOptions.js'
  *  tell them to look would be worse. */
 export const KLEIN_CLEAN_TITLE =
   'Klein: the zones the scan found are erased first, then Flux.2 re-renders the WHOLE '
-  + 'photo through ComfyUI under one instruction — remove the watermarks — so it also '
+  + 'photo through ComfyUI under one instruction · remove the watermarks · so it also '
   + 'clears marks the scan missed, including one tiled across the frame or sitting ON '
   + 'the subject. What can survive is a distinct mark nobody found. Every pixel is '
   + 'regenerated, so details shift outside the marks too: look at the result, and '
@@ -51,7 +51,7 @@ export const kleinCleanTitle = (caps) =>
 /** The half-sentence appended after "Engine: Klein" in a launch window, where the
  *  engine name is already on screen and only the difference is worth the room. */
 export const KLEIN_CLEAN_SHORT =
-  ' — erases the zones it found, then re-renders the whole photo, which also clears '
+  ' · erases the zones it found, then re-renders the whole photo, which also clears '
   + 'what the scan missed (a tiled mark included); every pixel is regenerated, and '
   + '↩ Restore original brings the file back.';
 

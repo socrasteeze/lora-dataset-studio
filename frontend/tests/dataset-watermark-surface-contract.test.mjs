@@ -24,7 +24,7 @@ test('the bulk-reject button counts what it will really reject', () => {
   assert.match(workspace, /id="ds-curation-reject-flagged"/);
   // Rendered on, labelled with and acting on the SAME derived number.
   assert.match(workspace, /\{flagged\.rejectable > 0 && \(/);
-  assert.match(workspace, /Reject all flagged \(\{flagged\.rejectable\}\)/);
+  assert.match(workspace, /Reject \(\{flagged\.rejectable\}\)/);
   assert.match(workspace, /ds\.batchImages\(flagged\.rejectableIds, 'reject'\)/);
   assert.doesNotMatch(workspace, /batchImages\(\s*images\.filter/);
 });
@@ -32,7 +32,7 @@ test('the bulk-reject button counts what it will really reject', () => {
 test('it confirms first, and reports the SERVER\'s number with the way back', () => {
   assert.match(workspace, /window\.confirm\(rejectFlaggedConfirmText\(flagged\)\)/);
   assert.match(workspace, /const affected = await ds\.batchImages/);
-  assert.match(workspace, /Show ▸ Rejected in the grid, then ✓ Keep/);
+  assert.match(workspace, /select Rejected, then Keep/);
 });
 
 test('the flagged pile is summarised once, by the shared pure module', () => {

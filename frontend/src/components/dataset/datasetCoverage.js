@@ -36,7 +36,7 @@ export function axisRows(axis) {
  *  name because the bucket alone is ambiguous across axes — "studio" is both a
  *  light and a place, and the two are different chips on the same panel. */
 export function coverageFilterLabel(axis, row) {
-  return `${row.label} — ${String(axis.label || '').toLowerCase()}`;
+  return `${row.label}, ${String(axis.label || '').toLowerCase()}`;
 }
 
 /** One line per axis, the thing a screen reader announces. Says what IS there
@@ -48,7 +48,7 @@ export function axisSummary(axis) {
   const shown = seen.map((r) => `${r.label} ${r.count}`).join(', ');
   const gaps = rows.filter((r) => r.state === 'gap').map((r) => r.label);
   return gaps.length
-    ? `${axis.label}: ${shown} — no ${gaps.join(', no ')}.`
+    ? `${axis.label}: ${shown} · no ${gaps.join(', no ')}.`
     : `${axis.label}: ${shown}.`;
 }
 
@@ -58,13 +58,13 @@ export function axisSummary(axis) {
 export function coverageReadiness(coverage) {
   if (!coverage) return { ready: false, reason: 'Reading coverage' };
   if (!coverage.total) {
-    return { ready: false, reason: 'No images yet — add some and the variety read appears here.' };
+    return { ready: false, reason: 'No images yet · add some and the variety read appears here.' };
   }
   if (!coverage.captioned) {
     return {
       ready: false,
       reason: 'No captions yet, so variety cannot be read. Run the caption pass '
-        + 'and this panel fills in — the composition counts above are all that is known so far.',
+        + 'and this panel fills in · the composition counts above are all that is known so far.',
     };
   }
   return { ready: true, reason: '' };

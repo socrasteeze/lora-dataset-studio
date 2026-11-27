@@ -84,7 +84,7 @@ export function bankImportOption(bank, promotable) {
         count: 0,
         ready: false,
         reason: 'all-rejected',
-        hint: `All ${total} image${total === 1 ? '' : 's'} in this bank are rejected — nothing kept to import.`,
+        hint: `All ${total} image${total === 1 ? '' : 's'} in this bank are rejected · nothing kept to import.`,
       };
     }
     return {
@@ -92,7 +92,7 @@ export function bankImportOption(bank, promotable) {
       count: 0,
       ready: false,
       reason: 'untriaged',
-      hint: `No kept images yet — ${total - reject} still undecided. Triage this bank first.`,
+      hint: `No kept images yet · ${total - reject} still undecided. Triage this bank first.`,
     };
   }
   return {
@@ -124,7 +124,7 @@ export function bankActivity(banks, bankId) {
  *  an error when it failed, so the toast never invents a number. */
 export function promoteOutcome(activity) {
   if (!activity) return null;
-  if (activity.error) return { kind: 'error', text: `Import failed — ${activity.error}` };
+  if (activity.error) return { kind: 'error', text: `Import failed: ${activity.error}` };
   if (activity.cancelled) return { kind: 'info', text: activity.detail || 'Import stopped.' };
   return { kind: 'success', text: activity.detail || 'Import finished.' };
 }

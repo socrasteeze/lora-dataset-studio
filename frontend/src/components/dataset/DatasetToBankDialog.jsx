@@ -58,10 +58,10 @@ export default function DatasetToBankDialog({ datasetName, keptCount, onClose, o
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 id="dataset-to-bank-title" className="m-0 text-base font-bold text-content">
-              🗃️ Import kept images into a new bank
+              🗃️ Import to Bank
             </h2>
             <p id="dataset-to-bank-copy-note" className="m-0 mt-1 text-xs leading-relaxed text-content-muted">
-              {keptCount} kept image{keptCount === 1 ? '' : 's'} will be copied. This dataset stays unchanged.
+              Copies {keptCount} kept image{keptCount === 1 ? '' : 's'}.
             </p>
           </div>
           <button type="button" onClick={dismiss} disabled={busy} aria-label="Close import to bank"
@@ -92,7 +92,7 @@ export default function DatasetToBankDialog({ datasetName, keptCount, onClose, o
               <span>
                 <span className="block text-sm font-semibold text-content">Reuse compatible final-file analysis</span>
                 <span className="mt-0.5 block text-xs leading-relaxed text-content-muted">
-                  Restore compatible final-file technical analysis. Face and Score AI results are not reused after a transformed copy.
+                  Reuse Face and Score AI results only for unchanged copies.
                 </span>
               </span>
             </span>
@@ -107,7 +107,7 @@ export default function DatasetToBankDialog({ datasetName, keptCount, onClose, o
               <span>
                 <span className="block text-sm font-semibold text-content">Start fresh analysis</span>
                 <span className="mt-0.5 block text-xs leading-relaxed text-content-muted">
-                  Keep the same Dataset metadata, but skip reuse of prior analysis. Run bank passes when you want fresh analysis.
+                  Run analysis from the Bank.
                 </span>
               </span>
             </span>
@@ -118,12 +118,12 @@ export default function DatasetToBankDialog({ datasetName, keptCount, onClose, o
           <div role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
             {error}
             <span className="mt-1 block text-2xs text-content-subtle">
-              Your name and choice are kept — adjust them and try again.
+              Name and choice retained. Try again.
             </span>
           </div>
         )}
 
-        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+        <div className="grid grid-cols-2 gap-2 pt-1">
           <button type="button" onClick={dismiss} disabled={busy}
             className={btnClass({ size: 'lg' })}>
             Cancel

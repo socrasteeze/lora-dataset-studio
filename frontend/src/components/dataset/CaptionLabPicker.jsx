@@ -24,7 +24,7 @@ import { imageDisplayName } from './captionLabSurface';
  */
 export default function CaptionLabPicker({ images, thumbUrl, onPick, onClose,
                                           nameOf = imageDisplayName,
-                                          emptyNote = 'No image to bench yet.' }) {
+                                          emptyNote = 'No images.' }) {
   const [query, setQuery] = useState('');
   const searchRef = useRef(null);
 
@@ -69,7 +69,6 @@ export default function CaptionLabPicker({ images, thumbUrl, onPick, onClose,
         className="flex h-[min(92vh,46rem)] w-[min(96vw,60rem)] flex-col overflow-hidden rounded-2xl border border-border bg-app shadow-2xl">
         <header className="flex items-start justify-between gap-3 border-b border-border bg-surface px-4 py-3 sm:px-5">
           <div className="min-w-0">
-            <p className="m-0 text-2xs font-semibold uppercase tracking-[0.18em] text-content-subtle">Captions</p>
             <h2 id="caption-lab-picker-title" className="m-0 mt-0.5 text-xl font-semibold text-content">🧪 Caption Lab</h2>
           </div>
           <button type="button" onClick={onClose} aria-label="Close the Caption Lab picker"
@@ -79,14 +78,8 @@ export default function CaptionLabPicker({ images, thumbUrl, onPick, onClose,
         </header>
 
         <div className="flex flex-col gap-2 border-b border-border px-4 py-3 sm:px-5">
-          <p className="m-0 text-xs leading-relaxed text-content-muted">
-            The bench runs up to four caption configs — engine, vision model, vocabulary
-            register and length — on <strong className="text-content">one</strong> image and
-            shows them side by side. Nothing is written until you keep a result, so it costs
-            you nothing to try before you re-caption the whole set.
-          </p>
           <label className="flex flex-col gap-1">
-            <span className="text-2xs uppercase tracking-wide text-content-subtle">Pick the image to bench</span>
+            <span className="text-xs text-content-subtle">Choose an image</span>
             <input type="search" ref={searchRef} value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Filter by caption or filename"

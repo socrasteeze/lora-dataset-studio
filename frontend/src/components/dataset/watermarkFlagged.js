@@ -76,7 +76,7 @@ export function rejectFlaggedConfirmText(summary) {
   const lines = [
     `Reject ${rejectable} flagged image(s)?`,
     '',
-    'They leave the training set but stay on disk — bring any of them back with '
+    'They leave the training set but stay on disk · bring any of them back with '
     + 'Show ▸ Rejected in the grid, then ✓ Keep.',
     '',
     'Rejecting also clears their watermark flags: 🔍 Review flagged will be empty '
@@ -84,7 +84,7 @@ export function rejectFlaggedConfirmText(summary) {
   ];
   if (heldBack > 0) {
     lines.push('', `${heldBack} more flagged image(s) are NOT included (small-image `
-      + 'rescue pairs and failed rows) — settle those in their own review.');
+      + 'rescue pairs and failed rows) · settle those in their own review.');
   }
   return lines.join('\n');
 }
@@ -105,7 +105,7 @@ export function flaggedSourceNote(summary) {
   if (!mixed && !unlocated) return '';
   const head = mixed ? `Judged ${parts.join(', ')}.` : '';
   const tail = unlocated
-    ? `${unlocated} flagged without a position — 🧽 Clean cannot route those; `
+    ? `${unlocated} flagged without a position · 🧽 Clean cannot route those; `
       + 'draw a zone in 🔍 Review flagged.'
     : '';
   return [head, tail].filter(Boolean).join(' ');

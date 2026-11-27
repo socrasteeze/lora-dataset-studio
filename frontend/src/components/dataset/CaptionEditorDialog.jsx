@@ -22,7 +22,7 @@ function authorshipNote(draft, saved, origin) {
   const text = (draft || '');
   if (!text.trim()) return null;
   if (text !== (saved || '')) {
-    return { text: 'Unsaved edit — saving records this caption as written by you.',
+    return { text: 'Unsaved edit · saving records this caption as written by you.',
              title: 'A caption you save is stamped as yours, and a forced 🔄 Re-caption '
                + 'then skips it.' };
   }
@@ -145,7 +145,7 @@ export default function CaptionEditorDialog({
               {onPickAnotherImage ? (
                 <button type="button" onClick={leaveForAnotherImage} disabled={busy}
                   title={dirty
-                    ? 'You have an unsaved caption on this image — save it or clear the edit first'
+                    ? 'You have an unsaved caption on this image · save it or clear the edit first'
                     : 'Pick another image to bench captions on'}
                   className="m-0 inline-flex min-h-10 items-center text-2xs font-semibold uppercase tracking-[0.18em] text-content-subtle hover:text-content disabled:opacity-40 lg:min-h-0">
                   ‹ Another image
@@ -207,7 +207,7 @@ export default function CaptionEditorDialog({
             )}
             {isLikelyTruncatedCaption(initialCaption) && (
               <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-2xs leading-relaxed text-amber-200">
-                This caption is exactly 800 characters and ends mid-sentence — an earlier
+                This caption is exactly 800 characters and ends mid-sentence · an earlier
                 version of the app capped captions there. The cut-off text can’t be recovered;
                 re-caption this image to regenerate the full description.
               </p>
@@ -310,7 +310,7 @@ export default function CaptionEditorDialog({
                   {error}
                 </span>
                 <span className="mt-1 block text-2xs text-content-subtle">
-                  Your caption is kept — adjust and try again.
+                  Your caption is kept · adjust and try again.
                 </span>
               </div>
             )}

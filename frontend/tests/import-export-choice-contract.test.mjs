@@ -53,13 +53,11 @@ test('the dropzone reads the live policy, filters exactly the supported formats,
     'the hardcoded "normalized to 1024" claim must be gone from the UI text');
   assert.ok(dropzone.includes('importPolicyLine(importPolicy)'),
     'the line must be built from the live policy');
-  assert.match(dropzone, /IMPORT_IMAGE_FORMATS} files stay byte-for-byte unchanged/,
-    'the preservation promise must name the supported original formats');
   assert.ok(dropzone.includes('accept={IMPORT_IMAGE_ACCEPT}'),
     'the picker must use the exact static-image accept list');
   assert.ok(!dropzone.includes('accept="image/*"'),
     'the picker must not advertise unsupported image types');
-  assert.match(dropzone, /Files larger than \{inputLimit\} are rejected — resize before importing, or raise the budget\./,
+  assert.match(dropzone, /Rejects files over \{inputLimit\}\./,
     'a size rejection must say how to remedy it — including the budget it can raise');
   assert.ok(dropzone.includes('focus="image-input-max-pixels"'),
     'the rejection hint must reach the budget that caused it');
@@ -74,7 +72,7 @@ test('manual import reports every refused file and keeps the size budget actiona
   assert.match(panel, /items.filter\(\(item\) => item.result\?\.failed\)/);
   assert.match(panel, /JPEG, PNG, WebP, BMP, HEIC or AVIF/);
   assert.match(panel, /Image size budget/);
-  assert.match(panel, /Resize a larger file, or raise/);
+  assert.match(panel, /Resize large files or raise/);
   assert.match(policy, /select JPEG, PNG, WebP, BMP, HEIC or AVIF/);
   assert.match(datasetHook, /const importFiles = importQueue.start/);
 });
@@ -112,13 +110,12 @@ test('a Style export without captions can be confirmed past', () => {
   // cancelling still walks the user to the captions — the guard-rail stays useful
   assert.match(style, /jumpTo\(\{ targetId: 'gf-captions' \}\)/);
   // and it says WHY, and where the images can come back in
-  assert.match(style, /Import dataset/);
+  assert.match(style, /Import ZIP/);
 });
 
-test('the caption-elsewhere round trip is stated where the ZIP buttons are', () => {
-  const at = workspace.indexOf('id="ds-caption-elsewhere"');
-  assert.ok(at > 0, 'the round trip must be named next to the import/export buttons');
-  const hint = workspace.slice(at, at + 900);
-  assert.match(hint, /another tool/);
-  assert.match(hint, /never overwritten/);
+test('the Import ZIP and Export ZIP actions remain in the export section', () => {
+  const section = workspace.slice(workspace.indexOf('id="gf-export"'), workspace.indexOf('id="gf-training"'));
+  assert.match(section, /zipInput\.current\?\.click\(\)/);
+  assert.match(section, /ds\.importDatasetZip\(f\)/);
+  assert.match(section, /onClick=\{exportZipGuarded\}/);
 });

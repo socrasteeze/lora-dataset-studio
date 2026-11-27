@@ -85,6 +85,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-11-27-zzz-dataset-phone-layout', date: '2026-11-27',
+    title: 'Easier Dataset Controls on Phones',
+    blurb: 'Tabs scroll in one row. Buttons line up, and shorter labels leave more room.',
+    to: '/datasets',
+  },
+  {
     id: '2026-11-27-zz-ios-field-zoom', date: '2026-11-27',
     title: 'Steady iPhone Forms',
     blurb: 'Text fields stay at 16 px on touch and small screens to prevent focus zoom. The app checks for a newer build when you return.',

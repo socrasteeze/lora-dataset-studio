@@ -377,7 +377,7 @@ test('the lightbox mounts the actions in the sheet, and floats one button', () =
   assert.match(lightbox, /const sheet = placement === 'sheet'/);
   // ONE trigger, saying what it opens, with its state in aria and not in colour.
   assert.match(lightbox, /aria-expanded=\{actionsOpen\} aria-controls=\{panelId\}/);
-  assert.match(lightbox, /Image actions for \$\{alt\} — compare, crop, mirror, rotate, improve/);
+  assert.match(lightbox, /Image actions for \$\{alt\}/);
   // It floats: a strip of its own is the height this placement exists to return.
   assert.match(lightbox, /absolute bottom-3 left-1\/2 z-20/);
   // 44 px so a thumb can hit it, like the ⟨ / ⟩ arrows.

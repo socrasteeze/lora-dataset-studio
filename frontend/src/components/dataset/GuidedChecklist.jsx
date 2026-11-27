@@ -9,9 +9,6 @@ export default function GuidedChecklist({ steps, currentId, onJump }) {
   return (
     <nav aria-label="Dataset progress"
       className="rounded-lg border border-border bg-surface p-2">
-      <p className="px-1.5 pb-1.5 text-2xs font-semibold uppercase tracking-wide text-content-subtle lg:text-xs">
-        Progress
-      </p>
       <ol className="flex flex-col gap-0.5">
         {steps.map((s, i) => {
           const glyph = s.done ? '✓' : s.busy ? '' : s.id === currentId ? '◉' : '○';
@@ -39,7 +36,7 @@ export default function GuidedChecklist({ steps, currentId, onJump }) {
                 <Link to="/settings/local-tools?focus=comfyui-api-url" title={s.hint} className={cls}>
                   {body}
                   <span aria-hidden className="shrink-0 pl-0.5">⚙</span>
-                  <span className="sr-only"> — {s.hint}</span>
+                  <span className="sr-only">. {s.hint}</span>
                 </Link>
               ) : (
                 <button type="button" onClick={() => onJump(s)}

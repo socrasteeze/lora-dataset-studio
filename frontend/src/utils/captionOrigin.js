@@ -66,7 +66,7 @@ export const CAPTION_ORIGINS = [
     short: 'Written by the local LLM vision model',
     title: 'Written by the local LLM vision model (Ollama or LM Studio, whichever is '
       + 'configured). With the Auto backend this is the '
-      + 'second half of the run — the images JoyCaption did not caption.',
+      + 'second half of the run · the images JoyCaption did not caption.',
   },
   {
     key: 'pixai',
@@ -97,7 +97,7 @@ export const CAPTION_ORIGIN_UNRECORDED = {
   chip: 'author not recorded',
   short: 'Author not recorded',
   title: 'This caption was written before the app recorded who writes captions. '
-    + 'That is not the same as "written by a model" — nobody knows, and the app '
+    + 'That is not the same as "written by a model" · nobody knows, and the app '
     + 'does not guess.',
   known: false,
 };

@@ -12,10 +12,8 @@ import { useCapabilities } from '../../context/CapabilitiesContext';
 import SettingsLink from '../common/SettingsLink';
 import {
   IMPORT_IMAGE_ACCEPT,
-  IMPORT_IMAGE_FORMATS,
   importInputLimitLine,
   importPolicyLine,
-  preservesOriginalFiles,
 } from './importPolicy.js';
 
 export default function ImportDropzone({ onImport, busy, visionBusy = false, cropOption = false, defaultCrop = false }) {
@@ -23,7 +21,6 @@ export default function ImportDropzone({ onImport, busy, visionBusy = false, cro
   const inputRef = useRef(null);
   const [over, setOver] = useState(false);
   const importPolicy = caps?.dataset_import;
-  const preservesOriginals = preservesOriginalFiles(importPolicy);
   const inputLimit = importInputLimitLine(importPolicy);
   // Auto head-crop (square, vision pass). OFF keeps the original file and
   // framing — a bust/body photo stays a bust/body photo (aspect kept, no padding).
@@ -49,34 +46,24 @@ export default function ImportDropzone({ onImport, busy, visionBusy = false, cro
         ${over ? 'border-primary bg-primary/10' : 'border-border bg-surface'} ${busy ? 'opacity-50 pointer-events-none' : ''}`}
     >
       <ImageDown aria-hidden="true" className="h-5 w-5 lg:h-6 lg:w-6" />
-      <span className="text-content text-sm font-medium lg:text-base">Import real photos</span>
+      <span className="text-content text-sm font-medium lg:text-base">Import Photos</span>
       <span className="text-content-muted text-xs lg:text-sm">
-        drag and drop or click — {autoCropEnabled
-          ? `auto head-crop is on (input limit: ${inputLimit})`
-          : importPolicyLine(importPolicy)}
+        {autoCropEnabled ? 'Auto head-crop on' : importPolicyLine(importPolicy)}
       </span>
       <span onClick={(e) => e.stopPropagation()}
-        className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-xs text-content-muted lg:text-sm">
-        {autoCropEnabled ? (
-          <span>Auto head-crop creates a derived WebP. Turn it off to preserve an eligible original.</span>
-        ) : preservesOriginals ? (
-          <span>Uncropped {IMPORT_IMAGE_FORMATS} files stay byte-for-byte unchanged.</span>
-        ) : (
-          <span>WebP normalization resizes and re-encodes eligible imports.</span>
-        )}
-        <span>Files larger than {inputLimit} are rejected — resize before importing, or raise the budget.</span>
-        <span>Photos upload one at a time with recovery after each file.</span>
-        <span>HEIC, HEIF and AVIF images are stored as lossless PNG copies.</span>
-        <SettingsLink section="captioning" focus="dataset-import-encoding">Change storage mode</SettingsLink>
-        <SettingsLink section="captioning" focus="image-input-max-pixels">Change size budget</SettingsLink>
+        className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-content-muted">
+        <span>Rejects files over {inputLimit}.</span>
+        <span>HEIC, HEIF and AVIF convert to PNG.</span>
+        <SettingsLink section="captioning" focus="dataset-import-encoding">Storage Mode</SettingsLink>
+        <SettingsLink section="captioning" focus="image-input-max-pixels">Size Limit</SettingsLink>
       </span>
       {cropOption && (
         <label onClick={(e) => e.stopPropagation()}
           className="flex items-center gap-1.5 text-xs text-content-muted cursor-pointer lg:text-sm"
-          title={visionBusy ? 'Auto head-crop is unavailable during local generation; photos import full-frame.' : 'ON: each photo is auto-cropped to a square head shot (vision pass, pauses ComfyUI) and stored as a derived WebP. OFF: the original file and framing are kept — use for bust/body shots.'}>
+          title={visionBusy ? 'Unavailable during generation.' : 'Crop to a square headshot. Saves a WebP copy.'}>
           <input type="checkbox" checked={crop} disabled={visionBusy} onChange={(e) => setCrop(e.target.checked)}
             className="accent-indigo-500 w-3 h-3" />
-          ✂ Auto head-crop (square){visionBusy ? ' — unavailable during local generation' : ''}
+          ✂ Auto head-crop (square){visionBusy ? ' (generation active)' : ''}
         </label>
       )}
       <input ref={inputRef} type="file" accept={IMPORT_IMAGE_ACCEPT} multiple className="hidden"

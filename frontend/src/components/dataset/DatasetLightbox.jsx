@@ -73,7 +73,7 @@ function ComparePane({ label, url, alt, accent }) {
             were shown at different scales, which is precisely the comparison
             this mode must not produce. Filling the box and letting
             object-contain letterbox makes both fit the SAME box. */}
-        <img src={url} alt={`${label} — ${alt}`}
+        <img src={url} alt={`${label} · ${alt}`}
           className="h-full w-full select-none object-contain" />
       </div>
     </figure>
@@ -322,7 +322,7 @@ export default function DatasetLightbox({
   const pixelEditRefused = curationRefused || upscaleRendering;
   const pixelEditReason = curationRefusedReason
     || (upscaleRendering
-      ? 'An upscale of this image is still rendering — it would come back as an '
+      ? 'An upscale of this image is still rendering · it would come back as an '
         + 'upscale of the version from before your edit. It will be available '
         + 'again once that result arrives.'
       : null);
@@ -596,7 +596,7 @@ export default function DatasetLightbox({
   </>);
 
   return (
-    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={`Inspect — ${alt}`}
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={`Inspect · ${alt}`}
       data-probe-chrome="lightbox" data-probe-layer
       className={`fixed inset-0 z-[9996] bg-black/95 flex ${rail ? 'flex-row' : 'flex-col'}`}
       onClick={onClose}>
@@ -658,8 +658,8 @@ export default function DatasetLightbox({
         <button type="button" ref={actionsBtnRef}
           onClick={(e) => { e.stopPropagation(); patchImageState({ actionsOpen: !actionsOpen }); }}
           aria-expanded={actionsOpen} aria-controls={panelId}
-          aria-label={`Image actions for ${alt} — compare, crop, mirror, rotate, improve`}
-          title="Image actions — compare, crop, mirror, rotate, improve"
+          aria-label={`Image actions for ${alt}`}
+          title="Image actions"
           className="absolute bottom-3 left-1/2 z-20 flex min-h-11 -translate-x-1/2 items-center
             rounded-full border border-white/25 bg-black/75 px-5 py-2 text-sm font-semibold
             text-white shadow-lg hover:bg-black/90">
@@ -683,7 +683,7 @@ export default function DatasetLightbox({
         </div>
       )}
       <ActionsHost sheet={sheet} open={panelOpen} panelId={panelId}
-        label={`Image actions — ${alt}`} closeRef={panelCloseRef} onDone={closePanel}>
+        label={`Image actions · ${alt}`} closeRef={panelCloseRef} onDone={closePanel}>
       <div onClick={(e) => e.stopPropagation()}
         className={rail
           ? 'shrink-0 flex w-[17rem] flex-col items-stretch gap-2 overflow-y-auto border-l border-white/10 bg-black/60 px-4 pb-4 pt-14'
@@ -700,7 +700,7 @@ export default function DatasetLightbox({
               images the grid SHOWS, so it moves when a filter does. */}
           {canNavigate && (
             <span className="rounded bg-white/10 px-1.5 py-0.5 text-2xs tabular-nums text-white/80"
-              title={`Image ${nav.position} of the images the current filters show — ← → to move`}>
+              title={`Image ${nav.position} of the images the current filters show · ← → to move`}>
               {nav.position}
             </span>
           )}
@@ -711,7 +711,7 @@ export default function DatasetLightbox({
               the Bank's review chips. */}
           {VERDICT_CHIP[img.status] && (
             <span className={`rounded px-1.5 py-0.5 text-2xs font-semibold ${VERDICT_CHIP[img.status].cls}`}
-              title="The status this image carries in the dataset — only kept images are captioned, exported and trained on.">
+              title="The status this image carries in the dataset · only kept images are captioned, exported and trained on.">
               {VERDICT_CHIP[img.status].text}
             </span>
           )}
@@ -733,7 +733,7 @@ export default function DatasetLightbox({
               ? 'Same scale · Zoom unavailable'
               : compareMode === 'reference' && inCompare
                 ? 'Separate scales · Zoom unavailable'
-                : full ? '100 % — click image to fit' : 'fitted — click image for 100 %'}
+                : full ? '100 % · click image to fit' : 'fitted · click image for 100 %'}
           </span>
         </div>
         {(!sheet || panelOpen) && reviewControls}

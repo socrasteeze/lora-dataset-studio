@@ -236,12 +236,12 @@ const NEEDS = {
   face: {
     has: (i) => faceScore(i) !== null,
     missing: 'run Analyze faces first',
-    reason: 'No image has a face score yet — run 🎭 Analyze faces (Curation) to sort by this.',
+    reason: 'No image has a face score yet · run 🎭 Analyze faces (Curation) to sort by this.',
   },
   framing: {
     has: (i) => framingRank(i) !== null,
     missing: 'run 📐 Classify framing first',
-    reason: 'No image has a shot type yet — run 📐 Classify framing (under the Composition bar) to group by this.',
+    reason: 'No image has a shot type yet · run 📐 Classify framing (under the Composition bar) to group by this.',
   },
 };
 
@@ -259,15 +259,15 @@ const NEEDS = {
  *  greyed out. */
 export const DATASET_SORTS = [
   { id: 'default', label: 'Newest first',
-    title: 'The order images were added — most recent first' },
+    title: 'Most recent first.' },
   { id: 'face_desc', label: 'Face similarity ↓', needs: ['face'],
-    title: 'Closest to your reference photo first — from 🎭 Analyze faces' },
+    title: 'Closest to the reference first.' },
   { id: 'face_asc', label: 'Face similarity ↑', needs: ['face'],
-    title: 'Least like your reference first — the ones to cut, from 🎭 Analyze faces' },
+    title: 'Farthest from the reference first.' },
   { id: 'shot', label: 'Shot type', needs: ['framing'],
-    title: 'Face, then bust, then body, then back — every shot of one kind in a single run, newest first inside each' },
-  { id: 'shot_face', label: 'Shot type, then face similarity ↓', needs: ['framing', 'face'],
-    title: 'The same grouping, with the closest to your reference at the head of each kind — the order for deciding what to keep' },
+    title: 'Group by shot type.' },
+  { id: 'shot_face', label: 'Shot type + face ↓', needs: ['framing', 'face'],
+    title: 'Group by shot type, closest match first.' },
 ];
 
 export const DEFAULT_DATASET_SORT = 'default';
@@ -343,7 +343,7 @@ export function datasetSortOptions(images) {
     const need = lacking ? NEEDS[lacking] : null;
     return {
       id: s.id,
-      label: need ? `${s.label} — ${need.missing}` : s.label,
+      label: need ? `${s.label} · ${need.missing}` : s.label,
       title: need ? need.reason : s.title,
       disabled: !!need,
     };

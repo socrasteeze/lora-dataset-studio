@@ -11,7 +11,6 @@ import { createPortal } from 'react-dom';
 import { fmt } from '../../utils/studioFormat';
 import ImportDropzone from './ImportDropzone';
 import PluginSlot, { hasContributions } from '../../plugins/PluginSlot.jsx';
-import { contributions } from '../../plugins/registry.js';
 import BankImportPanel from './BankImportPanel';
 import ImageSourcesPanel from '../shared/ImageSourcesPanel';
 import DatasetFolderNote from './DatasetFolderNote';
@@ -37,7 +36,7 @@ import { recaptionConfirmation } from './captionCategory';
 import { defaultEditEngine } from './referenceEdit';
 import { localEngineUnavailableReason, hasComfyui } from '../../utils/localEngineReason.js';
 import { kleinCleanTitle } from '../../utils/watermarkCleanEngine.js';
-import { captionEnginesSummary, CAPTION_ENGINE_WHY } from '../../utils/captionEngines.js';
+import { captionEnginesSummary } from '../../utils/captionEngines.js';
 // …and the per-image half of the same question, for the captions listed in full here.
 import { captionOriginInfo } from '../../utils/captionOrigin.js';
 import { extraRefCropSource } from './extraRefs';
@@ -123,16 +122,10 @@ const GRID_SORT_KEY = 'datasetGridSort';
 // Shared style for secondary actions in the header's More menu.
 const MENU_ITEM = 'min-h-10 lg:min-h-0 w-full flex items-center gap-2 text-left px-2.5 py-1.5 rounded-md text-sm text-content hover:bg-surface-raised disabled:opacity-40';
 
-/*
- * Section heading: matches Settings SectionHeader visually, using h2 because the dataset name
- * remains the page's h1. Monospace eyebrow, title and description.
- */
-function SectionHeading({ id, eyebrow, title, description, badge }) {
+function SectionHeading({ id, title, badge }) {
   return (
     <div id={id} tabIndex={-1}>
-      <p className="m-0 font-mono text-2xs uppercase tracking-[0.18em] text-content-subtle lg:text-xs">{eyebrow}</p>
-      <h2 className="m-0 mt-0.5 flex items-center gap-2 text-content text-base font-semibold lg:text-xl">{title}{badge}</h2>
-      {description && <p className="m-0 mt-0.5 text-content-muted text-xs leading-relaxed lg:text-sm">{description}</p>}
+      <h2 className="m-0 flex items-center gap-2 text-content text-base font-semibold lg:text-xl">{title}{badge}</h2>
     </div>
   );
 }
@@ -151,7 +144,7 @@ function NavBadge({ badge }) {
     <span
       className={`ml-auto shrink-0 rounded-full border px-1.5 py-px text-2xs font-semibold tabular-nums ${cls} ${badge.pulse ? 'animate-pulse' : ''}`}>
       <span aria-hidden>{badge.n}</span>
-      <span className="sr-only"> — {badge.srLabel}</span>
+      <span className="sr-only">. {badge.srLabel}</span>
     </span>
   );
 }
@@ -161,11 +154,10 @@ function NavBadge({ badge }) {
    whole set. It narrows the list the grid receives, so auto-triage, "select all"
    and every bulk action then operate on exactly what is on screen. Composes with
    the caption tag filter (both apply). */
-function GridStatusFilter({ value, counts, onChange }) {
+function GridStatusFilter({ value, counts, onChange, children }) {
   return (
-    <div className="flex items-center gap-1.5 flex-wrap text-xs" role="group"
-      aria-label="Filter the grid by decision">
-      <span className="text-content-subtle shrink-0">Show</span>
+    <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6" role="group"
+      aria-label="Filter and sort images">
       {GRID_STATUS_FILTERS.map((f) => {
         const on = f.id === value;
         return (
@@ -175,7 +167,7 @@ function GridStatusFilter({ value, counts, onChange }) {
           </Chip>
         );
       })}
-      <HelpBadge topic="action-grid-status-filter" />
+      {children}
     </div>
   );
 }
@@ -191,23 +183,19 @@ function GridStatusFilter({ value, counts, onChange }) {
    grid derives its tiles AND its "select all" from the same list, the selection
    follows the order on screen. Images a pass never reached go last, both ways;
    an entry whose pass has not run is greyed out naming that pass, rather than
-   silently reordering nothing. `shrink-0` + a bounded width keep it usable when
-   the toolbar wraps at 400 px. */
+   silently reordering nothing. min-w-0 keeps the select within its grid cell. */
 function GridSortSelect({ value, images, onChange }) {
   return (
-    <label className="flex shrink-0 items-center gap-1 text-xs text-content-subtle">
       <Select size="sm" value={value} onChange={(e) => onChange(e.target.value)}
         aria-label="Sort the grid"
-        title="Order the images by face similarity to your reference, or group them by shot type. Images the pass never reached sink to the end."
-        className="max-w-[13rem]">
+        title="Sort images. Unscored images go last."
+        className="w-full min-w-0">
         {datasetSortOptions(images).map((o) => (
           <option key={o.id} value={o.id} disabled={o.disabled} title={o.title}>
             {o.label}
           </option>
         ))}
       </Select>
-      <HelpBadge topic="action-grid-sort" />
-    </label>
   );
 }
 
@@ -465,15 +453,10 @@ export default function DatasetWorkspace({ ds, onBack }) {
     trainingQueueCount: trainingNavigation.queueCount,
     studioVisible: Boolean(caps.studio_visible),
   }), [d, navImages, caps, trainingNavigation, hiddenSectionIds]);
-  // The plugins' ways out of this dataset (`export.action`), offered under
-  // their own predicate — the same one the rail reads through sectionPanels().
-  const exportActions = contributions('export.action', 'dataset')
-    .filter((item) => typeof item.when !== 'function' || item.when(navContext));
-  const exportActionSummary = exportActions.map((item) => item.summary).filter(Boolean)
-    .map((label) => ` · ${label}`).join('');
   const workspaceLocation = resolveWorkspaceLocation(searchParams, navContext);
   const section = workspaceLocation.section;
   const panel = workspaceLocation.panel;
+  const mobileRailRef = useRef(null);
 
   const writeWorkspaceLocation = useCallback((sectionId, panelId = null, replace = false) => {
     setSearchParams(
@@ -637,18 +620,21 @@ export default function DatasetWorkspace({ ds, onBack }) {
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
-      const parentChip = document.querySelector(`[data-mobile-section="${section}"]`);
+      const rail = mobileRailRef.current;
+      if (!rail?.clientWidth) return;
+      const parentChip = rail.querySelector(`[data-mobile-section="${section}"]`);
       const childChip = panel
-        ? document.querySelector(`[data-mobile-panel="${panel}"]`)
+        ? rail.querySelector(`[data-mobile-panel="${panel}"]`)
         : null;
-      for (const chip of [parentChip, childChip]) {
-        if (chip?.getClientRects().length) {
-          chip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-        }
-      }
+      const chip = childChip || parentChip;
+      if (!chip) return;
+      const { left, right } = chip.getBoundingClientRect();
+      const bounds = rail.getBoundingClientRect();
+      if (left < bounds.left) rail.scrollLeft += left - bounds.left;
+      else if (right > bounds.right) rail.scrollLeft += right - bounds.right;
     });
     return () => cancelAnimationFrame(frame);
-  }, [section, panel]);
+  }, [datasetId, section, panel]);
 
   // One-time contextual tips (best-effort; shown once ever, independent of Help
   // mode). Each fires when the user first reaches the relevant surface.
@@ -877,7 +863,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
     const result = await postJson(datasetToBankUrl(),
       datasetToBankRequest(d.id, name, preserveAnalysis));
     if (!result?.ok) throw new Error(result?.error || 'Could not create the bank');
-    toast.success(`Importing ${kept} image(s) into the bank — copying in the background`);
+    toast.success(`Copying ${kept} images to the Bank.`);
     // The bank page picks its open bank from localStorage (it has no :id route),
     // so preselect the new one before navigating rather than landing on the list.
     try { localStorage.setItem('bankCurrentId', String(result.id)); } catch { /* ignore */ }
@@ -898,13 +884,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
     if (isStyle && keptUncaptioned) {
       const ok = window.confirm(
         `${keptUncaptioned} kept image(s) have no caption.\n\n`
-        + 'A Style LoRA learns "everything the captions do NOT name", so an empty '
-        + '.txt teaches it nothing — that is why this is normally blocked, and the '
-        + 'ZIP will contain those empty files.\n\n'
-        + 'OK to export anyway — e.g. to caption the images in another tool and '
-        + 'bring the .txt files back with 📦 Import dataset, which drops them onto '
-        + 'these same images.\n'
-        + 'Cancel to caption them here instead.');
+        + 'The ZIP will contain empty caption files. To add captions elsewhere, re-import through Import ZIP.\n\n'
+        + 'Export anyway?');
       if (!ok) { jumpTo({ targetId: 'gf-captions' }); return; }
       ds.exportZip();
       return;
@@ -928,7 +909,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
     `\\b${act.done || 0}\\s*/\\s*${act.total}\\b`,
   ).test(act.detail || '');
   const activityDetail = act?.detail
-    ? `${act.detail}${activityCount && !detailHasCount ? ` — ${activityCount}` : ''}`
+    ? `${act.detail}${activityCount && !detailHasCount ? ` · ${activityCount}` : ''}`
     : '';
   const importBusy = isDatasetImportBlocked({ localBusy: ds.localBusy, activity: act });
   // Which activities actually hold ComfyUI, and therefore fight the import's
@@ -939,7 +920,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
   // queue-lane kind, and fails safe as local on an unknown engine.
   const visionImportBusy = holdsLocalGpu(act);
   const activityBanner = ds.captioning
-    ? `${activityDetail || `Captioning in progress — ${keptCaptioned}/${kept} captioned`} ComfyUI is paused.`
+    ? `${activityDetail || `Captioning: ${keptCaptioned}/${kept}`} ComfyUI is paused.`
     : (() => {
         if (act) {
           const prog = act.total ? ` ${act.done}/${act.total}` : '';
@@ -1063,7 +1044,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
       <button type="button" onClick={() => setSection(s.id)}
         aria-current={isActive ? 'page' : undefined}
         aria-expanded={isActive}
-        aria-controls={isActive
+        aria-controls={isActive && (!chip || activePanels.length > 0)
           ? `${chip ? 'dataset-mobile-panels' : 'dataset-nav-panels'}-${s.id}`
           : undefined}
         data-mobile-section={chip ? s.id : undefined}
@@ -1082,11 +1063,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
   const sectionMeta = Object.fromEntries(WORKSPACE_SECTIONS.map((s) => [s.id, s]));
   const heading = (id) => {
     const s = sectionMeta[id];
-    return <SectionHeading id={`ds-section-${id}-heading`} eyebrow={s.eyebrow} title={s.title}
-      badge={<HelpBadge topic={`workspace-${id}`} />}
-      description={isStyle && id === 'add'
-        ? 'Import varied images that share the aesthetic; subject and scene diversity keep the Style LoRA composable.'
-        : isConceptual && s.conceptDescription ? s.conceptDescription : s.description} />;
+    return <SectionHeading id={`ds-section-${id}-heading`} title={s.title}
+      badge={<HelpBadge topic={`workspace-${id}`} />} />;
   };
   // Inactive sections stay mounted but hidden with display:none, preserving polls and internal
   // state. TrainingPanel's 10-second poll ADVANCES the server training queue and must keep running
@@ -1102,7 +1080,6 @@ export default function DatasetWorkspace({ ds, onBack }) {
       className="flex w-full items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-left text-content-muted hover:text-content hover:bg-surface-raised transition-colors">
       <Globe aria-hidden="true" className="h-4 w-4" />
       <span className="text-sm font-medium">Scrape images from the web</span>
-      <span className="text-content-muted text-2xs lg:text-sm">scan a gallery URL, pick images, import full-frame</span>
       <span aria-hidden className="ml-auto text-content-subtle">→</span>
     </button>
   );
@@ -1146,11 +1123,11 @@ export default function DatasetWorkspace({ ds, onBack }) {
             </span>
           ) : (
             <button type="button"
-              onClick={async () => { const res = await copyText(d.trigger_word || ''); if (!res.ok) toast.error(`Could not copy the trigger word — ${res.reason}.`); }}
+              onClick={async () => { const res = await copyText(d.trigger_word || ''); if (!res.ok) toast.error(`Could not copy trigger: ${res.reason}.`); }}
               title="Copy the trigger word (to put in your prompts)"
               className={`${controlHeight()} min-w-0 max-w-full inline-flex items-center gap-1 px-2 rounded-md border border-indigo-400/40 bg-indigo-500/10 text-2xs lg:text-sm sm:flex-1 lg:max-w-sm`}>
               <span className="shrink-0 text-content-subtle">trigger:</span>
-              <code title={d.trigger_word || undefined} className="min-w-0 truncate text-indigo-300 font-semibold">{d.trigger_word || '—'}</code>
+              <code title={d.trigger_word || undefined} className="min-w-0 truncate text-indigo-300 font-semibold">{d.trigger_word || 'Unset'}</code>
               <Copy aria-hidden="true" className="h-3 w-3 shrink-0 text-content-subtle" />
             </button>
           )}
@@ -1165,7 +1142,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
              */}
             <details className="relative">
               <summary
-                title="More dataset actions — edit settings, body fidelity"
+                title="Dataset actions"
                 className={`${btnShape()} w-full border border-border bg-surface text-content-muted hover:text-content hover:bg-surface-raised cursor-pointer select-none sm:w-auto`}>
                 ⋯ More
               </summary>
@@ -1175,9 +1152,6 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   title={isStyle ? 'Edit the Style dataset name and review its always-on behavior.' : 'Edit the dataset name, trigger word, and (for concept datasets) the concept description that drives the caption avoid-list.'}
                   className={MENU_ITEM}>
                   <Settings aria-hidden="true" className="h-4 w-4" /> Edit settings
-                  <span className="ml-auto text-content-subtle text-2xs">
-                    {isStyle ? 'name · always-on' : `name · trigger${isConcept ? ' · concept' : ''}`}
-                  </span>
                 </button>
                 {!isConceptual && (
                   <button type="button" disabled={ds.busy}
@@ -1224,25 +1198,22 @@ export default function DatasetWorkspace({ ds, onBack }) {
               included — draws at 73% of the screen with dead space beside it.
               Nothing overflows visibly, because the escapee is a 1 px box no
               one can see. */}
-          <nav aria-label="Dataset sections" data-probe-chrome="sections"
-            className="relative -mx-3 overflow-x-auto px-3 pb-1 sm:-mx-4 sm:px-4 lg:hidden">
-            <ul className="m-0 flex list-none gap-2 p-0">
-              {visibleSections.map((s) => <li key={s.id}>{navItem(s, true)}</li>)}
+          <nav ref={mobileRailRef} aria-label="Dataset sections" data-probe-chrome="sections"
+            className="relative min-w-0 max-w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden">
+            <ul className="m-0 flex w-max list-none flex-nowrap gap-2 p-0">
+              {visibleSections.map((s) => <li key={s.id} className="shrink-0">{navItem(s, true)}</li>)}
+              {activePanels.length > 0 && (
+                <li className="shrink-0">
+                  <ul id={`dataset-mobile-panels-${section}`} aria-label={`${sectionMeta[section].title} destinations`}
+                    className="m-0 flex list-none flex-nowrap gap-2 p-0">
+                    {activePanels.map((destination) => (
+                      <li key={destination.id} className="shrink-0">{panelNavItem(section, destination, true)}</li>
+                    ))}
+                  </ul>
+                </li>
+              )}
             </ul>
           </nav>
-          {activePanels.length > 0 && (
-            /* On a phone held sideways (≤ 500 px of fold) this second rail is the
-               one thing to give back: the section buttons above still reach every
-               panel, this rail only jumps inside the open one. */
-            <nav aria-label={`${sectionMeta[section].title} destinations`} data-probe-chrome="destinations"
-              className="relative -mx-3 overflow-x-auto px-3 pb-1 sm:-mx-4 sm:px-4 lg:hidden [@media(max-height:500px)]:hidden">
-              <ul id={`dataset-mobile-panels-${section}`} className="m-0 flex list-none gap-2 p-0">
-                {activePanels.map((destination) => (
-                  <li key={destination.id}>{panelNavItem(section, destination, true)}</li>
-                ))}
-              </ul>
-            </nav>
-          )}
           <details className="lg:hidden">
             <summary className="min-h-11 cursor-pointer py-3 text-sm text-content-muted">Dataset Progress</summary>
             <GuidedChecklist steps={steps} currentId={nextStep ? nextStep.id : null} onJump={jumpTo} />
@@ -1250,7 +1221,6 @@ export default function DatasetWorkspace({ ds, onBack }) {
           {/* Desktop: sticky rail + guided progress below it */}
           <div data-probe-panel="sections-rail" className="hidden lg:sticky lg:top-20 lg:flex lg:flex-col lg:gap-2">
             <nav aria-label="Dataset sections">
-              <p className="m-0 px-3 pb-2 font-mono text-2xs uppercase tracking-[0.18em] text-content-subtle lg:text-xs">Dataset</p>
               <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
                 {visibleSections.map((s) => {
                   const isActive = s.id === section;
@@ -1280,7 +1250,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
            * GLOBAL banners remain visible in every section: a GPU pass or generation batch
            * concerns the whole screen.
            */}
-          <NextStepCard step={nextStep} trainMode={!!caps.training_visible} busy={ds.busy}
+          <NextStepCard step={nextStep} busy={ds.busy}
             totalImages={images.length} onAction={nextAction} actionLabel={nextActionLabel} />
 
           <ImportQueuePanel queue={ds.importQueue} />
@@ -1290,7 +1260,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
               <span className="text-content text-sm">{activityBanner}</span>
               {(act?.kind === 'caption' || act?.kind === 'recaption') && (
                 <button type="button" onClick={ds.cancelCaption} disabled={!!act?.cancelling}
-                  title="Stops after the current image finishes — captions already written are kept; the rest stays uncaptioned."
+                  title="Stops after this image. Saved captions stay."
                   className="ml-auto shrink-0 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed">
                   {act?.cancelling ? 'Stopping' : '⏹ Stop'}
                 </button>
@@ -1300,7 +1270,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
               {act?.kind === 'watermark_detect' && (
                 <button id="ds-watermark-scan-stop" type="button"
                   onClick={ds.cancelWatermarkScan} disabled={!!act?.cancelling}
-                  title="Stops after the current image finishes — every watermark already found is kept; run 🧽 Find watermarks again to finish the rest."
+                  title="Stops after this image. Saved marks stay."
                   className="ml-auto shrink-0 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed">
                   {act?.cancelling ? 'Stopping' : '⏹ Stop'}
                 </button>
@@ -1309,7 +1279,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
               {act?.kind === 'text_detect' && (
                 <button id="ds-text-scan-stop" type="button"
                   onClick={ds.cancelTextScan} disabled={!!act?.cancelling}
-                  title="Stops after the current image finishes — every zone already found is kept; run 🔤 Find text again to finish the rest."
+                  title="Stops after this image. Saved zones stay."
                   className="ml-auto shrink-0 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed">
                   {act?.cancelling ? 'Stopping' : '⏹ Stop'}
                 </button>
@@ -1326,13 +1296,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
               <div className="flex flex-col">
                 <span className="text-content text-sm font-semibold">
                   {act?.kind === 'improve' && act.total
-                    ? `${act.done}/${act.total} improvement(s) queued — ${pending} generating`
+                    ? `${act.done}/${act.total} queued · ${pending} generating`
                     : `${pending} generation(s) in progress`}
-                </span>
-                <span className="text-content-subtle text-2xs">
-                  {act?.kind === 'improve'
-                    ? 'Runs on the server — you can close this tab. Stop ends the whole batch, not just what is in flight.'
-                    : 'First results look wrong? Stop now — the remaining API calls are skipped (not billed).'}
                 </span>
               </div>
               <button type="button" onClick={stopGeneration}
@@ -1359,7 +1324,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
               {watermarkDetected > 0 ? ` · ${watermarkDetected} watermark(s) flagged` : ''}
             </p>
             <div id="gf-images" className="scroll-mt-20 flex flex-col gap-2">
-              <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2">
+              <div className="grid min-w-0 grid-cols-1 items-start gap-2 lg:grid-cols-2">
                 <IdentityFilter source="dataset" scopeId={d.id} value={identityFilter}
                   onChange={setIdentityFilter} version={identityVersion + ':' + identityRevision} />
                 <IdentityUndo key={d.instance_id} source="dataset" scopeId={d.id} version={identityVersion + ':' + identityRevision} busy={ds.busy}
@@ -1371,13 +1336,16 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   onClick={() => setIdentityVersion((value) => value + 1)}>Retry Filter</button>
               </div>}
               {rescueGridImages.length > 0 && (
-                // One wrapping row at 400 px: the decision chips flow, the Sort
-                // control drops onto its own line instead of forcing a scrollbar.
-                <div data-probe-chrome="grid-toolbar" className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                <div data-probe-chrome="grid-toolbar" className="grid min-w-0 gap-2">
                   <GridStatusFilter value={statusFilter} counts={statusCounts}
-                    onChange={setStatusFilter} />
-                  <GridSortSelect value={gridSort} images={rescueGridImages}
-                    onChange={setGridSort} />
+                    onChange={setStatusFilter}>
+                    <GridSortSelect value={gridSort} images={rescueGridImages}
+                      onChange={setGridSort} />
+                  </GridStatusFilter>
+                  <div className="flex gap-2 empty:hidden">
+                    <HelpBadge topic="action-grid-status-filter" />
+                    <HelpBadge topic="action-grid-sort" />
+                  </div>
                 </div>
               )}
               {filtersActive && (
@@ -1394,9 +1362,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 // Filtered down to nothing: say so plainly (the grid's own "no images"
                 // empty-state would read as "everything's gone", which would be a lie).
                 <p className="rounded-lg border border-border bg-surface px-3 py-4 text-center text-content-subtle text-sm">
-                  No images match the active filters —{' '}
-                  <button type="button" onClick={clearFilters} className="underline hover:text-content">clear all</button>{' '}
-                  to see all {rescueGridImages.length} again.
+                  No matches.{' '}
+                  <button type="button" onClick={clearFilters} className="underline hover:text-content">Clear filters</button>
                 </p>
               ) : (
                 <DatasetGrid images={gridImages} datasetId={d.id} datasetInstanceId={d.instance_id} onStatus={ds.setStatus} onCaption={ds.setCaption}
@@ -1448,9 +1415,6 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-content">Generate Images</summary>
                 <div id="gf-reference" className="scroll-mt-20">
                   <div id="ds-add-reference" tabIndex={-1} className="scroll-mt-20 flex flex-col gap-1">
-                    <span className="text-content-subtle text-2xs">
-                      one clear photo of the face — every generated variation starts from it
-                    </span>
                     <ReferencePanel refFilename={d.ref_filename} datasetId={d.id} onSetRef={ds.setRef}
                       onCropRef={() => setRefCrop(true)} onEditRef={() => setRefEdit(true)} busy={ds.busy} importBusy={importBusy} visionBusy={visionImportBusy} nonce={ds.refNonce}
                       extraRefs={d.ref_extra_filenames || []}
@@ -1540,8 +1504,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   <button id="ds-curation-face-analysis" type="button" data-workspace-focus
                     onClick={ds.analyzeFaces} disabled={faceAnalysis.disabled}
                     title={faceAnalysis.title}
-                    className="px-3 py-1.5 rounded-lg bg-surface text-content text-sm disabled:opacity-40 border border-border scroll-mt-20">
-                    <Drama aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />
+                    className={`${btnClass()} w-full scroll-mt-20 sm:w-auto`}>
+                    <Drama aria-hidden="true" className="h-4 w-4" />
                     {ds.analyzing
                       ? `Analyzing${act?.kind === 'analyze_faces' && act.total ? ` ${act.done}/${act.total}` : ''}`
                       : faceAnalysisLabel(d.face_scoring_scope)}
@@ -1555,19 +1519,19 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   <p className="m-0 basis-full text-sky-300/90 text-2xs">
                     ℹ {faceAnalysis.reason}
                     {faceAnalysis.setupRoute && (
-                      <> — <a href={faceAnalysis.setupRoute} className="underline">open Setup</a></>
+                      <>{' '}<a href={faceAnalysis.setupRoute} className="underline">Open Setup</a></>
                     )}
                   </p>
                 )}
                 <div id="ds-curation-watermarks" tabIndex={-1}
-                  className="flex items-center gap-2 flex-wrap scroll-mt-20">
+                  className="grid w-full min-w-0 grid-cols-2 items-start gap-2 scroll-mt-20 sm:grid-cols-3">
                 {/* Watermark auto-correction (V1): find overlaid site logos/URLs/usernames on
                     the kept images, then Clean them (border → crop, small off-center → LaMa
                     inpaint, on-subject → manual review). Applies to any dataset kind. */}
-                <div className="grid w-full grid-cols-2 gap-2 sm:max-w-md">
+                <div className="col-span-full grid w-full grid-cols-2 gap-2">
                 <button type="button" data-workspace-focus onClick={() => setWmScanOpen(true)}
                   disabled={ds.busy}
-                  title="Opens the launch window: try a sample, tune the detector threshold, then scan — each mark's position is recorded so 🧽 Clean can crop or repaint it (deletes nothing)"
+                  title="Find and mark watermarks."
                   className={btnClass()}>
                   <Eraser aria-hidden="true" className="h-4 w-4" />
                   {ds.watermarking
@@ -1610,7 +1574,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 <button type="button" data-workspace-focus onClick={() => setTextScanOpen(true)}
                   disabled={ds.busy || !caps.video_text}
                   title={caps.video_text
-                    ? 'Opens the launch window: try a sample, tune the sensitivity, then scan — zones land in the mask 🧽 Clean repaints (deletes nothing, CPU only)'
+                    ? 'Find and mark text.'
                     : 'Reads burned-in text on the kept images. Install "Burned-in text" from Setup first.'}
                   className={btnClass()}>
                   🔤 {ds.textScanning
@@ -1631,7 +1595,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                        returned, leaving the strip empty for the whole scan. */
                     datasetId={d.id} />
                 )}
-                <HelpBadge topic="action-watermark-clean" />
+                <div className="col-span-full empty:hidden"><HelpBadge topic="action-watermark-clean" /></div>
                 {watermarkDetected > 0 && (
                   <>
                   {/* Clean engine: LaMa (fast, non-generative, repaints the marked
@@ -1647,7 +1611,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     className={SEGMENT_GROUP_CLASS}>
                     <button type="button" aria-pressed={watermarkMethod === 'lama'}
                       onClick={() => setWatermarkMethod('lama')} disabled={ds.busy}
-                      title="LaMa: fast, non-generative. Crops border marks, repaints small off-center marks; on-subject marks go to manual review."
+                      title="Repaint small marks with LaMa."
                       className={SEGMENT_CLASS}>
                       LaMa
                     </button>
@@ -1667,16 +1631,16 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       bank panel. */}
                   {textFlaggedDetected > 0 && (
                     <div role="group" aria-label="What to clean"
-                      className={SEGMENT_GROUP_CLASS}>
+                      className={`${SEGMENT_GROUP_CLASS} col-span-full`}>
                       <button type="button" aria-pressed={watermarkTarget === 'all'}
                         onClick={() => setWatermarkTarget('all')} disabled={ds.busy}
-                        title="Repaint every flagged page — text and watermarks alike."
+                        title="Clean text and watermarks."
                         className={SEGMENT_CLASS}>
                         Both
                       </button>
                       <button type="button" aria-pressed={watermarkTarget === 'text'}
                         onClick={() => setWatermarkTarget('text')} disabled={ds.busy}
-                        title="Only pages 🔤 Find text flagged. A page carrying both a watermark and text counts here — one page is never split between two runs."
+                        title="Clean pages flagged for text."
                         className={SEGMENT_CLASS}>
                         🔤 Text
                       </button>
@@ -1694,7 +1658,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       changeable here. basis-full: its own row rather than a squeezed
                       column at 400 px. */}
                   {watermarkMethod === 'klein' && !caps.watermark_clean_custom && (
-                    <div className="basis-full flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <div className="col-span-full grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                       <KleinModelSetting datasetId={d.id} className="min-w-0 flex-1" />
                       {/* ⚖ The judging half: try the candidates on ONE flagged image
                           (same zones, same seed) before the batch overwrites all of
@@ -1711,8 +1675,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                             setKleinCompareOpen(true);
                           }}
                           disabled={ds.busy}
-                          title="Run each ticked Klein model on one flagged image (same zones, same seed) and pick the winner before cleaning the batch."
-                          className="min-h-10 lg:min-h-0 px-2.5 py-1 rounded-lg border border-border text-xs font-semibold text-content-subtle hover:text-content hover:bg-surface-raised disabled:opacity-40">
+                          title="Compare models on one flagged image."
+                          className={btnClass()}>
                           ⚖ Compare Models
                         </button>
                       )}
@@ -1726,7 +1690,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       the resolved values so the engine tooltip above quotes the prompt
                       that was just typed. */}
                   {watermarkMethod === 'klein' && (
-                    <KleinCleanOptions caps={caps} disabled={ds.busy} className="basis-full"
+                    <KleinCleanOptions caps={caps} disabled={ds.busy} className="col-span-full"
                       onChanged={() => refreshCaps(true, { background: true })} />
                   )}
                   {/* Allow auto-crop: the SAME persisted preference as Settings ▸ Watermark
@@ -1735,9 +1699,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   <button type="button" role="switch" aria-checked={allowAutoCrop}
                     onClick={() => setWatermarkAllowCrop(!allowAutoCrop)}
                     disabled={ds.busy || savingAllowCrop}
-                    title={allowAutoCrop
-                      ? 'Auto-crop ON: watermarks in a border are cropped off (no invented pixels). Click to repaint them instead. Saved as a preference.'
-                      : 'Auto-crop OFF: border watermarks are repainted (LaMa/Klein) instead of cropped. Click to allow cropping again. Saved as a preference.'}
+                      title={allowAutoCrop ? 'Crop border marks.' : 'Repaint border marks.'}
                     className={`${btnShape()} border font-semibold ${allowAutoCrop
                       ? 'border-border bg-surface text-content-subtle hover:text-content'
                       : 'border-amber-400/50 bg-amber-500/10 text-amber-200'}`}>
@@ -1746,15 +1708,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   <button type="button"
                     onClick={() => { requestHelpTip('watermark-batch-clean'); ds.cleanWatermarks(watermarkMethod, watermarkTarget); }}
                     disabled={ds.busy || savingAllowCrop || cleanTargetCount === 0}
-                    title={watermarkMethod === 'klein'
-                      ? (allowAutoCrop
-                        ? 'Removes them with Flux.2 Klein: border marks are cropped, and every image still marked (off-center AND on-subject) has its zones erased then the whole photo re-rendered with the instruction to remove the watermarks — check the result, a mark nobody detected can survive'
-                        : 'Auto-crop off: EVERY marked image (border included) has its zones erased then the whole photo re-rendered by Flux.2 Klein with the instruction to remove the watermarks — check the result, a mark nobody detected can survive')
-                      : caps.watermark_inpaint
-                      ? (allowAutoCrop
-                        ? 'Removes them: border marks are cropped, small off-center marks are inpainted (LaMa), on-subject marks are flagged for manual review'
-                        : 'Auto-crop off: border marks are repainted (LaMa) instead of cropped; large/on-subject marks are flagged for manual review')
-                      : 'Removes border marks by cropping. Inpainting (LaMa) needs a one-time install — use Install inpainting next to this button; off-center marks are skipped until then'}
+                    title={watermarkMethod === 'klein' ? 'Re-render flagged images.' : 'Clean flagged marks.'}
                     className={`${btnShape()} bg-amber-500/15 border border-amber-400/40 text-amber-200 font-semibold`}>
                     <Eraser aria-hidden="true" className="h-4 w-4" />Clean ({cleanTargetCount})
                   </button>
@@ -1768,9 +1722,9 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   <button id="ds-curation-review-flagged" type="button" data-workspace-focus
                     disabled={ds.busy}
                     onClick={() => setReviewQueue(images.filter((i) => i.watermark_state === 'detected'))}
-                    title="Step through the flagged images one by one — see each detected box and Clean, dismiss a false positive, or reject"
+                    title="Review flagged images."
                     className={`${btnClass()} scroll-mt-20`}>
-                    <Search aria-hidden="true" className="h-4 w-4" />Review flagged ({watermarkDetected})
+                    <Search aria-hidden="true" className="h-4 w-4" />Review ({watermarkDetected})
                   </button>
                 )}
                 {/* The shortcut past that review, because it was asked for — and
@@ -1790,30 +1744,29 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       // The server's number, not ours — it is the one that counts
                       // rows it actually wrote (see batch_image_action).
                       setRejectFlaggedNote(affected
-                        ? `✓ rejected ${affected} — undo with Show ▸ Rejected in the grid, then ✓ Keep`
+                        ? `${affected} rejected. To undo, select Rejected, then Keep.`
                         : '');
                     }}
-                    title="The detector is a review flag, not a verdict — it does flag clean images sometimes, which is what Review flagged is for. This rejects them all at once instead; rejected images stay on disk and can be brought back."
+                    title="Reject flagged images. Files stay on disk."
                     className={`${btnShape()} bg-red-500/10 border border-red-500/30 text-red-300 scroll-mt-20`}>
-                    <X aria-hidden="true" className="h-4 w-4" />Reject all flagged ({flagged.rejectable})
+                    <X aria-hidden="true" className="h-4 w-4" />Reject ({flagged.rejectable})
                   </button>
                 )}
                 {/* Two numbers that differ must never be shown as one. */}
                 {flagged.rejectable > 0 && flagged.heldBack > 0 && (
-                  <p className="m-0 basis-full text-content-subtle text-2xs">
-                    {flagged.rejectable} of {flagged.flagged} flagged can be rejected in bulk —
-                    the rest are small-image rescue pairs or failed rows, settled in their own review.
+                  <p className="m-0 col-span-full text-content-subtle text-xs">
+                    {flagged.rejectable} of {flagged.flagged} flagged images can be rejected.
                   </p>
                 )}
                 {rejectFlaggedNote && (
-                  <p className="m-0 basis-full text-emerald-300/90 text-2xs">
+                  <p className="m-0 col-span-full text-emerald-300/90 text-xs">
                     {rejectFlaggedNote}
                   </p>
                 )}
                 {/* Who judged, and how many carry no position. Silent on the
                     ordinary run (one source, every flag located). */}
                 {flaggedNote && (
-                  <p className="m-0 basis-full text-content-subtle text-2xs">
+                  <p className="m-0 col-span-full text-content-subtle text-xs">
                     ℹ {flaggedNote}
                   </p>
                 )}
@@ -1825,9 +1778,9 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 {flagged.dismissed > 0 && (
                   <button type="button" disabled={ds.busy}
                     onClick={() => ds.findWatermarks({ includeDismissed: true })}
-                    title="Re-examines the images you ruled false positives too. Use it after changing the watermark detector — a normal scan skips them forever."
+                    title="Scan again, including dismissed marks."
                     className={`${btnShape()} bg-surface border border-dashed border-border text-content-subtle hover:text-content`}>
-                    ⟲ Rescan incl. dismissed ({flagged.dismissed})
+                    ⟲ Rescan ({flagged.dismissed})
                   </button>
                 )}
                 {/* Watermark inpainting (LaMa) needs one extra ML package (simple-lama-
@@ -1839,10 +1792,9 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 {!caps.watermark_inpaint && (
                   <button type="button" onClick={() => setInstallInpaintOpen((v) => !v)}
                     aria-expanded={installInpaintOpen}
-                    title="Install the watermark-inpainting package (LaMa) so off-center marks can be repainted instead of only cropped. One-time download (~hundreds of MB)."
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-amber-400/50 bg-amber-500/5 text-amber-200/90 text-sm hover:bg-amber-500/10">
-                    <Download aria-hidden="true" className="h-4 w-4" /> Install inpainting
-                    <span className="text-content-subtle text-2xs font-normal">one-time · ~hundreds of MB</span>
+                    title="Install LaMa for inpainting."
+                    className={`${btnShape()} border border-dashed border-amber-400/50 bg-amber-500/5 text-amber-200/90 hover:bg-amber-500/10`}>
+                    <Download aria-hidden="true" className="h-4 w-4" /> Install LaMa
                     <span aria-hidden className="text-content-subtle text-xs">{installInpaintOpen ? '▴' : '▾'}</span>
                   </button>
                 )}
@@ -1860,11 +1812,6 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     <Eraser aria-hidden="true" className="h-5 w-5 shrink-0 text-amber-300" />
                     <div className="flex flex-col">
                       <span className="text-amber-200 text-sm font-semibold">Install watermark inpainting (LaMa)</span>
-                      <span className="text-content-subtle text-2xs">
-                        Adds the <code className="text-amber-200/90">simple-lama-inpainting</code> package
-                        (pulls a CPU torch — one-time download, ~hundreds of MB). No restart, no GPU:
-                        once done, the Clean pass inpaints small off-center marks instead of skipping them.
-                      </span>
                     </div>
                     <button type="button" onClick={() => setInstallInpaintOpen(false)}
                       className="ml-auto shrink-0 text-content-subtle hover:text-content text-sm"
@@ -1887,12 +1834,9 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       if (window.confirm(`Permanently delete the ${unused} rejected/failed image(s) (files included)?`)) ds.purgeUnused();
                     }}
                     title="Permanently delete rejected and failed images"
-                    className="px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm disabled:opacity-40">
-                    <Trash2 aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Purge rejected/failed ({unused})
+                    className={`${btnShape()} w-full border border-red-500/30 bg-red-500/10 text-red-300 sm:w-auto`}>
+                    <Trash2 aria-hidden="true" className="h-4 w-4" />Purge Unused ({unused})
                   </button>
-                  <span className="text-content-subtle text-2xs">
-                    frees disk space — rejected images never train either way
-                  </span>
                 </div>
               )}
             </div>
@@ -1910,19 +1854,17 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   produced it, not only in Settings. Wraps freely: it must stay
                   readable at 400px. In-session only; it disappears on reload. */}
               {lastCaptionEngines && (
-                <p title={CAPTION_ENGINE_WHY}
-                  className="break-words rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-content-muted">
-                  <PenLine aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Last pass: {ds.lastCaptionRun.captioned} caption(s) — {lastCaptionEngines}
+                <p className="break-words rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-content-muted">
+                  <PenLine aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Last pass: {ds.lastCaptionRun.captioned} captions · {lastCaptionEngines}
                 </p>
               )}
               <div id="ds-captions-generate" tabIndex={-1}
-                className="lds-section flex items-center gap-2 flex-wrap py-2 scroll-mt-20">
+                className="lds-section flex flex-col gap-2 py-2 scroll-mt-20">
+                <div className={`grid grid-cols-2 gap-2 ${isConceptual ? 'sm:grid-cols-3' : 'sm:grid-cols-4'}`}>
                 {!isConceptual && (
                   <select value={effCaptionMode} onChange={(e) => setCaptionMode(e.target.value)} disabled={ds.busy}
-                    title={d.train_type === 'anima'
-                      ? "Caption style — Anima reads BOTH: booru tags and natural language are first-class on this model. Prose is only the default; switching to Booru tags trains fine and is never flagged as a mismatch."
-                      : "Caption style — Prose (Z-Image) or Booru tags (SDXL booru-native, e.g. bigLove). Defaults to auto based on the dataset's type."}
-                    className={fieldClass()}>
+                    aria-label="Caption style"
+                    className={`${fieldClass()} min-w-0`}>
                     <option value="prose">Prose</option>
                     <option value="booru">Booru tags</option>
                   </select>
@@ -1931,30 +1873,32 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   onClick={() => ds.caption(effCaptionMode)} disabled={ds.busy}
                   className={btnClass({ variant: 'primary' })}>
                   <Sparkles aria-hidden="true" className="h-4 w-4" />
-                  {ds.captioning ? `${keptCaptioned}/${kept} captioned` : 'Caption the kept ones'}
+                  {ds.captioning ? `${keptCaptioned}/${kept} captioned` : 'Caption kept'}
                 </button>
-                <HelpBadge topic="action-caption-generate" />
                 <button type="button" disabled={ds.busy || !recaptionable}
                   onClick={() => {
                     if (window.confirm(recaptionConfirmation(d.kind || 'character', recaptionable, keptAsserted))) ds.recaption(effCaptionMode);
                   }}
                   title={keptCaptioned && !recaptionable
-                    ? 'Every existing caption is hand-written — a forced pass never rewrites those. Edit or clear them on their tiles instead.'
+                    ? 'Edit or clear handwritten captions in Images.'
                     : isConcept
-                    ? "Re-generates every caption while keeping the recurring concept unspoken"
+                    ? 'Omit the concept.'
                     : isStyle
-                      ? "Re-generates every caption as content-only text without naming the aesthetic"
-                      : "Re-generates every caption without describing identity (face/hair)"}
+                      ? 'Omit the style.'
+                      : 'Omit identity traits.'}
                   className={btnClass()}>
                   <RefreshCw aria-hidden="true" className="h-4 w-4" />Re-caption
                 </button>
                 <button type="button" data-workspace-focus
                   onClick={() => setCaptionOptionsOpen(true)} disabled={ds.busy}
-                  title="Choose the caption engine, Ollama model and vocabulary, pull a new model, and add custom instructions — for this dataset"
-                  className={btnClass()}>
+                  className={`${btnClass()} ${isConceptual ? 'col-span-2 sm:col-span-1' : ''}`}>
                   <Settings aria-hidden="true" className="h-4 w-4" />Options
                 </button>
-                <HelpBadge topic="action-caption-options" />
+                </div>
+                <div className="flex gap-2 empty:hidden">
+                  <HelpBadge topic="action-caption-generate" />
+                  <HelpBadge topic="action-caption-options" />
+                </div>
                 {/* Caption-leak badge — KIND-aware. character: identity words
                     (hair/face/skin); concept: the caption NAMING the concept (must bind to
                     the trigger, not the words); style: not applicable (the subjects'
@@ -1962,10 +1906,9 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     explainer panel; the count is spelled out ("N checked") so a green 0
                     reads as a REAL result, not a scan that never ran. */}
                 {isStyle ? (
-                  <span className={`ml-auto text-xs ${keptUncaptioned ? 'text-amber-300' : 'text-emerald-400'}`}
-                    title="Every Style image needs a content-only caption: describe subject, action and setting, but do not name the aesthetic, medium or artist. No activation trigger is added.">
+                  <span className={`text-xs ${keptUncaptioned ? 'text-amber-300' : 'text-emerald-400'}`}>
                     {keptUncaptioned
-                      ? `${keptUncaptioned} missing · content-only captions required · no trigger`
+                      ? `${keptUncaptioned} captions missing`
                       : `${keptCaptioned}/${kept} content-only captions · no trigger`}
                   </span>
                 ) : d.caption_leak && (
@@ -1973,14 +1916,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     <button id="ds-captions-leak-review" type="button" data-workspace-focus
                       onClick={toggleLeakReview}
                       aria-expanded={showLeaks}
-                      title={d.caption_leak.leaking === 0
-                        ? (isConcept
-                            ? "0 captions name the concept — it binds to the trigger. Click for what was checked and why."
-                            : "0 captions describe hair/face/skin — identity binds to the trigger. Click for what was checked and why.")
-                        : (isConcept
-                            ? "These captions name the concept → it won't bind to the trigger. Click to see what's watched and fix them here."
-                            : "These captions mention hair/face/skin → identity won't bind to the trigger. Click to see what's watched and fix them here.")}
-                      className={`${controlHeight()} inline-flex items-center ml-auto text-xs underline decoration-dashed scroll-mt-20 ${
+                      title="Review leaks"
+                      className={`${controlHeight()} inline-flex items-center self-start whitespace-nowrap text-xs underline decoration-dashed scroll-mt-20 ${
                         d.caption_leak.leaking === 0
                           ? 'text-emerald-400 decoration-emerald-400/40'
                           : 'text-amber-400 decoration-amber-400/50'}`}>
@@ -1993,8 +1930,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     <button id="ds-captions-leak-review" type="button" data-workspace-focus
                       onClick={toggleLeakReview}
                       aria-expanded={showLeaks}
-                      title={`The ${isConcept ? 'concept' : 'identity'}-leak scan runs on captions. Caption the kept images first. Click to learn what it checks.`}
-                      className={`${controlHeight()} inline-flex items-center ml-auto text-content-subtle text-xs underline decoration-dashed decoration-border scroll-mt-20`}>
+                      title="Review leaks"
+                      className={`${controlHeight()} inline-flex items-center self-start whitespace-nowrap text-content-subtle text-xs underline decoration-dashed decoration-border scroll-mt-20`}>
                       {isConcept ? 'concept' : 'identity'}-leak scan: no captions yet {showLeaks ? '▴' : '▾'}
                     </button>
                   ) : null
@@ -2013,29 +1950,6 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     <Drama aria-hidden="true" className="h-5 w-5 shrink-0 text-content-muted" />
                     <div className="flex flex-col gap-1">
                       <span className="text-content font-semibold text-sm">{isConcept ? 'Concept-leak check' : 'Identity-leak check'}</span>
-                      {isConcept ? (
-                        <p className="m-0 text-content-muted leading-relaxed">
-                          A <strong className="text-content">concept leak</strong> is a word in a caption
-                          that names <em>the concept itself</em> — the recurring element every image in
-                          the set shares. On a concept LoRA these words must stay OUT of the captions:
-                          they bind the concept to the text instead of to your trigger word{' '}
-                          <code className="text-indigo-300">{d.trigger_word || 'your trigger'}</code>.
-                          Describe the person and scene freely, but leave the concept
-                          {d.concept_desc ? <> (<em className="text-content-muted">{d.concept_desc}</em>)</> : null}
-                          {' '}unspoken so it binds to the trigger, not the caption.
-                        </p>
-                      ) : (
-                        <p className="m-0 text-content-muted leading-relaxed">
-                          An <strong className="text-content">identity leak</strong> is a word in a caption
-                          that describes <em>who the person is</em> — the traits currently set to Omit
-                          (face, eyes, skin, and by default hair). On a character LoRA those words
-                          must stay OUT of the captions: they dilute the identity into the text instead
-                          of binding it to your trigger word{' '}
-                          <code className="text-indigo-300">{d.trigger_word || 'your trigger'}</code>.
-                          Flip a family to Describe in Captions ▸ Options when you want that look
-                          prompt-controllable.
-                        </p>
-                      )}
                     </div>
                     <button type="button" onClick={toggleLeakReview}
                       className="ml-auto shrink-0 text-content-subtle hover:text-content text-sm" aria-label="Close"><X aria-hidden="true" className="h-4 w-4" /></button>
@@ -2047,7 +1961,6 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     <span className={d.caption_leak?.leaking ? 'text-amber-300' : 'text-emerald-400'}>
                       <strong>{d.caption_leak?.leaking ?? 0}</strong> leaking
                     </span>
-                    <span className="text-content-subtle/70">re-scanned live on every caption change</span>
                   </div>
 
                   {/* Words the detector watches. Concept: derived from the description
@@ -2055,13 +1968,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   <div className="flex flex-col gap-1">
                     <span className="text-content-subtle">Words watched for:</span>
                     {isConcept ? (
-                      <p className="m-0 text-content-muted leading-relaxed">
-                        The words of the concept description
-                        {d.concept_desc ? <> (<em className="text-content-muted">{d.concept_desc}</em>)</> : null}
-                        {' '}and their basic lexical field — the body parts and positions it refers to
-                        (e.g. a leg pose also watches <em>knees, feet, thighs, lifted, raised</em>), so a
-                        periphrase can’t sneak the concept back into the caption.
-                      </p>
+                      <span className="text-content-muted">{d.concept_desc || 'Concept description'}</span>
                     ) : (
                       <div className="flex flex-wrap gap-1.5">
                         {(d.caption_leak?.watched?.length
@@ -2076,21 +1983,11 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     )}
                   </div>
 
-                  {/* Why a green 0 is expected, not suspicious. */}
                   {d.caption_leak?.captioned === 0 ? (
-                    <p className="m-0 text-content-subtle leading-relaxed">
-                      Nothing checked yet — the scan runs on captions. Caption the kept images first.
-                    </p>
+                    <p className="m-0 text-content-subtle">No captions to check.</p>
                   ) : d.caption_leak?.leaking === 0 ? (
-                    <p className="m-0 text-emerald-400/90 leading-relaxed">
-                      {isConcept
-                        ? <><CheckCircle2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />All clear — every caption describes the scene while leaving the concept
-                          unspoken, so it will bind to your trigger. It’s a real result on {d.caption_leak?.captioned} caption(s),
-                          not a check that didn’t run.</>
-                        : <><CheckCircle2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />All clear — and this is expected. The app’s captioner is built to describe pose,
-                          clothing, setting and framing but never the person’s identity, so a clean character
-                          set genuinely reads 0. It’s a real result on {d.caption_leak?.captioned} caption(s),
-                          not a check that didn’t run.</>}
+                    <p className="m-0 text-emerald-400/90">
+                      <CheckCircle2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />No leaks found.
                     </p>
                   ) : (
                     <div className="rounded-lg border border-amber-400/40 bg-amber-500/5 p-2.5 flex flex-col gap-2">
@@ -2103,8 +2000,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                           <div className="flex items-start justify-between gap-2 flex-wrap">
                             <span className="text-amber-300 text-xs font-semibold">
                               {isConcept
-                                ? <>Captions naming the concept ({d.caption_leak?.leaking}) — remove the concept words, or Re-caption. Edits save when you click away.</>
-                                : <>Captions leaking identity ({d.caption_leak?.leaking}) — remove the highlighted words, or Re-caption. Edits save when you click away.</>}
+                                ? <>Concept leaks ({d.caption_leak?.leaking})</>
+                                : <>Identity leaks ({d.caption_leak?.leaking})</>}
                               <HelpBadge topic="action-recaption-targeted" className="ml-1" />
                             </span>
                             {leakingImages.length > 1 && (
@@ -2115,7 +2012,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                                   ? 'Re-generate every leaking caption while keeping the concept unspoken'
                                   : 'Re-generate every leaking caption without describing identity (face/hair)'}
                                 className="shrink-0 px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-200 text-xs font-semibold border border-amber-400/40 hover:bg-amber-500/25 disabled:opacity-40">
-                                <RefreshCw aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Re-caption all leaking ({leakingImages.length})
+                                <RefreshCw aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Re-caption all ({leakingImages.length})
                               </button>
                             )}
                           </div>
@@ -2165,7 +2062,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                         );
                       })}
                       {leakingImages.length === 0 && (
-                        <p className="m-0 text-emerald-400 text-xs"><CheckCircle2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />All clear — no leaking caption left.</p>
+                        <p className="m-0 text-emerald-400 text-xs"><CheckCircle2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />No leaks left.</p>
                       )}
                     </div>
                   )}
@@ -2183,16 +2080,11 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 <button type="button" data-workspace-focus
                   onClick={() => setLabPickerOpen(true)} disabled={ds.busy || kept === 0}
                   aria-label="Open the Caption Lab"
-                  title={kept === 0
-                    ? 'Keep ✓ at least one image first — the bench runs on one of them.'
-                    : 'Try up to four caption configs (engine, vision model, vocabulary, length) on one image and read them side by side. Nothing is written until you keep a result.'}
-                  className="px-3 py-1.5 rounded-lg bg-surface text-content text-sm disabled:opacity-40 border border-border">
+                  title={kept ? 'Compare caption settings.' : 'Keep an image first.'}
+                  className={btnClass()}>
                   🧪 Caption Lab
                 </button>
                 <HelpBadge topic="action-caption-lab" />
-                <span className="text-content-subtle text-xs">
-                  compare engines, models and vocabulary on one image — before re-captioning the whole set
-                </span>
               </div>
 
               <div id="ds-captions-tools" tabIndex={-1} className="scroll-mt-20">
@@ -2208,7 +2100,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
               </div>
               {filtersActive && (
                 <p className="m-0 text-content-subtle text-2xs">
-                  <Filter aria-hidden="true" className="mr-1 inline h-3 w-3 align-[-1px]" />A grid filter is active — the filtered grid lives in{' '}
+                  <Filter aria-hidden="true" className="mr-1 inline h-3 w-3 align-[-1px]" />Filtered view in{' '}
                   <button type="button" onClick={() => setSection('images')}
                     className="underline hover:text-content">Images</button>
                   {' '}(showing {gridImages.length} of {rescueGridImages.length}).
@@ -2224,37 +2116,20 @@ export default function DatasetWorkspace({ ds, onBack }) {
           <div className={sectionCls('export')}>
             {heading('export')}
             <div id="gf-export" className="scroll-mt-20 flex flex-col gap-2">
-              <span className="text-content-subtle text-2xs uppercase tracking-wide">Bring images in</span>
               <div id="ds-export-import" tabIndex={-1}
-                className="lds-section flex items-center gap-2 flex-wrap py-2 scroll-mt-20">
+                className="lds-section grid grid-cols-2 gap-2 py-2 scroll-mt-20">
                 <button type="button" data-workspace-focus
                   onClick={() => zipInput.current?.click()} disabled={importBusy}
-                  title="Merge an existing training dataset into this one: a ZIP of images with kohya-style same-name .txt captions (any folder layout). Aspect kept, perceptual duplicates skipped."
-                  className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm disabled:opacity-40">
-                  <Package aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Import dataset (ZIP)
+                  title="Merge ZIP images and captions."
+                  className={btnClass()}>
+                  <Package aria-hidden="true" className="h-4 w-4" />Import ZIP
                 </button>
                 <button type="button" disabled={importBusy} onClick={importFolderPrompt}
-                  title="Merge an existing training dataset already on this machine's disk: a folder of images with kohya-style same-name .txt captions (subfolders included). Aspect kept, perceptual duplicates skipped."
-                  className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm disabled:opacity-40">
-                  <FolderOpen aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Import from folder
+                  title="Merge folder images and captions."
+                  className={btnClass()}>
+                  <FolderOpen aria-hidden="true" className="h-4 w-4" />Import Folder
                 </button>
-                <span className="text-content-subtle text-2xs">
-                  merges images + same-name .txt captions in — duplicates are skipped
-                </span>
               </div>
-              {/* The round trip existed and nothing said so: export → caption in
-                  another tool → import back. It only became a real trip once a
-                  re-imported .txt landed on the image ALREADY here instead of
-                  being dropped with its duplicate (see _merge_training_images).
-                  Reported by Qeeyana (Reddit). */}
-              <p id="ds-caption-elsewhere" tabIndex={-1}
-                className="scroll-mt-20 rounded-lg border border-border bg-surface px-3 py-2 text-2xs text-content-muted">
-                <span className="font-medium text-content">Want to caption in another tool?</span>{' '}
-                Export the ZIP below, caption it wherever you like, then bring the same
-                folder back through Import dataset: images already here are not
-                duplicated, and their new <code>.txt</code> captions land on them.
-                A caption you already wrote here is never overwritten.
-              </p>
               <input ref={zipInput} type="file" accept=".zip,application/zip" className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
@@ -2262,18 +2137,14 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   e.target.value = '';
                 }} />
 
-              <span className="text-content-subtle text-2xs uppercase tracking-wide">Get this dataset out</span>
               <div className="lds-section flex flex-col gap-2 py-2">
                 <div id="ds-export-training-zip" tabIndex={-1}
                   className="flex items-center gap-2 flex-wrap scroll-mt-20">
                   <button type="button" data-workspace-focus={kept ? '' : undefined}
                     disabled={!kept} onClick={exportZipGuarded}
-                    className="px-3 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
-                    <Download aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Export ZIP ({kept})
+                    className={btnClass({ variant: 'primary' })}>
+                    <Download aria-hidden="true" className="h-4 w-4" />Export ZIP ({kept})
                   </button>
-                  <span className="text-content-subtle text-2xs">
-                    kept images + captions, training-ready (kohya layout)
-                  </span>
                 </div>
                 {/* One primary way out (the training ZIP) stays in the open; the
                     other three are occasional, so they live behind one disclosure
@@ -2284,35 +2155,26 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     plugin's row keep working. Do NOT make this a controlled
                     <details> without teaching `land` about it. */}
                 <details className="lds-section">
-                  <summary className="flex items-center gap-2 px-2.5 py-1.5 text-2xs text-content-muted hover:text-content cursor-pointer select-none">
+                  <summary className="flex min-h-10 items-center gap-2 px-2.5 py-1.5 text-xs text-content-muted hover:text-content cursor-pointer select-none lg:min-h-0">
                     More ways out
-                    <span className="text-content-subtle">
-                      bank · portable backup{exportActionSummary}
-                    </span>
                   </summary>
-                  <div className="flex flex-col gap-2 px-2.5 pb-2.5 pt-1">
+                  <div className="grid grid-cols-2 gap-2 px-2.5 pb-2.5 pt-1">
                     <div id="ds-export-to-bank" tabIndex={-1}
-                      className="flex items-center gap-2 flex-wrap scroll-mt-20">
+                      className="min-w-0 scroll-mt-20">
                       <button type="button" data-workspace-focus disabled={!kept}
                         onClick={() => setImportToBankOpen(true)}
-                        title="Turn this dataset back into a bank: its kept images are COPIED into a bank of their own. Both choices keep Dataset-owned captions, curation, framing, watermark and provenance. By default compatible final-file technical analysis is restored; Start fresh skips only reuse of prior analysis. This dataset is never touched."
-                        className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm disabled:opacity-40">
-                        <ArrowUp aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Import to bank
+                        title="Copy kept images to a Bank."
+                        className={`${btnClass()} w-full`}>
+                        <ArrowUp aria-hidden="true" className="h-4 w-4" />Import to Bank
                       </button>
-                      <span className="text-content-subtle text-2xs">
-                        both choices keep Dataset metadata — restore compatible analysis, or start fresh analysis
-                      </span>
                     </div>
                     <div id="ds-export-backup" tabIndex={-1}
-                      className="flex items-center gap-2 flex-wrap scroll-mt-20">
+                      className="min-w-0 scroll-mt-20">
                       <button type="button" data-workspace-focus onClick={ds.exportBackup}
-                        title="Full portable backup: all images with statuses, captions, scores and settings — restore it on any machine from the Datasets page."
-                        className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm">
-                        <Save aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Backup
+                        title="Back up images and settings."
+                        className={`${btnClass()} w-full`}>
+                        <Save aria-hidden="true" className="h-4 w-4" />Backup
                       </button>
-                      <span className="text-content-subtle text-2xs">
-                        portable copy — restore it on any machine from the Datasets page
-                      </span>
                     </div>
                     {/* The plugins' ways out (a publisher's row): each draws
                         its own row under its own predicate, its dialog with it. */}
@@ -2555,7 +2417,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
           onClose={(recap) => {
             setReviewQueue(null);
             const summary = recap || buildWatermarkRecap({});
-            if (summary) toast.success(`Review done — ${summary}`);
+            if (summary) toast.success(`Review complete: ${summary}`);
           }} />
       )}
       {/* 🧪 Caption Lab, entered from the Captions section: pick the subject, then
@@ -2569,7 +2431,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
              entire kept pile. datasetThumbUrl is the app's one rewrite for exactly
              this, used by every other tile grid. */
           thumbUrl={(img) => datasetThumbUrl(`/api/dataset/${d.id}/img/${encodeURIComponent(img.filename)}`, 256)}
-          emptyNote="No kept image to bench yet — keep ✓ a few shots in Images first."
+          emptyNote="No kept images."
           onClose={() => setLabPickerOpen(false)}
           onPick={(img) => { setLabPickerOpen(false); setLabImage(img); }} />
       )}

@@ -157,10 +157,9 @@ test('both selects stay inside a 400 px toolbar', () => {
      rail actually is. min-w-0 is the load-bearing half — without it a
      flex child refuses to go below its content width and overflows. */
   assert.match(BANK_RAIL, /<Select size="sm" value=\{filter\.sort\}[\s\S]*?className=\{`min-w-0 flex-1 \$\{FILTER_HOVER\}`\}/)
-  assert.match(WORKSPACE, /max-w-\[13rem\]/)
-  // The dataset control wraps onto its own line rather than squeezing the chips.
-  assert.match(WORKSPACE, /flex flex-wrap items-center gap-x-3 gap-y-1\.5/)
-  assert.match(WORKSPACE, /flex shrink-0 items-center gap-1 text-xs/)
+  assert.match(WORKSPACE, /<Select size="sm" value=\{value\}[\s\S]*?className="w-full min-w-0"/)
+  assert.match(WORKSPACE, /grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6/)
+  assert.match(WORKSPACE, /<GridStatusFilter[\s\S]*?<GridSortSelect[\s\S]*?<\/GridStatusFilter>/)
 })
 
 test('the grouped menu is readable in a dark-only app', () => {

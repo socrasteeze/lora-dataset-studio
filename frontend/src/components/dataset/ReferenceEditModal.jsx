@@ -211,7 +211,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
               )}
             </div>
             <p className="text-content-muted text-2xs text-center">
-              This runs on the server — you can close this tab and come back; the Before/After will be here.
+              This runs on the server · you can close this tab and come back; the Before/After will be here.
             </p>
             <button type="button" onClick={() => discard(true)} disabled={busy}
               className="px-4 py-2 rounded-lg bg-surface text-content text-sm disabled:opacity-40">
@@ -387,7 +387,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
                   const label = engineLabel(candidate.engine);
                   return (
                     <div key={candidate.engine}>
-                      <p className="text-content font-semibold">{label} — Failed</p>
+                      <p className="text-content font-semibold">{label} · Failed</p>
                       <p className="text-red-300">
                         {candidate.error || 'This engine did not produce a candidate.'}
                       </p>

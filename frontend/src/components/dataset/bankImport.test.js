@@ -92,7 +92,7 @@ test('a live bank job is one that exists and has not finished', () => {
 
 test('the end-of-job message repeats the server, it never invents a number', () => {
   assert.equal(promoteOutcome(null), null);
-  assert.deepEqual(promoteOutcome({ error: 'boom' }), { kind: 'error', text: 'Import failed — boom' });
+  assert.deepEqual(promoteOutcome({ error: 'boom' }), { kind: 'error', text: 'Import failed: boom' });
   assert.deepEqual(promoteOutcome({ cancelled: true, detail: 'Stopped — 4 copied' }),
     { kind: 'info', text: 'Stopped — 4 copied' });
   assert.deepEqual(promoteOutcome({ detail: '17 images copied' }),

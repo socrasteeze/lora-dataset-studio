@@ -45,15 +45,15 @@ export function describeDerivedComparison(img, images = []) {
   if (!img.parent_image_id) {
     // Legacy rows written before the link was recorded, and archives restored
     // without their source. Nothing is broken — there is just no original.
-    return unavailable(spec, 'No original recorded for this image — nothing to compare.');
+    return unavailable(spec, 'No original recorded for this image · nothing to compare.');
   }
   const rows = Array.isArray(images) ? images : [];
   const parent = rows.find((row) => row && row.id === img.parent_image_id) || null;
   if (!parent) {
-    return unavailable(spec, 'The original is no longer in this dataset — nothing to compare.');
+    return unavailable(spec, 'The original is no longer in this dataset · nothing to compare.');
   }
   if (!parent.filename) {
-    return unavailable(spec, 'The original file is missing — nothing to compare.');
+    return unavailable(spec, 'The original file is missing · nothing to compare.');
   }
   return { ...spec, parent, available: true, reason: '' };
 }

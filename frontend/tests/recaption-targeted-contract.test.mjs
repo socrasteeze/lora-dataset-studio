@@ -39,9 +39,9 @@ test('the leak panel wires a per-row targeted Re-caption button', () => {
   assert.match(workspace, /Re-captioning/)
 })
 
-test('the leak panel wires a "Re-caption all leaking" header button', () => {
+test('the leak panel wires a "Re-caption all" header button', () => {
   assert.match(workspace, /ds\.recaptionImages\(leakingImages\.map\(\(i\) => i\.id\), effCaptionMode\)/)
-  assert.match(workspace, /Re-caption all leaking \(\{leakingImages\.length\}\)/)
+  assert.match(workspace, /Re-caption all \(\{leakingImages\.length\}\)/)
 })
 
 test('targeted re-caption buttons are locked during a batch caption pass', () => {

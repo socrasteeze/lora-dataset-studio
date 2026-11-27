@@ -82,7 +82,7 @@ export async function postJson(url, body, isForm) {
 export function faceScoringErrorMessage(scoringError) {
   const { kind, detail } = scoringError || {};
   if (kind === 'unavailable') {
-    return 'Face scoring is not installed — run the Quality tools step in Setup.';
+    return 'Face scoring is not installed · run the Quality tools step in Setup.';
   }
   if (kind === 'subject_not_photographic') return detail || 'Face scoring is unavailable for this dataset.';
   if (kind === 'busy') {
@@ -375,7 +375,7 @@ export function useDataset() {
     const d = await postJson(`/api/dataset/${currentId}/fidelity`, { fidelity });
     if (!d.ok) { toast.error(d.error || 'Unexpected error'); return; }
     toast.success(fidelity === 'body'
-      ? 'Body fidelity ON — re-caption to apply to existing captions'
+      ? 'Body fidelity on. Re-caption to apply.'
       : 'Back to face-only fidelity');
     await refresh();
   }, [currentId, refresh, toast]);
@@ -419,13 +419,13 @@ export function useDataset() {
           + 'not be renamed: another dataset already uses that name on disk. They keep '
           + 'the old name.');
       } else if (renamed && renamed.files > 0) {
-        toast.success(`Settings saved — ${renamed.files} file${renamed.files > 1 ? 's' : ''} `
+        toast.success(`Settings saved · ${renamed.files} file${renamed.files > 1 ? 's' : ''} `
           + 'renamed to follow the new trigger word (LoRAs, run folder, export)');
       } else if (d.kind_changed) {
-        toast.success(`Kind changed to ${d.kind} — re-caption to apply the new caption style to existing captions`);
+        toast.success(`Kind changed to ${d.kind} · re-caption to apply the new caption style to existing captions`);
       } else {
         toast.success(d.concept_desc_changed
-          ? 'Saved — concept changed; re-caption to apply it to existing captions'
+          ? 'Saved · concept changed; re-caption to apply it to existing captions'
           : 'Settings saved');
       }
     }
@@ -481,7 +481,7 @@ export function useDataset() {
     // GUARD-RAIL: the backend head-crop can silently fall back to a centered crop
     // (e.g. vision model not pulled). Surface its reason instead of a plain success.
     if (d.warning) toast.warning(d.warning);
-    else toast.success(autoCrop ? 'Reference set (auto head-crop)' : 'Reference set — adjust with ✂ Crop if needed');
+    else toast.success(autoCrop ? 'Reference set (auto head-crop)' : 'Reference set.');
     await refresh();
   }), [wrap, currentId, refresh, toast]);
 
@@ -603,7 +603,7 @@ export function useDataset() {
       if (!silent) toast.error(d.error || 'Could not start image improvement');
       return d;
     }
-    if (!silent) toast.success('Improvement started — the original stays intact while a separate 2 MP candidate is generated for validation.');
+    if (!silent) toast.success('Improvement started · the original stays intact while a separate 2 MP candidate is generated for validation.');
     if (refreshAfter) await refresh();
     return d;
   }, [refresh, toast]);
@@ -654,7 +654,7 @@ export function useDataset() {
     try {
       const d = await postJson(`/api/dataset/${currentId}/classify`, options);
       if (!d.ok) {
-        toast.error([d.error, d.detail].filter(Boolean).join(' — ') || 'Unexpected error');
+        toast.error([d.error, d.detail].filter(Boolean).join(' · ') || 'Unexpected error');
         return;
       }
       const msg = classifyResultMessage(d.classified, want, {
@@ -691,11 +691,11 @@ export function useDataset() {
     try {
       const d = await postJson(`/api/dataset/${run.datasetId}/caption`, mode ? { mode } : {});
       if (!d.ok) {
-        toast.error([d.error, d.detail].filter(Boolean).join(' — ') || 'Unexpected error');
+        toast.error([d.error, d.detail].filter(Boolean).join(' · ') || 'Unexpected error');
         return;
       }
       setLastCaptionRun({ datasetId: run.datasetId, captioned: d.captioned, engines: d.engines });
-      if (d.stopped) toast.info(`Stopped — ${d.captioned} captioned before you stopped; the rest stays uncaptioned.`);
+      if (d.stopped) toast.info(`Stopped. ${d.captioned} captions saved.`);
       else toast.success(`${d.captioned} captioned${captionResultSuffix(d.engines)}${captionSkippedSuffix(d)}`);
       await refresh(run.datasetId);
     } finally {
@@ -712,11 +712,11 @@ export function useDataset() {
     try {
       const d = await postJson(`/api/dataset/${run.datasetId}/caption`, { force: true, ...(mode ? { mode } : {}) });
       if (!d.ok) {
-        toast.error([d.error, d.detail].filter(Boolean).join(' — ') || 'Unexpected error');
+        toast.error([d.error, d.detail].filter(Boolean).join(' · ') || 'Unexpected error');
         return;
       }
       setLastCaptionRun({ datasetId: run.datasetId, captioned: d.captioned, engines: d.engines });
-      if (d.stopped) toast.info(`Stopped — ${d.captioned} re-captioned before you stopped; the rest keeps its previous caption.`);
+      if (d.stopped) toast.info(`Stopped. ${d.captioned} captions updated.`);
       else toast.success(`${d.captioned} re-captioned${captionResultSuffix(d.engines)}${captionSkippedSuffix(d)}`);
       await refresh(run.datasetId);
     } finally {
@@ -759,7 +759,7 @@ export function useDataset() {
         { image_ids: fresh, ...(mode ? { mode } : {}) });
       if (!d.ok) {
         // GPU-busy (a batch/training pass holds the vision window) carries a detail.
-        toast.error(d.detail ? `${d.error} — ${d.detail}` : (d.error || 'Could not re-caption'));
+        toast.error(d.detail ? `${d.error} · ${d.detail}` : (d.error || 'Could not re-caption'));
         return d;
       }
       setLastCaptionRun({ datasetId: currentId, captioned: d.captioned, engines: d.engines });
@@ -863,17 +863,17 @@ export function useDataset() {
       // model was simply down — which is how the maintainer caught it.
       if (!d.checked && d.unanswered) {
         toast.error(d.unanswered_note
-          || 'The vision model answered nothing — nothing was scanned.');
+          || 'The vision model answered nothing · nothing was scanned.');
         return;
       }
-      const head = d.stopped ? 'Stopped —' : '';
+      const head = d.stopped ? 'Stopped:' : '';
       toast.success(`${head} ${d.detected || 0} watermark(s) found · ${d.none || 0} clean `
         + `(of ${d.checked || 0}, ${engine})`.trim());
       if (d.unanswered) toast.info(d.unanswered_note || `${d.unanswered} image(s) got no answer.`);
       // 0 found is two very different stories: nothing there, or everything
       // UNDER the bar. The near-miss number is what separates them.
       if (d.backend === 'detector' && !d.detected && Number.isFinite(d.top_clean_score)) {
-        toast.info(`Highest score ${d.top_clean_score} — nothing crossed the threshold. `
+        toast.info(`Highest score ${d.top_clean_score} · nothing crossed the threshold. `
           + 'Lower the Detector threshold in this window to flag fainter marks.');
       }
       // A silent fallback is the failure mode this setting exists to remove: say
@@ -883,7 +883,7 @@ export function useDataset() {
       // Flagged with no position: only the detector cascade produces this, and
       // 🧽 Clean cannot route on it. Named here rather than discovered later.
       if (d.unlocated) {
-        toast.info(`${d.unlocated} flagged without a position — open 🔍 Review flagged `
+        toast.info(`${d.unlocated} flagged without a position · open 🔍 Review flagged `
           + 'and draw the zone, or Clean will leave them untouched.');
       }
       await refresh(run.datasetId);
@@ -911,26 +911,26 @@ export function useDataset() {
       const d = await postJson(`/api/dataset/${run.datasetId}/text/detect`,
         Object.keys(body).length ? body : undefined);
       if (!d.ok) { toast.error(d.error || 'Unexpected error'); return; }
-      const head = d.stopped ? 'Stopped —' : limit ? 'Sample —' : '';
+      const head = d.stopped ? 'Stopped:' : limit ? 'Sample:' : '';
       toast.success(`${head} ${d.found || 0} image(s) with text · ${d.none || 0} without `
         + `(of ${d.checked || 0})`.trim());
       // A sample exists to be JUDGED — say where, like the bank's run detail does.
       if (limit && !d.stopped) {
         toast.info('Open the 🔍 review of flagged images to judge the zones, '
-          + 'then run again for the rest — or re-read the same sample after '
+          + 'then run again for the rest · or re-read the same sample after '
           + 'changing the sensitivity.');
       }
       // The mask channel holds 32 zones per image; a text-heavy page can carry
       // more. Named out loud — a silently partial mask reads as a clean pass.
       if (d.uncovered) {
-        toast.info(`${d.uncovered} zone(s) beyond the 32-zone mask cap — open `
+        toast.info(`${d.uncovered} zone(s) beyond the 32-zone mask cap · open `
           + '🔍 Review flagged and draw them if they matter.');
       }
       // Files the reader could not open are counted, not silently missing —
       // they stay retryable and this is the only place the user learns why
       // the checked total fell short.
       if (d.unreadable) {
-        toast.info(`${d.unreadable} file(s) the text reader could not open — `
+        toast.info(`${d.unreadable} file(s) the text reader could not open · `
           + 'they are marked in error and a later run retries them.');
       }
       await refresh(run.datasetId);
@@ -990,7 +990,7 @@ export function useDataset() {
       // A LaMa inpaint that was attempted and failed surfaces WHY (never silent).
       if (d.error) {
         toast.error(d.error.kind === 'unavailable'
-          ? 'Watermark inpainting is not installed — use ⬇ Install inpainting next to the watermark tools.'
+          ? 'Watermark inpainting is not installed · use ⬇ Install inpainting next to the watermark tools.'
           : `Watermark inpainting failed: ${d.error.detail}`);
       }
       // ONE honest summary toast (no more "Nothing to clean" alongside "N skipped").
@@ -1375,7 +1375,7 @@ export function useDataset() {
       d.uncaptioned && `${d.uncaptioned} not captioned yet`,
       d.too_long && `${d.too_long} at the caption length limit`,
     ].filter(Boolean).join(' · ');
-    toast.success(`Added “${tag}” to ${d.added} caption(s)${skipped ? ` — ${skipped}` : ''}`);
+    toast.success(`Added “${tag}” to ${d.added} caption(s)${skipped ? ` · ${skipped}` : ''}`);
     return d.added;
   }, [currentId, refresh, toast]);
 
@@ -1409,7 +1409,7 @@ export function useDataset() {
     } else if (d.ok && d.retry_pending) {
       toast.error(
         `${d.retry_pending} generation(s) still await exact ComfyUI recovery. ` +
-        'The cards were preserved — wait for ComfyUI to respond, then press Stop again.'
+        'The cards were preserved · wait for ComfyUI to respond, then press Stop again.'
       );
     } else if (d.ok) {
       toast.success(`${d.cancelled} generation(s) cancelled`);
@@ -1491,8 +1491,8 @@ export function useDataset() {
     // user acts on — they would wait for a generation queue that never stalled.
     if (d.ok && d.mode === 'peer') {
       toast.success(`Training started on ${d.run?.machine_label || 'the other machine'}`
-        + ' — its log and checkpoints are mirrored back here');
-    } else if (d.ok) toast.success(`Training started (${d.steps || '?'} steps) — ComfyUI paused, follow the checkpoints here`);
+        + ' · its log and checkpoints are mirrored back here');
+    } else if (d.ok) toast.success(`Training started (${d.steps || '?'} steps) · ComfyUI paused, follow the checkpoints here`);
     // Les refus confirmables (mismatch caption↔type, images sans caption) sont
     // gérés par un confirm dans TrainingPanel — pas un toast d'erreur.
     else if (!String(d.error || '').includes('MISMATCH_CAPTION')
@@ -1577,7 +1577,7 @@ export function useDataset() {
     const d = await postJson('/api/dataset/train/stop');
     // Say what happened (the run stopped) and what survived, not just the side
     // effect — mirrors the Runs hub toast for the same endpoint.
-    if (d.ok) toast.success('Training stopped — checkpoints already saved are kept; ComfyUI is re-enabled.');
+    if (d.ok) toast.success('Training stopped. Checkpoints saved. ComfyUI ready.');
     else toast.error(d.error || 'Unexpected error');
   }, [toast]);
 
@@ -1602,7 +1602,7 @@ export function useDataset() {
       ...(opts.stateBundleId ? { state_bundle_id: opts.stateBundleId } : {}),
     };
     const d = await postJson(`/api/dataset/${currentId}/train/continue`, body);
-    if (d.ok) toast.success(`Resumed from step ${d.resumed_from} → ${d.target_steps} — ComfyUI paused`);
+    if (d.ok) toast.success(`Resumed from step ${d.resumed_from} → ${d.target_steps} · ComfyUI paused`);
     // CUSTOM_WEIGHTS_UNVERIFIED is an interactive refusal: TrainingPanel owns
     // the explicit confirm + retry, so do not emit a premature error toast.
     // `opts.quiet` says the CALLER shows the refusal itself — the ▶ Continue
@@ -1763,7 +1763,7 @@ export function useDataset() {
     if (d.captions_kept) parts.push(`${d.captions_kept} kept the caption written here`);
     if (d.failed) parts.push(`${d.failed} unreadable`);
     toast.success(parts.join(' · '));
-    if (d.small) toast.warning(`${d.small} image(s) under 768 px — they will stay soft in training.`);
+    if (d.small) toast.warning(`${d.small} image(s) under 768 px · they will stay soft in training.`);
     await refresh();
   }), [wrap, currentId, refresh, toast]);
 
@@ -1794,11 +1794,11 @@ export function useDataset() {
       if (d.captions_kept) parts.push(`${d.captions_kept} kept the caption written here`);
       if (d.failed) parts.push(`${d.failed} unreadable`);
       toast.success(parts.join(' · '));
-      if (d.small) toast.warning(`${d.small} image(s) under 768 px — they will stay soft in training.`);
+      if (d.small) toast.warning(`${d.small} image(s) under 768 px · they will stay soft in training.`);
       await refresh();
       return { ok: true };
     });
-    return out ?? { ok: false, error: 'Another dataset job is running — wait for it to finish, then try again.' };
+    return out ?? { ok: false, error: 'Dataset busy. Try again when the job finishes.' };
   }, [wrap, currentId, refresh, toast]);
 
   // Restoration layer: fold the server-side `activity` into the visual flags so a

@@ -39,11 +39,7 @@ export default function DatasetFolderNote({ path }) {
           {copied ? '✓ Copied' : failed ? 'Copy failed' : '⧉ Copy'}
         </button>
       </div>
-      <p className="mt-1 text-content-muted">
-        This folder belongs to the dataset — don’t use it as an image bank’s source.
-        A bank points at a live folder, so its Delete rejected would delete these
-        images. To re-triage them, use Import to bank below: it copies.
-      </p>
+      <p className="mt-1 text-content-muted">Dataset folder. Don’t use as a Bank source.</p>
     </div>
   )
 }

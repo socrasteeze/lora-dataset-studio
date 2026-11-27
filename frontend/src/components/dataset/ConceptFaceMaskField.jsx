@@ -97,9 +97,9 @@ function SamplePreview({ datasetId, sample, expand }) {
       </div>
       <figcaption className="mt-1 text-2xs leading-tight text-content-subtle">
         {!boxes.length
-          ? 'Trains unmasked — nothing was detected here.'
+          ? 'Trains unmasked · nothing was detected here.'
           : tooLarge
-            ? `Covers ${Math.round(covered * 100)}% of the frame — left unmasked.`
+            ? `Covers ${Math.round(covered * 100)}% of the frame · left unmasked.`
             : `${boxes.length} face${boxes.length > 1 ? 's' : ''} · ${Math.round(covered * 100)}% of the frame`}
       </figcaption>
     </figure>
@@ -185,7 +185,7 @@ export default function ConceptFaceMaskField({
         </div>
         <span className="text-content-subtle text-2xs leading-relaxed">
           A character LoRA has to learn the face, and a style LoRA has to learn how faces
-          are rendered — weighing faces down would amputate the very thing being trained.
+          are rendered · weighing faces down would amputate the very thing being trained.
           This lever only applies to a <b className="text-content-muted font-medium">concept</b> dataset,
           where the identities in your photos are incidental. Change the dataset type in
           Dataset settings if that is what you meant to train.
@@ -258,7 +258,7 @@ export default function ConceptFaceMaskField({
         faces it was trained on, and then pulls against a character LoRA over whose face to
         render. This weighs the detected faces down in the training loss, so the concept
         binds to the act rather than to the people in your photos. Your images are never
-        altered — nothing is blurred or painted over, only the loss is re-weighted.
+        altered · nothing is blurred or painted over, only the loss is re-weighted.
         <b className="text-content-muted font-medium"> How:</b> turn it on, then preview it on
         your own shots. Adjust the head coverage in Settings ▸ Training if the mask sits too
         tight or too wide.
@@ -271,14 +271,14 @@ export default function ConceptFaceMaskField({
         these trainers consider dataset variety to matter more than masking here. A concept shown
         by ten different people already dilutes identity; with two, the faces are as constant as
         the concept itself and no mask fully makes up for it. Nobody has published a measured
-        before/after of face masking on a concept LoRA — this gives you the lever, not a promise.
+        before/after of face masking on a concept LoRA · this gives you the lever, not a promise.
       </span>
 
       {conceptConflict && (
         <span className="text-amber-300 text-2xs leading-relaxed">
           ⚠ Your concept description mentions the face, mouth or gaze. If the face is where your
           concept actually happens, masking it can erase the thing you are teaching. Preview it
-          before you train — you know your dataset, so this is a heads-up, not a block.
+          before you train · you know your dataset, so this is a heads-up, not a block.
         </span>
       )}
 
@@ -339,7 +339,7 @@ export default function ConceptFaceMaskField({
               )}
               {cov && cov.total === 0 && (
                 <p className="text-2xs text-content-muted">
-                  No kept images to look at yet — keep a few shots first, then preview.
+                  No kept images to look at yet · keep a few shots first, then preview.
                 </p>
               )}
               {cov && cov.total > 0 && (
@@ -349,7 +349,7 @@ export default function ConceptFaceMaskField({
                   {cov.no_face > 0 && ` · ${cov.no_face} with no face found`}
                   {cov.too_large > 0 && ` · ${cov.too_large} too close-up to mask`}
                   {cov.failed > 0 && ` · ${cov.failed} unreadable`}
-                  {partial && ' — the unmasked faces are the only ones the LoRA still learns from, '
+                  {partial && ' · the unmasked faces are the only ones the LoRA still learns from, '
                     + 'so they end up over-represented.'}
                 </p>
               )}
@@ -362,7 +362,7 @@ export default function ConceptFaceMaskField({
                   className="w-32 accent-indigo-500" />
                 <span className="tabular-nums text-content">×{expand.toFixed(1)}</span>
                 <span className="text-content-subtle">
-                  preview only — save it in Settings ▸ Training
+                  preview only · save it in Settings ▸ Training
                 </span>
               </label>
               )}
@@ -375,7 +375,7 @@ export default function ConceptFaceMaskField({
                     ))}
                   </div>
                   <p className="mt-1.5 text-2xs leading-tight text-content-subtle">
-                    Images where no face was found are shown first — those are the ones worth looking at.
+                    Images where no face was found are shown first · those are the ones worth looking at.
                   </p>
                 </>
               )}

@@ -31,7 +31,7 @@ test('the dialog only starts with a nonblank name and keeps an accessible fresh-
   assert.match(dialog, /Both choices keep Dataset-owned metadata/);
   assert.match(dialog, /Reuse compatible final-file analysis/);
   assert.match(dialog, /Start fresh analysis/);
-  assert.match(dialog, /skip reuse of prior analysis/);
+  assert.match(dialog, /onChange=\{\(\) => setPreserveAnalysis\(false\)\}/);
   assert.doesNotMatch(dialog, /starts unanalysed/);
   assert.match(dialog, /role="alert"/);
 });
@@ -44,7 +44,6 @@ test('the workspace opens the dialog instead of using a native prompt for this a
   assert.ok(start >= 0 && end > start, 'import-to-bank action must remain identifiable');
   assert.doesNotMatch(action, /window\.prompt/);
   assert.match(workspace, /<DatasetToBankDialog/);
-  assert.match(workspace, /Both choices keep Dataset-owned captions/);
-  assert.match(workspace, /Start fresh skips only reuse of prior analysis/);
+  assert.match(workspace, /onClick=\{\(\) => setImportToBankOpen\(true\)\}/);
   assert.doesNotMatch(workspace, /start unanalysed/);
 });

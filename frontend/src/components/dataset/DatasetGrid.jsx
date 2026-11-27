@@ -33,7 +33,7 @@ import {
 } from './autoTriageApply.js';
 
 const DEFAULT_GREEN = 0.50;
-const AUTO_TRIAGE_HELP = 'Uses face scores to mark undecided images. Manual decisions stay unchanged.';
+const AUTO_TRIAGE_HELP = 'Keeps scores at or above the threshold. Manual decisions stay.';
 
 // Thumbnail size (S/M/L): three steps avoid a fiddly slider with no useful extra granularity.
 // Persist as a GLOBAL preference, not per dataset, like datasetGenerator: this controls display,
@@ -46,9 +46,9 @@ const TILE_SIZE_COLS = {
   L: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
 };
 const TILE_SIZE_TITLE = {
-  S: 'Small tiles — more per row, quick overview',
+  S: 'Small tiles',
   M: 'Medium tiles (default)',
-  L: 'Large tiles — see the full composition before you crop/keep/reject',
+  L: 'Large tiles',
 };
 
 /* Auto-triage (A2): pre-mark scorable images by face-score threshold —
@@ -172,14 +172,16 @@ function AutoTriageBar({ images, allImages, datasetId, faceThresholds, onBatch, 
   };
 
   return (
-    <div className="lds-section relative flex flex-wrap items-center gap-3 py-2">
-      <span className="inline-flex items-center gap-1.5 text-content text-sm font-semibold shrink-0"><Target aria-hidden="true" className="h-4 w-4" /> Auto-triage</span>
-      <button type="button" onClick={() => setShowHelp((v) => !v)}
-        aria-expanded={showHelp} aria-label="About Auto-triage"
-        title="About Auto-triage"
-        className={`${btnShape({ size: 'sm' })} min-w-10 border border-border bg-surface-raised px-0 text-xs font-bold text-content-muted hover:bg-surface hover:text-content`}>
-        ?
-      </button>
+    <div className="lds-section relative grid grid-cols-2 items-center gap-2 py-2">
+      <div className="col-span-full flex items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 text-content text-sm font-semibold"><Target aria-hidden="true" className="h-4 w-4" /> Auto-triage</span>
+        <button type="button" onClick={() => setShowHelp((v) => !v)}
+          aria-expanded={showHelp} aria-label="About Auto-triage"
+          title="About Auto-triage"
+          className={`${btnClass({ size: 'sm' })} min-w-10`}>
+          ?
+        </button>
+      </div>
       {showHelp && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowHelp(false)} aria-hidden />
@@ -188,11 +190,11 @@ function AutoTriageBar({ images, allImages, datasetId, faceThresholds, onBatch, 
           </p>
         </>
       )}
-      <label className="flex items-center gap-2 text-xs text-content-muted">
+      <label className="col-span-full flex items-center gap-2 text-xs text-content-muted">
         keep&nbsp;≥
         <input type="range" min="0.30" max="0.70" step="0.01" value={t}
           onChange={(e) => setT(parseFloat(e.target.value))}
-          aria-label="Face-score threshold for auto-triage" className="w-36" />
+          aria-label="Face-score threshold for auto-triage" className="min-w-0 flex-1" />
         <span className="font-mono text-content w-10">{t.toFixed(2)}</span>
       </label>
       <span className="text-xs text-content-subtle">
@@ -202,12 +204,12 @@ function AutoTriageBar({ images, allImages, datasetId, faceThresholds, onBatch, 
           : ` (of ${replay.length} undecided)`}
       </span>
       <button type="button" onClick={apply} disabled={busy || applying || nothingToDo}
-        title="Marks only scored images — your manual ✓/✕ choices are never changed"
+        title="Triage scored images. Manual decisions stay."
         className={btnClass({ size: 'sm' })}>
         {applying ? 'Applying' : isReplay ? 'Re-apply' : 'Apply'}
       </button>
       <span role="status" aria-live="polite" aria-atomic="true"
-        className="text-xs text-emerald-400">
+        className="col-span-full text-xs text-emerald-400">
         {applying
           ? 'Applying auto-triage'
           : lastRun && !applyFailure
@@ -215,7 +217,7 @@ function AutoTriageBar({ images, allImages, datasetId, faceThresholds, onBatch, 
             : ''}
       </span>
       {applyFailure && (
-        <span role="alert" className="text-xs text-rose-300">
+        <span role="alert" className="col-span-full text-xs text-rose-300">
           {autoTriageFailureMessage(applyFailure)}
         </span>
       )}
@@ -411,7 +413,7 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
     return (
       <p id="ds-images-review" tabIndex={-1} data-workspace-focus
         className="text-content-subtle text-xs scroll-mt-20">
-        No images — generate variations or import photos.
+        No images yet.
       </p>
     );
   }
@@ -508,7 +510,7 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
       setLaunchingImprove(false);
     }
   };
-  const batchBtn = `${btnShape({ size: 'sm' })} !h-auto !whitespace-normal py-1 font-semibold lg:!min-h-7`;
+  const batchBtn = `${btnShape({ size: 'sm' })} font-semibold`;
 
   return (
     <div id="ds-images-review" tabIndex={-1} data-workspace-focus
@@ -532,24 +534,23 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
           busy={bulkBusy} applying={autoTriageApplying} onApplyingChange={setAutoTriageRun} />
       )}
       <div id="ds-images-bulk" tabIndex={-1}
-        className="flex items-center gap-2 flex-wrap text-xs scroll-mt-20">
+        className="grid grid-cols-2 items-center gap-2 text-xs scroll-mt-20">
         {onBatch && (
           selected.size === 0 ? (
             <>
-              <span className="text-content-subtle">Tick images to curate them in bulk —</span>
               {/* The grid shows one page at a time, so this button has to say
                   what it takes: EVERY image the current filters show, not the
                   500 on screen (same rule as the Bank's "whole filter, all
                   pages"). A selection also survives a page change. */}
               <button type="button" data-workspace-focus
                 disabled={bulkBusy}
-                title="Selects every image the current filters show — all pages, not just the tiles on screen"
+                title="Select all matching images across pages"
                 onClick={() => setSelected(new Set(selectable.map((i) => i.id)))}
-                className="text-content-muted underline hover:text-content disabled:opacity-40">select all ({selectable.length})</button>
+                className={btnClass()}>Select All ({selectable.length})</button>
             </>
           ) : (
             <div role="toolbar" aria-label="Bulk actions on the selection"
-              className="flex items-center gap-2 flex-wrap rounded-lg border border-indigo-400/40 bg-indigo-500/10 px-2.5 py-1.5 w-full">
+              className="col-span-full flex min-w-0 flex-wrap items-center gap-2 rounded-lg border border-indigo-400/40 bg-indigo-500/10 px-2.5 py-1.5">
               <span className="text-content font-semibold">{selected.size} selected</span>
               {bulkAction && (
                 <span role="status" aria-live="polite" aria-atomic="true"
@@ -567,11 +568,11 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
               <button type="button" disabled={curationWriteBusy} onClick={() => act('pending')}
                 title="Back to undecided" className={`${batchBtn} bg-surface text-content border border-border`}>↺ Undecide</button>
               <button type="button" disabled={curationWriteBusy} onClick={() => act('clear_caption')}
-                title="Delete the selected images' captions (the Caption button then regenerates them)"
+                title="Clear captions on selected images."
                 className={`${batchBtn} bg-surface text-content border border-border`}>🧹 Clear captions</button>
               {onAddTag && (
                 <button type="button" disabled={curationWriteBusy} onClick={addTag}
-                  title="Append one tag to the selected images' captions. Captions that already have it, and images not captioned yet, are left alone."
+                  title="Add a tag to selected captions."
                   className={`${batchBtn} bg-surface text-content border border-border`}>🏷️ Add tag</button>
               )}
               {/* One button per engine that can actually run, because the two
@@ -591,7 +592,7 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
                     disabled={improveLaunchBusy || !!improveLabel || !!blocked}
                     title={blocked
                       ? `${blocked}${exclusionSummary ? ` ${exclusionSummary}.` : ''}`
-                      : `${engine.summary} Runs in the background, a few at a time — survives a page reload.${exclusionSummary ? ` Excluded: ${exclusionSummary}.` : ''}`}
+                      : `${engine.summary}${exclusionSummary ? ` Excluded: ${exclusionSummary}.` : ''}`}
                     className={`${batchBtn} border border-indigo-400/50 bg-indigo-500/20 text-indigo-100`}>
                     {improveLabel || `${engine.emoji} ${engine.action} (${improveSelection.eligible.length})`}
                   </button>
@@ -607,13 +608,13 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
                   {improveSelection.excluded.length} not eligible
                 </span>
               )}
-              <span className="ml-auto flex gap-2">
+              <span className="grid w-full grid-cols-2 gap-2">
                 <button type="button" disabled={bulkBusy}
-                  title="Selects every image the current filters show — all pages, not just the tiles on screen"
+                  title="Select all matching images across pages"
                   onClick={() => setSelected(new Set(selectable.map((i) => i.id)))}
-                  className="text-content-muted underline hover:text-content disabled:opacity-40">all ({selectable.length})</button>
+                  className={btnClass({ size: 'sm' })}>Select All ({selectable.length})</button>
                 <button type="button" disabled={bulkBusy} onClick={() => setSelected(new Set())}
-                  className="text-content-muted underline hover:text-content disabled:opacity-40">none</button>
+                  className={btnClass({ size: 'sm' })}>Clear Selection</button>
               </span>
               {/* A bulk improve is where the damage scales: the instruction that
                   turned ONE anime tile realistic is about to run on the whole
@@ -628,7 +629,7 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
             </div>
           )
         )}
-        <TileSizeControl size={tileSize} onChange={setTileSize} titles={TILE_SIZE_TITLE} className="ml-auto" />
+        <TileSizeControl size={tileSize} onChange={setTileSize} titles={TILE_SIZE_TITLE} className="col-start-2 min-w-0" />
       </div>
       <GridPager view={view} onGo={goToPage} where="top" />
       <div className={`grid ${TILE_SIZE_COLS[tileSize]} gap-2`}>

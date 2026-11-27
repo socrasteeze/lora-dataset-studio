@@ -108,7 +108,7 @@ export default function IdentityPromptModal({ onClose, subjectType = 'human' }) 
             the help dot and ✕ wrap onto two lines instead of pushing ✕ off-screen. */}
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-indigo-300 font-semibold min-w-0">
-            <span aria-hidden>✎</span> Identity instruction — multiple references
+            <span aria-hidden>✎</span> Identity instruction · multiple references
           </span>
           <span className="rounded-full border border-indigo-400/50 bg-indigo-500/15 px-2 py-0.5 text-2xs font-semibold text-indigo-200">
             {stLabel} subject

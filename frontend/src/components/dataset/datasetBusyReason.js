@@ -50,7 +50,7 @@ const DATASET_JOB_LABELS = {
 const STOPPABLE = new Set(['caption', 'recaption', 'watermark_detect', 'improve', 'generate']);
 
 const STOP_HINT = 'Wait for it to finish, or press ⏹ Stop in the banner at the top of the workspace.';
-const WAIT_HINT = 'Wait for it to finish — inspecting and selecting stay available meanwhile.';
+const WAIT_HINT = 'Wait for it to finish · inspecting and selecting stay available meanwhile.';
 
 /* The one thing the workspace's amber progress banner does NOT say: what the
    pass is holding, and what it is not. Kept OUT of `datasetBusyReason` on
@@ -59,7 +59,7 @@ const WAIT_HINT = 'Wait for it to finish — inspecting and selecting stay avail
    its counter would print the same words twice (the mistake `withDetail:false`
    exists to avoid in the Bank). */
 export const READS_STAY_OPEN =
-  'Edits, captions and deletes wait for the pass above to finish — inspecting an image and ticking a selection still work.';
+  'Edits, captions and deletes wait for the pass above to finish · inspecting an image and ticking a selection still work.';
 
 /**
  * The full sentence a refused write shows: blocker + progress + time left +

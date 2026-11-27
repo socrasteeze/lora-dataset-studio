@@ -167,7 +167,7 @@ function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBacku
             })}
           </span>
           <span className={`truncate text-2xs ${d.kind === 'style' ? 'text-cyan-300' : 'font-mono text-indigo-300'} ${phoneHidden}`}>
-            {d.kind === 'style' ? 'always-on · no activation trigger' : (d.trigger_word || '—')}
+            {d.kind === 'style' ? 'always-on · no activation trigger' : (d.trigger_word || 'N/A')}
           </span>
           <span className={`text-2xs text-content-subtle ${phoneHidden}`}>{tileStats(d)}</span>
         </div>
@@ -286,8 +286,8 @@ function NewDatasetForm({ onCreate, onClose, onQuickSet }) {
        * hidden.
        */}
       <div className="flex gap-1.5">
-        {[['character', User, 'Character', 'A person/face — identity binds to the trigger'],
-          ['concept', Lightbulb, 'Concept', 'A recurring act/effect — the concept binds to the trigger'],
+        {[['character', User, 'Character', 'A person/face · identity binds to the trigger'],
+          ['concept', Lightbulb, 'Concept', 'A recurring act/effect · the concept binds to the trigger'],
           ['style', Palette, 'Style', 'An always-on aesthetic: load the LoRA and control its influence with the LoRA weight']].map(
           ([val, KindIcon, label, hint]) => (
             <button key={val} type="button" onClick={() => setKind(val)} title={hint}
@@ -317,7 +317,7 @@ function NewDatasetForm({ onCreate, onClose, onQuickSet }) {
                 everywhere. A unique token (prefix/underscore/digits) binds cleanly. */}
             {trigger.trim() && /^[a-z]{1,7}$/i.test(trigger.trim()) && (
               <span className="text-amber-300 text-2xs">
-                <AlertTriangle aria-hidden="true" className="mr-0.5 inline h-3 w-3 align-[-1px]" />“{trigger.trim()}” looks like a common word — the base model already has a meaning
+                <AlertTriangle aria-hidden="true" className="mr-0.5 inline h-3 w-3 align-[-1px]" />“{trigger.trim()}” looks like a common word · the base model already has a meaning
                 for it. Prefer a unique token like <span className="font-mono">zchar_{trigger.trim().toLowerCase()}</span>.
               </span>
             )}
@@ -330,7 +330,7 @@ function NewDatasetForm({ onCreate, onClose, onQuickSet }) {
        * panel.
        */}
       <label className="flex flex-col gap-1 text-xs text-content-muted">
-        Target model <span className="text-content-subtle normal-case">— sets the caption style &amp; groups the menu (changeable later)</span>
+        Target model <span className="text-content-subtle normal-case">: sets the caption style &amp; groups the menu (changeable later)</span>
         <select value={trainType} onChange={(e) => setTrainType(e.target.value)}
           className={fieldClass()}>
           {TRAIN_TYPE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -342,7 +342,7 @@ function NewDatasetForm({ onCreate, onClose, onQuickSet }) {
        */}
       {!concept && !style && (
         <div className="flex flex-col gap-1 text-2xs text-content-muted">
-          <span>Fidelity <span className="text-content-subtle normal-case">— what the LoRA must reproduce (changeable later)</span></span>
+          <span>Fidelity <span className="text-content-subtle normal-case">: what the LoRA must reproduce (changeable later)</span></span>
           <div className="flex gap-1.5">
             {[['face', Smile, 'Face', 'Identity = the face. Body shape may vary with the prompt.'],
               ['body', PersonStanding, 'Face + body', 'Total fidelity: body shape, tattoos and marks bind to the trigger too. Prefers full-frame imports and more bust/body shots.']].map(
@@ -364,9 +364,9 @@ function NewDatasetForm({ onCreate, onClose, onQuickSet }) {
        */}
       {concept && (
         <label className="flex flex-col gap-1 text-xs text-content-muted">
-          What is the recurring concept? <span className="text-fuchsia-300">(required — it will be omitted from every caption)</span>
+          What is the recurring concept? <span className="text-fuchsia-300">(required · it will be omitted from every caption)</span>
           <textarea value={conceptDesc} onChange={(e) => setConceptDesc(e.target.value)} rows={2}
-            placeholder="Describe the recurring act/effect itself, not the people — e.g. “a tongue licking an ice-cream cone”"
+            placeholder="Describe the recurring act/effect itself, not the people · e.g. “a tongue licking an ice-cream cone”"
             className="bg-app/60 border border-border rounded px-2 py-1.5 text-sm text-content resize-y" />
         </label>
       )}

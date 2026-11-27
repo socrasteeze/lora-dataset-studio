@@ -1,26 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Lightbulb } from 'lucide-react';
+import { btnClass } from '../common/controls';
 
 const LS_KEY = 'guidedCardCollapsed';
 
-const COPY = {
-  reference: 'Add the reference photo — one clear face shot is enough to start.',
-  generate: 'Generate ~25 varied shots from the reference (or import real photos).',
-  curate: 'Review the grid: keep ✓ the good ones, reject ✕ the rest.',
-  caption: 'Caption the kept images — required for training.',
-  finish_export: 'Your dataset is ready — export the ZIP for training.',
-  finish_train: 'Your dataset is ready — launch a LoRA training.',
-  studio: 'Compare checkpoints in the Test Studio and pick the best one.',
-};
-
-export default function NextStepCard({ step, trainMode, busy, totalImages, onAction, actionLabel }) {
+export default function NextStepCard({ step, busy, totalImages, onAction, actionLabel }) {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(LS_KEY) === '1');
   const forceOpen = totalImages === 0;
   const open = forceOpen || !collapsed;
   useEffect(() => { if (!forceOpen) localStorage.setItem(LS_KEY, collapsed ? '1' : '0'); },
     [collapsed, forceOpen]);
   if (!step) return null;
-  const key = step.id === 'finish' ? (trainMode ? 'finish_train' : 'finish_export') : step.id;
 
   return (
     <div role="status" className="rounded-lg border border-border bg-surface-raised px-3 py-2 lg:px-4 lg:py-3">
@@ -29,7 +19,7 @@ export default function NextStepCard({ step, trainMode, busy, totalImages, onAct
         <span className="text-content text-sm font-semibold lg:text-base">Next step: {step.label}</span>
         {!forceOpen && (
           <button type="button" onClick={() => setCollapsed((v) => !v)} aria-expanded={open}
-            className="ml-auto text-content-subtle hover:text-content px-1"
+            className={`${btnClass({ size: 'sm', variant: 'ghost' })} ml-auto min-w-10 lg:min-w-0`}
             title={open ? 'Collapse the guide' : 'Expand the guide'}>
             <span aria-hidden>{open ? '▾' : '▸'}</span>
             <span className="sr-only">{open ? 'Collapse' : 'Expand'} next-step guide</span>
@@ -37,10 +27,9 @@ export default function NextStepCard({ step, trainMode, busy, totalImages, onAct
         )}
       </div>
       {open && (
-        <div className="mt-1 flex items-center gap-3 flex-wrap">
-          <p className="text-content-muted text-sm m-0 lg:text-base">{step.description || COPY[key]}</p>
+        <div className="mt-1 flex">
           <button type="button" onClick={onAction} disabled={busy}
-            className="ml-auto min-h-11 px-3 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40 lg:text-base">
+            className={`${btnClass({ variant: 'primary' })} w-full lg:ml-auto lg:w-auto`}>
             {actionLabel}
           </button>
         </div>

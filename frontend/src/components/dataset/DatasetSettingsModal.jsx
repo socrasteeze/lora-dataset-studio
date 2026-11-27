@@ -36,8 +36,8 @@ const SUFFIX_FRAMINGS = [
 // Same order + copy as the New-dataset selector (DatasetListPanel), so the two
 // surfaces read identically.
 const KIND_OPTIONS = [
-  ['character', KIND_LABELS.character, 'A person/face — identity binds to the trigger'],
-  ['concept', KIND_LABELS.concept, 'A recurring act/effect — the concept binds to the trigger'],
+  ['character', KIND_LABELS.character, 'A person/face · identity binds to the trigger'],
+  ['concept', KIND_LABELS.concept, 'A recurring act/effect · the concept binds to the trigger'],
   ['style', KIND_LABELS.style, 'An always-on aesthetic: control its influence with the LoRA weight'],
 ];
 
@@ -132,7 +132,7 @@ export default function DatasetSettingsModal({ d, busy, onSave, onClose }) {
             <input value={trigger} onChange={(e) => setTrigger(e.target.value)}
               placeholder="e.g. myTrigger" className={`${FIELD} font-mono`} />
             <span className="text-content-subtle text-2xs">
-              The word you put in prompts to summon this LoRA. Safe to change anytime —
+              The word you put in prompts to summon this LoRA. Safe to change anytime ·
               it&apos;s added at export, so existing captions don&apos;t need redoing.
             </span>
           </label>
@@ -140,13 +140,13 @@ export default function DatasetSettingsModal({ d, busy, onSave, onClose }) {
 
         {concept && (
           <label className="flex flex-col gap-1">
-            <span className="text-content-muted text-xs">Concept description — what captions must OMIT</span>
+            <span className="text-content-muted text-xs">Concept description · what captions must OMIT</span>
             <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2}
               placeholder="e.g. a mirror selfie / a specific pose / an art style"
               className={`${FIELD} resize-y`} />
             <span className="text-content-subtle text-2xs">
               This is the thing the LoRA learns. Captions describe everything <b>except</b> this,
-              so it binds to the trigger. Editing it rebuilds the auto avoid-list —
+              so it binds to the trigger. Editing it rebuilds the auto avoid-list ·
               <b> re-caption</b> to apply it to images already captioned.
             </span>
           </label>
@@ -158,7 +158,7 @@ export default function DatasetSettingsModal({ d, busy, onSave, onClose }) {
             className="flex items-center gap-1.5 text-left text-content-muted hover:text-content text-xs font-medium">
             <span className={`transition-transform ${suffixOpen ? 'rotate-90' : ''}`}>▸</span>
             ✨ Prompt suffixes
-            <span className="text-content-subtle font-normal">— optional creative direction</span>
+            <span className="text-content-subtle font-normal">: optional creative direction</span>
           </button>
           {suffixOpen && (
             <div className="lds-section flex flex-col gap-2 py-2.5">
@@ -179,7 +179,7 @@ export default function DatasetSettingsModal({ d, busy, onSave, onClose }) {
                 ))}
               </div>
               <span className="text-content-subtle text-2xs">
-                Free text added to every <b>generated</b> variation — the identity lock is
+                Free text added to every <b>generated</b> variation · the identity lock is
                 untouched. A framing suffix applies to that shot type first, then the global
                 one. Applied at generation time: safe to change anytime, existing images
                 stay as they are (regenerate to apply).
@@ -210,7 +210,7 @@ export default function DatasetSettingsModal({ d, busy, onSave, onClose }) {
             {switchSummary.recaption && (
               <div className="rounded border border-amber-400/30 bg-amber-500/10 px-2 py-1.5 text-amber-100">
                 Existing captions were written for <b>{KIND_LABELS[switchSummary.from]}</b>. They
-                are <b>not</b> rewritten automatically — use <b>🔄 Re-caption</b> in the Captions
+                are <b>not</b> rewritten automatically · use <b>🔄 Re-caption</b> in the Captions
                 section to apply the new strategy.
               </div>
             )}

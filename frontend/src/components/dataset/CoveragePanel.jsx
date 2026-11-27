@@ -64,7 +64,7 @@ function Axis({ axis, onPick }) {
                 label: coverageFilterLabel(axis, r),
                 ids: r.imageIds,
               })}
-              title={`Show these ${r.count} in the grid — the images whose captions mention this`}
+              title={`Show these ${r.count} in the grid · the images whose captions mention this`}
               className={`${cls} hover:brightness-125 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70`}>
               {body}
             </button>
@@ -102,11 +102,8 @@ export default function CoveragePanel({ datasetId, refreshKey = 0, onPick = null
   return (
     <div className="lds-section flex flex-col gap-2 py-2">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
-        className="flex flex-wrap items-center gap-2 text-left">
-        <span className="inline-flex items-center gap-1.5 text-content-muted text-2xs uppercase tracking-wide"><Search aria-hidden="true" className="h-3 w-3" /> Coverage</span>
-        <span className="text-content-subtle text-2xs">
-          what the set never shows — read from your captions
-        </span>
+        className="flex min-h-10 items-center gap-2 whitespace-nowrap text-left lg:min-h-0">
+        <span className="inline-flex items-center gap-1.5 text-content-muted text-2xs uppercase tracking-wide"><Search aria-hidden="true" className="h-3 w-3" /> Caption Coverage</span>
         <span aria-hidden className="ml-auto text-content-subtle text-2xs">{open ? '▲' : '▼'}</span>
       </button>
 
@@ -134,13 +131,6 @@ export default function CoveragePanel({ datasetId, refreshKey = 0, onPick = null
               </div>
             </>
           )}
-          <p className="m-0 text-content-subtle text-2xs">
-            Reads the same images as the Composition bar above (everything except rejected
-            and failed). Advice only — nothing is kept, rejected or changed. This reads the words in your
-            captions, not the pixels: a shot the captioner never described is invisible here,
-            and “not smiling” still counts as a smile.
-            {onPick && ' Click any chip with a count to see exactly those images in the grid.'}
-          </p>
         </div>
       )}
     </div>

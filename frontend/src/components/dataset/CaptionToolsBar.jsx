@@ -64,10 +64,10 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
     <div className="lds-section py-2">
       <button type="button" data-workspace-focus
         onClick={() => setOpen((v) => !v)} aria-expanded={open}
-        className="flex items-center gap-2 w-full text-left text-content text-sm font-semibold">
+        className="flex min-h-10 w-full items-center gap-2 whitespace-nowrap text-left text-sm font-semibold text-content lg:min-h-0">
         <span aria-hidden>📝</span> Caption Tools
         <span className="text-content-subtle text-2xs font-normal">
-          find/replace · {categoryCopy.frequencyTitle.toLowerCase()} ({captioned.length} captioned)
+          {captioned.length} captioned
         </span>
         <span aria-hidden className="ml-auto text-content-subtle">{open ? '▾' : '▸'}</span>
       </button>
@@ -77,18 +77,17 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
             <span className="text-content-muted text-xs font-medium">Find &amp; Replace</span>
             <SettingsLink section="captioning" focus="captioning-backend">Settings</SettingsLink>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="grid grid-cols-2 items-center gap-2 sm:grid-cols-4">
             <input value={find} onChange={(e) => setFind(e.target.value)}
-              placeholder={tagMode ? 'tag to replace/remove' : 'text to find'}
+              placeholder={tagMode ? 'Find tag' : 'Find text'}
               aria-label="Find in captions"
-              className={`${fieldClass({ size: 'sm' })} w-44`} />
-            <span aria-hidden className="text-content-subtle text-xs">→</span>
+              className={`${fieldClass({ size: 'sm' })} min-w-0 w-full`} />
             <input value={replace} onChange={(e) => setReplace(e.target.value)}
-              placeholder="replacement (empty = remove)"
+              placeholder="Replace with"
               aria-label="Replace with"
-              className={`${fieldClass({ size: 'sm' })} w-48`} />
+              className={`${fieldClass({ size: 'sm' })} min-w-0 w-full`} />
             <label className="flex items-center gap-1 text-xs text-content-muted"
-              title="Tag mode treats captions as comma-separated tags: the whole tag must match (case-insensitive), and removal keeps the commas clean. Recommended for booru (SDXL).">
+              title="Match whole comma-separated tags.">
               <input type="checkbox" checked={tagMode} onChange={(e) => setTagMode(e.target.checked)}
                 className="accent-indigo-500" />
               Tag Mode
@@ -106,20 +105,20 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
               active filters show as loud chips above the grid. Session-only (they
               reset on reload / dataset switch — a transient view, not dataset state). */}
           <span className="text-content-muted text-xs font-medium">Filter Grid</span>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className={`grid gap-2 ${onInclude ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
             <input value={filterInput} onChange={(e) => setFilterInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitFilter(onExclude); } }}
               placeholder={categoryCopy.filterPlaceholder}
               aria-label={`${categoryCopy.frequencyItem} to filter the grid by`}
-              className={`${fieldClass({ size: 'sm' })} w-44`} />
+              className={`${fieldClass({ size: 'sm' })} min-w-0 w-full ${onInclude ? 'col-span-2 sm:col-span-1' : ''} `} />
             <button type="button" onClick={() => submitFilter(onExclude)} disabled={!onExclude || !filterInput.trim()}
-              title="Hide every image that already carries this tag from the grid"
+              title="Hide images with this tag."
               className={`${btnClass({ size: 'sm' })} hover:bg-rose-500/15 hover:border-rose-400/50`}>
               ⊘ Exclude
             </button>
             {onInclude && (
               <button type="button" onClick={() => submitFilter(onInclude)} disabled={!filterInput.trim()}
-                title="Show ONLY images that carry this tag (hide the rest)"
+                title="Show images with this tag."
                 className={`${btnClass({ size: 'sm' })} hover:bg-indigo-500/15 hover:border-indigo-400/50`}>
                 ◉ Only With
               </button>
@@ -140,7 +139,7 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
                         isExcluded ? 'border-rose-400/60' : isIncluded ? 'border-indigo-400/60' : 'border-border'}`}>
                       <button type="button"
                         onClick={() => { setFind(tag); setTagMode(mode === 'booru'); }}
-                        title={`"${tag}" appears in ${n} caption(s) — click to fill Find (${mode === 'booru' ? 'tag' : 'text'} mode)`}
+                        title={`"${tag}" appears in ${n} captions. Fill Find (${mode === 'booru' ? 'tag' : 'text'} mode)`}
                         className="px-1.5 py-0.5 bg-app/60 text-2xs text-content-muted hover:text-content hover:bg-surface-raised">
                         {tag} <span className="text-content-subtle">×{n}</span>
                       </button>
@@ -150,7 +149,7 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
                           aria-pressed={isExcluded}
                           aria-label={isExcluded ? `Stop hiding images tagged ${tag}` : `Hide images tagged ${tag}`}
                           title={isExcluded
-                            ? `Hiding images tagged "${tag}" — click to show them again`
+                            ? `Hiding images tagged "${tag}". Click to show them`
                             : `Hide images already tagged "${tag}" from the grid`}
                           className={`px-1.5 border-l text-2xs ${
                             isExcluded ? 'bg-rose-500/25 border-rose-400/50 text-rose-200'
@@ -170,18 +169,18 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
           {onWriteFiles && (
             <div className="flex flex-col gap-1">
               <span className="text-content-muted text-xs font-medium">Caption Files</span>
-              <div className="flex items-end gap-2 flex-wrap">
-                <label htmlFor={triggerInputId} className="flex w-full min-w-0 flex-col gap-1 sm:w-auto">
+              <div className={`grid items-end gap-2 ${onOpenFolder ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
+                <label htmlFor={triggerInputId} className={`flex min-w-0 flex-col gap-1 ${onOpenFolder ? 'col-span-2 sm:col-span-1' : ''}`}>
                   <span className="text-xs text-content-muted">Trigger Word</span>
                   <input id={triggerInputId} value={fileTrigger}
                     onChange={(event) => { setFileTriggerEdited(true); setFileTrigger(event.target.value); }}
                     disabled={busy || writingFiles} placeholder="e.g. @exampleartist"
-                    className={`${fieldClass({ size: 'sm' })} w-full sm:w-64`} />
+                    className={`${fieldClass({ size: 'sm' })} w-full`} />
                 </label>
                 <button type="button" onClick={writeFiles} disabled={busy || writingFiles || !fileTrigger.trim()}
                   aria-busy={writingFiles}
-                  title="Write a TXT caption beside each kept image with this trigger prepended once. Overwrites existing TXT files."
-                  className={`${btnClass({ size: 'sm' })} min-w-28`}>
+                  title="Overwrites existing TXT files."
+                  className={btnClass({ size: 'sm' })}>
                   💾 {writingFiles ? 'Writing' : 'Write TXT'}
                 </button>
                 {onOpenFolder && (
@@ -189,11 +188,11 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
                     title="Open the dataset folder in the file explorer"
                     aria-label="Open the dataset folder"
                     className={btnClass({ size: 'sm' })}>
-                    <FolderOpen aria-hidden="true" className="h-3.5 w-3.5" />
+                    <FolderOpen aria-hidden="true" className="h-3.5 w-3.5" />Open Folder
                   </button>
                 )}
-                <span className="basis-full text-content-muted text-xs">
-                  Prepends this trigger to TXT files, including Style datasets. Overwrites existing .txt files.
+                <span className="col-span-full text-content-muted text-xs">
+                  Overwrites existing TXT files.
                 </span>
               </div>
             </div>

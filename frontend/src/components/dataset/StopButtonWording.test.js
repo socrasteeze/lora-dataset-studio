@@ -61,7 +61,7 @@ test('stopping an hours-long training asks for confirmation, and says what survi
 });
 
 test('the success toast reports the stop, not just the freed GPU', () => {
-  assert.match(hook, /toast\.success\('Training stopped — checkpoints already saved are kept; ComfyUI is re-enabled\.'\)/);
+  assert.match(hook, /toast\.success\('Training stopped\. Checkpoints saved\. ComfyUI ready\.'\)/);
   assert.doesNotMatch(hook, /toast\.success\('ComfyUI re-enabled'\)/);
 });
 
@@ -81,7 +81,7 @@ test('the captioning Stop keeps the same convention: stop verb + what is kept', 
   const title = block.match(/title="([^"]+)"/);
   assert.ok(title, 'the captioning Stop button has no title');
   assert.match(title[1], /^Stops/);
-  assert.match(title[1], /captions already written are kept/i);
+  assert.match(title[1], /Saved captions stay/);
   // The Caption Lab's own Stop follows suit.
   assert.match(captionLab, /■ Stop/);
   assert.doesNotMatch(captionLab, /re-enable ComfyUI/);

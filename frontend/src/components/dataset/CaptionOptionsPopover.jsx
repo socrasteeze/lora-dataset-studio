@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiFetch, postJson } from '../../api/fetchClient';
 import { useToast } from '../common/Toast';
+import { btnClass, fieldClass, SEGMENT_CLASS, SEGMENT_GROUP_CLASS } from '../common/controls';
 import { appearancePolicyChanged } from '../../utils/captionAppearancePolicy.js';
 import { modelPickerCopy } from '../../utils/localLlm.js';
 
@@ -26,13 +27,13 @@ export const ENGINE_OPTIONS = [
   // the labels follow the fact that the local engine may now be either server; the
   // value 'ollama' reads as "the configured local provider" (settings-reference
   // says so). This is the alias path CLAUDE.md asks for, applied to the label side.
-  { id: 'auto', label: 'Auto — JoyCaption, then the local LLM' },
+  { id: 'auto', label: 'Auto · JoyCaption, then the local LLM' },
   { id: 'joycaption', label: 'JoyCaption only' },
   { id: 'pixai', label: 'PixAI Tagger' },
   { id: 'wd14', label: 'WD14 Tagger' },
   { id: 'pixai_hybrid', label: 'PixAI tags + VLM' },
   { id: 'ollama', label: 'Local LLM only (Ollama / LM Studio)' },
-  { id: 'none', label: 'None — captioning disabled' },
+  { id: 'none', label: 'None · captioning disabled' },
 ];
 
 // The Ollama model + pull only bite when the resolved engine can use Ollama.
@@ -45,10 +46,10 @@ export const KREA_2_OLLAMA_MODEL = 'qwen3-vl:4b-instruct';
 // Vocabulary register for nude/sexual content. '' = leave the model to its own wording.
 // 'explicit' is the NSFW lane — pair it with an abliterated Ollama vision model.
 export const VOCABULARY_OPTIONS = [
-  { id: '', label: 'Default — the model’s own wording' },
-  { id: 'explicit', label: 'Explicit — crude, uncensored terms' },
-  { id: 'clinical', label: 'Clinical — neutral anatomical terms' },
-  { id: 'safe', label: 'Safe — non-explicit, no crude terms' },
+  { id: '', label: 'Default · the model’s own wording' },
+  { id: 'explicit', label: 'Explicit · crude, uncensored terms' },
+  { id: 'clinical', label: 'Clinical · neutral anatomical terms' },
+  { id: 'safe', label: 'Safe · non-explicit, no crude terms' },
 ];
 
 // Caption LENGTH preset — how MUCH the captioner writes. Orthogonal to the vocabulary
@@ -57,9 +58,9 @@ export const VOCABULARY_OPTIONS = [
 // '' = Standard: nothing appended, byte-identical to the prompt before this option existed.
 // Idea by djpraxis (Reddit).
 export const CAPTION_LENGTH_OPTIONS = [
-  { id: '', label: 'Standard — the prompt as it is' },
-  { id: 'concise', label: 'Concise — aims for one short sentence' },
-  { id: 'detailed', label: 'Detailed — several sentences' },
+  { id: '', label: 'Standard · the prompt as it is' },
+  { id: 'concise', label: 'Concise · aims for one short sentence' },
+  { id: 'detailed', label: 'Detailed · several sentences' },
 ];
 
 // Character-only omit vs describe. Must match backend APPEARANCE_FAMILIES /
@@ -260,7 +261,7 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
         initialAppearanceRef.current, r.options?.appearance);
       if (policyMoved) {
         toast.success(
-          'Appearance policy saved — re-caption to apply it to existing captions',
+          'Appearance policy saved · re-caption to apply it to existing captions',
           10000);
       } else {
         toast.success('Caption options saved');
@@ -289,7 +290,7 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
     }
     startPullByName(KREA_2_OLLAMA_MODEL, true);
   };
-  const inputCls = 'w-full px-2 py-1.5 rounded-lg bg-app/60 border border-border text-content text-sm';
+  const inputCls = `${fieldClass()} w-full min-w-0`;
   const showAppearance = kind !== 'concept' && kind !== 'style';
   const shownAppearance = { ...APPEARANCE_DEFAULTS, ...(appearance || {}) };
   const policyActive = Boolean(appearance && Object.keys(appearance).length);
@@ -306,7 +307,7 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
         className="w-full max-w-md max-h-[92vh] overflow-y-auto rounded-xl border border-border bg-surface-overlay p-4 shadow-2xl flex flex-col gap-4"
         onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <h3 className="text-content font-semibold text-sm">⚙️ Caption method — this dataset</h3>
+          <h3 className="text-content font-semibold text-sm">⚙️ Caption method · this dataset</h3>
           <button type="button" onClick={onClose} aria-label="Close"
             className="text-content-subtle hover:text-content text-xl leading-none">×</button>
         </div>
@@ -323,15 +324,11 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
                 {ENGINE_OPTIONS.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.id === 'auto' && trainType === 'anima'
-                      ? 'Auto — PixAI tags, else Qwen3-VL'
+                      ? 'Auto · PixAI tags, else Qwen3-VL'
                       : o.label}
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-content-subtle">
-                Overrides the global default only for this dataset. Leave on “default” to follow Settings.
-                {trainType === 'anima' ? ' Auto on an Anima dataset tags with PixAI when it is installed, else Qwen3-VL. It skips JoyCaption.' : ''}
-              </p>
             </div>
 
             {/* Ollama model + pull */}
@@ -369,32 +366,25 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
                         : 'Pull & use'}
                     </button>
                   </div>
-                  <p id="krea-caption-model-note" className="mt-2 text-xs leading-relaxed text-content-subtle">
-                    Uses the same Qwen3-VL-4B Instruct base model family/checkpoint as Krea 2 Edit.
-                    Ollama uses a different quantization and runtime, so captions are not bit-identical.
-                    The vanilla model can refuse explicit content; the default 8B abliterated model
-                    remains the better choice for NSFW.
+                  <p id="krea-caption-model-note" className="mt-2 text-xs text-content-subtle">
+                    Qwen3-VL-4B Instruct may refuse explicit content.
                   </p>
                 </section>
               )}
               {!canPull && (
                 <p className="text-xs text-content-subtle">
-                  Downloading models is done in the LM Studio app, which shows progress and
-                  lets you cancel — this app cannot do that for it.
+                  Download models in LM Studio.
                 </p>
               )}
               {canPull && (<>
-              <p className="text-xs text-content-subtle">
-                Only used when the engine is Auto or Ollama. Pull a new vision model by name:
-              </p>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="grid grid-cols-2 gap-2">
                 <input value={pullName} onChange={(e) => setPullName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); startPull(); } }}
                   placeholder="e.g. huihui_ai/qwen3-vl-abliterated:8b-instruct"
                   aria-label="Ollama model to pull"
-                  className="min-w-0 w-full flex-1 px-2 py-1.5 rounded-lg bg-app/60 border border-border text-content text-xs" />
+                  className={inputCls} />
                 <button type="button" onClick={startPull} disabled={pulling || !pullName.trim() || !modelsReachable}
-                  className="w-full px-3 py-1.5 rounded-lg bg-surface-raised border border-border text-content text-xs font-semibold disabled:opacity-40 hover:bg-surface sm:w-auto">
+                  className={btnClass()}>
                   {pulling ? 'Pulling' : '⇩ Pull'}
                 </button>
               </div>
@@ -402,7 +392,7 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
                 <p role="status" aria-live="polite"
                   className={`break-words text-xs ${pull.state === 'error' ? 'text-rose-400' : 'text-content-subtle'}`}>
                   {pull.state === 'running'
-                    ? `Pulling ${pull.model}${pull.progress != null ? ` — ${pull.progress}%` : ''}${pull.log?.length ? ` (${pull.log[pull.log.length - 1]})` : ''}`
+                    ? `Pulling ${pull.model}${pull.progress != null ? ` · ${pull.progress}%` : ''}${pull.log?.length ? ` (${pull.log[pull.log.length - 1]})` : ''}`
                     : pull.state === 'success' ? `Pulled ${pull.model}.`
                     : `Pull failed: ${pull.error || 'unknown error'}`}
                 </p>
@@ -434,17 +424,9 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
             {showAppearance && (
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium text-content">Appearance in captions</span>
-              <p className="text-xs text-content-subtle leading-relaxed">
-                <strong className="font-medium text-content-muted">Omit</strong> binds that look
-                to the trigger (do not caption it).{' '}
-                <strong className="font-medium text-content-muted">Describe</strong> names
-                what is clearly visible so it stays prompt-controllable (lipstick, a beard,
-                glasses). Re-caption after changing this.
-              </p>
               {!policyActive && !appearanceDirty && (
                 <p className="text-xs text-content-subtle leading-relaxed">
-                  Not applied until you change a row — the captioner currently uses the classic
-                  lock (hair omitted, makeup neither asked nor forbidden).
+                  Default policy active.
                 </p>
               )}
               <div className="flex flex-col gap-1.5">
@@ -455,18 +437,13 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
                       className="flex items-center justify-between gap-2 rounded-lg border border-border bg-app/40 px-2 py-1.5">
                       <div className="min-w-0">
                         <div className="text-sm text-content">{fam.label}</div>
-                        <div className="text-2xs text-content-subtle">{fam.hint}</div>
                       </div>
-                      <div className="flex shrink-0 rounded-md border border-border overflow-hidden">
+                      <div className={SEGMENT_GROUP_CLASS}>
                         {['omit', 'describe'].map((state) => (
                           <button key={state} type="button"
                             aria-pressed={value === state}
                             onClick={() => flipAppearance(fam.id, state)}
-                            className={`px-2 py-1 text-2xs font-semibold capitalize ${
-                              value === state
-                                ? 'bg-surface-raised text-content'
-                                : 'bg-transparent text-content-muted hover:text-content'
-                            }`}>
+                            className={`${SEGMENT_CLASS} capitalize`}>
                             {state}
                           </button>
                         ))}
@@ -476,7 +453,7 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
                 })}
               </div>
               <p className="text-xs text-content-subtle leading-relaxed">
-                Always omitted (the trigger’s job): {APPEARANCE_LOCKED.join(', ')}.
+                Always omitted: {APPEARANCE_LOCKED.join(', ')}.
               </p>
             </div>
             )}
@@ -493,12 +470,7 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
                 className="self-start min-h-10 lg:min-h-0 px-3 py-1.5 rounded-lg bg-surface-raised border border-border text-content text-xs font-semibold disabled:opacity-40 hover:bg-surface">
                 {suggesting ? 'Suggesting' : 'Suggest'}
               </button>
-              <p className="text-xs text-content-subtle">
-                Comma-separated. These are removed from every caption and the prompt is told to
-                leave them out, so they bind to the trigger. Clothing is tagged only when it
-                differs from these. Suggest adds hair, eye, mark, accessory and outfit tags found
-                in 60% of the booru captions. Edit the list, then Save and re-caption.
-              </p>
+              <span className="text-xs text-content-subtle">Comma-separated. Save, then re-caption.</span>
             </div>
             )}
 
@@ -509,13 +481,6 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
                 onChange={(e) => setInstructions(e.target.value)}
                 placeholder="e.g. Always name the visible clothing colors and the time of day."
                 className="w-full px-2 py-1.5 rounded-lg bg-app/60 border border-border text-content text-sm resize-y" />
-              <p className="text-xs text-content-subtle">
-                Added to the end of the caption prompt (both engines), <em>after</em> the vocabulary
-                and length presets — so when yours contradicts one of them, yours is what the model
-                reads last.{showAppearance
-                  ? ' Extra instructions can only steer wording of a described appearance family — they still cannot reintroduce an omitted one (hair stays omitted until you flip it above). Identity leak cleaners still run.'
-                  : ' The identity / concept / style omission rules and the leak cleaners still apply, so this can’t reintroduce a banned term.'}
-              </p>
             </div>
 
             <div className="flex justify-end gap-2 pt-1">

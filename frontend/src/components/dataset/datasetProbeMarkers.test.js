@@ -18,7 +18,7 @@ const lightbox = read('./DatasetLightbox.jsx');
 const probe = read('../../../scripts/responsiveProbe.mjs');
 
 test('every fixed surface of the workspace is marked for the responsive probe', () => {
-  for (const surface of ['header', 'more-menu', 'sections', 'destinations', 'grid-toolbar', 'filter-bar']) {
+  for (const surface of ['header', 'more-menu', 'sections', 'grid-toolbar', 'filter-bar']) {
     assert.ok(workspace.includes(`data-probe-chrome="${surface}"`),
       `the ${surface} lost its data-probe-chrome marker — the probe stops measuring it`);
   }
@@ -32,10 +32,12 @@ test('the lightbox is a layer', () => {
   assert.match(lightbox, /data-probe-chrome="lightbox" data-probe-layer/);
 });
 
-test('the two chip rails do not overlap, and the second one folds on a phone held sideways', () => {
-  // -mt-1 on the destinations rail put it 4 px under the sections rail
-  assert.ok(!/destinations.*\n.*-mt-1/.test(workspace), 'the destinations rail pulls itself under the sections rail again');
-  assert.match(workspace, /data-probe-chrome="destinations"\n\s+className="relative -mx-3 overflow-x-auto px-3 pb-1 sm:-mx-4 sm:px-4 lg:hidden \[@media\(max-height:500px\)\]:hidden"/);
+test('section and destination chips share one non-wrapping scroll rail', () => {
+  const rail = workspace.slice(workspace.indexOf('ref={mobileRailRef}'), workspace.indexOf('<details className="lg:hidden">'));
+  assert.match(rail, /overflow-x-auto.*scrollbar-width:none/);
+  assert.match(rail, /flex w-max list-none flex-nowrap/);
+  assert.match(rail, /navItem\(s, true\)/);
+  assert.match(rail, /panelNavItem\(section, destination, true\)/);
 });
 
 test('controls reach 40 px below lg — the section chips, the header, the menu, the toolbar chips', () => {

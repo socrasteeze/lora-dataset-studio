@@ -43,7 +43,7 @@ import RepairDialog from '../shared/RepairDialog';
 const ROUTE_LABEL = {
   crop: { icon: '✂', text: 'Crop the watermarked border', cls: 'text-sky-300' },
   lama: { icon: Brush, text: 'Inpaint the mark (LaMa)', cls: 'text-emerald-300' },
-  review: { icon: Eye, text: 'On the subject — needs manual review', cls: 'text-amber-300' },
+  review: { icon: Eye, text: 'On the subject · needs manual review', cls: 'text-amber-300' },
   klein: { icon: Palette, text: 'Erase the zones, re-render the whole photo (Klein)', cls: 'text-emerald-300' },
 };
 
@@ -54,9 +54,9 @@ const ROUTE_LABEL = {
 const OUTCOME = {
   cleaned: { icon: '✨', text: 'Cleaned', cls: 'text-emerald-300', terminal: true },
   dismissed: { icon: '⊘', text: 'Marked “not a watermark”', cls: 'text-content-subtle', terminal: true },
-  rejected: { icon: '✕', text: 'Rejected — removed from the set', cls: 'text-red-300', terminal: true },
+  rejected: { icon: '✕', text: 'Rejected · removed from the set', cls: 'text-red-300', terminal: true },
   review: { icon: Eye, text: 'Left for manual review', cls: 'text-amber-300', terminal: false },
-  skipped: { icon: '⬇', text: 'Skipped — inpainting not installed', cls: 'text-amber-300', terminal: false },
+  skipped: { icon: '⬇', text: 'Skipped · inpainting not installed', cls: 'text-amber-300', terminal: false },
   failed: { icon: '⚠', text: 'Clean failed', cls: 'text-red-300', terminal: false },
 };
 
@@ -66,8 +66,8 @@ const AUTO_ADVANCE = new Set(['dismissed', 'rejected']);
 
 // Clean's outcome text, refined with which route actually ran (from the clean API's
 // per-request counts) once known.
-const CLEAN_DETAIL_TEXT = { cropped: 'Cleaned — cropped', inpainted: 'Cleaned — inpainted',
-  inpainted_klein: 'Cleaned — Klein inpaint' };
+const CLEAN_DETAIL_TEXT = { cropped: 'Cleaned · cropped', inpainted: 'Cleaned · inpainted',
+  inpainted_klein: 'Cleaned · Klein inpaint' };
 
 const RECAP_ORDER = ['cleaned', 'dismissed', 'rejected', 'review', 'skipped', 'failed'];
 const RECAP_WORD = { cleaned: 'cleaned', dismissed: 'dismissed', rejected: 'rejected',
@@ -401,7 +401,7 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
       if (d.error) {
         return { key: 'failed', note: { tone: 'err',
           text: d.error.kind === 'unavailable'
-            ? 'Inpainting isn’t installed — install it (next to the watermark tools) or reject/crop this one.'
+            ? 'Inpainting isn’t installed · install it (next to the watermark tools) or reject/crop this one.'
             : `Inpainting failed: ${d.error.detail || d.error.kind}` } };
       }
       if (d.cropped || d.inpainted || d.inpainted_klein) {
@@ -410,11 +410,11 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
       }
       if (d.needs_review) {
         return { key: 'review', note: { tone: 'warn',
-          text: 'On the subject — auto crop/inpaint would damage the photo. Reject it or crop it manually.' } };
+          text: 'On the subject · auto crop/inpaint would damage the photo. Reject it or crop it manually.' } };
       }
       if (d.skipped) {
         return { key: 'skipped', note: { tone: 'warn',
-          text: 'Off-center mark, but inpainting isn’t installed — install it or reject/crop this one.' } };
+          text: 'Off-center mark, but inpainting isn’t installed · install it or reject/crop this one.' } };
       }
       return { key: 'cleaned' };   // nothing to do reported → treat as resolved
     });
@@ -434,7 +434,7 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
       }
       setOutcomes((m) => { const n = { ...m }; delete n[it.id]; return n; });
       setCleanDetail((m) => { const n = { ...m }; delete n[it.id]; return n; });
-      return { note: { tone: 'warn', text: 'Original restored — re-clean it, or switch engine and clean again.' } };
+      return { note: { tone: 'warn', text: 'Original restored · re-clean it, or switch engine and clean again.' } };
     });
   }, [item, outcome, cleanDetail, onRestore, run]);
 
@@ -666,7 +666,7 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
           {route ? (
             <span className={`font-semibold ${route.cls}`}><route.icon aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{route.text}</span>
           ) : (
-            <span className="text-white/60">— unknown (missing box)</span>
+            <span className="text-white/60">: unknown (missing box)</span>
           )}
           {manual && regions.length > 0 && (
             <span className="text-emerald-200/70 text-xs">
@@ -678,7 +678,7 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
                   “why is LaMa used there?” — because this line
                   used to say so whatever the real plan was. */}
               · {item?.text_state === 'detected'
-                ? 'outline-safe text fill — bubbles emptied with their own background, the inpaint engine only sees leftovers on art'
+                ? 'outline-safe text fill · bubbles emptied with their own background, the inpaint engine only sees leftovers on art'
                 : kleinSelected ? 'one Klein inpaint per zone' : 'one composite LaMa pass'}
             </span>
           )}
@@ -716,14 +716,14 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
             <div className="flex items-center rounded-lg border border-white/15 bg-white/5 p-0.5">
               <button type="button" aria-pressed={useCrop} disabled={working}
                 onClick={() => setCropChoiceById((m) => ({ ...m, [item.id]: 'crop' }))}
-                title="Crop the watermarked border off — invents no pixel (aspect ratio changes; ai-toolkit buckets it)."
+                title="Crop the watermarked border off · invents no pixel (aspect ratio changes; ai-toolkit buckets it)."
                 className={`px-2.5 py-1 rounded-md font-semibold disabled:opacity-40 ${useCrop
                   ? 'bg-sky-500/25 text-sky-100' : 'text-white/60 hover:text-white'}`}>
                 ✂ Crop
               </button>
               <button type="button" aria-pressed={!useCrop} disabled={working}
                 onClick={() => setCropChoiceById((m) => ({ ...m, [item.id]: 'inpaint' }))}
-                title="Repaint the mark instead of cropping — keeps the full frame (uses the engine below)."
+                title="Repaint the mark instead of cropping · keeps the full frame (uses the engine below)."
                 className={`px-2.5 py-1 rounded-md font-semibold disabled:opacity-40 ${!useCrop
                   ? 'bg-amber-500/25 text-amber-100' : 'text-white/60 hover:text-white'}`}>
                 <Brush aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Inpaint
@@ -773,7 +773,7 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
         <div className="flex gap-2 flex-wrap">
           {restorable ? (
             <button type="button" onClick={doRestore} disabled={working}
-              title="Undo the clean — bring the watermarked original back so you can re-clean it (e.g. with the other engine) — shortcut r"
+              title="Undo the clean · bring the watermarked original back so you can re-clean it (e.g. with the other engine) · shortcut r"
               className={`${btn} bg-sky-500/20 border border-sky-400/50 text-sky-100 hover:bg-sky-500/30`}>
               {restoring ? '↩ Restoring' : <>↩ Restore original <kbd className="text-2xs text-white/50">r</kbd></>}
             </button>
@@ -789,7 +789,7 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
                         : 'Install LaMa inpainting before cleaning manual zones')
                     : saveBlocked
                       ? 'Save correction zones before cleaning'
-                : "Apply this image's watermark removal now (crop / inpaint / manual review) — shortcut c"}
+                : "Apply this image's watermark removal now (crop / inpaint / manual review) · shortcut c"}
               className={`${btn} bg-amber-500/20 border border-amber-400/50 text-amber-100 hover:bg-amber-500/30`}>
               <Eraser aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{cleaning ? 'Cleaning' : <>Clean <kbd className="text-2xs text-white/50">c</kbd></>}
             </button>
@@ -802,19 +802,19 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
               the sentence and ↩ Undo live in the dialog, where there is room. */}
           {onRepair && !(oc && oc.terminal) && (
             <button type="button" onClick={() => setRepairOpen(true)} disabled={actionBlocked}
-              title="Repaint an area from your own description — draw the zone, say what should be there, and everything outside it stays byte-identical"
+              title="Repaint an area from your own description · draw the zone, say what should be there, and everything outside it stays byte-identical"
               className={`${btn} bg-sky-500/20 border border-sky-400/50 text-sky-100 hover:bg-sky-500/30`}>
               ✦ Repair
             </button>
           )}
           <HelpBadge topic="action-watermark-restore" className="self-center" />
           <button type="button" onClick={doDismiss} disabled={actionBlocked}
-            title="This is NOT a watermark (false positive) — clears the flag, future scans skip it — shortcut d"
+            title="This is NOT a watermark (false positive) · clears the flag, future scans skip it · shortcut d"
             className={`${btn} bg-emerald-600/20 border border-emerald-400/40 text-emerald-100 hover:bg-emerald-600/30`}>
             ✓ Not a watermark <kbd className="text-2xs text-white/50">d</kbd>
           </button>
           <button type="button" onClick={doReject} disabled={actionBlocked}
-            title="Reject this image — it leaves the kept set (for watermarks that can't be recovered) — shortcut x"
+            title="Reject this image · it leaves the kept set (for watermarks that can't be recovered) · shortcut x"
             className={`${btn} bg-red-600/20 border border-red-400/40 text-red-100 hover:bg-red-600/30`}>
             ✕ Reject <kbd className="text-2xs text-white/50">x</kbd>
           </button>

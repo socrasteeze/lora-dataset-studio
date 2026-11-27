@@ -15,7 +15,7 @@ import {
    SEQUENTIALLY — the GPU is single and serialized server-side, so firing them in parallel
    would just 409/503. Results live only while the modal is open (ephemeral bench).
 
-   ✓ Keep this one → drops the caption into the editor's textarea (normal save applies it).
+   ✓ Keep → drops the caption into the editor's textarea (normal save applies it).
    ⚙️ The apply verb is the surface's: a Dataset STORES the winning config as its caption
    options, a Bank loads it into the dials of its next run — same promise, different
    mechanics, so it wears a different label (surface.applyLabel). */
@@ -131,7 +131,7 @@ export default function CaptionLab({ surface, currentCaption, onKeep }) {
         patch(c.id, { status: 'error', error: e.message || 'Preview failed' });
         if (e.status === 503 || e.status === 409) {
           // GPU busy / a real batch owns it — stop the whole run, nothing else will land.
-          toast.error(e.message || 'The GPU is busy — try again once captioning/training is idle.');
+          toast.error(e.message || 'GPU busy. Try again when idle.');
           break;
         }
       }
@@ -167,11 +167,6 @@ export default function CaptionLab({ surface, currentCaption, onKeep }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="m-0 text-2xs leading-relaxed text-content-subtle">
-          Try up to {MAX_CANDIDATES} caption configs on this image and compare them. Nothing is saved
-          until you pick one — “Keep” drops it into the editor, and “{surface.applyLabel}”
-          applies the winning config.
-        </p>
         <div className="flex shrink-0 gap-2">
           {running ? (
             <button type="button" onClick={stop}
@@ -187,7 +182,6 @@ export default function CaptionLab({ surface, currentCaption, onKeep }) {
         </div>
       </div>
 
-      <p className="m-0 text-2xs text-content-subtle">{surface.promptHelp}</p>
       {configLoading && <p role="status" className="text-xs text-content-muted">Loading saved caption method</p>}
       {configError && <div role="alert" className="text-xs text-amber-300">
         {configError} <button type="button" onClick={() => setConfigAttempt((n) => n + 1)}
@@ -204,7 +198,7 @@ export default function CaptionLab({ surface, currentCaption, onKeep }) {
       <div className="lds-section py-3">
         <p className="m-0 text-2xs font-semibold uppercase tracking-[0.16em] text-content-subtle">Current caption</p>
         <p className="m-0 mt-1 whitespace-pre-wrap text-xs leading-5 text-content-muted">
-          {currentCaption?.trim() ? currentCaption : <span className="italic text-content-subtle">— no caption yet —</span>}
+          {currentCaption?.trim() ? currentCaption : <span className="italic text-content-subtle">No caption.</span>}
         </p>
       </div>
 
@@ -274,7 +268,7 @@ export default function CaptionLab({ surface, currentCaption, onKeep }) {
               )}
             </div>
 
-            <div className="flex flex-wrap justify-end gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => makeDefault(c)} disabled={running || configLoading || Boolean(configError)}
                 title={surface.applyTitle}
                 className="inline-flex min-h-10 items-center justify-center lg:min-h-0 rounded-lg border border-border bg-surface px-2.5 py-1 text-2xs font-medium text-content-muted hover:text-content disabled:opacity-40">

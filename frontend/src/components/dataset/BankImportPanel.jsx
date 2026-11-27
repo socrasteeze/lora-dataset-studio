@@ -14,6 +14,7 @@ import { Archive } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { apiFetch, postJson } from '../../api/fetchClient';
 import { useToast } from '../common/Toast';
+import { btnClass, fieldClass } from '../common/controls';
 import SelectionMark from '../shared/SelectionMark';
 import { imageVersionQuery } from '../bank/bankEdits.js';
 import { datasetThumbUrl } from '../../utils/datasetThumbUrl.js';
@@ -194,7 +195,7 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
     setStarting(true);
     try {
       await postJson(promoteUrl(currentBank.id), promoteAllBody(datasetId));
-      toast.success('Import started — the images arrive as they are copied.');
+      toast.success('Import started.');
       wasLive.current = false;
       setWatching(currentBank.id);
     } catch (e) {
@@ -213,7 +214,7 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
       setStarting(true);
       try {
         await postJson(promoteUrl(source.id), promoteSelectionBody(datasetId, ids));
-        toast.success('Import started — the images arrive as they are copied.');
+        toast.success('Import started.');
         wasLive.current = false;
         setWatching(source.id);
         setSelected(new Set());
@@ -237,10 +238,10 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
         setCopying((c) => (c ? { ...c, done: c.done + batch.length } : c));
       }
       toast.success(datasetCopyOutcome(totals));
-      if (totals.small) toast.warning(`${totals.small} image(s) under 768 px — they will stay soft in training.`);
+      if (totals.small) toast.warning(`${totals.small} images under 768 px.`);
       setSelected(new Set());
     } catch (e) {
-      const partial = totals.imported ? ` — ${totals.imported} copied before the error` : '';
+      const partial = totals.imported ? ` · ${totals.imported} copied before the error` : '';
       toast.error(`${e?.message || 'Could not copy the images from this dataset.'}${partial}`);
     } finally {
       setCopying(null);
@@ -258,7 +259,7 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
       <button type="button" onClick={() => setOpen(true)} disabled={disabled}
         className="flex w-full items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-left text-content-muted hover:text-content hover:bg-surface-raised transition-colors disabled:opacity-50">
         <Archive aria-hidden="true" className="h-4 w-4" />
-        <span className="text-sm font-medium lg:text-base">Import from a bank or a dataset</span>
+        <span className="text-sm font-medium lg:text-base">Import from Bank or Dataset</span>
         <span className="text-content-muted text-2xs lg:text-sm">pick images from a triaged bank or another dataset</span>
         <span aria-hidden className="ml-auto text-content-subtle">→</span>
       </button>
@@ -270,7 +271,7 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
   const importLabel = copying ? `Copying ${copying.done}/${copying.total}`
     : watching != null ? 'Importing'
       : starting ? 'Starting'
-        : selected.size ? `Import ${selected.size} selected` : 'Import selected';
+        : selected.size ? `Import (${selected.size})` : 'Import Selected';
 
   return (
     <div id="ds-add-bank-import" tabIndex={-1}
@@ -301,13 +302,13 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
             </label>
             <select id="ds-bank-import-select" value={chosen} disabled={busy}
               onChange={(e) => pickSource(e.target.value)}
-              className="mt-1 w-full rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50">
+              className={`${fieldClass()} mt-1 w-full min-w-0`}>
               <option value="">Choose a bank or a dataset</option>
               {bankRows.length > 0 && (
                 <optgroup label="Banks">
                   {bankRows.map((r) => (
                     <option key={`bank-${r.id}`} value={sourceValue('bank', r.id)}>
-                      {r.name} — {r.count == null ? 'counting' : `${r.count} to import`} ({r.keep}/{r.total} kept)
+                      {r.name} · {r.count == null ? 'counting' : `${r.count} to import`} ({r.keep}/{r.total} kept)
                     </option>
                   ))}
                 </optgroup>
@@ -316,7 +317,7 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
                 <optgroup label="Datasets">
                   {datasets.map((d) => (
                     <option key={`dataset-${d.id}`} value={sourceValue('dataset', d.id)}>
-                      {d.name} — {d.total} image{d.total === 1 ? '' : 's'} ({d.kept} kept)
+                      {d.name} · {d.total} image{d.total === 1 ? '' : 's'} ({d.kept} kept)
                     </option>
                   ))}
                 </optgroup>
@@ -340,29 +341,29 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
 
           {source && (
             <>
-              <div className="flex flex-wrap items-center gap-2 text-2xs">
+              <div className="grid grid-cols-2 items-center gap-2 sm:grid-cols-4">
                 <div role="group" aria-label="Images to show"
-                  className="flex shrink-0 rounded-md border border-border overflow-hidden">
+                  className="col-span-2 grid grid-cols-2 gap-2">
                   {[[false, 'Kept'], [true, 'All']].map(([all, label]) => (
                     <button key={label} type="button" aria-pressed={showAll === all}
                       onClick={() => setShowAll(all)}
-                      className={`px-2 py-1 text-2xs font-semibold ${showAll === all
+                      className={`${btnClass({ size: 'sm' })} font-semibold ${showAll === all
                         ? 'bg-surface-raised text-content'
                         : 'bg-transparent text-content-muted hover:text-content'}`}>
                       {label}
                     </button>
                   ))}
                 </div>
-                <span className="text-content-muted">{selected.size} selected</span>
                 <button type="button" onClick={selectShown} disabled={busy || !items?.length}
-                  className="text-content-subtle underline hover:text-content disabled:opacity-40">
-                  Select all shown
+                  className={btnClass({ size: 'sm' })}>
+                  Select Shown
                 </button>
                 <button type="button" onClick={() => setSelected(new Set())}
                   disabled={busy || selected.size === 0}
-                  className="text-content-subtle underline hover:text-content disabled:opacity-40">
+                  className={btnClass({ size: 'sm' })}>
                   Clear
                 </button>
+                <span className="col-span-full text-xs text-content-muted">{selected.size} selected</span>
               </div>
 
               {items == null ? (
@@ -370,8 +371,8 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
               ) : items.length === 0 ? (
                 <p className="text-content-subtle text-xs">
                   {showAll
-                    ? `This ${sourceKind} has no images yet.`
-                    : `No kept image in this ${sourceKind} — switch to All to pick among every image.`}
+                    ? 'No images.'
+                    : 'No kept images.'}
                 </p>
               ) : (
                 <ul className="m-0 grid max-h-[22rem] list-none grid-cols-4 gap-1.5 overflow-y-auto p-0 sm:grid-cols-6 lg:grid-cols-8">
@@ -407,21 +408,16 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
             </>
           )}
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className={`grid gap-2 ${currentBank ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <button type="button" onClick={importSelected} disabled={busy || !source || selected.size === 0}
-              className="rounded-md bg-gradient-primary px-3 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-40">
+              className={btnClass({ variant: 'primary' })}>
               {importLabel}
             </button>
             {currentBank && (
               <button type="button" onClick={startAll} disabled={busy || !currentBank.ready}
-                className="rounded-md border border-border px-3 py-1.5 text-sm text-content-muted hover:text-content hover:bg-surface-raised disabled:opacity-40">
-                {currentBank.ready ? `Import all ${currentBank.count} kept` : 'Import all kept'}
+                className={btnClass()}>
+                {currentBank.ready ? `Import Kept (${currentBank.count})` : 'Import Kept'}
               </button>
-            )}
-            {watching != null && (
-              <span className="text-content-subtle text-2xs">
-                running in the background — the grid fills in when it ends
-              </span>
             )}
           </div>
         </>

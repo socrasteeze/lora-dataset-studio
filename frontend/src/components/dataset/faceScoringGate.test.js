@@ -126,7 +126,7 @@ test('a filter hiding the undecided images says so, and counts them', () => {
   const r = autoTriageEmptyReason(visible, all);
   assert.equal(r.kind, 'hidden_by_filter');
   assert.equal(r.count, 2);
-  assert.match(r.message, /filter hides them/);
+  assert.match(r.message, /scored images are hidden/);
   // Singular is not "1 scored images".
   assert.match(autoTriageEmptyReason([], [img()]).message, /^1 scored image is/);
 });
@@ -147,7 +147,7 @@ test('a set the pass could not score at all says THAT, not "run the pass"', () =
                 img({ id: 2, face_state: 'extreme_pose', face_score: null })];
   const r = autoTriageEmptyReason(rows, rows);
   assert.equal(r.kind, 'none_scorable');
-  assert.match(r.message, /judge those by eye/);
+  assert.match(r.message, /No scorable faces/);
 });
 
 test('a fully curated dataset says the work is done', () => {

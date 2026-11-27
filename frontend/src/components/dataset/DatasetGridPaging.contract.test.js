@@ -32,7 +32,7 @@ test('select all still takes the whole filtered list, not the page', () => {
 
 test('the page-crossing reach of select all is stated, not implied', () => {
   const titles = source.match(
-    /title="Selects every image the current filters show — all pages, not just the tiles on screen"/g);
+    /title="Select all matching images across pages"/g);
   assert.equal(titles?.length, 2);
 });
 

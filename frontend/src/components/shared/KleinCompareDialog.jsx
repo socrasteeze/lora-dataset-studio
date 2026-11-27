@@ -78,7 +78,7 @@ export default function KleinCompareDialog({
         </div>
         <p className="text-xs leading-relaxed text-content-muted">
           Each ticked model repaints the <b>same flagged image</b>, same zones, same
-          seed — so what differs between the results is the model, nothing else. The
+          seed · so what differs between the results is the model, nothing else. The
           original is never modified; this is a preview, exactly like the detection
           window&apos;s sample.
         </p>
@@ -106,10 +106,10 @@ export default function KleinCompareDialog({
 
         {before && (
           <figure className="space-y-1">
-            <img src={`data:image/jpeg;base64,${before.image}`} alt="Before — the flagged image"
+            <img src={`data:image/jpeg;base64,${before.image}`} alt="Before · the flagged image"
               className="max-h-64 w-auto rounded-md border border-border" />
             <figcaption className="text-2xs text-content-subtle">
-              Before — <span className="font-mono">{before.label}</span>
+              Before · <span className="font-mono">{before.label}</span>
             </figcaption>
           </figure>
         )}

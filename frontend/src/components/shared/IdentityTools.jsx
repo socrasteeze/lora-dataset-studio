@@ -2,10 +2,11 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { apiFetch, postForm, postJson } from '../../api/fetchClient.js';
 import CropModal from '../dataset/CropModal.jsx';
+import { btnClass, fieldClass } from '../common/controls';
 import { useUnsavedWork } from '../../hooks/useUnsavedWork.js';
 
-const BUTTON = 'min-h-10 min-w-0 rounded-md border border-border px-3 py-2 text-xs font-semibold disabled:opacity-40 hover:bg-surface-raised';
-const FIELD = 'min-h-10 w-full min-w-0 rounded-md border border-border bg-surface px-2 py-2 text-sm text-content';
+const BUTTON = `${btnClass({ size: 'sm' })} min-w-0 font-semibold`;
+const FIELD = `${fieldClass({ size: 'sm' })} w-full min-w-0`;
 const batches = (ids) => Array.from({ length: Math.ceil(ids.length / 16) }, (_, n) => ids.slice(n * 16, n * 16 + 16));
 
 function SubjectPreview({ src, region, onReady }) {
@@ -392,7 +393,7 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
           <h2 id={titleId} className="text-base font-semibold">Identities</h2>
           <button type="button" className={BUTTON} disabled={working} onClick={close}>Close</button>
         </div>
-        <p className="text-xs text-content-muted">{ids.length} selected. Preview shows up to 16 images. Actions process every selected image.</p>
+        <p className="text-xs text-content-muted">{ids.length} selected · Up to 16 previews</p>
         {focusId && <button type="button" className={BUTTON} disabled={working} onClick={() => setFocusId(null)}>All Selected</button>}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="min-w-0 text-xs">Kind
@@ -449,13 +450,12 @@ export default function IdentityTools({ source, scopeId, imageIds, busy = false,
           <label className="flex min-h-10 items-center gap-2"><input aria-label="Learn Identity" type="checkbox" checked={learn} disabled={working} onChange={(event) => setLearn(event.target.checked)} />Learn Identity</label>
           <label className="flex min-h-10 items-center gap-2"><input aria-label="One Character" type="checkbox" checked={single} disabled={working} onChange={(event) => setSingle(event.target.checked)} />One Character</label>
         </div>
-        <p className="text-xs text-content-muted">For several characters, choose a subject crop. Only confirmed examples teach identity. Captions and image decisions stay unchanged.</p>
+        <p className="text-xs text-content-muted">For multiple subjects, choose a crop.</p>
         <div className="grid grid-cols-2 gap-2">
           <button type="button" className={BUTTON} disabled={working || !prepared || (learn && previewId && !previewReady) || (!target && !name.trim())} onClick={assign}>{replaceIdentity ? 'Correct Name' : 'Assign'}</button>
           <button type="button" className={BUTTON} disabled={working || !undoOffer} onClick={undo}>Undo</button>
           <button type="button" className={BUTTON + ' col-span-2'} disabled={working || !prepared || !target} onClick={unassignSelection}>Unassign Name</button>
         </div>
-        <p className="text-xs text-content-muted">Unassign removes the chosen name from selected images. Other names stay. Undo Identity also works when the filtered grid is empty.</p>
         <div className="grid grid-cols-2 gap-3">
           <label className="text-xs">Minimum Similarity<input aria-label="Minimum Similarity" className={FIELD} type="number" min="-1" max="1" step="0.01" value={minimum} disabled={working} onChange={(event) => setMinimum(event.target.value)} /></label>
           <label className="text-xs">Ambiguity Margin<input aria-label="Ambiguity Margin" className={FIELD} type="number" min="0" max="1" step="0.01" value={margin} disabled={working} onChange={(event) => setMargin(event.target.value)} /></label>
